@@ -2,6 +2,7 @@
   "name": "studio-realcar-erp",
   "version": "0.1.0",
   "private": true,
+
   "scripts": {
     "dev": "next dev --webpack --hostname 0.0.0.0",
     "build": "prisma generate --schema=prisma/schema.prisma && next build",
@@ -17,8 +18,8 @@
 
     "dev:turbo": "next dev --turbopack --hostname 0.0.0.0",
     "dev:local": "next dev --webpack",
-    "mobile:test": "next dev --webpack --hostname 0.0.0.0",
 
+    "mobile:test": "next dev --webpack --hostname 0.0.0.0",
     "mobile": "npm run build:local && next start -H 0.0.0.0 -p 3000",
     "start:mobile": "next start -H 0.0.0.0 -p 3000",
 
@@ -47,7 +48,7 @@
 
     "hosting:check-env": "node scripts/verify-hosting-env.mjs",
 
-    "deploy:build": "prisma generate --schema=prisma/schema.prisma && prisma migrate deploy --schema=prisma/schema.prisma && prisma db seed --schema=prisma/schema.prisma && next build",
+    "deploy:build": "prisma generate --schema=prisma/schema.prisma && prisma migrate deploy --schema=prisma/schema.prisma && next build",
 
     "deploy:build:no-seed": "prisma generate --schema=prisma/schema.prisma && prisma migrate deploy --schema=prisma/schema.prisma && next build",
 
@@ -55,7 +56,9 @@
 
     "deploy:seed": "prisma db seed --schema=prisma/schema.prisma",
 
-    "setup:hosting": "npm run setup:postgres"
+    "setup:hosting": "npm run setup:postgres",
+
+    "seed": "prisma db seed --schema=prisma/schema.prisma"
   },
 
   "dependencies": {
