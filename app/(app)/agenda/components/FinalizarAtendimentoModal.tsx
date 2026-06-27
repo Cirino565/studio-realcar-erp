@@ -2,9 +2,7 @@
 
 import { useState, useTransition } from "react";
 import type { Agendamento } from "@prisma/client";
-
-// ✅ IMPORT CORRETO (AJUSTADO AO SEU PROJETO)
-import { finalizarAtendimento } from "@/actions/agenda.actions";
+import { finalizarAtendimento } from "@/actions/agendamento.actions";
 
 type Props = {
   open: boolean;
@@ -21,16 +19,19 @@ export default function FinalizarAtendimentoModal({
   const [valor, setValor] = useState(0);
   const [isPending, startTransition] = useTransition();
 
-  // 🔥 PROTEÇÃO DEFINITIVA
-  if (!open || !appointment) return null;
-
   function handleFinalizar() {
+    // 🔥 FIX DEFINITIVO DE NULL SAFETY
+    if (!appointment) return;
+
     startTransition(async () => {
       await finalizarAtendimento({
         agendamentoId: appointment.id,
         procedimentoRealizado: procedimentoRealizado.trim(),
         profissional: undefined,
         valorCobrado: valor,
+        formaPagamento: "DINHEIRO",
+        statusPagamento: "PAGO",
+        evolucao: "",
       });
 
       setProcedimentoRealizado("");
@@ -38,6 +39,8 @@ export default function FinalizarAtendimentoModal({
       onClose();
     });
   }
+
+  if (!open || !appointment) return null;
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
