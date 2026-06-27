@@ -5,8 +5,12 @@
 
   "scripts": {
     "dev": "next dev --webpack --hostname 0.0.0.0",
+
     "build": "prisma generate --schema=prisma/schema.prisma && next build",
+
     "start": "next start",
+    "start:host": "node scripts/start-host.mjs",
+
     "lint": "eslint",
 
     "postinstall": "node scripts/prisma-generate-auto.mjs",
@@ -19,7 +23,6 @@
     "dev:turbo": "next dev --turbopack --hostname 0.0.0.0",
     "dev:local": "next dev --webpack",
 
-    "mobile:test": "next dev --webpack --hostname 0.0.0.0",
     "mobile": "npm run build:local && next start -H 0.0.0.0 -p 3000",
     "start:mobile": "next start -H 0.0.0.0 -p 3000",
 
@@ -34,8 +37,6 @@
 
     "secret:generate": "node scripts/generate-session-secret.mjs",
 
-    "setup:sqlite": "npm run setup:local",
-
     "build:local": "prisma generate --schema=prisma/schema.sqlite.prisma && next build",
 
     "setup:postgres": "prisma generate --schema=prisma/schema.prisma && prisma migrate deploy --schema=prisma/schema.prisma && prisma db seed --schema=prisma/schema.prisma",
@@ -43,8 +44,6 @@
     "db:seed:postgres": "prisma db seed --schema=prisma/schema.prisma",
     "db:push:postgres": "prisma db push --schema=prisma/schema.prisma",
     "db:studio:postgres": "prisma studio --schema=prisma/schema.prisma",
-
-    "start:host": "node scripts/start-host.mjs",
 
     "hosting:check-env": "node scripts/verify-hosting-env.mjs",
 
@@ -56,9 +55,7 @@
 
     "deploy:seed": "prisma db seed --schema=prisma/schema.prisma",
 
-    "setup:hosting": "npm run setup:postgres",
-
-    "seed": "prisma db seed --schema=prisma/schema.prisma"
+    "seed:prod": "prisma db seed --schema=prisma/schema.prisma"
   },
 
   "dependencies": {
