@@ -1,16 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import type { Agendamento } from "@prisma/client";
+import type { Agendamento, Cliente } from "@prisma/client";
 
 import FinalizarAtendimentoModal from "./FinalizarAtendimentoModal";
 
 type Props = {
-  agendamentos: Agendamento[];
+  clientes: Cliente[];
+  agendamentos: (Agendamento & {
+    cliente: Cliente;
+  })[];
+  profissionais: any[];
+  origensCliente: any[];
 };
 
-export default function AgendaClient({ agendamentos }: Props) {
-  // 🔥 CORREÇÃO PRINCIPAL: usar tipo Prisma correto
+export default function AgendaClient({
+  clientes,
+  agendamentos,
+  profissionais,
+  origensCliente,
+}: Props) {
   const [finishAppointment, setFinishAppointment] =
     useState<Agendamento | null>(null);
 
@@ -30,6 +39,10 @@ export default function AgendaClient({ agendamentos }: Props) {
 
             <p className="text-xs text-slate-400">
               {new Date(agendamento.data).toLocaleString()}
+            </p>
+
+            <p className="text-xs text-slate-500">
+              Cliente: {agendamento.cliente?.nome}
             </p>
           </div>
 
