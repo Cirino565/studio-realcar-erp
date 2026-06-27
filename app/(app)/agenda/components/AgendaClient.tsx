@@ -12,7 +12,7 @@ type Props = {
   })[];
   profissionais: any[];
   origensCliente: any[];
-  servicos: any[]; // 🔥 FIX FINAL AQUI
+  servicos: any[];
 };
 
 export default function AgendaClient({
@@ -28,7 +28,6 @@ export default function AgendaClient({
   return (
     <div className="space-y-4 lg:space-y-8">
 
-      {/* 🔥 LISTA DE AGENDAMENTOS */}
       {agendamentos.map((agendamento) => (
         <div
           key={agendamento.id}
@@ -57,7 +56,6 @@ export default function AgendaClient({
         </div>
       ))}
 
-      {/* 🔥 MODAL */}
       <FinalizarAtendimentoModal
         open={Boolean(finishAppointment)}
         appointment={finishAppointment}
