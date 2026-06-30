@@ -8,7 +8,7 @@ import { requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 type Props = {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 };
 
 function getString(formData: FormData, key: string) {
@@ -18,20 +18,28 @@ function getString(formData: FormData, key: string) {
 
 export default async function EditarClientePage({ params }: Props) {
   await requirePagePermission("clientes.gerenciar");
-  const { id } = await params;
-  const clienteId = Number(id);
+
+  const clienteId = Number(params.id);
 
   const [cliente, origens, procedimentosInteresse] = await Promise.all([
     prisma.cliente.findUnique({ where: { id: clienteId } }),
-    prisma.origemCliente.findMany({ where: { status: "Ativa" }, orderBy: [{ ordem: "asc" }, { nome: "asc" }] }),
-    prisma.procedimentoInteresse.findMany({ where: { status: "Ativo" }, orderBy: [{ ordem: "asc" }, { nome: "asc" }] }),
+    prisma.origemCliente.findMany({
+      where: { status: "Ativa" },
+      orderBy: [{ ordem: "asc" }, { nome: "asc" }],
+    }),
+    prisma.procedimentoInteresse.findMany({
+      where: { status: "Ativo" },
+      orderBy: [{ ordem: "asc" }, { nome: "asc" }],
+    }),
   ]);
 
   if (!cliente) {
     return (
       <div className="premium-card p-10 text-center text-white">
         <h1 className="text-xl font-semibold">Cliente não encontrado</h1>
-        <p className="mt-2 text-sm text-slate-400">O cadastro solicitado não existe ou foi removido.</p>
+        <p className="mt-2 text-sm text-slate-400">
+          O cadastro solicitado não existe ou foi removido.
+        </p>
         <Button className="mt-6" asChild>
           <Link href="/clientes">Voltar para clientes</Link>
         </Button>
