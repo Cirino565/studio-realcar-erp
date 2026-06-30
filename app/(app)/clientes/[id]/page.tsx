@@ -1,9 +1,12 @@
 import { prisma } from "@/lib/prisma";
 
-export default async function ClientePage(
-  { params }: { params: { id: string } }
-) {
-  const rawId = params.id;
+export default async function ClientePage({ params }: any) {
+  const rawId = params?.id;
+
+  // 🔒 proteção contra undefined
+  if (!rawId) {
+    return <h1>Cliente inválido</h1>;
+  }
 
   const id = Number(rawId);
 
@@ -13,7 +16,9 @@ export default async function ClientePage(
 
   const cliente = await prisma.cliente.findUnique({
     where: { id },
-    include: { agendamentos: true },
+    include: {
+      agendamentos: true,
+    },
   });
 
   if (!cliente) {
