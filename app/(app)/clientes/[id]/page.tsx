@@ -1,14 +1,16 @@
 import { prisma } from "@/lib/prisma";
 
 export default async function ClientePage({ params }: any) {
-  const id = Number(params?.id);
+  const rawId = params?.id;
 
-  if (!params?.id || isNaN(id)) {
-    return (
-      <div className="p-6 text-white">
-        <h1>Cliente inválido</h1>
-      </div>
-    );
+  if (!rawId) {
+    return <h1>Cliente inválido</h1>;
+  }
+
+  const id = Number(rawId);
+
+  if (isNaN(id)) {
+    return <h1>Cliente inválido</h1>;
   }
 
   const cliente = await prisma.cliente.findUnique({
@@ -19,16 +21,12 @@ export default async function ClientePage({ params }: any) {
   });
 
   if (!cliente) {
-    return (
-      <div className="p-6 text-white">
-        <h1>Cliente não encontrado</h1>
-      </div>
-    );
+    return <h1>Cliente não encontrado</h1>;
   }
 
   return (
-    <div className="p-6 text-white">
-      <h1 className="text-xl font-bold">{cliente.nome}</h1>
+    <div>
+      <h1>{cliente.nome}</h1>
       <p>{cliente.telefone}</p>
     </div>
   );
