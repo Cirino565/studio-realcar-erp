@@ -1,16 +1,33 @@
 import { prisma } from "@/lib/prisma";
 
 export default async function ClientePage({ params }: any) {
+  const id = Number(params?.id);
+
+  // 🔒 proteção contra erro (NaN / undefined)
+  if (!params?.id || isNaN(id)) {
+    return (
+      <div>
+        <h1>Cliente inválido</h1>
+      </div>
+    );
+  }
+
   const cliente = await prisma.cliente.findUnique({
-    where: { id: Number(params.id) },
+    where: { id },
     include: {
       agendamentos: true,
     },
   });
 
-  if (!cliente) return null;
+  if (!cliente) {
+    return (
+      <div>
+        <h1>Cliente não encontrado</h1>
+      </div>
+    );
+  }
 
-  const agendamentos = cliente.agendamentos;
+  const agendamentos = cliente.agendamentos || [];
 
   const proximoAgendamento = agendamentos.find(
     (agendamento: { data: Date }) =>
@@ -29,13 +46,6 @@ export default async function ClientePage({ params }: any) {
         Próximo:{" "}
         {proximoAgendamento
           ? new Date(proximoAgendamento.data).toLocaleString()
-          : "Nenhum"}
-      </p>
-
-      <p>
-        Último:{" "}
-        {ultimoAgendamento
-          ? new Date(ultimoAgendamento.data).toLocaleString()
           : "Nenhum"}
       </p>
     </div>
