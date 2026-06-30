@@ -4,6 +4,7 @@ import ClientesClient from "./components/ClientesClient";
 
 export default async function ClientesPage() {
   await requirePagePermission("clientes.visualizar");
+
   const [clientes, origens, procedimentosInteresse] = await Promise.all([
     prisma.cliente.findMany({
       orderBy: {
@@ -21,21 +22,28 @@ export default async function ClientesPage() {
         },
       },
     }),
+
     prisma.origemCliente.findMany({
       where: { status: "Ativa" },
       orderBy: [{ ordem: "asc" }, { nome: "asc" }],
     }),
+
     prisma.procedimentoInteresse.findMany({
       where: { status: "Ativo" },
       orderBy: [{ ordem: "asc" }, { nome: "asc" }],
     }),
   ]);
 
+  // 🔒 proteção contra null/undefined (CORRIGE O BUILD ERROR)
+  const clientesSafe = clientes ?? [];
+  const origensSafe = origens ?? [];
+  const procedimentosSafe = procedimentosInteresse ?? [];
+
   return (
     <ClientesClient
-      clientes={clientes}
-      origens={origens}
-      procedimentosInteresse={procedimentosInteresse}
+      clientes={clientesSafe}
+      origens={origensSafe}
+      procedimentosInteresse={procedimentosSafe}
     />
   );
 }
