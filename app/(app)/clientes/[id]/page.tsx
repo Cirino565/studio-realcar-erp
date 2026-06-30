@@ -1,11 +1,9 @@
 import { prisma } from "@/lib/prisma";
 
 export default async function ClientePage(
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
-  const { id } = await params;
-
-  const clienteId = Number(id);
+  const clienteId = Number(params.id);
 
   if (isNaN(clienteId)) {
     return <h1>Cliente inválido</h1>;
