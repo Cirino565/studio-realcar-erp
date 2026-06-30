@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import ClienteClinicoTabs from "@/app/(app)/components/ClienteClinicoTabs";
+import ClienteClinicoTabs from "@/app/(app)/clientes/components/ClienteClinicoTabs";
 
 export default async function ClientePage({ params }: any) {
   const clienteId = Number(params?.id);
