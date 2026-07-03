@@ -1,5 +1,4 @@
 import type { Viewport } from "next";
-
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -16,7 +15,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR">
-      <body>{children}</body>
+      <body className="min-h-screen w-full overflow-x-hidden">
+        {children}
+      </body>
     </html>
   );
 }

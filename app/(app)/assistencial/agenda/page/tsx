@@ -1,0 +1,40 @@
+"use client"
+
+import { useEffect, useState } from "react"
+
+export default function AgendaAssistencial() {
+  const [agenda, setAgenda] = useState<any[]>([])
+
+  useEffect(() => {
+    setAgenda([
+      { id: 1, hora: "09:00", cliente: "Maria Silva", status: "aguardando" },
+      { id: 2, hora: "10:00", cliente: "João Souza", status: "em atendimento" },
+    ])
+  }, [])
+
+  return (
+    <div className="p-3 flex flex-col gap-3">
+      
+      <h1 className="text-xl font-bold">Hoje</h1>
+
+      {agenda.map((a) => (
+        <div key={a.id} className="border rounded-xl p-4 flex flex-col gap-2">
+          
+          <div className="font-semibold">
+            {a.hora} - {a.cliente}
+          </div>
+
+          <div className="text-sm text-gray-500">
+            Status: {a.status}
+          </div>
+
+          <button className="bg-black text-white py-2 rounded-lg">
+            Iniciar atendimento
+          </button>
+
+        </div>
+      ))}
+
+    </div>
+  )
+}

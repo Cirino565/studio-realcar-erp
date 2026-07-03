@@ -394,3 +394,11 @@ body {
     user-select: auto;
   }
 }
+html, body {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+* {
+  box-sizing: border-box;
+}

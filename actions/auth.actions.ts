@@ -1,12 +1,13 @@
 "use server";
 
 import bcrypt from "bcryptjs";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { getDefaultPathForUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createSessionToken, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from "@/lib/session";
+import { getDefaultPathForUser } from "@/lib/auth";
+import { isMobileUserAgent } from "@/lib/device";
 
 export type LoginState = {
   erro?: string;
@@ -87,24 +88,22 @@ export async function login(_state: LoginState, formData: FormData): Promise<Log
       entidade: "Usuario",
       entidadeId: String(user.id),
       usuario: user.email,
-      detalhes: "Sessão assinada criada com expiração de 8 horas.",
+      detalhes: "Sessão iniciada com autenticação segura.",
     },
   });
 
-  redirect(getDefaultPathForUser(user));
-}
+  // 🔥 DETECÇÃO MOBILE
+  const userAgent = headers().get("user-agent");
+  const isMobile = isMobileUserAgent(userAgent);
 
-export async function logout() {
-  const cookieStore = await cookies();
+  // 🧠 DESTINO PADRÃO (DESKTOP)
+  const destinoDesktop = getDefaultPathForUser(user);
 
-  cookieStore.set(SESSION_COOKIE_NAME, "", {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 0,
-    expires: new Date(0),
-  });
+  // 📱 FLUXO CLÍNICO MOBILE
+  if (isMobile) {
+    redirect("/assistencial/agenda");
+  }
 
-  redirect("/login");
+  // 🖥️ FLUXO NORMAL (ADMIN / SISTEMA COMPLETO)
+  redirect(destinoDesktop);
 }
