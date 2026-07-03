@@ -7,12 +7,17 @@ import { Button } from "@/components/ui/button";
 import { requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-export default async function EditarClientePage({ params }: any) {
+type EditarClientePageProps = {
+  params: Promise<{ id: string }> | { id: string };
+};
+
+export default async function EditarClientePage({ params }: EditarClientePageProps) {
   await requirePagePermission("clientes.gerenciar");
 
-  const clienteId = Number(params?.id);
+  const { id } = await params;
+  const clienteId = Number(id);
 
-  if (isNaN(clienteId)) {
+  if (!Number.isInteger(clienteId) || clienteId <= 0) {
     return <h1>Cliente inválido</h1>;
   }
 
