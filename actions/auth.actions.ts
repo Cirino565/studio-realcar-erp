@@ -5,9 +5,13 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
-import { createSessionToken, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from "@/lib/session";
 import { getDefaultPathForUser } from "@/lib/auth";
 import { isMobileUserAgent } from "@/lib/device";
+import {
+  createSessionToken,
+  SESSION_COOKIE_NAME,
+  SESSION_MAX_AGE_SECONDS,
+} from "@/lib/session";
 
 export type LoginState = {
   erro?: string;
@@ -21,7 +25,10 @@ function normalizarSenha(valor: FormDataEntryValue | null) {
   return typeof valor === "string" ? valor : "";
 }
 
-export async function login(_state: LoginState, formData: FormData): Promise<LoginState> {
+export async function login(
+  _state: LoginState,
+  formData: FormData
+): Promise<LoginState> {
   const email = normalizarEmail(formData.get("email"));
   const senha = normalizarSenha(formData.get("senha"));
 
@@ -52,21 +59,15 @@ export async function login(_state: LoginState, formData: FormData): Promise<Log
     return { erro: "E-mail ou senha inválidos." };
   }
 
-  let token: string;
+  const token = await createSessionToken({
+    uid: user.id,
+    email: user.email,
+    nome: user.nome,
+    tipo: user.tipo,
+  });
 
-  try {
-    token = await createSessionToken({
-      uid: user.id,
-      email: user.email,
-      nome: user.nome,
-      tipo: user.tipo,
-    });
-  } catch (error) {
-    console.error(error);
-    return { erro: "Configuração de segurança pendente. Defina SESSION_SECRET no ambiente." };
-  }
-
-  const cookieStore = await cookies();
+  // 🍪 cookies (NÃO é await no seu runtime)
+  const cookieStore = cookies();
 
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
@@ -92,18 +93,19 @@ export async function login(_state: LoginState, formData: FormData): Promise<Log
     },
   });
 
-  // 🔥 DETECÇÃO MOBILE
-  const userAgent = headers().get("user-agent");
+  // 📡 headers (AGORA COM AWAIT — seu erro atual)
+  const requestHeaders = await headers();
+  const userAgent = requestHeaders.get("user-agent");
+
   const isMobile = isMobileUserAgent(userAgent);
 
-  // 🧠 DESTINO PADRÃO (DESKTOP)
   const destinoDesktop = getDefaultPathForUser(user);
 
-  // 📱 FLUXO CLÍNICO MOBILE
+  // 📱 MODO CLÍNICO MOBILE
   if (isMobile) {
     redirect("/assistencial/agenda");
   }
 
-  // 🖥️ FLUXO NORMAL (ADMIN / SISTEMA COMPLETO)
+  // 🖥️ DESKTOP NORMAL
   redirect(destinoDesktop);
 }
