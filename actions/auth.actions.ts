@@ -25,7 +25,10 @@ function normalizarSenha(valor: FormDataEntryValue | null) {
   return typeof valor === "string" ? valor : "";
 }
 
-export async function login(_state: LoginState, formData: FormData) {
+export async function login(
+  _state: LoginState,
+  formData: FormData
+): Promise<LoginState> {
   const email = normalizarEmail(formData.get("email"));
   const senha = normalizarSenha(formData.get("senha"));
 
@@ -63,8 +66,8 @@ export async function login(_state: LoginState, formData: FormData) {
     tipo: user.tipo,
   });
 
-  // 🍪 PADRÃO CORRETO NEXT
-  const cookieStore = cookies();
+  // 🔥 FIX DEFINITIVO DO RAILWAY (ERRO REAL)
+  const cookieStore = await cookies();
 
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
@@ -79,27 +82,41 @@ export async function login(_state: LoginState, formData: FormData) {
     data: { ultimoAcesso: new Date() },
   });
 
-  const requestHeaders = headers();
+  await prisma.auditoria.create({
+    data: {
+      modulo: "Autenticação",
+      acao: "Login realizado",
+      entidade: "Usuario",
+      entidadeId: String(user.id),
+      usuario: user.email,
+      detalhes: "Sessão iniciada com autenticação segura.",
+    },
+  });
+
+  // 🔥 FIX HEADERS (TAMBÉM AFETADO NO RAILWAY)
+  const requestHeaders = await headers();
   const userAgent = requestHeaders.get("user-agent");
 
   const isMobile = isMobileUserAgent(userAgent);
 
-  const destino = getDefaultPathForUser(user);
+  const destinoDesktop = getDefaultPathForUser(user);
 
   if (isMobile) {
     redirect("/assistencial/agenda");
   }
 
-  redirect(destino);
+  redirect(destinoDesktop);
 }
 
 export async function logout() {
-  const cookieStore = cookies();
+  // 🔥 FIX DEFINITIVO COOKIE
+  const cookieStore = await cookies();
 
   cookieStore.set(SESSION_COOKIE_NAME, "", {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
+    secure: process.env.NODE_ENV === "production",
     maxAge: 0,
     expires: new Date(0),
   });
