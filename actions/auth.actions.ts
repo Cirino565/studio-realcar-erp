@@ -13,51 +13,21 @@ import {
   SESSION_MAX_AGE_SECONDS,
 } from "@/lib/session";
 
-export type LoginState = {
-  erro?: string;
-};
-
-function normalizarEmail(valor: FormDataEntryValue | null) {
-  return typeof valor === "string" ? valor.trim().toLowerCase() : "";
-}
-
-function normalizarSenha(valor: FormDataEntryValue | null) {
-  return typeof valor === "string" ? valor : "";
-}
-
-export async function login(
-  _state: LoginState,
-  formData: FormData
-): Promise<LoginState> {
-  const email = normalizarEmail(formData.get("email"));
-  const senha = normalizarSenha(formData.get("senha"));
-
-  if (!email || !senha) {
-    return { erro: "Informe e-mail e senha para acessar." };
-  }
+export async function login(_state: any, formData: FormData) {
+  const email = String(formData.get("email") || "").toLowerCase().trim();
+  const senha = String(formData.get("senha") || "");
 
   const user = await prisma.usuario.findUnique({
     where: { email },
     include: {
-      perfil: {
-        include: {
-          permissoes: {
-            include: { permissao: true },
-          },
-        },
-      },
+      perfil: { include: { permissoes: { include: { permissao: true } } } },
     },
   });
 
-  if (!user || user.status !== "Ativo") {
-    return { erro: "Usuário não encontrado ou inativo." };
-  }
+  if (!user) return { erro: "Usuário inválido" };
 
-  const senhaValida = await bcrypt.compare(senha, user.senha);
-
-  if (!senhaValida) {
-    return { erro: "E-mail ou senha inválidos." };
-  }
+  const ok = await bcrypt.compare(senha, user.senha);
+  if (!ok) return { erro: "Senha inválida" };
 
   const token = await createSessionToken({
     uid: user.id,
@@ -66,8 +36,7 @@ export async function login(
     tipo: user.tipo,
   });
 
-  // 🍪 FIX RAILWAY (TIPAGEM + BUILD SAFE)
-  const cookieStore = (await cookies()) as any;
+  const cookieStore = cookies();
 
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
@@ -82,41 +51,26 @@ export async function login(
     data: { ultimoAcesso: new Date() },
   });
 
-  await prisma.auditoria.create({
-    data: {
-      modulo: "Autenticação",
-      acao: "Login realizado",
-      entidade: "Usuario",
-      entidadeId: String(user.id),
-      usuario: user.email,
-      detalhes: "Sessão iniciada com autenticação segura.",
-    },
-  });
+  const h = headers();
+  const ua = h.get("user-agent");
 
-  // 📡 HEADERS FIX (NEXT 16 SAFE)
-  const requestHeaders = await headers();
-  const userAgent = requestHeaders.get("user-agent");
+  const mobile = isMobileUserAgent(ua);
 
-  const isMobile = isMobileUserAgent(userAgent);
-
-  const destinoDesktop = getDefaultPathForUser(user);
-
-  if (isMobile) {
+  if (mobile) {
     redirect("/assistencial/agenda");
   }
 
-  redirect(destinoDesktop);
+  redirect(getDefaultPathForUser(user));
 }
+
 export async function logout() {
-  const cookieStore = (await cookies()) as any;
+  const cookieStore = cookies();
 
   cookieStore.set(SESSION_COOKIE_NAME, "", {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
-    secure: process.env.NODE_ENV === "production",
     maxAge: 0,
-    expires: new Date(0),
   });
 
   redirect("/login");
