@@ -23,8 +23,8 @@ export const PAGE_PERMISSION_PRIORITY = [
 export async function getCurrentUser() {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  const session = await verifySessionToken(token);
 
+  const session = await verifySessionToken(token);
   if (!session) return null;
 
   const usuario = await prisma.usuario.findUnique({
@@ -55,7 +55,10 @@ export function canAccess(usuario: CurrentUser, permissaoChave: string) {
   if (isAdminUser(usuario)) return true;
 
   return Boolean(
-    usuario.perfil?.permissoes.some((perfilPermissao) => perfilPermissao.permissao.chave === permissaoChave),
+    usuario.perfil?.permissoes?.some(
+      (p: { permissao: { chave: string } }) =>
+        p.permissao.chave === permissaoChave
+    )
   );
 }
 
@@ -64,11 +67,18 @@ export function getUserPermissionKeys(usuario: CurrentUser) {
     return PAGE_PERMISSION_PRIORITY.map((item) => item.permissao);
   }
 
-  return usuario.perfil?.permissoes.map((perfilPermissao) => perfilPermissao.permissao.chave) ?? [];
+  return (
+    usuario.perfil?.permissoes?.map(
+      (p: { permissao: { chave: string } }) => p.permissao.chave
+    ) ?? []
+  );
 }
 
 export function getDefaultPathForUser(usuario: CurrentUser) {
-  const primeiraPaginaPermitida = PAGE_PERMISSION_PRIORITY.find((item) => canAccess(usuario, item.permissao));
+  const primeiraPaginaPermitida = PAGE_PERMISSION_PRIORITY.find((item) =>
+    canAccess(usuario, item.permissao)
+  );
+
   return primeiraPaginaPermitida?.href ?? "/login";
 }
 
