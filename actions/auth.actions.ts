@@ -25,7 +25,7 @@ function normalizarSenha(valor: FormDataEntryValue | null) {
   return typeof valor === "string" ? valor : "";
 }
 
-export async function login(_state: LoginState, formData: FormData): Promise<LoginState> {
+export async function login(_state: LoginState, formData: FormData) {
   const email = normalizarEmail(formData.get("email"));
   const senha = normalizarSenha(formData.get("senha"));
 
@@ -63,8 +63,8 @@ export async function login(_state: LoginState, formData: FormData): Promise<Log
     tipo: user.tipo,
   });
 
-  // 🚨 FIX DEFINITIVO (RAILWAY + NEXT 16)
-  const cookieStore = await cookies() as any;
+  // 🍪 PADRÃO CORRETO NEXT
+  const cookieStore = cookies();
 
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
@@ -79,41 +79,27 @@ export async function login(_state: LoginState, formData: FormData): Promise<Log
     data: { ultimoAcesso: new Date() },
   });
 
-  await prisma.auditoria.create({
-    data: {
-      modulo: "Autenticação",
-      acao: "Login realizado",
-      entidade: "Usuario",
-      entidadeId: String(user.id),
-      usuario: user.email,
-      detalhes: "Sessão iniciada com autenticação segura.",
-    },
-  });
-
-  // 🚨 FIX DEFINITIVO (HEADERS ASYNC RUNTIME)
-  const requestHeaders = await headers();
+  const requestHeaders = headers();
   const userAgent = requestHeaders.get("user-agent");
 
   const isMobile = isMobileUserAgent(userAgent);
 
-  const destinoDesktop = getDefaultPathForUser(user);
+  const destino = getDefaultPathForUser(user);
 
   if (isMobile) {
     redirect("/assistencial/agenda");
   }
 
-  redirect(destinoDesktop);
+  redirect(destino);
 }
 
 export async function logout() {
-  // 🚨 FIX DEFINITIVO COOKIE STORE
-  const cookieStore = await cookies() as any;
+  const cookieStore = cookies();
 
   cookieStore.set(SESSION_COOKIE_NAME, "", {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
-    secure: process.env.NODE_ENV === "production",
     maxAge: 0,
     expires: new Date(0),
   });
