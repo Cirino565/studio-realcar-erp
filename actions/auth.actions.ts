@@ -66,7 +66,8 @@ export async function login(
     tipo: user.tipo,
   });
 
-  const cookieStore = cookies();
+  // 🍪 FIX RAILWAY (TIPAGEM + BUILD SAFE)
+  const cookieStore = (await cookies()) as any;
 
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
@@ -92,7 +93,8 @@ export async function login(
     },
   });
 
-  const requestHeaders = headers();
+  // 📡 HEADERS FIX (NEXT 16 SAFE)
+  const requestHeaders = await headers();
   const userAgent = requestHeaders.get("user-agent");
 
   const isMobile = isMobileUserAgent(userAgent);
@@ -105,9 +107,8 @@ export async function login(
 
   redirect(destinoDesktop);
 }
-
 export async function logout() {
-  const cookieStore = cookies();
+  const cookieStore = (await cookies()) as any;
 
   cookieStore.set(SESSION_COOKIE_NAME, "", {
     httpOnly: true,
