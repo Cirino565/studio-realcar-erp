@@ -66,7 +66,6 @@ export async function login(
     tipo: user.tipo,
   });
 
-  // 🍪 cookies (NÃO é await no seu runtime)
   const cookieStore = cookies();
 
   cookieStore.set(SESSION_COOKIE_NAME, token, {
@@ -93,19 +92,31 @@ export async function login(
     },
   });
 
-  // 📡 headers (AGORA COM AWAIT — seu erro atual)
-  const requestHeaders = await headers();
+  const requestHeaders = headers();
   const userAgent = requestHeaders.get("user-agent");
 
   const isMobile = isMobileUserAgent(userAgent);
 
   const destinoDesktop = getDefaultPathForUser(user);
 
-  // 📱 MODO CLÍNICO MOBILE
   if (isMobile) {
     redirect("/assistencial/agenda");
   }
 
-  // 🖥️ DESKTOP NORMAL
   redirect(destinoDesktop);
+}
+
+export async function logout() {
+  const cookieStore = cookies();
+
+  cookieStore.set(SESSION_COOKIE_NAME, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 0,
+    expires: new Date(0),
+  });
+
+  redirect("/login");
 }
