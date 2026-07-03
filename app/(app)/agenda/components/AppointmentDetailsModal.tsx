@@ -22,19 +22,24 @@ type AppointmentDetails = {
   clienteId: number;
   profissionalId: number | null;
   procedimento: string;
-  data: Date | string;
+  data: string;
   duracao: number;
   valor: number;
   observacoes: string | null;
   status: string;
+  createdAt?: string;
+  updatedAt?: string;
   cliente: {
     nome: string;
     telefone?: string | null;
     whatsapp?: string | null;
   };
   profissional: {
+    id: number;
     nome: string;
     area: string | null;
+    cor: string;
+    status: string;
   } | null;
 };
 
