@@ -25,10 +25,7 @@ function normalizarSenha(valor: FormDataEntryValue | null) {
   return typeof valor === "string" ? valor : "";
 }
 
-export async function login(
-  _state: LoginState,
-  formData: FormData
-): Promise<LoginState> {
+export async function login(_state: LoginState, formData: FormData) {
   const email = normalizarEmail(formData.get("email"));
   const senha = normalizarSenha(formData.get("senha"));
 
@@ -66,8 +63,8 @@ export async function login(
     tipo: user.tipo,
   });
 
-  // 🔥 FIX DEFINITIVO DO RAILWAY (ERRO REAL)
-  const cookieStore = await cookies();
+  // 🍪 COOKIE ESTÁVEL (SEM PROMISE / SEM ASYNC)
+  const cookieStore = cookies();
 
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
@@ -82,19 +79,7 @@ export async function login(
     data: { ultimoAcesso: new Date() },
   });
 
-  await prisma.auditoria.create({
-    data: {
-      modulo: "Autenticação",
-      acao: "Login realizado",
-      entidade: "Usuario",
-      entidadeId: String(user.id),
-      usuario: user.email,
-      detalhes: "Sessão iniciada com autenticação segura.",
-    },
-  });
-
-  // 🔥 FIX HEADERS (TAMBÉM AFETADO NO RAILWAY)
-  const requestHeaders = await headers();
+  const requestHeaders = headers();
   const userAgent = requestHeaders.get("user-agent");
 
   const isMobile = isMobileUserAgent(userAgent);
@@ -109,14 +94,12 @@ export async function login(
 }
 
 export async function logout() {
-  // 🔥 FIX DEFINITIVO COOKIE
-  const cookieStore = await cookies();
+  const cookieStore = cookies();
 
   cookieStore.set(SESSION_COOKIE_NAME, "", {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
-    secure: process.env.NODE_ENV === "production",
     maxAge: 0,
     expires: new Date(0),
   });
