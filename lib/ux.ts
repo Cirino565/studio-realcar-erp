@@ -1,11 +1,31 @@
-export function getAssistencialModules(user: any) {
-  const modules = [];
+type PermissaoDoPerfil = {
+  permissao: {
+    chave: string;
+  };
+};
 
-  if (user.perfil?.permissoes?.some(p => p.permissao.chave === "clientes.visualizar")) {
+type UsuarioUx = {
+  perfil?: {
+    permissoes?: PermissaoDoPerfil[];
+  } | null;
+};
+
+function temPermissao(user: UsuarioUx, chave: string) {
+  return (
+    user.perfil?.permissoes?.some(
+      (p: PermissaoDoPerfil) => p.permissao.chave === chave,
+    ) ?? false
+  );
+}
+
+export function getAssistencialModules(user: UsuarioUx) {
+  const modules: string[] = [];
+
+  if (temPermissao(user, "clientes.visualizar")) {
     modules.push("clientes");
   }
 
-  if (user.perfil?.permissoes?.some(p => p.permissao.chave === "agenda.visualizar")) {
+  if (temPermissao(user, "agenda.visualizar")) {
     modules.push("agenda");
   }
 

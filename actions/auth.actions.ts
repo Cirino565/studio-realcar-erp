@@ -30,7 +30,9 @@ export async function login(_state: LoginState, formData: FormData) {
   const senha = normalizarSenha(formData.get("senha"));
 
   if (!email || !senha) {
-    return { erro: "Informe e-mail e senha para acessar." };
+    return {
+      erro: "Informe e-mail e senha para acessar.",
+    };
   }
 
   const user = await prisma.usuario.findUnique({
@@ -39,7 +41,9 @@ export async function login(_state: LoginState, formData: FormData) {
       perfil: {
         include: {
           permissoes: {
-            include: { permissao: true },
+            include: {
+              permissao: true,
+            },
           },
         },
       },
@@ -47,13 +51,17 @@ export async function login(_state: LoginState, formData: FormData) {
   });
 
   if (!user || user.status !== "Ativo") {
-    return { erro: "Usuário não encontrado ou inativo." };
+    return {
+      erro: "Usuário não encontrado ou inativo.",
+    };
   }
 
   const senhaValida = await bcrypt.compare(senha, user.senha);
 
   if (!senhaValida) {
-    return { erro: "E-mail ou senha inválidos." };
+    return {
+      erro: "E-mail ou senha inválidos.",
+    };
   }
 
   const token = await createSessionToken({
@@ -63,8 +71,7 @@ export async function login(_state: LoginState, formData: FormData) {
     tipo: user.tipo,
   });
 
-  // 🍪 COOKIE ESTÁVEL (SEM PROMISE / SEM ASYNC)
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
 
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
@@ -76,30 +83,30 @@ export async function login(_state: LoginState, formData: FormData) {
 
   await prisma.usuario.update({
     where: { id: user.id },
-    data: { ultimoAcesso: new Date() },
+    data: {
+      ultimoAcesso: new Date(),
+    },
   });
 
-  const requestHeaders = headers();
+  const requestHeaders = await headers();
   const userAgent = requestHeaders.get("user-agent");
-
   const isMobile = isMobileUserAgent(userAgent);
 
-  const destinoDesktop = getDefaultPathForUser(user);
-
   if (isMobile) {
-    redirect("/assistencial/agenda");
+    redirect("/agenda");
   }
 
-  redirect(destinoDesktop);
+  redirect(getDefaultPathForUser(user));
 }
 
 export async function logout() {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
 
   cookieStore.set(SESSION_COOKIE_NAME, "", {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
+    secure: process.env.NODE_ENV === "production",
     maxAge: 0,
     expires: new Date(0),
   });
