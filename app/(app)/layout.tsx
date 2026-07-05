@@ -1,4 +1,8 @@
-import { getUserPermissionKeys, isAdminUser, requireCurrentUser } from "@/lib/auth";
+import {
+  getUserPermissionKeys,
+  isAdminUser,
+  requireCurrentUser,
+} from "@/lib/auth";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 
@@ -11,12 +15,18 @@ export default async function AppLayout({
   const permissoes = getUserPermissionKeys(usuario);
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-[#111827] text-slate-100">
-      <div className="flex min-h-screen w-full overflow-x-hidden">
+    <div className="min-h-[100dvh] w-full overflow-x-hidden bg-[#111827] text-slate-100">
+      <div className="flex min-h-[100dvh] w-full overflow-x-hidden">
         <Sidebar permissoes={permissoes} isAdmin={isAdminUser(usuario)} />
+
         <div className="flex min-w-0 flex-1 flex-col lg:pl-72">
           <Header />
-          <main className="min-w-0 flex-1 overflow-x-hidden px-4 py-4 pb-32 sm:p-6 sm:pb-32 lg:pb-6">{children}</main>
+
+          <main className="min-w-0 flex-1 overflow-x-hidden px-3 py-3 pb-28 sm:px-4 sm:py-4 sm:pb-32 lg:px-6 lg:py-6 lg:pb-6">
+            <div className="mx-auto w-full max-w-full min-w-0">
+              {children}
+            </div>
+          </main>
         </div>
       </div>
     </div>

@@ -89,16 +89,28 @@ export default function AgendaClient({
   initialDate,
   initialProfissionalFiltro,
 }: Props) {
-  const [selectedDate, setSelectedDate] = useState(() => parseLocalDate(initialDate));
-  const [profissionalFiltro, setProfissionalFiltro] = useState(initialProfissionalFiltro || "todas");
-  const [novoHorario, setNovoHorario] = useState<NovoHorarioPayload | null>(null);
-  const [selectedAppointment, setSelectedAppointment] = useState<AgendamentoAgenda | null>(null);
-  const [finishAppointment, setFinishAppointment] = useState<AgendamentoAgenda | null>(null);
+  const [selectedDate, setSelectedDate] = useState(() =>
+    parseLocalDate(initialDate),
+  );
+  const [profissionalFiltro, setProfissionalFiltro] = useState(
+    initialProfissionalFiltro || "todas",
+  );
+  const [novoHorario, setNovoHorario] = useState<NovoHorarioPayload | null>(
+    null,
+  );
+  const [selectedAppointment, setSelectedAppointment] =
+    useState<AgendamentoAgenda | null>(null);
+  const [finishAppointment, setFinishAppointment] =
+    useState<AgendamentoAgenda | null>(null);
 
   const profissionaisVisiveis = useMemo(() => {
-    if (profissionalFiltro === "todas") return profissionais;
+    if (profissionalFiltro === "todas") {
+      return profissionais;
+    }
 
-    return profissionais.filter((profissional) => String(profissional.id) === String(profissionalFiltro));
+    return profissionais.filter(
+      (profissional) => String(profissional.id) === String(profissionalFiltro),
+    );
   }, [profissionais, profissionalFiltro]);
 
   function handleDateChange(date: Date) {
@@ -124,7 +136,7 @@ export default function AgendaClient({
         clientName: appointment.cliente.nome,
         procedure: appointment.procedimento,
         appointmentDate: appointment.data,
-      })
+      }),
     );
 
     window.open(url, "_blank", "noopener,noreferrer");
@@ -136,47 +148,54 @@ export default function AgendaClient({
   }
 
   return (
-    <div className="space-y-4 lg:space-y-8">
-      <AgendaHeader />
+    <div className="w-full max-w-full overflow-x-hidden pb-28 lg:space-y-8 lg:overflow-visible lg:pb-0">
+      <div className="hidden lg:block">
+        <AgendaHeader />
+      </div>
 
-      {profissionais.length === 0 ? (
-        <section className="premium-card p-5 sm:p-7">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-violet-300/20 bg-violet-400/10 px-3 py-1 text-xs font-semibold text-violet-100">
-                <CalendarDays size={14} />
-                Agenda
+      <div className="w-full max-w-full min-w-0">
+        {profissionais.length === 0 ? (
+          <section className="premium-card mx-0 p-4 sm:p-7">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-violet-300/20 bg-violet-400/10 px-3 py-1 text-xs font-semibold text-violet-100">
+                  <CalendarDays size={14} />
+                  Agenda
+                </div>
+
+                <h1 className="mt-4 text-xl font-semibold tracking-tight text-white sm:text-2xl">
+                  Nenhuma profissional ativa cadastrada
+                </h1>
+
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  Cadastre uma profissional ativa nas configurações para a agenda
+                  exibir os horários.
+                </p>
               </div>
-              <h1 className="mt-4 text-2xl font-semibold tracking-tight text-white">
-                Nenhuma profissional ativa cadastrada
-              </h1>
-              <p className="mt-2 text-sm leading-6 text-slate-400">
-                Cadastre uma profissional ativa nas configurações para a agenda exibir os horários.
-              </p>
-            </div>
 
-            <Button asChild className="w-full sm:w-auto">
-              <a href="/agenda/novo">
-                <Plus size={16} />
-                Novo agendamento
-              </a>
-            </Button>
-          </div>
-        </section>
-      ) : (
-        <AgendaCalendar
-          selectedDate={selectedDate}
-          onDateChange={handleDateChange}
-          profissionalFiltro={profissionalFiltro}
-          onProfissionalFiltroChange={handleProfissionalFiltroChange}
-          profissionais={profissionaisVisiveis}
-          todosProfissionais={profissionais}
-          agendamentos={agendamentos}
-          onNovoHorario={abrirNovoHorario}
-          onSelectAppointment={setSelectedAppointment}
-          onMessage={abrirWhatsApp}
-        />
-      )}
+              <Button asChild className="w-full sm:w-auto">
+                <a href="/agenda/novo">
+                  <Plus size={16} />
+                  Novo agendamento
+                </a>
+              </Button>
+            </div>
+          </section>
+        ) : (
+          <AgendaCalendar
+            selectedDate={selectedDate}
+            onDateChange={handleDateChange}
+            profissionalFiltro={profissionalFiltro}
+            onProfissionalFiltroChange={handleProfissionalFiltroChange}
+            profissionais={profissionaisVisiveis}
+            todosProfissionais={profissionais}
+            agendamentos={agendamentos}
+            onNovoHorario={abrirNovoHorario}
+            onSelectAppointment={setSelectedAppointment}
+            onMessage={abrirWhatsApp}
+          />
+        )}
+      </div>
 
       <NovoAgendamentoModal
         open={Boolean(novoHorario)}
