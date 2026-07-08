@@ -1,4 +1,4 @@
-import { requirePagePermission } from "@/lib/auth";
+import { isAdminUser, requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 import AgendaClient from "./components/AgendaClient";
@@ -14,6 +14,7 @@ function getParam(
   key: string,
 ) {
   const value = params[key];
+
   return Array.isArray(value) ? value[0] : value;
 }
 
@@ -23,6 +24,7 @@ function getDataSelecionada(value?: string) {
   }
 
   const [year, month, day] = value.split("-").map(Number);
+
   return new Date(year, month - 1, day);
 }
 
@@ -42,59 +44,139 @@ function fimDoDia(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
 }
 
+function normalizarTexto(value?: string | null) {
+  return (value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function encontrarProfissionalDoUsuario<
+  T extends {
+    id: number;
+    nome: string;
+    email?: string | null;
+  },
+>(usuario: { nome: string; email: string }, profissionais: T[]) {
+  const emailUsuario = usuario.email.trim().toLowerCase();
+  const nomeUsuario = normalizarTexto(usuario.nome);
+
+  const porEmail = profissionais.find(
+    (profissional) =>
+      profissional.email?.trim().toLowerCase() === emailUsuario,
+  );
+
+  if (porEmail) {
+    return porEmail;
+  }
+
+  const porNomeExato = profissionais.find(
+    (profissional) => normalizarTexto(profissional.nome) === nomeUsuario,
+  );
+
+  if (porNomeExato) {
+    return porNomeExato;
+  }
+
+  return profissionais.find((profissional) => {
+    const nomeProfissional = normalizarTexto(profissional.nome);
+
+    return (
+      nomeUsuario.includes(nomeProfissional) ||
+      nomeProfissional.includes(nomeUsuario)
+    );
+  });
+}
+
 export default async function AgendaPage({ searchParams }: AgendaPageProps) {
-  await requirePagePermission("agenda.visualizar");
+  const usuario = await requirePagePermission("agenda.visualizar");
+  const usuarioAdmin = isAdminUser(usuario);
 
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const dataSelecionada = getDataSelecionada(
     getParam(resolvedSearchParams, "data"),
   );
-  const profissionalFiltro =
-    getParam(resolvedSearchParams, "profissional") || "todas";
 
-  const [clientes, agendamentos, profissionais, origensCliente, servicos] =
-    await Promise.all([
-      prisma.cliente.findMany({
-        orderBy: { nome: "asc" },
+  const profissionalFiltroParam = getParam(
+    resolvedSearchParams,
+    "profissional",
+  );
+
+  const [clientes, profissionais, origensCliente, servicos] = await Promise.all([
+    prisma.cliente.findMany({
+      orderBy: { nome: "asc" },
+      select: {
+        id: true,
+        nome: true,
+        telefone: true,
+        whatsapp: true,
+      },
+    }),
+
+    prisma.profissional.findMany({
+      where: { status: "Ativa" },
+      orderBy: [{ ordem: "asc" }, { nome: "asc" }],
+      select: {
+        id: true,
+        nome: true,
+        area: true,
+        cor: true,
+        telefone: true,
+        email: true,
+        status: true,
+      },
+    }),
+
+    prisma.origemCliente.findMany({
+      where: { status: "Ativa" },
+      orderBy: [{ ordem: "asc" }, { nome: "asc" }],
+      select: {
+        id: true,
+        nome: true,
+      },
+    }),
+
+    prisma.procedimentoServico.findMany({
+      where: { status: "Ativo" },
+      orderBy: [{ ordem: "asc" }, { nome: "asc" }],
+      select: {
+        id: true,
+        nome: true,
+        categoria: true,
+        duracaoPadrao: true,
+        valorPadrao: true,
+      },
+    }),
+  ]);
+
+  const profissionalDoUsuario = usuarioAdmin
+    ? null
+    : encontrarProfissionalDoUsuario(usuario, profissionais);
+
+  const profissionalFiltro =
+    profissionalFiltroParam && profissionalFiltroParam !== "todas"
+      ? profissionalFiltroParam
+      : profissionalDoUsuario
+        ? String(profissionalDoUsuario.id)
+        : "todas";
+
+  const agendamentos = await prisma.agendamento.findMany({
+    where: {
+      data: {
+        gte: inicioDoDia(dataSelecionada),
+        lt: fimDoDia(dataSelecionada),
+      },
+    },
+    include: {
+      cliente: {
         select: {
-          id: true,
           nome: true,
           telefone: true,
           whatsapp: true,
         },
-      }),
-
-      prisma.agendamento.findMany({
-        where: {
-          data: {
-            gte: inicioDoDia(dataSelecionada),
-            lt: fimDoDia(dataSelecionada),
-          },
-        },
-        include: {
-          cliente: {
-            select: {
-              nome: true,
-              telefone: true,
-              whatsapp: true,
-            },
-          },
-          profissional: {
-            select: {
-              id: true,
-              nome: true,
-              area: true,
-              cor: true,
-              status: true,
-            },
-          },
-        },
-        orderBy: { data: "asc" },
-      }),
-
-      prisma.profissional.findMany({
-        where: { status: "Ativa" },
-        orderBy: [{ ordem: "asc" }, { nome: "asc" }],
+      },
+      profissional: {
         select: {
           id: true,
           nome: true,
@@ -102,29 +184,10 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
           cor: true,
           status: true,
         },
-      }),
-
-      prisma.origemCliente.findMany({
-        where: { status: "Ativa" },
-        orderBy: [{ ordem: "asc" }, { nome: "asc" }],
-        select: {
-          id: true,
-          nome: true,
-        },
-      }),
-
-      prisma.procedimentoServico.findMany({
-        where: { status: "Ativo" },
-        orderBy: [{ ordem: "asc" }, { nome: "asc" }],
-        select: {
-          id: true,
-          nome: true,
-          categoria: true,
-          duracaoPadrao: true,
-          valorPadrao: true,
-        },
-      }),
-    ]);
+      },
+    },
+    orderBy: { data: "asc" },
+  });
 
   return (
     <div className="w-full max-w-full overflow-x-hidden pb-24 lg:space-y-8 lg:pb-0">

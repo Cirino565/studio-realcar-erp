@@ -1,475 +1,273 @@
-generator client {
-  provider = "prisma-client-js"
+import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
+
+const prisma = new PrismaClient();
+
+const permissoesPadrao = [
+  { modulo: "Dashboard", nome: "Visualizar dashboard", chave: "dashboard.visualizar" },
+
+  { modulo: "Clientes", nome: "Visualizar clientes", chave: "clientes.visualizar" },
+  { modulo: "Clientes", nome: "Visualizar todos os clientes", chave: "clientes.visualizar.todos" },
+  { modulo: "Clientes", nome: "Gerenciar clientes", chave: "clientes.gerenciar" },
+  { modulo: "Clientes", nome: "Gerenciar ficha clínica", chave: "clientes.clinico" },
+
+  { modulo: "Agenda", nome: "Visualizar agenda", chave: "agenda.visualizar" },
+  { modulo: "Agenda", nome: "Visualizar todas as agendas", chave: "agenda.visualizar.todas" },
+  { modulo: "Agenda", nome: "Gerenciar agendamentos", chave: "agenda.gerenciar" },
+
+  { modulo: "Atendimento", nome: "Iniciar atendimento", chave: "atendimento.iniciar" },
+  { modulo: "Atendimento", nome: "Finalizar atendimento", chave: "atendimento.finalizar" },
+  { modulo: "Atendimento", nome: "Criar retorno/reagendamento", chave: "retorno.criar" },
+
+  { modulo: "Financeiro", nome: "Visualizar financeiro", chave: "financeiro.visualizar" },
+  { modulo: "Financeiro", nome: "Gerenciar financeiro", chave: "financeiro.gerenciar" },
+
+  { modulo: "Estoque", nome: "Visualizar estoque", chave: "estoque.visualizar" },
+  { modulo: "Estoque", nome: "Gerenciar estoque", chave: "estoque.gerenciar" },
+
+  { modulo: "Relatórios", nome: "Visualizar relatórios", chave: "relatorios.visualizar" },
+
+  { modulo: "Marketing", nome: "Visualizar marketing", chave: "marketing.visualizar" },
+  { modulo: "Marketing", nome: "Gerenciar marketing", chave: "marketing.gerenciar" },
+
+  { modulo: "Configurações", nome: "Gerenciar configurações", chave: "configuracoes.gerenciar" },
+  { modulo: "Usuários", nome: "Gerenciar usuários", chave: "usuarios.gerenciar" },
+  { modulo: "Permissões", nome: "Gerenciar permissões", chave: "permissoes.gerenciar" },
+  { modulo: "Auditoria", nome: "Visualizar auditoria", chave: "auditoria.visualizar" },
+  { modulo: "Backup", nome: "Gerenciar backup", chave: "backup.gerenciar" },
+  { modulo: "Automações", nome: "Gerenciar automações", chave: "automacoes.gerenciar" },
+];
+
+function getSeedPassword(envName: string, fallback: string) {
+  const password = process.env[envName]?.trim();
+
+  if (!password) {
+    return fallback;
+  }
+
+  return password;
 }
 
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+function getAdminPassword() {
+  return getSeedPassword("ADMIN_PASSWORD", "12345678");
 }
 
-model Cliente {
-  id           Int      @id @default(autoincrement())
-  nome         String
-  telefone     String
-  whatsapp     String?
-  cpf          String?
-  instagram    String?
-  origem       String?
-  procedimentoInteresse String?
-  nascimento   DateTime?
-  observacoes  String?
-  procedimento String?
-  valorGasto   Float    @default(0)
-  ultimaVisita DateTime?
-  status       String   @default("Ativa")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  agendamentos Agendamento[]
-  anamneses    ClienteAnamnese[]
-  fotos        ClienteFoto[]
-  documentos   ClienteDocumento[]
-  procedimentos ClienteProcedimento[]
-  evolucoes    ClienteEvolucao[]
-  anamneseRespostas ClienteAnamneseResposta[]
+function getOperationalPassword() {
+  return getSeedPassword("OPERATIONAL_PASSWORD", "12345678");
 }
 
-model OrigemCliente {
-  id          Int      @id @default(autoincrement())
-  nome        String   @unique
-  descricao   String?
-  status      String   @default("Ativa")
-  ordem       Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+function getEnvEmail(envName: string) {
+  const value = process.env[envName]?.trim().toLowerCase();
+
+  return value || null;
 }
 
-model ProcedimentoInteresse {
-  id          Int      @id @default(autoincrement())
-  nome        String   @unique
-  descricao   String?
-  status      String   @default("Ativo")
-  ordem       Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+async function criarOuAtualizarProfissionais() {
+  const vivianEmail = getEnvEmail("VIVIAN_EMAIL");
+  const gabrielyEmail = getEnvEmail("GABRIELY_EMAIL");
+
+  await prisma.profissional.upsert({
+    where: { nome: "Vivian" },
+    update: {
+      area: "Estética facial e corporal",
+      cor: "violet",
+      status: "Ativa",
+      ordem: 1,
+      ...(vivianEmail ? { email: vivianEmail } : {}),
+    },
+    create: {
+      nome: "Vivian",
+      area: "Estética facial e corporal",
+      cor: "violet",
+      status: "Ativa",
+      ordem: 1,
+      email: vivianEmail,
+    },
+  });
+
+  await prisma.profissional.upsert({
+    where: { nome: "Gabriely" },
+    update: {
+      area: "Cílios e sobrancelhas",
+      cor: "pink",
+      status: "Ativa",
+      ordem: 2,
+      ...(gabrielyEmail ? { email: gabrielyEmail } : {}),
+    },
+    create: {
+      nome: "Gabriely",
+      area: "Cílios e sobrancelhas",
+      cor: "pink",
+      status: "Ativa",
+      ordem: 2,
+      email: gabrielyEmail,
+    },
+  });
 }
 
+async function main() {
+  const adminEmail = (process.env.ADMIN_EMAIL || "admin@studiorealcar.com")
+    .trim()
+    .toLowerCase();
+  const adminName = (process.env.ADMIN_NAME || "Administrador").trim();
 
-model ProcedimentoServico {
-  id            Int      @id @default(autoincrement())
-  nome          String   @unique
-  categoria     String?
-  descricao     String?
-  duracaoPadrao Int      @default(60)
-  valorPadrao   Float    @default(0)
-  status        String   @default("Ativo")
-  ordem         Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  const operationalEmail = (
+    process.env.OPERATIONAL_EMAIL || "operacional@studiorealcar.com"
+  )
+    .trim()
+    .toLowerCase();
+  const operationalName = (process.env.OPERATIONAL_NAME || "Operacional").trim();
 
-  anamneseModelos AnamneseModelo[]
+  const adminPassword = getAdminPassword();
+  const operationalPassword = getOperationalPassword();
+
+  const senhaHash = await bcrypt.hash(adminPassword, 10);
+  const senhaOperacionalHash = await bcrypt.hash(operationalPassword, 10);
+
+  await criarOuAtualizarProfissionais();
+
+  for (const permissao of permissoesPadrao) {
+    await prisma.permissao.upsert({
+      where: { chave: permissao.chave },
+      update: {
+        nome: permissao.nome,
+        modulo: permissao.modulo,
+      },
+      create: permissao,
+    });
+  }
+
+  const perfilAdmin = await prisma.perfil.upsert({
+    where: { nome: "Administrador" },
+    update: {
+      descricao: "Acesso total ao ERP.",
+      nivel: 5,
+      status: "Ativo",
+    },
+    create: {
+      nome: "Administrador",
+      descricao: "Acesso total ao ERP.",
+      nivel: 5,
+      status: "Ativo",
+    },
+  });
+
+  const permissoes = await prisma.permissao.findMany({
+    where: {
+      chave: {
+        in: permissoesPadrao.map((p) => p.chave),
+      },
+    },
+  });
+
+  for (const permissao of permissoes) {
+    await prisma.perfilPermissao.upsert({
+      where: {
+        perfilId_permissaoId: {
+          perfilId: perfilAdmin.id,
+          permissaoId: permissao.id,
+        },
+      },
+      update: {},
+      create: {
+        perfilId: perfilAdmin.id,
+        permissaoId: permissao.id,
+      },
+    });
+  }
+
+  const perfilOperacional = await prisma.perfil.upsert({
+    where: { nome: "Operacional" },
+    update: {
+      descricao:
+        "Acesso operacional para agenda, clientes, atendimento e retorno.",
+      nivel: 1,
+      status: "Ativo",
+    },
+    create: {
+      nome: "Operacional",
+      descricao:
+        "Acesso operacional para agenda, clientes, atendimento e retorno.",
+      nivel: 1,
+      status: "Ativo",
+    },
+  });
+
+  const permissoesOperacionais = permissoes.filter((p) =>
+    [
+      "agenda.visualizar",
+      "agenda.gerenciar",
+      "clientes.visualizar",
+      "clientes.gerenciar",
+      "clientes.clinico",
+      "atendimento.iniciar",
+      "atendimento.finalizar",
+      "retorno.criar",
+    ].includes(p.chave),
+  );
+
+  for (const permissao of permissoesOperacionais) {
+    await prisma.perfilPermissao.upsert({
+      where: {
+        perfilId_permissaoId: {
+          perfilId: perfilOperacional.id,
+          permissaoId: permissao.id,
+        },
+      },
+      update: {},
+      create: {
+        perfilId: perfilOperacional.id,
+        permissaoId: permissao.id,
+      },
+    });
+  }
+
+  await prisma.usuario.upsert({
+    where: { email: adminEmail },
+    update: {
+      nome: adminName,
+      senha: senhaHash,
+      tipo: "Admin",
+      status: "Ativo",
+      perfilId: perfilAdmin.id,
+    },
+    create: {
+      nome: adminName,
+      email: adminEmail,
+      senha: senhaHash,
+      tipo: "Admin",
+      status: "Ativo",
+      perfilId: perfilAdmin.id,
+    },
+  });
+
+  await prisma.usuario.upsert({
+    where: { email: operationalEmail },
+    update: {
+      nome: operationalName,
+      senha: senhaOperacionalHash,
+      tipo: "Equipe",
+      status: "Ativo",
+      perfilId: perfilOperacional.id,
+    },
+    create: {
+      nome: operationalName,
+      email: operationalEmail,
+      senha: senhaOperacionalHash,
+      tipo: "Equipe",
+      status: "Ativo",
+      perfilId: perfilOperacional.id,
+    },
+  });
+
+  console.log("Seed concluído com sucesso 🚀");
 }
 
-model Agendamento {
-  id             Int           @id @default(autoincrement())
-  clienteId      Int
-  cliente        Cliente       @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  profissionalId Int?
-  profissional   Profissional? @relation(fields: [profissionalId], references: [id], onDelete: SetNull)
-  procedimento   String
-  data           DateTime
-  duracao        Int           @default(60)
-  valor          Float         @default(0)
-  observacoes    String?
-  status         String        @default("Agendado")
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-}
-
-model Profissional {
-  id            Int      @id @default(autoincrement())
-  nome          String   @unique
-  area          String?
-  cor           String   @default("violet")
-  telefone      String?
-  email         String?
-  status        String   @default("Ativa")
-  ordem         Int      @default(0)
-  observacoes   String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  agendamentos  Agendamento[]
-}
-
-model Lancamento {
-  id              Int      @id @default(autoincrement())
-  descricao       String
-  valor           Float
-  tipo            String
-  categoria       String?
-  observacoes     String?
-  data            DateTime
-  formaPagamento  String?
-  statusPagamento String   @default("Pago")
-  origem          String?
-  agendamentoId   Int?
-  clienteId       Int?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-}
-
-model Fornecedor {
-  id          Int      @id @default(autoincrement())
-  nome        String
-  telefone    String?
-  email       String?
-  cnpj        String?
-  endereco    String?
-  observacoes String?
-  status      String   @default("Ativo")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  produtos    Produto[]
-  compras     Compra[]
-}
-
-model Produto {
-  id             Int      @id @default(autoincrement())
-  fornecedorId   Int?
-  fornecedor     Fornecedor? @relation(fields: [fornecedorId], references: [id], onDelete: SetNull)
-  nome           String
-  categoria      String?
-  unidade        String   @default("un")
-  quantidade     Int      @default(0)
-  estoqueMinimo  Int      @default(0)
-  valorCompra    Float    @default(0)
-  valorVenda     Float    @default(0)
-  status         String   @default("Ativo")
-  observacoes    String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  movimentacoes  MovimentacaoEstoque[]
-  itensCompra    CompraItem[]
-}
-
-model MovimentacaoEstoque {
-  id          Int      @id @default(autoincrement())
-  produtoId   Int
-  produto     Produto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
-  tipo        String
-  quantidade  Int
-  motivo      String
-  observacoes String?
-  createdAt   DateTime @default(now())
-}
-
-model Compra {
-  id           Int      @id @default(autoincrement())
-  fornecedorId Int?
-  fornecedor   Fornecedor? @relation(fields: [fornecedorId], references: [id], onDelete: SetNull)
-  descricao    String
-  valorTotal   Float    @default(0)
-  status       String   @default("Aberta")
-  data         DateTime @default(now())
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  itens        CompraItem[]
-}
-
-model CompraItem {
-  id        Int     @id @default(autoincrement())
-  compraId  Int
-  compra    Compra  @relation(fields: [compraId], references: [id], onDelete: Cascade)
-  produtoId Int
-  produto   Produto @relation(fields: [produtoId], references: [id], onDelete: Restrict)
-  quantidade Int
-  valorUnitario Float
-}
-
-model Lead {
-  id          Int      @id @default(autoincrement())
-  nome        String
-  telefone    String?
-  origem      String?
-  interesse   String?
-  etapa       String   @default("Novo")
-  valorPrevisto Float  @default(0)
-  observacoes String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-model CampanhaMarketing {
-  id          Int      @id @default(autoincrement())
-  nome        String
-  canal       String
-  investimento Float  @default(0)
-  leads       Int      @default(0)
-  status      String   @default("Ativa")
-  inicio      DateTime?
-  fim         DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-model Usuario {
-  id             Int       @id @default(autoincrement())
-  nome           String
-  email          String    @unique
-  senha          String
-  telefone       String?
-  cargo          String?
-  tipo           String    @default("Equipe")
-  especialidade  String?
-  status         String    @default("Ativo")
-  perfilId       Int?
-  perfil         Perfil?   @relation(fields: [perfilId], references: [id], onDelete: SetNull)
-  dataAdmissao   DateTime?
-  ultimoAcesso   DateTime?
-  observacoes    String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-}
-
-model Perfil {
-  id          Int      @id @default(autoincrement())
-  nome        String   @unique
-  descricao   String?
-  nivel       Int      @default(1)
-  status      String   @default("Ativo")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  usuarios    Usuario[]
-  permissoes  PerfilPermissao[]
-}
-
-model Permissao {
-  id          Int      @id @default(autoincrement())
-  chave       String   @unique
-  nome        String
-  modulo      String
-  createdAt   DateTime @default(now())
-
-  perfis      PerfilPermissao[]
-}
-
-model PerfilPermissao {
-  id          Int       @id @default(autoincrement())
-  perfilId    Int
-  perfil      Perfil    @relation(fields: [perfilId], references: [id], onDelete: Cascade)
-  permissaoId Int
-  permissao   Permissao @relation(fields: [permissaoId], references: [id], onDelete: Cascade)
-
-  @@unique([perfilId, permissaoId])
-}
-
-model Auditoria {
-  id          Int      @id @default(autoincrement())
-  modulo      String
-  acao        String
-  entidade    String?
-  entidadeId  String?
-  usuario     String?
-  detalhes    String?
-  createdAt   DateTime @default(now())
-}
-
-model ConfiguracaoClinica {
-  id                    Int      @id @default(autoincrement())
-  nome                  String   @default("Studio Realçar")
-  razaoSocial           String?
-  cnpj                  String?
-  telefone              String?
-  whatsapp              String?
-  email                 String?
-  site                  String?
-  instagram             String?
-  endereco              String?
-  bairro                String?
-  cidade                String?
-  estado                String?
-  cep                   String?
-  responsavelTecnico    String?
-  registroProfissional  String?
-  especialidadePrincipal String?
-  horarioAtendimento   String?
-  intervaloAgenda       Int      @default(30)
-  antecedenciaLembrete  Int      @default(24)
-  toleranciaAtraso      Int      @default(10)
-  moeda                 String   @default("BRL")
-  timezone              String   @default("America/Sao_Paulo")
-  logoUrl               String?
-  corPrincipal          String   @default("violet")
-  assinaturaMensagem    String?
-  mensagemConfirmacao   String?
-  mensagemLembrete      String?
-  mensagemRetorno       String?
-  politicaCancelamento  String?
-  observacoesInternas   String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-}
-
-model BackupRegistro {
-  id          Int      @id @default(autoincrement())
-  nome        String
-  status      String   @default("Concluído")
-  tamanho     String?
-  observacoes String?
-  createdAt   DateTime @default(now())
-}
-
-model Automacao {
-  id              Int       @id @default(autoincrement())
-  nome            String
-  tipo            String    @default("Operacional")
-  gatilho         String
-  acao            String
-  canal           String?
-  frequencia      String    @default("Manual")
-  prioridade      String    @default("Média")
-  status          String    @default("Ativa")
-  proximaExecucao DateTime?
-  ultimaExecucao  DateTime?
-  execucoes       Int       @default(0)
-  falhas          Int       @default(0)
-  observacoes     String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-}
-
-
-model ClienteAnamnese {
-  id                    Int      @id @default(autoincrement())
-  clienteId             Int
-  cliente               Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  procedimento          String?
-  queixaPrincipal        String?
-  alergias              String?
-  medicamentos          String?
-  doencasPreExistentes  String?
-  procedimentosAnteriores String?
-  gestante              Boolean  @default(false)
-  lactante              Boolean  @default(false)
-  usaAcidos             Boolean  @default(false)
-  possuiMarcapasso      Boolean  @default(false)
-  restricoes            String?
-  objetivoTratamento    String?
-  observacoesClinicas   String?
-  respostasRapidas      String?
-  assinaturaCliente     String?
-  termoConsentimento    Boolean  @default(false)
-  profissional          String?
-  dataFicha             DateTime @default(now())
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-}
-
-model ClienteFoto {
-  id            Int      @id @default(autoincrement())
-  clienteId     Int
-  cliente       Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  titulo        String
-  tipo          String   @default("Evolução")
-  url           String
-  descricao     String?
-  dataRegistro  DateTime @default(now())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-}
-
-model ClienteDocumento {
-  id            Int      @id @default(autoincrement())
-  clienteId     Int
-  cliente       Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  titulo        String
-  tipo          String   @default("Documento")
-  url           String?
-  observacoes   String?
-  dataRegistro  DateTime @default(now())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-}
-
-model ClienteProcedimento {
-  id              Int      @id @default(autoincrement())
-  clienteId       Int
-  cliente         Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  nome            String
-  profissional    String?
-  valor           Float    @default(0)
-  status          String   @default("Realizado")
-  dataProcedimento DateTime @default(now())
-  observacoes     String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-}
-
-model ClienteEvolucao {
-  id            Int      @id @default(autoincrement())
-  clienteId     Int
-  cliente       Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  titulo        String
-  descricao     String
-  profissional  String?
-  dataRegistro  DateTime @default(now())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-}
-
-
-model AnamneseModelo {
-  id              Int      @id @default(autoincrement())
-  nome            String
-  procedimentoId  Int?
-  procedimento    ProcedimentoServico? @relation(fields: [procedimentoId], references: [id], onDelete: SetNull)
-  procedimentoNome String?
-  descricao       String?
-  status          String   @default("Ativo")
-  ordem           Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  perguntas       AnamnesePergunta[]
-  respostas       ClienteAnamneseResposta[]
-}
-
-model AnamnesePergunta {
-  id            Int      @id @default(autoincrement())
-  modeloId      Int
-  modelo        AnamneseModelo @relation(fields: [modeloId], references: [id], onDelete: Cascade)
-  pergunta      String
-  tipo          String   @default("SIM_NAO")
-  opcoes        String?
-  obrigatoria   Boolean  @default(false)
-  ativa         Boolean  @default(true)
-  ordem         Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  respostas     ClienteAnamneseResposta[]
-}
-
-model ClienteAnamneseResposta {
-  id            Int      @id @default(autoincrement())
-  clienteId     Int
-  cliente       Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  modeloId      Int?
-  modelo        AnamneseModelo? @relation(fields: [modeloId], references: [id], onDelete: SetNull)
-  perguntaId    Int?
-  pergunta      AnamnesePergunta? @relation(fields: [perguntaId], references: [id], onDelete: SetNull)
-  procedimento  String?
-  perguntaTexto String
-  tipo          String
-  resposta      String?
-  observacao    String?
-  profissional  String?
-  dataResposta  DateTime @default(now())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-}
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
