@@ -63,11 +63,11 @@ type Props = {
 const START_HOUR = 6;
 const END_HOUR = 21;
 const SLOT_MINUTES = 30;
-const MINUTE_HEIGHT = 1.28;
+const MINUTE_HEIGHT = 0.86;
 const TOTAL_MINUTES = (END_HOUR - START_HOUR) * 60;
 
 const slots = Array.from(
-  { length: (TOTAL_MINUTES / SLOT_MINUTES) + 1 },
+  { length: TOTAL_MINUTES / SLOT_MINUTES + 1 },
   (_, index) => {
     const totalMinutes = START_HOUR * 60 + index * SLOT_MINUTES;
     const hour = Math.floor(totalMinutes / 60);
@@ -297,6 +297,11 @@ export default function AgendaCalendar({
     });
   }, [agendamentos, visibleProfessionals]);
 
+  const gridMinWidth =
+    visibleProfessionals.length <= 2
+      ? "100%"
+      : `${52 + visibleProfessionals.length * 148}px`;
+
   function goToDate(date: Date) {
     onDateChange(date);
     window.location.href = agendaHref(date, profissionalFiltro);
@@ -337,23 +342,23 @@ export default function AgendaCalendar({
   }
 
   return (
-    <div className="premium-card w-full max-w-full overflow-hidden">
+    <div className="premium-card relative w-full max-w-[100vw] overflow-hidden sm:max-w-full">
       <div className="border-b border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))]">
-        <div className="flex flex-col gap-3 p-3 sm:p-4 xl:p-5">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex flex-col gap-2.5 p-2.5 sm:gap-3 sm:p-4 xl:p-5">
+          <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between">
             <div className="min-w-0">
-              <div className="flex min-w-0 items-center gap-2 text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-slate-500">
+              <div className="hidden min-w-0 items-center gap-2 text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-slate-500 sm:flex">
                 <CalendarDays size={13} />
                 Agenda profissional
               </div>
 
-              <h2 className="mt-1 truncate text-lg font-semibold capitalize tracking-tight text-white sm:text-xl xl:text-2xl">
+              <h2 className="truncate text-base font-semibold capitalize tracking-tight text-white sm:mt-1 sm:text-xl xl:text-2xl">
                 {formatLongDate(selectedDate)}
               </h2>
             </div>
 
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <div className="grid grid-cols-2 rounded-2xl border border-white/[0.10] bg-white/[0.035] p-1 text-xs font-semibold">
+            <div className="grid min-w-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+              <div className="grid h-10 grid-cols-2 rounded-2xl border border-white/[0.10] bg-white/[0.035] p-1 text-xs font-semibold">
                 <button
                   type="button"
                   className="rounded-xl bg-violet-600 px-3 py-2 text-white shadow-lg shadow-violet-950/20"
@@ -372,7 +377,7 @@ export default function AgendaCalendar({
               <select
                 value={profissionalFiltro}
                 onChange={(event) => onProfissionalFiltroChange(event.target.value)}
-                className="premium-input h-10 min-w-[170px] rounded-2xl px-3 py-2 text-xs sm:text-sm"
+                className="premium-input h-10 min-w-0 rounded-2xl px-3 py-2 text-xs sm:min-w-[170px] sm:text-sm"
               >
                 <option value="todas">Todas as agendas</option>
                 {todosProfissionais.map((profissional) => (
@@ -432,7 +437,7 @@ export default function AgendaCalendar({
                     abrirNovo(profissional.id);
                   }
                 }}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 text-xs font-semibold text-white shadow-lg shadow-violet-950/25 transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+                className="hidden h-10 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 text-xs font-semibold text-white shadow-lg shadow-violet-950/25 transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:inline-flex sm:text-sm"
                 disabled={!visibleProfessionals[0] && !profissionais[0]}
               >
                 <Plus size={15} />
@@ -441,7 +446,7 @@ export default function AgendaCalendar({
             </div>
           </div>
 
-          <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+          <div className="grid grid-cols-7 gap-1 sm:gap-2">
             {weekDays.map((day) => {
               const active = isSameDay(day, selectedDate);
               const isToday = isSameDay(day, today);
@@ -450,16 +455,16 @@ export default function AgendaCalendar({
                 <a
                   key={day.toISOString()}
                   href={agendaHref(day, profissionalFiltro)}
-                  className={`min-w-0 rounded-2xl border px-2 py-2 text-center transition sm:px-3 ${
+                  className={`min-w-0 rounded-xl border px-1 py-1.5 text-center transition sm:rounded-2xl sm:px-3 sm:py-2 ${
                     active
                       ? "border-violet-300/35 bg-violet-500/20 text-white shadow-lg shadow-violet-950/10"
                       : "border-white/[0.08] bg-white/[0.03] text-slate-400 hover:border-white/[0.14] hover:bg-white/[0.05]"
                   }`}
                 >
                   <span className="block truncate text-[0.6rem] font-semibold uppercase tracking-[0.10em] sm:text-[0.65rem]">
-                    {formatShortWeekDay(day)}
+                    {formatShortWeekDay(day).slice(0, 3)}
                   </span>
-                  <span className="mt-1 block text-sm font-semibold leading-none sm:text-base">
+                  <span className="mt-1 block text-xs font-semibold leading-none sm:text-base">
                     {day.getDate()}
                   </span>
                   <span
@@ -477,7 +482,7 @@ export default function AgendaCalendar({
           </div>
 
           {profissionais.length > 1 ? (
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-premium">
+            <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-premium sm:gap-2">
               {profissionais.map((profissional) => {
                 const hidden = hiddenProfessionalIds.includes(profissional.id);
                 const color = getColorClasses(profissional.cor);
@@ -487,7 +492,7 @@ export default function AgendaCalendar({
                     key={profissional.id}
                     type="button"
                     onClick={() => toggleProfessional(profissional.id)}
-                    className={`inline-flex shrink-0 items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-semibold transition ${
+                    className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-xl border px-2 text-[0.68rem] font-semibold transition sm:h-auto sm:gap-2 sm:rounded-2xl sm:px-3 sm:py-2 sm:text-xs ${
                       hidden
                         ? "border-white/[0.08] bg-white/[0.025] text-slate-500"
                         : color.eventSoft
@@ -504,18 +509,19 @@ export default function AgendaCalendar({
         </div>
       </div>
 
-      <div className="overflow-x-auto overflow-y-hidden scrollbar-premium">
+      <div className="max-w-full overflow-x-auto overflow-y-hidden scrollbar-premium">
         <div
-          className="relative min-w-[720px] xl:min-w-[980px]"
+          className="relative w-full min-w-0"
           style={{
             display: "grid",
-            gridTemplateColumns: `54px repeat(${Math.max(
+            minWidth: gridMinWidth,
+            gridTemplateColumns: `46px repeat(${Math.max(
               visibleProfessionals.length,
               1,
-            )}, minmax(220px, 1fr))`,
+            )}, minmax(0, 1fr))`,
           }}
         >
-          <div className="sticky left-0 z-30 border-b border-r border-white/[0.08] bg-[#12192a] px-2 py-3 text-center text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-slate-500 xl:px-3">
+          <div className="sticky left-0 z-30 border-b border-r border-white/[0.08] bg-[#12192a] px-1 py-2 text-center text-[0.56rem] font-semibold uppercase tracking-[0.10em] text-slate-500 sm:px-2 sm:py-3 sm:text-[0.65rem] xl:px-3">
             Hora
           </div>
 
@@ -525,28 +531,31 @@ export default function AgendaCalendar({
             return (
               <div
                 key={profissional.id}
-                className="border-b border-r border-white/[0.08] bg-[#12192a] px-2 py-2 xl:px-3"
+                className="border-b border-r border-white/[0.08] bg-[#12192a] px-1.5 py-1.5 sm:px-2 sm:py-2 xl:px-3"
               >
-                <div className={`rounded-2xl border px-3 py-2.5 ${color.header}`}>
+                <div
+                  className={`rounded-xl border px-2 py-2 sm:rounded-2xl sm:px-3 sm:py-2.5 ${color.header}`}
+                >
                   <div className="flex min-w-0 items-center justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-2.5">
+                    <div className="flex min-w-0 items-center gap-1.5 sm:gap-2.5">
                       <div
-                        className={`flex size-9 shrink-0 items-center justify-center rounded-full border shadow-lg shadow-black/20 ${color.avatar}`}
+                        className={`flex size-8 shrink-0 items-center justify-center rounded-full border shadow-lg shadow-black/20 sm:size-9 ${color.avatar}`}
                       >
-                        <UserRound size={17} />
+                        <UserRound size={15} className="sm:hidden" />
+                        <UserRound size={17} className="hidden sm:block" />
                       </div>
 
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-white">
+                        <p className="truncate text-xs font-semibold text-white sm:text-sm">
                           {profissional.nome}
                         </p>
-                        <p className="truncate text-[0.68rem] text-slate-400">
+                        <p className="hidden truncate text-[0.68rem] text-slate-400 sm:block">
                           {profissional.area || "Agenda ativa"}
                         </p>
                       </div>
                     </div>
 
-                    <div className="shrink-0 text-right">
+                    <div className="hidden shrink-0 text-right md:block">
                       <p className="text-xs font-semibold text-white">
                         {appointments.length} atend.
                       </p>
@@ -626,20 +635,23 @@ export default function AgendaCalendar({
                           onSelectAppointment(appointment);
                         }
                       }}
-                      className={`absolute left-1.5 right-1.5 z-10 cursor-pointer overflow-hidden rounded-xl border p-2 text-left shadow-lg transition hover:scale-[1.005] hover:brightness-110 xl:left-2 xl:right-2 xl:rounded-2xl xl:p-3 ${color.event}`}
+                      className={`absolute left-1 right-1 z-10 cursor-pointer overflow-hidden rounded-lg border p-1.5 text-left shadow-lg transition hover:scale-[1.005] hover:brightness-110 sm:left-1.5 sm:right-1.5 sm:rounded-xl sm:p-2 xl:left-2 xl:right-2 xl:rounded-2xl xl:p-3 ${color.event}`}
                       style={{ top, height }}
                     >
-                      <div className={`absolute left-0 top-0 h-full w-1 ${color.line}`} />
+                      <div
+                        className={`absolute left-0 top-0 h-full w-1 ${color.line}`}
+                      />
 
                       <div className="relative flex h-full min-w-0 flex-col">
                         <div className="flex min-w-0 items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <p className="flex items-center gap-1.5 text-[0.65rem] font-bold leading-tight text-white/95 xl:text-[0.72rem]">
-                              <Clock3 size={12} className="shrink-0" />
-                              {formatTime(appointment.data)} - {formatTime(appointmentEnd(appointment))}
+                            <p className="flex items-center gap-1 text-[0.58rem] font-bold leading-tight text-white/95 sm:gap-1.5 sm:text-[0.65rem] xl:text-[0.72rem]">
+                              <Clock3 size={10} className="shrink-0 sm:size-3" />
+                              {formatTime(appointment.data)} -{" "}
+                              {formatTime(appointmentEnd(appointment))}
                             </p>
 
-                            <p className="mt-1 truncate text-xs font-extrabold uppercase leading-tight tracking-tight text-white xl:text-sm">
+                            <p className="mt-0.5 truncate text-[0.68rem] font-extrabold uppercase leading-tight tracking-tight text-white sm:mt-1 sm:text-xs xl:text-sm">
                               {appointment.cliente.nome}
                             </p>
                           </div>
@@ -650,19 +662,19 @@ export default function AgendaCalendar({
                               event.stopPropagation();
                               onMessage(appointment);
                             }}
-                            className="shrink-0 rounded-lg border border-white/20 bg-white/12 p-1.5 text-white transition hover:bg-white/20"
+                            className="hidden shrink-0 rounded-lg border border-white/20 bg-white/12 p-1.5 text-white transition hover:bg-white/20 sm:block"
                             aria-label="Gerar mensagem de WhatsApp"
                           >
                             <MessageCircle size={13} />
                           </button>
                         </div>
 
-                        <p className="mt-1 line-clamp-2 text-[0.68rem] font-semibold leading-snug text-white/90 xl:text-xs">
+                        <p className="mt-0.5 line-clamp-2 text-[0.62rem] font-semibold leading-snug text-white/90 sm:mt-1 sm:text-[0.68rem] xl:text-xs">
                           {appointment.procedimento}
                         </p>
 
                         {height > 74 ? (
-                          <p className="mt-1 line-clamp-2 text-[0.65rem] leading-snug text-white/75 xl:text-[0.72rem]">
+                          <p className="mt-0.5 line-clamp-2 text-[0.6rem] leading-snug text-white/75 sm:mt-1 sm:text-[0.65rem] xl:text-[0.72rem]">
                             {note}
                           </p>
                         ) : null}
@@ -692,13 +704,30 @@ export default function AgendaCalendar({
         </div>
       </div>
 
-      <div className="flex flex-col gap-2 border-t border-white/[0.08] bg-white/[0.02] px-3 py-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between xl:px-5">
+      <button
+        type="button"
+        onClick={() => {
+          const profissional = visibleProfessionals[0] || profissionais[0];
+
+          if (profissional) {
+            abrirNovo(profissional.id);
+          }
+        }}
+        className="absolute bottom-4 right-4 z-40 inline-flex size-14 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white shadow-2xl shadow-violet-950/40 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:hidden"
+        disabled={!visibleProfessionals[0] && !profissionais[0]}
+        aria-label="Novo agendamento"
+      >
+        <Plus size={22} />
+      </button>
+
+      <div className="hidden flex-col gap-2 border-t border-white/[0.08] bg-white/[0.02] px-3 py-3 text-xs text-slate-500 sm:flex sm:flex-row sm:items-center sm:justify-between xl:px-5">
         <span>
           Arraste para o lado no celular para comparar profissionais e horários.
         </span>
 
         <span>
-          Horários exibidos de {String(START_HOUR).padStart(2, "0")}:00 às {String(END_HOUR).padStart(2, "0")}:00
+          Horários exibidos de {String(START_HOUR).padStart(2, "0")}:00 às{" "}
+          {String(END_HOUR).padStart(2, "0")}:00
         </span>
       </div>
     </div>
