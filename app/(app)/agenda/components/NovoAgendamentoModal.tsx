@@ -55,6 +55,31 @@ type Props = {
   initialPayload: NovoAgendamentoPayload | null;
 };
 
+function useLockBodyScroll(open: boolean) {
+  useEffect(() => {
+    if (!open) return;
+
+    const scrollY = window.scrollY;
+    const originalOverflow = document.body.style.overflow;
+    const originalPosition = document.body.style.position;
+    const originalTop = document.body.style.top;
+    const originalWidth = document.body.style.width;
+
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.position = originalPosition;
+      document.body.style.top = originalTop;
+      document.body.style.width = originalWidth;
+      window.scrollTo(0, scrollY);
+    };
+  }, [open]);
+}
+
 function onlyDigits(value: string) {
   return value.replace(/\D/g, "");
 }
@@ -118,6 +143,8 @@ export default function NovoAgendamentoModal({
   const [status, setStatus] = useState("Agendado");
   const [observacoes, setObservacoes] = useState("");
   const [salvando, setSalvando] = useState(false);
+
+  useLockBodyScroll(open);
 
   useEffect(() => {
     if (!open) {
@@ -256,9 +283,9 @@ export default function NovoAgendamentoModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-slate-950/80 px-3 py-4 backdrop-blur-xl sm:items-center sm:px-4">
-      <div className="my-auto w-full max-w-5xl overflow-hidden rounded-[1.5rem] border border-white/[0.10] bg-[#111827] shadow-2xl shadow-black/50 sm:rounded-[2rem]">
-        <div className="flex items-start justify-between gap-4 border-b border-white/[0.08] bg-white/[0.035] p-4 sm:gap-6 sm:p-6">
+    <div className="fixed inset-0 z-[100] flex h-[100dvh] items-stretch justify-center overflow-hidden bg-slate-950/80 px-0 py-0 backdrop-blur-xl sm:items-center sm:px-4 sm:py-4">
+      <div className="my-0 flex h-[100dvh] w-full max-w-5xl flex-col overflow-hidden rounded-none border border-white/[0.10] bg-[#111827] shadow-2xl shadow-black/50 sm:my-auto sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-[2rem]">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-white/[0.08] bg-white/[0.035] p-4 sm:gap-6 sm:p-6">
           <div>
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-violet-400/20 bg-violet-400/10 px-3 py-1 text-xs font-medium text-violet-200">
               <CalendarPlus size={14} />
@@ -285,7 +312,7 @@ export default function NovoAgendamentoModal({
           </button>
         </div>
 
-        <div className="max-h-[calc(100dvh-11rem)] overflow-y-auto p-4 sm:p-6">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-4 scrollbar-premium sm:p-6">
           <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
             <section className="rounded-3xl border border-white/[0.08] bg-white/[0.025] p-4 sm:p-5">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row">
@@ -338,7 +365,7 @@ export default function NovoAgendamentoModal({
                     </div>
                   </label>
 
-                  <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                  <div className="max-h-72 space-y-2 overflow-y-auto overscroll-contain pr-1">
                     {clientesFiltrados.map((cliente) => {
                       const active = clienteId === String(cliente.id);
 
@@ -596,7 +623,7 @@ export default function NovoAgendamentoModal({
           </div>
         </div>
 
-        <div className="flex flex-col-reverse gap-3 border-t border-white/[0.08] bg-white/[0.02] p-5 sm:flex-row sm:justify-end sm:p-6">
+        <div className="flex shrink-0 flex-col-reverse gap-3 border-t border-white/[0.08] bg-white/[0.02] p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:flex-row sm:justify-end sm:p-6">
           <Button
             type="button"
             variant="outline"

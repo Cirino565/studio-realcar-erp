@@ -18,6 +18,31 @@ type Props = {
   onAgendarRetorno?: () => void;
 };
 
+function useLockBodyScroll(open: boolean) {
+  useEffect(() => {
+    if (!open) return;
+
+    const scrollY = window.scrollY;
+    const originalOverflow = document.body.style.overflow;
+    const originalPosition = document.body.style.position;
+    const originalTop = document.body.style.top;
+    const originalWidth = document.body.style.width;
+
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.position = originalPosition;
+      document.body.style.top = originalTop;
+      document.body.style.width = originalWidth;
+      window.scrollTo(0, scrollY);
+    };
+  }, [open]);
+}
+
 export default function FinalizarAtendimentoModal({
   open,
   onClose,
@@ -29,6 +54,8 @@ export default function FinalizarAtendimentoModal({
   const [valor, setValor] = useState(0);
   const [confirmando, setConfirmando] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  useLockBodyScroll(open);
 
   useEffect(() => {
     if (!open || !appointment) {
@@ -125,9 +152,9 @@ export default function FinalizarAtendimentoModal({
   if (!open || !appointment) return null;
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 px-3 py-4 backdrop-blur-sm">
-      <div className="max-h-[calc(100dvh-2rem)] w-full max-w-[500px] overflow-hidden rounded-2xl border border-white/[0.10] bg-zinc-900 shadow-2xl shadow-black/40">
-        <div className="flex items-start justify-between gap-4 border-b border-white/[0.08] p-5">
+    <div className="fixed inset-0 z-[110] flex h-[100dvh] items-stretch justify-center overflow-hidden bg-black/60 px-0 py-0 backdrop-blur-sm sm:items-center sm:px-4 sm:py-4">
+      <div className="flex h-[100dvh] w-full max-w-[500px] flex-col overflow-hidden rounded-none border border-white/[0.10] bg-zinc-900 shadow-2xl shadow-black/40 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-white/[0.08] p-5">
           <div>
             <h2 className="text-lg font-semibold text-white">
               Finalizar atendimento
@@ -151,7 +178,7 @@ export default function FinalizarAtendimentoModal({
 
         {!confirmando ? (
           <>
-            <div className="max-h-[calc(100dvh-13rem)] space-y-4 overflow-y-auto p-5">
+            <div className="flex-1 space-y-4 overflow-y-auto overscroll-contain p-5">
               <label className="block space-y-2">
                 <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                   Procedimento realizado
@@ -176,7 +203,7 @@ export default function FinalizarAtendimentoModal({
                   value={evolucao}
                   onChange={(event) => setEvolucao(event.target.value)}
                   placeholder="Descreva como foi o atendimento, resposta da cliente, recomendações ou observações clínicas."
-                  className="premium-input min-h-28 w-full resize-none py-3 text-white"
+                  className="premium-input min-h-32 w-full resize-none py-3 text-white"
                 />
               </label>
 
@@ -195,11 +222,11 @@ export default function FinalizarAtendimentoModal({
               </label>
             </div>
 
-            <div className="flex flex-col-reverse gap-2 border-t border-white/[0.08] bg-white/[0.025] p-5 sm:flex-row sm:justify-end">
+            <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-white/[0.08] bg-white/[0.025] p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={limparEFechar}
-                className="rounded-xl border border-white/[0.10] bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-white/[0.08]"
+                className="rounded-xl border border-white/[0.10] bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-200 hover:bg-white/[0.08] sm:py-2"
               >
                 Cancelar
               </button>
@@ -207,7 +234,7 @@ export default function FinalizarAtendimentoModal({
               <button
                 type="button"
                 onClick={validarAntesDeConfirmar}
-                className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+                className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-500 sm:py-2"
               >
                 Revisar e finalizar
               </button>
@@ -215,7 +242,7 @@ export default function FinalizarAtendimentoModal({
           </>
         ) : (
           <>
-            <div className="space-y-4 p-5">
+            <div className="flex-1 space-y-4 overflow-y-auto overscroll-contain p-5">
               <div className="rounded-2xl border border-amber-300/20 bg-amber-400/10 p-4">
                 <div className="flex items-start gap-3">
                   <AlertTriangle
@@ -257,7 +284,7 @@ export default function FinalizarAtendimentoModal({
                   })}
                 </p>
 
-                <p className="mt-3 line-clamp-4 text-sm leading-6 text-slate-400">
+                <p className="mt-3 line-clamp-5 text-sm leading-6 text-slate-400">
                   {evolucao}
                 </p>
               </div>
@@ -277,12 +304,12 @@ export default function FinalizarAtendimentoModal({
               </div>
             </div>
 
-            <div className="flex flex-col-reverse gap-2 border-t border-white/[0.08] bg-white/[0.025] p-5 sm:flex-row sm:justify-end">
+            <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-white/[0.08] bg-white/[0.025] p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={() => setConfirmando(false)}
                 disabled={isPending}
-                className="rounded-xl border border-white/[0.10] bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-xl border border-white/[0.10] bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-200 hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-60 sm:py-2"
               >
                 Voltar e editar
               </button>
@@ -291,7 +318,7 @@ export default function FinalizarAtendimentoModal({
                 type="button"
                 onClick={handleFinalizarConfirmado}
                 disabled={isPending}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60 sm:py-2"
               >
                 <CheckCircle2 size={16} />
                 {isPending ? "Finalizando..." : "Sim, finalizar"}

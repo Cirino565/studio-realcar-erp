@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useEffect, useTransition } from "react";
 import {
   Activity,
   CalendarClock,
@@ -54,6 +54,31 @@ type Props = {
   onFinalizar: (appointment: AppointmentDetails) => void;
   onReagendar: (appointment: AppointmentDetails) => void;
 };
+
+function useLockBodyScroll(open: boolean) {
+  useEffect(() => {
+    if (!open) return;
+
+    const scrollY = window.scrollY;
+    const originalOverflow = document.body.style.overflow;
+    const originalPosition = document.body.style.position;
+    const originalTop = document.body.style.top;
+    const originalWidth = document.body.style.width;
+
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.position = originalPosition;
+      document.body.style.top = originalTop;
+      document.body.style.width = originalWidth;
+      window.scrollTo(0, scrollY);
+    };
+  }, [open]);
+}
 
 function formatDateTime(value: Date | string) {
   return new Intl.DateTimeFormat("pt-BR", {
@@ -113,6 +138,8 @@ export default function AppointmentDetailsModal({
 }: Props) {
   const [isPending, startTransition] = useTransition();
 
+  useLockBodyScroll(open);
+
   if (!open || !appointment) return null;
 
   const endDate = addMinutes(appointment.data, appointment.duracao);
@@ -166,7 +193,7 @@ export default function AppointmentDetailsModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] overflow-hidden">
+    <div className="fixed inset-0 z-[100] h-[100dvh] overflow-hidden">
       <button
         type="button"
         aria-label="Fechar painel de atendimento"
@@ -174,8 +201,8 @@ export default function AppointmentDetailsModal({
         className="absolute inset-0 bg-slate-950/70 backdrop-blur-md"
       />
 
-      <aside className="absolute inset-y-0 right-0 flex w-full max-w-[520px] flex-col border-l border-white/[0.10] bg-[#111827]/95 shadow-2xl shadow-black/50 backdrop-blur-2xl">
-        <div className="relative overflow-hidden border-b border-white/[0.08] p-5 sm:p-6">
+      <aside className="absolute inset-0 ml-auto flex h-[100dvh] w-full max-w-[520px] flex-col overflow-hidden border-l border-white/[0.10] bg-[#111827]/95 shadow-2xl shadow-black/50 backdrop-blur-2xl">
+        <div className="relative shrink-0 overflow-hidden border-b border-white/[0.08] p-5 sm:p-6">
           <div className="absolute -right-10 -top-12 h-36 w-36 rounded-full bg-violet-500/20 blur-3xl" />
           <div className="absolute -bottom-12 left-10 h-28 w-28 rounded-full bg-cyan-400/10 blur-3xl" />
 
@@ -206,7 +233,7 @@ export default function AppointmentDetailsModal({
           </div>
         </div>
 
-        <div className="flex-1 space-y-4 overflow-y-auto p-5 scrollbar-premium sm:p-6">
+        <div className="flex-1 space-y-4 overflow-y-auto overscroll-contain p-5 scrollbar-premium sm:p-6">
           <div className="rounded-3xl border border-white/[0.08] bg-white/[0.04] p-4">
             <div className="flex items-start justify-between gap-4">
               <div className="flex min-w-0 items-center gap-3">
@@ -388,7 +415,7 @@ export default function AppointmentDetailsModal({
           </div>
         </div>
 
-        <div className="border-t border-white/[0.08] bg-white/[0.025] p-4 sm:p-5">
+        <div className="shrink-0 border-t border-white/[0.08] bg-white/[0.025] p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:p-5">
           <div className="grid gap-3 sm:grid-cols-2">
             <Button asChild variant="outline" className="h-11">
               <WhatsAppLink href={whatsappUrl}>
