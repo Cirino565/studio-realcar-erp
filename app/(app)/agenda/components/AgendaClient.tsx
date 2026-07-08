@@ -156,8 +156,14 @@ export default function AgendaClient({
   function handleProfissionalFiltroChange(value: string) {
     setProfissionalFiltro(value);
 
-    const data = value !== "todas" ? `&profissional=${value}` : "";
-    window.history.replaceState(null, "", `/agenda?data=${initialDate}${data}`);
+    const dataAtual = toDateInput(selectedDate);
+    const profissional = value !== "todas" ? `&profissional=${value}` : "";
+
+    window.history.replaceState(
+      null,
+      "",
+      `/agenda?data=${dataAtual}${profissional}`,
+    );
   }
 
   function abrirNovoHorario(payload: NovoHorarioPayload) {
@@ -208,7 +214,7 @@ export default function AgendaClient({
   }
 
   return (
-    <div className="w-full max-w-full overflow-x-hidden pb-28 lg:space-y-8 lg:overflow-visible lg:pb-0">
+    <div className="w-full max-w-full overflow-x-hidden pb-6 lg:space-y-8 lg:overflow-visible lg:pb-0">
       <div className="hidden lg:block">
         <AgendaHeader />
       </div>

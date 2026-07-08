@@ -559,3 +559,122 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
   revalidatePath("/relatorios");
   revalidatePath("/");
 }
+
+export type HorarioDisponivelAgenda = {
+  hora: string;
+  disponivel: boolean;
+  motivo?: string;
+};
+
+function montarHorario(baseDate: Date, hora: string) {
+  const [hours, minutes] = hora.split(":").map(Number);
+
+  return new Date(
+    baseDate.getFullYear(),
+    baseDate.getMonth(),
+    baseDate.getDate(),
+    hours,
+    minutes,
+    0,
+  );
+}
+
+function gerarSlotsDisponibilidade() {
+  const slots: string[] = [];
+
+  for (let hour = 6; hour <= 20; hour += 1) {
+    slots.push(`${String(hour).padStart(2, "0")}:00`);
+    slots.push(`${String(hour).padStart(2, "0")}:30`);
+  }
+
+  return slots;
+}
+
+export async function buscarDisponibilidadeAgenda({
+  profissionalId,
+  data,
+  duracao = 60,
+}: {
+  profissionalId?: number;
+  data: string;
+  duracao?: number;
+}): Promise<HorarioDisponivelAgenda[]> {
+  await requirePermission("agenda.visualizar");
+
+  if (!profissionalId || !data) {
+    return [];
+  }
+
+  const dataBase = new Date(`${data}T00:00:00`);
+  const inicioDia = new Date(
+    dataBase.getFullYear(),
+    dataBase.getMonth(),
+    dataBase.getDate(),
+  );
+  const fimDia = new Date(
+    dataBase.getFullYear(),
+    dataBase.getMonth(),
+    dataBase.getDate() + 1,
+  );
+
+  const agendamentosDoDia = await prisma.agendamento.findMany({
+    where: {
+      profissionalId,
+      data: {
+        gte: inicioDia,
+        lt: fimDia,
+      },
+      status: {
+        notIn: ["Cancelado"],
+      },
+    },
+    select: {
+      id: true,
+      data: true,
+      duracao: true,
+      cliente: {
+        select: {
+          nome: true,
+        },
+      },
+    },
+    orderBy: {
+      data: "asc",
+    },
+  });
+
+  return gerarSlotsDisponibilidade().map((hora) => {
+    const inicioNovo = montarHorario(dataBase, hora);
+    const fimNovo = addMinutes(inicioNovo, duracao);
+
+    const conflito = agendamentosDoDia.find((agendamento) => {
+      const inicioExistente = new Date(agendamento.data);
+      const fimExistente = addMinutes(inicioExistente, agendamento.duracao);
+
+      return inicioExistente < fimNovo && fimExistente > inicioNovo;
+    });
+
+    if (!conflito) {
+      return {
+        hora,
+        disponivel: true,
+      };
+    }
+
+    const inicio = new Intl.DateTimeFormat("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(conflito.data);
+
+    const fim = new Intl.DateTimeFormat("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(addMinutes(conflito.data, conflito.duracao));
+
+    return {
+      hora,
+      disponivel: false,
+      motivo: `${conflito.cliente.nome} · ${inicio} às ${fim}`,
+    };
+  });
+}
