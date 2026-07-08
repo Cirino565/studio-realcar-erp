@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarPlus, Search, UserPlus, UsersRound, X } from "lucide-react";
+import {
+  CalendarPlus,
+  CheckCircle2,
+  Search,
+  UserPlus,
+  UsersRound,
+  X,
+} from "lucide-react";
 
 import { criarAgendamento } from "@/actions/agendamento.actions";
 import { Button } from "@/components/ui/button";
@@ -129,6 +136,7 @@ export default function NovoAgendamentoModal({
     "existente",
   );
   const [clienteId, setClienteId] = useState("");
+  const [clienteBloqueado, setClienteBloqueado] = useState(false);
   const [buscaCliente, setBuscaCliente] = useState("");
   const [novoClienteNome, setNovoClienteNome] = useState("");
   const [novoClienteWhatsapp, setNovoClienteWhatsapp] = useState("");
@@ -151,7 +159,10 @@ export default function NovoAgendamentoModal({
       return;
     }
 
-    setTipoCliente(initialPayload?.clienteId ? "existente" : "existente");
+    const temClientePreSelecionado = Boolean(initialPayload?.clienteId);
+
+    setClienteBloqueado(temClientePreSelecionado);
+    setTipoCliente("existente");
     setClienteId(initialPayload?.clienteId ? String(initialPayload.clienteId) : "");
     setBuscaCliente("");
     setNovoClienteNome("");
@@ -180,6 +191,12 @@ export default function NovoAgendamentoModal({
     }
   }, [open, initialPayload]);
 
+  const clienteSelecionado = useMemo(() => {
+    if (!clienteId) return null;
+
+    return clientes.find((cliente) => String(cliente.id) === String(clienteId));
+  }, [clienteId, clientes]);
+
   const clientesFiltrados = useMemo(() => {
     const query = buscaCliente.trim().toLowerCase();
 
@@ -195,6 +212,8 @@ export default function NovoAgendamentoModal({
       })
       .slice(0, 12);
   }, [buscaCliente, clientes]);
+
+  const modoRetorno = Boolean(initialPayload?.clienteId);
 
   function selecionarServico(value: string) {
     setServicoSelecionadoId(value);
@@ -283,182 +302,252 @@ export default function NovoAgendamentoModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex h-[100dvh] items-stretch justify-center overflow-hidden bg-slate-950/80 px-0 py-0 backdrop-blur-xl sm:items-center sm:px-4 sm:py-4">
+    <div
+      className="fixed inset-0 z-[100] flex h-[100dvh] w-screen max-w-[100vw] items-stretch justify-center overflow-hidden bg-slate-950/80 px-0 py-0 backdrop-blur-xl sm:items-center sm:px-4 sm:py-4"
+      style={{ touchAction: "pan-y" }}
+    >
       <div className="my-0 flex h-[100dvh] w-full max-w-5xl flex-col overflow-hidden rounded-none border border-white/[0.10] bg-[#111827] shadow-2xl shadow-black/50 sm:my-auto sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-[2rem]">
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-white/[0.08] bg-white/[0.035] p-4 sm:gap-6 sm:p-6">
-          <div>
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-violet-400/20 bg-violet-400/10 px-3 py-1 text-xs font-medium text-violet-200">
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-white/[0.08] bg-white/[0.035] p-4 sm:gap-6 sm:p-6">
+          <div className="min-w-0">
+            <div className="mb-2 hidden w-fit items-center gap-2 rounded-full border border-violet-400/20 bg-violet-400/10 px-3 py-1 text-xs font-medium text-violet-200 sm:inline-flex">
               <CalendarPlus size={14} />
-              Novo atendimento
+              {modoRetorno ? "Retorno" : "Novo atendimento"}
             </div>
 
-            <h2 className="text-2xl font-semibold tracking-tight text-white">
-              Criar agendamento
+            <h2 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
+              {modoRetorno ? "Agendar retorno" : "Criar agendamento"}
             </h2>
 
-            <p className="mt-2 text-sm text-slate-400">
-              Escolha cliente cadastrado ou cadastre um novo cliente durante o
-              agendamento.
+            <p className="mt-1.5 text-xs leading-5 text-slate-400 sm:mt-2 sm:text-sm">
+              {modoRetorno
+                ? "A cliente já está selecionada. Escolha data, horário e procedimento do retorno."
+                : "Escolha cliente cadastrado ou cadastre um novo cliente."}
             </p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-2 text-slate-300 hover:bg-white/[0.08] hover:text-white"
+            className="shrink-0 rounded-2xl border border-white/[0.08] bg-white/[0.04] p-2 text-slate-300 hover:bg-white/[0.08] hover:text-white"
             aria-label="Fechar modal"
           >
             <X size={18} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto overscroll-contain p-4 scrollbar-premium sm:p-6">
-          <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-            <section className="rounded-3xl border border-white/[0.08] bg-white/[0.025] p-4 sm:p-5">
-              <div className="mb-4 flex flex-col gap-3 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={() => setTipoCliente("existente")}
-                  className={`flex flex-1 items-center gap-2 rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${
-                    tipoCliente === "existente"
-                      ? "border-violet-300/40 bg-violet-500/15 text-white"
-                      : "border-white/[0.08] bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]"
-                  }`}
-                >
-                  <UsersRound size={16} />
-                  Cliente cadastrado
-                </button>
+        <div className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3 scrollbar-premium sm:p-6">
+          {clienteBloqueado && clienteSelecionado ? (
+            <div className="mb-3 rounded-2xl border border-violet-300/20 bg-violet-400/10 p-3 sm:mb-5 sm:p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-violet-200/80">
+                    Cliente selecionada
+                  </p>
 
-                <button
-                  type="button"
-                  onClick={() => setTipoCliente("novo")}
-                  className={`flex flex-1 items-center gap-2 rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${
-                    tipoCliente === "novo"
-                      ? "border-violet-300/40 bg-violet-500/15 text-white"
-                      : "border-white/[0.08] bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]"
-                  }`}
-                >
-                  <UserPlus size={16} />
-                  Novo cliente
-                </button>
+                  <p className="mt-1 truncate text-base font-semibold text-white">
+                    {clienteSelecionado.nome}
+                  </p>
+
+                  <p className="mt-1 truncate text-xs text-slate-400">
+                    {clienteSelecionado.whatsapp ||
+                      clienteSelecionado.telefone ||
+                      "Sem telefone"}
+                  </p>
+                </div>
+
+                <CheckCircle2 className="shrink-0 text-violet-200" size={20} />
               </div>
+            </div>
+          ) : null}
 
-              {tipoCliente === "existente" ? (
-                <div className="space-y-4">
-                  <label className="space-y-2">
-                    <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                      Buscar cliente
-                    </span>
+          <div className="grid min-w-0 gap-4 lg:grid-cols-[1.1fr_0.9fr] lg:gap-5">
+            <section
+              className={`min-w-0 overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.025] p-3 sm:p-5 ${
+                clienteBloqueado ? "order-2 lg:order-1" : "order-1"
+              }`}
+            >
+              {clienteBloqueado && clienteSelecionado ? (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Cliente
+                  </p>
 
-                    <div className="relative">
-                      <Search
-                        className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"
-                        size={16}
-                      />
+                  <div className="mt-3 rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4">
+                    <p className="font-semibold text-white">
+                      {clienteSelecionado.nome}
+                    </p>
 
-                      <input
-                        value={buscaCliente}
-                        onChange={(event) => setBuscaCliente(event.target.value)}
-                        placeholder="Digite nome, telefone ou WhatsApp"
-                        className="premium-input w-full pl-11"
-                      />
-                    </div>
-                  </label>
-
-                  <div className="max-h-72 space-y-2 overflow-y-auto overscroll-contain pr-1">
-                    {clientesFiltrados.map((cliente) => {
-                      const active = clienteId === String(cliente.id);
-
-                      return (
-                        <button
-                          key={cliente.id}
-                          type="button"
-                          onClick={() => setClienteId(String(cliente.id))}
-                          className={`w-full rounded-2xl border p-4 text-left transition ${
-                            active
-                              ? "border-violet-300/40 bg-violet-500/15"
-                              : "border-white/[0.08] bg-white/[0.025] hover:bg-white/[0.05]"
-                          }`}
-                        >
-                          <p className="font-semibold text-white">
-                            {cliente.nome}
-                          </p>
-
-                          <p className="mt-1 text-xs text-slate-500">
-                            {cliente.whatsapp ||
-                              cliente.telefone ||
-                              "Sem telefone"}
-                          </p>
-                        </button>
-                      );
-                    })}
-
-                    {clientesFiltrados.length === 0 ? (
-                      <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-4 text-sm text-slate-400">
-                        Nenhum cliente encontrado. Use a opção Novo cliente.
-                      </div>
-                    ) : null}
+                    <p className="mt-1 text-xs text-slate-500">
+                      {clienteSelecionado.whatsapp ||
+                        clienteSelecionado.telefone ||
+                        "Sem telefone"}
+                    </p>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setClienteBloqueado(false)}
+                    className="mt-3 w-full rounded-2xl border border-white/[0.10] bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-200"
+                  >
+                    Alterar cliente
+                  </button>
                 </div>
               ) : (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="space-y-2 sm:col-span-2">
-                    <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                      Nome do cliente
-                    </span>
-
-                    <input
-                      value={novoClienteNome}
-                      onChange={(event) => setNovoClienteNome(event.target.value)}
-                      placeholder="Ex.: Jully Oliveira"
-                      className="premium-input w-full"
-                    />
-                  </label>
-
-                  <label className="space-y-2">
-                    <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                      WhatsApp
-                    </span>
-
-                    <input
-                      value={novoClienteWhatsapp}
-                      onChange={(event) =>
-                        setNovoClienteWhatsapp(maskPhone(event.target.value))
-                      }
-                      placeholder="(11) 99999-9999"
-                      className="premium-input w-full"
-                    />
-                  </label>
-
-                  <label className="space-y-2">
-                    <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                      Origem
-                    </span>
-
-                    <select
-                      value={novoClienteOrigem}
-                      onChange={(event) =>
-                        setNovoClienteOrigem(event.target.value)
-                      }
-                      className="premium-input w-full"
+                <>
+                  <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => setTipoCliente("existente")}
+                      className={`flex min-w-0 items-center gap-2 rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${
+                        tipoCliente === "existente"
+                          ? "border-violet-300/40 bg-violet-500/15 text-white"
+                          : "border-white/[0.08] bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]"
+                      }`}
                     >
-                      <option value="">Selecione</option>
+                      <UsersRound size={16} className="shrink-0" />
+                      <span className="truncate">Cliente cadastrado</span>
+                    </button>
 
-                      {origensCliente.map((origem) => (
-                        <option key={origem.id} value={origem.nome}>
-                          {origem.nome}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
+                    <button
+                      type="button"
+                      onClick={() => setTipoCliente("novo")}
+                      className={`flex min-w-0 items-center gap-2 rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${
+                        tipoCliente === "novo"
+                          ? "border-violet-300/40 bg-violet-500/15 text-white"
+                          : "border-white/[0.08] bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]"
+                      }`}
+                    >
+                      <UserPlus size={16} className="shrink-0" />
+                      <span className="truncate">Novo cliente</span>
+                    </button>
+                  </div>
+
+                  {tipoCliente === "existente" ? (
+                    <div className="space-y-4">
+                      <label className="block space-y-2">
+                        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          Buscar cliente
+                        </span>
+
+                        <div className="relative min-w-0">
+                          <Search
+                            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"
+                            size={16}
+                          />
+
+                          <input
+                            value={buscaCliente}
+                            onChange={(event) =>
+                              setBuscaCliente(event.target.value)
+                            }
+                            placeholder="Digite nome, telefone ou WhatsApp"
+                            className="premium-input w-full min-w-0 pl-11"
+                          />
+                        </div>
+                      </label>
+
+                      <div className="max-h-72 space-y-2 overflow-x-hidden overflow-y-auto overscroll-contain pr-1">
+                        {clientesFiltrados.map((cliente) => {
+                          const active = clienteId === String(cliente.id);
+
+                          return (
+                            <button
+                              key={cliente.id}
+                              type="button"
+                              onClick={() => setClienteId(String(cliente.id))}
+                              className={`w-full rounded-2xl border p-4 text-left transition ${
+                                active
+                                  ? "border-violet-300/40 bg-violet-500/15"
+                                  : "border-white/[0.08] bg-white/[0.025] hover:bg-white/[0.05]"
+                              }`}
+                            >
+                              <p className="truncate font-semibold text-white">
+                                {cliente.nome}
+                              </p>
+
+                              <p className="mt-1 truncate text-xs text-slate-500">
+                                {cliente.whatsapp ||
+                                  cliente.telefone ||
+                                  "Sem telefone"}
+                              </p>
+                            </button>
+                          );
+                        })}
+
+                        {clientesFiltrados.length === 0 ? (
+                          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-4 text-sm text-slate-400">
+                            Nenhum cliente encontrado. Use a opção Novo cliente.
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <label className="block space-y-2 sm:col-span-2">
+                        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          Nome do cliente
+                        </span>
+
+                        <input
+                          value={novoClienteNome}
+                          onChange={(event) =>
+                            setNovoClienteNome(event.target.value)
+                          }
+                          placeholder="Ex.: Jully Oliveira"
+                          className="premium-input w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-2">
+                        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          WhatsApp
+                        </span>
+
+                        <input
+                          value={novoClienteWhatsapp}
+                          onChange={(event) =>
+                            setNovoClienteWhatsapp(maskPhone(event.target.value))
+                          }
+                          placeholder="(11) 99999-9999"
+                          className="premium-input w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-2">
+                        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          Origem
+                        </span>
+
+                        <select
+                          value={novoClienteOrigem}
+                          onChange={(event) =>
+                            setNovoClienteOrigem(event.target.value)
+                          }
+                          className="premium-input w-full"
+                        >
+                          <option value="">Selecione</option>
+
+                          {origensCliente.map((origem) => (
+                            <option key={origem.id} value={origem.nome}>
+                              {origem.nome}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  )}
+                </>
               )}
             </section>
 
-            <section className="rounded-3xl border border-white/[0.08] bg-white/[0.025] p-4 sm:p-5">
+            <section
+              className={`min-w-0 overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.025] p-3 sm:p-5 ${
+                clienteBloqueado ? "order-1 lg:order-2" : "order-2"
+              }`}
+            >
               <div className="grid gap-4 sm:grid-cols-2">
-                <label className="space-y-2 sm:col-span-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <label className="block space-y-2 sm:col-span-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                     Profissional
                   </span>
 
@@ -478,8 +567,8 @@ export default function NovoAgendamentoModal({
                   </select>
                 </label>
 
-                <label className="space-y-2 sm:col-span-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <label className="block space-y-2 sm:col-span-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                     Procedimento / serviço
                   </span>
 
@@ -505,15 +594,15 @@ export default function NovoAgendamentoModal({
                     <option value="outro">Outro procedimento</option>
                   </select>
 
-                  <p className="text-xs text-slate-500">
-                    A duração padrão do serviço bloqueia automaticamente a agenda
-                    no período correto.
+                  <p className="text-xs leading-5 text-slate-500">
+                    No retorno, você pode manter o texto preenchido ou trocar por
+                    outro procedimento.
                   </p>
                 </label>
 
                 {servicoSelecionadoId === "outro" ? (
-                  <label className="space-y-2 sm:col-span-2">
-                    <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  <label className="block space-y-2 sm:col-span-2">
+                    <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                       Nome do procedimento
                     </span>
 
@@ -526,8 +615,8 @@ export default function NovoAgendamentoModal({
                   </label>
                 ) : null}
 
-                <label className="space-y-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <label className="block space-y-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                     Data
                   </span>
 
@@ -539,8 +628,8 @@ export default function NovoAgendamentoModal({
                   />
                 </label>
 
-                <label className="space-y-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <label className="block space-y-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                     Horário
                   </span>
 
@@ -552,8 +641,8 @@ export default function NovoAgendamentoModal({
                   />
                 </label>
 
-                <label className="space-y-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <label className="block space-y-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                     Duração
                   </span>
 
@@ -572,8 +661,8 @@ export default function NovoAgendamentoModal({
                   </select>
                 </label>
 
-                <label className="space-y-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <label className="block space-y-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                     Valor previsto
                   </span>
 
@@ -587,8 +676,8 @@ export default function NovoAgendamentoModal({
                   />
                 </label>
 
-                <label className="space-y-2 sm:col-span-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <label className="block space-y-2 sm:col-span-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                     Status
                   </span>
 
@@ -606,8 +695,8 @@ export default function NovoAgendamentoModal({
                   </select>
                 </label>
 
-                <label className="space-y-2 sm:col-span-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <label className="block space-y-2 sm:col-span-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                     Observações
                   </span>
 
@@ -623,18 +712,28 @@ export default function NovoAgendamentoModal({
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-col-reverse gap-3 border-t border-white/[0.08] bg-white/[0.02] p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:flex-row sm:justify-end sm:p-6">
+        <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-white/[0.08] bg-white/[0.02] p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:flex-row sm:justify-end sm:p-6">
           <Button
             type="button"
             variant="outline"
             onClick={onClose}
             disabled={salvando}
+            className="h-11"
           >
             Cancelar
           </Button>
 
-          <Button type="button" onClick={salvar} disabled={salvando}>
-            {salvando ? "Salvando..." : "Salvar atendimento"}
+          <Button
+            type="button"
+            onClick={salvar}
+            disabled={salvando}
+            className="h-11"
+          >
+            {salvando
+              ? "Salvando..."
+              : modoRetorno
+                ? "Salvar retorno"
+                : "Salvar atendimento"}
           </Button>
         </div>
       </div>

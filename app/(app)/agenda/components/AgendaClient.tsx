@@ -199,7 +199,7 @@ export default function AgendaClient({
       clienteId: appointment.clienteId,
       procedimento: `Retorno - ${appointment.procedimento}`,
       duracao: appointment.duracao || 60,
-      valor: appointment.valor || 0,
+      valor: 0,
       status: "Agendado",
       observacoes: `Retorno referente ao atendimento de ${formatarDataCurta(
         appointment.data,
@@ -280,11 +280,7 @@ export default function AgendaClient({
         open={Boolean(finishAppointment)}
         appointment={finishAppointment}
         onClose={() => setFinishAppointment(null)}
-        onAgendarRetorno={() => {
-          if (finishAppointment) {
-            abrirReagendamento(finishAppointment);
-          }
-        }}
+        onAgendarRetorno={abrirReagendamento}
       />
     </div>
   );
