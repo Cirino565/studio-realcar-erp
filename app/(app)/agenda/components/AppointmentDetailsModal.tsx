@@ -1,5 +1,6 @@
 "use client";
 
+import { useTransition } from "react";
 import {
   Activity,
   CalendarClock,
@@ -8,11 +9,13 @@ import {
   ExternalLink,
   MessageCircle,
   Phone,
+  PlayCircle,
   Sparkles,
   UserRound,
   X,
 } from "lucide-react";
 
+import { iniciarAtendimento } from "@/actions/agendamento.actions";
 import { Button } from "@/components/ui/button";
 import { WhatsAppLink } from "@/components/ui/whatsapp-link";
 import { buildWhatsAppMessage, buildWhatsAppUrl } from "@/lib/whatsapp";
@@ -49,6 +52,7 @@ type Props = {
   onClose: () => void;
   onWhatsApp: (appointment: AppointmentDetails) => void;
   onFinalizar: (appointment: AppointmentDetails) => void;
+  onReagendar: (appointment: AppointmentDetails) => void;
 };
 
 function formatDateTime(value: Date | string) {
@@ -71,30 +75,95 @@ function formatTime(value: Date | string) {
 function addMinutes(value: Date | string, minutes: number) {
   const date = new Date(value);
   date.setMinutes(date.getMinutes() + minutes);
+
   return date;
 }
 
 function statusClass(status: string) {
-  if (status === "Confirmado") return "border-emerald-300/20 bg-emerald-400/10 text-emerald-200";
-  if (status === "Atendido") return "border-blue-300/20 bg-blue-400/10 text-blue-200";
-  if (status === "Faltou") return "border-amber-300/20 bg-amber-400/10 text-amber-200";
-  if (status === "Cancelado") return "border-rose-300/20 bg-rose-400/10 text-rose-200";
+  if (status === "Confirmado") {
+    return "border-emerald-300/20 bg-emerald-400/10 text-emerald-200";
+  }
+
+  if (status === "Em atendimento") {
+    return "border-cyan-300/20 bg-cyan-400/10 text-cyan-200";
+  }
+
+  if (status === "Atendido") {
+    return "border-blue-300/20 bg-blue-400/10 text-blue-200";
+  }
+
+  if (status === "Faltou") {
+    return "border-amber-300/20 bg-amber-400/10 text-amber-200";
+  }
+
+  if (status === "Cancelado") {
+    return "border-rose-300/20 bg-rose-400/10 text-rose-200";
+  }
 
   return "border-violet-300/20 bg-violet-400/10 text-violet-200";
 }
 
-export default function AppointmentDetailsModal({ open, appointment, onClose, onWhatsApp, onFinalizar }: Props) {
+export default function AppointmentDetailsModal({
+  open,
+  appointment,
+  onClose,
+  onWhatsApp,
+  onFinalizar,
+  onReagendar,
+}: Props) {
+  const [isPending, startTransition] = useTransition();
+
   if (!open || !appointment) return null;
 
   const endDate = addMinutes(appointment.data, appointment.duracao);
+
   const message = buildWhatsAppMessage({
     template: "reminder",
     clientName: appointment.cliente.nome,
     procedure: appointment.procedimento,
     appointmentDate: appointment.data,
   });
-  const whatsappUrl = buildWhatsAppUrl(appointment.cliente.whatsapp || appointment.cliente.telefone, message);
-  const phone = appointment.cliente.whatsapp || appointment.cliente.telefone || "Não informado";
+
+  const whatsappUrl = buildWhatsAppUrl(
+    appointment.cliente.whatsapp || appointment.cliente.telefone,
+    message,
+  );
+
+  const phone =
+    appointment.cliente.whatsapp ||
+    appointment.cliente.telefone ||
+    "Não informado";
+
+  const atendimentoFinalizado = appointment.status === "Atendido";
+  const atendimentoCancelado = appointment.status === "Cancelado";
+  const atendimentoEmAndamento = appointment.status === "Em atendimento";
+
+  function handleIniciar() {
+    if (!appointment) return;
+
+    if (atendimentoFinalizado) {
+      alert("Este atendimento já foi finalizado.");
+      return;
+    }
+
+    if (atendimentoCancelado) {
+      alert("Não é possível iniciar um atendimento cancelado.");
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        await iniciarAtendimento(appointment.id);
+        window.location.reload();
+      } catch (error) {
+        alert(
+          error instanceof Error
+            ? error.message
+            : "Não foi possível iniciar o atendimento.",
+        );
+      }
+    });
+  }
 
   return (
     <div className="fixed inset-0 z-[100] overflow-hidden">
@@ -116,11 +185,13 @@ export default function AppointmentDetailsModal({ open, appointment, onClose, on
                 <Sparkles size={13} />
                 Atendimento selecionado
               </div>
+
               <h2 className="truncate text-2xl font-semibold tracking-tight text-white">
                 {appointment.cliente.nome}
               </h2>
+
               <p className="mt-2 text-sm leading-6 text-slate-400">
-                Acesso rápido à ficha, anamnese, evolução e WhatsApp do cliente.
+                Acesso rápido à ficha, WhatsApp, início, finalização e retorno.
               </p>
             </div>
 
@@ -142,8 +213,12 @@ export default function AppointmentDetailsModal({ open, appointment, onClose, on
                 <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl border border-violet-300/25 bg-violet-400/12 text-violet-100">
                   <UserRound size={20} />
                 </div>
+
                 <div className="min-w-0">
-                  <p className="truncate text-base font-semibold text-white">{appointment.cliente.nome}</p>
+                  <p className="truncate text-base font-semibold text-white">
+                    {appointment.cliente.nome}
+                  </p>
+
                   <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-400">
                     <Phone size={12} />
                     {phone}
@@ -151,7 +226,11 @@ export default function AppointmentDetailsModal({ open, appointment, onClose, on
                 </div>
               </div>
 
-              <span className={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${statusClass(appointment.status)}`}>
+              <span
+                className={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${statusClass(
+                  appointment.status,
+                )}`}
+              >
                 {appointment.status}
               </span>
             </div>
@@ -159,8 +238,12 @@ export default function AppointmentDetailsModal({ open, appointment, onClose, on
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4">
-              <p className="text-xs font-medium text-slate-500">Data e horário</p>
-              <p className="mt-1 text-sm font-semibold text-white">{formatDateTime(appointment.data)}</p>
+              <p className="text-xs font-medium text-slate-500">
+                Data e horário
+              </p>
+              <p className="mt-1 text-sm font-semibold text-white">
+                {formatDateTime(appointment.data)}
+              </p>
               <p className="mt-1 text-xs text-slate-500">
                 {formatTime(appointment.data)} - {formatTime(endDate)}
               </p>
@@ -168,20 +251,34 @@ export default function AppointmentDetailsModal({ open, appointment, onClose, on
 
             <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4">
               <p className="text-xs font-medium text-slate-500">Duração</p>
-              <p className="mt-1 text-sm font-semibold text-white">{appointment.duracao} minutos</p>
-              <p className="mt-1 text-xs text-slate-500">Bloqueado até {formatTime(endDate)}</p>
-            </div>
-
-            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4 sm:col-span-2">
-              <p className="text-xs font-medium text-slate-500">Procedimento</p>
-              <p className="mt-1 text-base font-semibold text-white">{appointment.procedimento}</p>
+              <p className="mt-1 text-sm font-semibold text-white">
+                {appointment.duracao} minutos
+              </p>
               <p className="mt-1 text-xs text-slate-500">
-                Valor previsto: {appointment.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                Bloqueado até {formatTime(endDate)}
               </p>
             </div>
 
             <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4 sm:col-span-2">
-              <p className="text-xs font-medium text-slate-500">Profissional</p>
+              <p className="text-xs font-medium text-slate-500">
+                Procedimento
+              </p>
+              <p className="mt-1 text-base font-semibold text-white">
+                {appointment.procedimento}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Valor previsto:{" "}
+                {appointment.valor.toLocaleString("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                })}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4 sm:col-span-2">
+              <p className="text-xs font-medium text-slate-500">
+                Profissional
+              </p>
               <p className="mt-1 text-sm font-semibold text-white">
                 {appointment.profissional?.nome || "Não definida"}
               </p>
@@ -193,10 +290,63 @@ export default function AppointmentDetailsModal({ open, appointment, onClose, on
 
           {appointment.observacoes ? (
             <div className="rounded-3xl border border-white/[0.08] bg-white/[0.035] p-4">
-              <p className="text-xs font-medium text-slate-500">Observações do agendamento</p>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-300">{appointment.observacoes}</p>
+              <p className="text-xs font-medium text-slate-500">
+                Observações do agendamento
+              </p>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-300">
+                {appointment.observacoes}
+              </p>
             </div>
           ) : null}
+
+          <div className="rounded-3xl border border-white/[0.08] bg-white/[0.035] p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Fluxo do atendimento
+            </p>
+
+            <div className="mt-4 grid gap-3">
+              <Button
+                type="button"
+                className="h-12 justify-start bg-cyan-600 text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={handleIniciar}
+                disabled={
+                  isPending ||
+                  atendimentoFinalizado ||
+                  atendimentoCancelado ||
+                  atendimentoEmAndamento
+                }
+              >
+                <PlayCircle size={17} />
+                {atendimentoEmAndamento
+                  ? "Atendimento em andamento"
+                  : atendimentoFinalizado
+                    ? "Atendimento finalizado"
+                    : "Iniciar atendimento"}
+              </Button>
+
+              <Button
+                type="button"
+                className="h-12 justify-start bg-emerald-600 text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => onFinalizar(appointment)}
+                disabled={atendimentoFinalizado || atendimentoCancelado}
+              >
+                <CheckCircle2 size={17} />
+                {atendimentoFinalizado
+                  ? "Atendimento finalizado"
+                  : "Finalizar atendimento"}
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="h-12 justify-start"
+                onClick={() => onReagendar(appointment)}
+              >
+                <CalendarClock size={17} />
+                Reagendar retorno
+              </Button>
+            </div>
+          </div>
 
           <div className="rounded-3xl border border-white/[0.08] bg-white/[0.035] p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
@@ -204,16 +354,6 @@ export default function AppointmentDetailsModal({ open, appointment, onClose, on
             </p>
 
             <div className="mt-4 grid gap-3">
-              <Button
-                type="button"
-                className="h-12 justify-start bg-emerald-600 text-white hover:bg-emerald-500"
-                onClick={() => onFinalizar(appointment)}
-                disabled={appointment.status === "Atendido"}
-              >
-                <CheckCircle2 size={17} />
-                {appointment.status === "Atendido" ? "Atendimento finalizado" : "Finalizar atendimento"}
-              </Button>
-
               <Button asChild className="h-12 justify-start">
                 <a href={`/clientes/${appointment.clienteId}`}>
                   <UserRound size={17} />
@@ -221,7 +361,12 @@ export default function AppointmentDetailsModal({ open, appointment, onClose, on
                 </a>
               </Button>
 
-              <Button type="button" variant="outline" onClick={() => onWhatsApp(appointment)} className="h-12 justify-start">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onWhatsApp(appointment)}
+                className="h-12 justify-start"
+              >
                 <MessageCircle size={17} />
                 Gerar mensagem manual
               </Button>
@@ -251,7 +396,13 @@ export default function AppointmentDetailsModal({ open, appointment, onClose, on
                 Abrir WhatsApp
               </WhatsAppLink>
             </Button>
-            <Button type="button" variant="ghost" className="h-11" onClick={onClose}>
+
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-11"
+              onClick={onClose}
+            >
               Fechar painel
             </Button>
           </div>

@@ -60,6 +60,15 @@ type AgendamentoAgenda = {
   profissional: ProfissionalAgenda | null;
 };
 
+type NovoAgendamentoPayload = NovoHorarioPayload & {
+  clienteId?: number;
+  procedimento?: string;
+  duracao?: number;
+  valor?: number;
+  status?: string;
+  observacoes?: string;
+};
+
 type Props = {
   clientes: ClienteAgenda[];
   agendamentos: AgendamentoAgenda[];
@@ -80,6 +89,30 @@ function parseLocalDate(value: string) {
   return new Date(year, month - 1, day);
 }
 
+function toDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function toTimeInput(value: Date | string) {
+  const date = new Date(value);
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+
+  return `${hour}:${minute}`;
+}
+
+function formatarDataCurta(value: Date | string) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
 export default function AgendaClient({
   clientes,
   agendamentos,
@@ -92,14 +125,17 @@ export default function AgendaClient({
   const [selectedDate, setSelectedDate] = useState(() =>
     parseLocalDate(initialDate),
   );
+
   const [profissionalFiltro, setProfissionalFiltro] = useState(
     initialProfissionalFiltro || "todas",
   );
-  const [novoHorario, setNovoHorario] = useState<NovoHorarioPayload | null>(
-    null,
-  );
+
+  const [novoHorario, setNovoHorario] =
+    useState<NovoAgendamentoPayload | null>(null);
+
   const [selectedAppointment, setSelectedAppointment] =
     useState<AgendamentoAgenda | null>(null);
+
   const [finishAppointment, setFinishAppointment] =
     useState<AgendamentoAgenda | null>(null);
 
@@ -145,6 +181,30 @@ export default function AgendaClient({
   function abrirFinalizacao(appointment: AgendamentoAgenda) {
     setSelectedAppointment(null);
     setFinishAppointment(appointment);
+  }
+
+  function abrirReagendamento(appointment: AgendamentoAgenda) {
+    const dataBase = new Date(appointment.data);
+    const dataRetorno = new Date(dataBase);
+
+    dataRetorno.setDate(dataRetorno.getDate() + 30);
+
+    setSelectedAppointment(null);
+    setFinishAppointment(null);
+
+    setNovoHorario({
+      data: toDateInput(dataRetorno),
+      hora: toTimeInput(dataBase),
+      profissionalId: appointment.profissionalId || undefined,
+      clienteId: appointment.clienteId,
+      procedimento: `Retorno - ${appointment.procedimento}`,
+      duracao: appointment.duracao || 60,
+      valor: appointment.valor || 0,
+      status: "Agendado",
+      observacoes: `Retorno referente ao atendimento de ${formatarDataCurta(
+        appointment.data,
+      )}.`,
+    });
   }
 
   return (
@@ -213,12 +273,18 @@ export default function AgendaClient({
         onClose={() => setSelectedAppointment(null)}
         onWhatsApp={abrirWhatsApp}
         onFinalizar={abrirFinalizacao}
+        onReagendar={abrirReagendamento}
       />
 
       <FinalizarAtendimentoModal
         open={Boolean(finishAppointment)}
         appointment={finishAppointment}
         onClose={() => setFinishAppointment(null)}
+        onAgendarRetorno={() => {
+          if (finishAppointment) {
+            abrirReagendamento(finishAppointment);
+          }
+        }}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarPlus, Search, UserPlus, UsersRound, X } from "lucide-react";
 
 import { criarAgendamento } from "@/actions/agendamento.actions";
@@ -36,6 +36,15 @@ type ServicoAgenda = {
   valorPadrao: number;
 };
 
+type NovoAgendamentoPayload = NovoHorarioPayload & {
+  clienteId?: number;
+  procedimento?: string;
+  duracao?: number;
+  valor?: number;
+  status?: string;
+  observacoes?: string;
+};
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -43,7 +52,7 @@ type Props = {
   profissionais: Profissional[];
   origensCliente: OpcaoAuxiliar[];
   servicos: ServicoAgenda[];
-  initialPayload: NovoHorarioPayload | null;
+  initialPayload: NovoAgendamentoPayload | null;
 };
 
 function onlyDigits(value: string) {
@@ -74,6 +83,14 @@ function parseCurrency(value: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function valorParaInput(value?: number) {
+  if (!value || value <= 0) {
+    return "";
+  }
+
+  return String(value).replace(".", ",");
+}
+
 export default function NovoAgendamentoModal({
   open,
   onClose,
@@ -83,24 +100,58 @@ export default function NovoAgendamentoModal({
   servicos,
   initialPayload,
 }: Props) {
-  const [tipoCliente, setTipoCliente] = useState<"existente" | "novo">("existente");
+  const [tipoCliente, setTipoCliente] = useState<"existente" | "novo">(
+    "existente",
+  );
   const [clienteId, setClienteId] = useState("");
   const [buscaCliente, setBuscaCliente] = useState("");
   const [novoClienteNome, setNovoClienteNome] = useState("");
   const [novoClienteWhatsapp, setNovoClienteWhatsapp] = useState("");
   const [novoClienteOrigem, setNovoClienteOrigem] = useState("");
-  const [profissionalId, setProfissionalId] = useState(
-    initialPayload?.profissionalId ? String(initialPayload.profissionalId) : ""
-  );
+  const [profissionalId, setProfissionalId] = useState("");
   const [procedimento, setProcedimento] = useState("");
   const [servicoSelecionadoId, setServicoSelecionadoId] = useState("");
-  const [data, setData] = useState(initialPayload?.data || "");
-  const [hora, setHora] = useState(initialPayload?.hora || "09:00");
+  const [data, setData] = useState("");
+  const [hora, setHora] = useState("09:00");
   const [duracao, setDuracao] = useState("60");
   const [valor, setValor] = useState("");
   const [status, setStatus] = useState("Agendado");
   const [observacoes, setObservacoes] = useState("");
   const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    setTipoCliente(initialPayload?.clienteId ? "existente" : "existente");
+    setClienteId(initialPayload?.clienteId ? String(initialPayload.clienteId) : "");
+    setBuscaCliente("");
+    setNovoClienteNome("");
+    setNovoClienteWhatsapp("");
+    setNovoClienteOrigem("");
+
+    setProfissionalId(
+      initialPayload?.profissionalId
+        ? String(initialPayload.profissionalId)
+        : "",
+    );
+
+    setData(initialPayload?.data || "");
+    setHora(initialPayload?.hora || "09:00");
+    setDuracao(String(initialPayload?.duracao || 60));
+    setValor(valorParaInput(initialPayload?.valor));
+    setStatus(initialPayload?.status || "Agendado");
+    setObservacoes(initialPayload?.observacoes || "");
+
+    if (initialPayload?.procedimento) {
+      setServicoSelecionadoId("outro");
+      setProcedimento(initialPayload.procedimento);
+    } else {
+      setServicoSelecionadoId("");
+      setProcedimento("");
+    }
+  }, [open, initialPayload]);
 
   const clientesFiltrados = useMemo(() => {
     const query = buscaCliente.trim().toLowerCase();
@@ -135,7 +186,11 @@ export default function NovoAgendamentoModal({
 
     setProcedimento(servico.nome);
     setDuracao(String(servico.duracaoPadrao));
-    setValor(servico.valorPadrao > 0 ? String(servico.valorPadrao).replace(".", ",") : "");
+    setValor(
+      servico.valorPadrao > 0
+        ? String(servico.valorPadrao).replace(".", ",")
+        : "",
+    );
   }
 
   if (!open) return null;
@@ -192,7 +247,11 @@ export default function NovoAgendamentoModal({
       window.location.reload();
     } catch (error) {
       setSalvando(false);
-      alert(error instanceof Error ? error.message : "Não foi possível salvar o agendamento.");
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível salvar o agendamento.",
+      );
     }
   }
 
@@ -205,11 +264,14 @@ export default function NovoAgendamentoModal({
               <CalendarPlus size={14} />
               Novo atendimento
             </div>
+
             <h2 className="text-2xl font-semibold tracking-tight text-white">
               Criar agendamento
             </h2>
+
             <p className="mt-2 text-sm text-slate-400">
-              Escolha cliente cadastrado ou cadastre um novo cliente durante o agendamento.
+              Escolha cliente cadastrado ou cadastre um novo cliente durante o
+              agendamento.
             </p>
           </div>
 
@@ -260,8 +322,13 @@ export default function NovoAgendamentoModal({
                     <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Buscar cliente
                     </span>
+
                     <div className="relative">
-                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                      <Search
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"
+                        size={16}
+                      />
+
                       <input
                         value={buscaCliente}
                         onChange={(event) => setBuscaCliente(event.target.value)}
@@ -286,9 +353,14 @@ export default function NovoAgendamentoModal({
                               : "border-white/[0.08] bg-white/[0.025] hover:bg-white/[0.05]"
                           }`}
                         >
-                          <p className="font-semibold text-white">{cliente.nome}</p>
+                          <p className="font-semibold text-white">
+                            {cliente.nome}
+                          </p>
+
                           <p className="mt-1 text-xs text-slate-500">
-                            {cliente.whatsapp || cliente.telefone || "Sem telefone"}
+                            {cliente.whatsapp ||
+                              cliente.telefone ||
+                              "Sem telefone"}
                           </p>
                         </button>
                       );
@@ -307,6 +379,7 @@ export default function NovoAgendamentoModal({
                     <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Nome do cliente
                     </span>
+
                     <input
                       value={novoClienteNome}
                       onChange={(event) => setNovoClienteNome(event.target.value)}
@@ -319,9 +392,12 @@ export default function NovoAgendamentoModal({
                     <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                       WhatsApp
                     </span>
+
                     <input
                       value={novoClienteWhatsapp}
-                      onChange={(event) => setNovoClienteWhatsapp(maskPhone(event.target.value))}
+                      onChange={(event) =>
+                        setNovoClienteWhatsapp(maskPhone(event.target.value))
+                      }
                       placeholder="(11) 99999-9999"
                       className="premium-input w-full"
                     />
@@ -331,12 +407,16 @@ export default function NovoAgendamentoModal({
                     <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Origem
                     </span>
+
                     <select
                       value={novoClienteOrigem}
-                      onChange={(event) => setNovoClienteOrigem(event.target.value)}
+                      onChange={(event) =>
+                        setNovoClienteOrigem(event.target.value)
+                      }
                       className="premium-input w-full"
                     >
                       <option value="">Selecione</option>
+
                       {origensCliente.map((origem) => (
                         <option key={origem.id} value={origem.nome}>
                           {origem.nome}
@@ -354,15 +434,18 @@ export default function NovoAgendamentoModal({
                   <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                     Profissional
                   </span>
+
                   <select
                     value={profissionalId}
                     onChange={(event) => setProfissionalId(event.target.value)}
                     className="premium-input w-full"
                   >
                     <option value="">Selecione</option>
+
                     {profissionais.map((profissional) => (
                       <option key={profissional.id} value={profissional.id}>
-                        {profissional.nome} {profissional.area ? `· ${profissional.area}` : ""}
+                        {profissional.nome}{" "}
+                        {profissional.area ? `· ${profissional.area}` : ""}
                       </option>
                     ))}
                   </select>
@@ -372,12 +455,14 @@ export default function NovoAgendamentoModal({
                   <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                     Procedimento / serviço
                   </span>
+
                   <select
                     value={servicoSelecionadoId}
                     onChange={(event) => selecionarServico(event.target.value)}
                     className="premium-input w-full"
                   >
                     <option value="">Selecione um serviço cadastrado</option>
+
                     {servicos.map((servico) => (
                       <option key={servico.id} value={servico.id}>
                         {servico.nome} · {servico.duracaoPadrao} min
@@ -389,10 +474,13 @@ export default function NovoAgendamentoModal({
                           : ""}
                       </option>
                     ))}
+
                     <option value="outro">Outro procedimento</option>
                   </select>
+
                   <p className="text-xs text-slate-500">
-                    A duração padrão do serviço bloqueia automaticamente a agenda no período correto.
+                    A duração padrão do serviço bloqueia automaticamente a agenda
+                    no período correto.
                   </p>
                 </label>
 
@@ -401,6 +489,7 @@ export default function NovoAgendamentoModal({
                     <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Nome do procedimento
                     </span>
+
                     <input
                       value={procedimento === "Outro" ? "" : procedimento}
                       onChange={(event) => setProcedimento(event.target.value)}
@@ -414,6 +503,7 @@ export default function NovoAgendamentoModal({
                   <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                     Data
                   </span>
+
                   <input
                     type="date"
                     value={data}
@@ -426,6 +516,7 @@ export default function NovoAgendamentoModal({
                   <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                     Horário
                   </span>
+
                   <input
                     type="time"
                     value={hora}
@@ -438,6 +529,7 @@ export default function NovoAgendamentoModal({
                   <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                     Duração
                   </span>
+
                   <select
                     value={duracao}
                     onChange={(event) => setDuracao(event.target.value)}
@@ -457,9 +549,12 @@ export default function NovoAgendamentoModal({
                   <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                     Valor previsto
                   </span>
+
                   <input
                     value={valor}
-                    onChange={(event) => setValor(formatCurrencyInput(event.target.value))}
+                    onChange={(event) =>
+                      setValor(formatCurrencyInput(event.target.value))
+                    }
                     placeholder="0,00"
                     className="premium-input w-full"
                   />
@@ -469,6 +564,7 @@ export default function NovoAgendamentoModal({
                   <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                     Status
                   </span>
+
                   <select
                     value={status}
                     onChange={(event) => setStatus(event.target.value)}
@@ -476,6 +572,7 @@ export default function NovoAgendamentoModal({
                   >
                     <option>Agendado</option>
                     <option>Confirmado</option>
+                    <option>Em atendimento</option>
                     <option>Atendido</option>
                     <option>Faltou</option>
                     <option>Cancelado</option>
@@ -486,6 +583,7 @@ export default function NovoAgendamentoModal({
                   <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                     Observações
                   </span>
+
                   <textarea
                     value={observacoes}
                     onChange={(event) => setObservacoes(event.target.value)}
@@ -499,9 +597,15 @@ export default function NovoAgendamentoModal({
         </div>
 
         <div className="flex flex-col-reverse gap-3 border-t border-white/[0.08] bg-white/[0.02] p-5 sm:flex-row sm:justify-end sm:p-6">
-          <Button type="button" variant="outline" onClick={onClose} disabled={salvando}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={salvando}
+          >
             Cancelar
           </Button>
+
           <Button type="button" onClick={salvar} disabled={salvando}>
             {salvando ? "Salvando..." : "Salvar atendimento"}
           </Button>

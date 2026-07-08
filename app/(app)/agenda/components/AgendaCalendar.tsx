@@ -74,7 +74,13 @@ const slots = Array.from({ length: 24 }, (_, index) => {
   };
 });
 
-const statusOptions = ["Agendado", "Confirmado", "Atendido", "Faltou", "Cancelado"];
+const statusOptions = [
+  "Agendado",
+  "Confirmado",
+  "Atendido",
+  "Faltou",
+  "Cancelado",
+];
 
 function formatDateInput(date: Date) {
   const year = date.getFullYear();
@@ -100,10 +106,11 @@ function formatLongDate(value: Date) {
   }).format(value);
 }
 
-function formatShortDate(value: Date) {
+function formatMobileDate(value: Date) {
   return new Intl.DateTimeFormat("pt-BR", {
     day: "2-digit",
     month: "short",
+    year: "numeric",
   }).format(value);
 }
 
@@ -256,6 +263,11 @@ export default function AgendaCalendar({
 
   function handleDateInputChange(value: string) {
     const [year, month, day] = value.split("-").map(Number);
+
+    if (!year || !month || !day) {
+      return;
+    }
+
     onDateChange(new Date(year, month - 1, day));
   }
 
@@ -372,14 +384,19 @@ export default function AgendaCalendar({
                   <input
                     type="date"
                     value={selectedDateInput}
-                    onChange={(event) => handleDateInputChange(event.target.value)}
+                    onChange={(event) =>
+                      handleDateInputChange(event.target.value)
+                    }
                     className="premium-input h-11 w-full rounded-2xl px-3 py-2 text-sm"
                   />
                 </label>
 
                 <div className="grid min-w-0 grid-cols-3 gap-2 xl:col-span-3">
                   <a
-                    href={agendaHref(addDays(selectedDate, -1), profissionalFiltro)}
+                    href={agendaHref(
+                      addDays(selectedDate, -1),
+                      profissionalFiltro,
+                    )}
                     onClick={() => onDateChange(addDays(selectedDate, -1))}
                     className="flex h-11 items-center justify-center gap-1.5 rounded-2xl border border-white/[0.10] bg-white/[0.04] px-3 text-sm font-semibold text-slate-100 transition active:scale-[0.98]"
                   >
@@ -400,7 +417,10 @@ export default function AgendaCalendar({
                   </a>
 
                   <a
-                    href={agendaHref(addDays(selectedDate, 1), profissionalFiltro)}
+                    href={agendaHref(
+                      addDays(selectedDate, 1),
+                      profissionalFiltro,
+                    )}
                     onClick={() => onDateChange(addDays(selectedDate, 1))}
                     className="flex h-11 items-center justify-center gap-1.5 rounded-2xl border border-white/[0.10] bg-white/[0.04] px-3 text-sm font-semibold text-slate-100 transition active:scale-[0.98]"
                   >
@@ -449,7 +469,7 @@ export default function AgendaCalendar({
           </div>
         </div>
 
-        <div className="w-full max-w-full space-y-3 p-3 xl:hidden">
+        <div className="w-full max-w-full space-y-3 overflow-hidden p-2.5 xl:hidden">
           <div className="min-w-0">
             <div className="flex min-w-0 items-center gap-2 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-slate-500">
               <CalendarDays size={12} />
@@ -481,29 +501,35 @@ export default function AgendaCalendar({
             </select>
           </label>
 
-          <div className="grid min-w-0 grid-cols-[42px_1fr_42px] gap-2">
+          <div className="grid w-full max-w-full grid-cols-[38px_minmax(0,1fr)_38px] gap-2 overflow-hidden">
             <a
               href={agendaHref(addDays(selectedDate, -1), profissionalFiltro)}
               onClick={() => onDateChange(addDays(selectedDate, -1))}
               aria-label="Dia anterior"
-              className="flex h-10 items-center justify-center rounded-2xl border border-white/[0.10] bg-white/[0.04] text-slate-100 transition active:scale-[0.98]"
+              className="flex h-10 w-[38px] shrink-0 items-center justify-center rounded-2xl border border-white/[0.10] bg-white/[0.04] text-slate-100 transition active:scale-[0.98]"
             >
               <ChevronLeft size={16} />
             </a>
 
-            <input
-              type="date"
-              value={selectedDateInput}
-              onChange={(event) => handleDateInputChange(event.target.value)}
-              className="premium-input h-10 min-w-0 rounded-2xl px-2 text-center text-sm"
-              aria-label="Selecionar data"
-            />
+            <label className="relative flex h-10 min-w-0 max-w-full items-center justify-center overflow-hidden rounded-2xl border border-white/[0.10] bg-white/[0.04] px-2 text-center text-xs font-medium text-slate-100">
+              <span className="pointer-events-none block max-w-full truncate">
+                {formatMobileDate(selectedDate)}
+              </span>
+
+              <input
+                type="date"
+                value={selectedDateInput}
+                onChange={(event) => handleDateInputChange(event.target.value)}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                aria-label="Selecionar data"
+              />
+            </label>
 
             <a
               href={agendaHref(addDays(selectedDate, 1), profissionalFiltro)}
               onClick={() => onDateChange(addDays(selectedDate, 1))}
               aria-label="Próximo dia"
-              className="flex h-10 items-center justify-center rounded-2xl border border-white/[0.10] bg-white/[0.04] text-slate-100 transition active:scale-[0.98]"
+              className="flex h-10 w-[38px] shrink-0 items-center justify-center rounded-2xl border border-white/[0.10] bg-white/[0.04] text-slate-100 transition active:scale-[0.98]"
             >
               <ChevronRight size={16} />
             </a>
@@ -623,7 +649,9 @@ export default function AgendaCalendar({
                             <div className="flex min-w-0 items-start justify-between gap-3">
                               <div className="min-w-0 flex-1">
                                 <div className="mb-2 flex flex-wrap items-center gap-2">
-                                  <span className={`size-2 rounded-full ${color.dot}`} />
+                                  <span
+                                    className={`size-2 rounded-full ${color.dot}`}
+                                  />
                                   <p className="text-[0.72rem] font-semibold text-slate-300">
                                     {formatTime(appointment.data)} -{" "}
                                     {formatTime(appointmentEnd(appointment))}
@@ -679,7 +707,8 @@ export default function AgendaCalendar({
                       <div
                         className={`flex h-full min-h-[34px] items-center justify-center rounded-2xl border px-2 text-center text-[0.68rem] ${color.busy}`}
                       >
-                        Ocupado até {formatTime(appointmentEnd(blockedAppointment))}
+                        Ocupado até{" "}
+                        {formatTime(appointmentEnd(blockedAppointment))}
                       </div>
                     ) : (
                       <a
@@ -703,7 +732,7 @@ export default function AgendaCalendar({
         </div>
       </div>
 
-      <div className="w-full max-w-full space-y-3 p-3 pb-28 xl:hidden">
+      <div className="w-full max-w-full space-y-3 overflow-hidden p-2.5 pb-28 xl:hidden">
         {profissionais.map((profissional) => {
           const color = getColorClasses(profissional.cor);
           const professionalAppointments = getProfessionalAppointments(
@@ -713,7 +742,7 @@ export default function AgendaCalendar({
           return (
             <section
               key={profissional.id}
-              className="w-full max-w-full rounded-3xl border border-white/[0.08] bg-white/[0.025] p-3"
+              className="w-full max-w-full overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.025] p-3"
             >
               <div className="mb-3 flex min-w-0 items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
@@ -755,7 +784,7 @@ export default function AgendaCalendar({
                   {professionalAppointments.map((appointment) => (
                     <article
                       key={appointment.id}
-                      className={`w-full max-w-full rounded-2xl border p-3 ${color.card}`}
+                      className={`w-full max-w-full overflow-hidden rounded-2xl border p-3 ${color.card}`}
                     >
                       <button
                         type="button"

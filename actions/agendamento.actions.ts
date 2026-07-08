@@ -101,6 +101,7 @@ const servicosPadrao = [
 
 export async function criarProfissionaisPadrao() {
   await requirePermission("agenda.gerenciar");
+
   for (const profissional of profissionaisPadrao) {
     await prisma.profissional.upsert({
       where: {
@@ -124,6 +125,7 @@ export async function criarProfissionaisPadrao() {
 
 export async function criarServicosPadrao() {
   await requirePermission("agenda.gerenciar");
+
   for (const servico of servicosPadrao) {
     await prisma.procedimentoServico.upsert({
       where: {
@@ -165,7 +167,8 @@ async function resolverCliente(dados: NovoAgendamento) {
         "Não informado",
       whatsapp: dados.novoCliente.whatsapp?.trim() || null,
       origem: dados.novoCliente.origem || null,
-      procedimentoInteresse: dados.novoCliente.procedimentoInteresse || dados.procedimento,
+      procedimentoInteresse:
+        dados.novoCliente.procedimentoInteresse || dados.procedimento,
       observacoes: dados.novoCliente.observacoes || null,
     },
   });
@@ -195,8 +198,16 @@ async function validarConflitoAgenda({
 
   const inicioNovo = data;
   const fimNovo = addMinutes(inicioNovo, duracao);
-  const inicioDia = new Date(data.getFullYear(), data.getMonth(), data.getDate());
-  const fimDia = new Date(data.getFullYear(), data.getMonth(), data.getDate() + 1);
+  const inicioDia = new Date(
+    data.getFullYear(),
+    data.getMonth(),
+    data.getDate(),
+  );
+  const fimDia = new Date(
+    data.getFullYear(),
+    data.getMonth(),
+    data.getDate() + 1,
+  );
 
   const agendamentosDoDia = await prisma.agendamento.findMany({
     where: {
@@ -235,18 +246,20 @@ async function validarConflitoAgenda({
     hour: "2-digit",
     minute: "2-digit",
   }).format(conflito.data);
+
   const fim = new Intl.DateTimeFormat("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
   }).format(addMinutes(conflito.data, conflito.duracao));
 
   throw new Error(
-    `Este horário conflita com ${conflito.cliente.nome}, agendado das ${inicio} às ${fim}. Escolha outro horário ou ajuste a duração.`
+    `Este horário conflita com ${conflito.cliente.nome}, agendado das ${inicio} às ${fim}. Escolha outro horário ou ajuste a duração.`,
   );
 }
 
 export async function criarAgendamento(dados: NovoAgendamento) {
   await requirePermission("agenda.gerenciar");
+
   const data = new Date(dados.data);
   const duracao = dados.duracao || 60;
 
@@ -280,6 +293,7 @@ export async function atualizarAgendamento({
   ...dados
 }: NovoAgendamento & { id: number }) {
   await requirePermission("agenda.gerenciar");
+
   const data = new Date(dados.data);
   const duracao = dados.duracao || 60;
 
@@ -314,6 +328,7 @@ export async function atualizarAgendamento({
 
 export async function excluirAgendamento(id: number) {
   await requirePermission("agenda.gerenciar");
+
   await prisma.agendamento.delete({
     where: {
       id,
@@ -321,6 +336,70 @@ export async function excluirAgendamento(id: number) {
   });
 
   revalidatePath("/agenda");
+  revalidatePath("/");
+}
+
+export async function iniciarAtendimento(agendamentoId: number) {
+  await requirePermission("agenda.gerenciar");
+
+  if (!agendamentoId) {
+    throw new Error("Agendamento inválido.");
+  }
+
+  const agendamento = await prisma.agendamento.findUnique({
+    where: {
+      id: agendamentoId,
+    },
+    include: {
+      cliente: {
+        select: {
+          nome: true,
+        },
+      },
+      profissional: {
+        select: {
+          nome: true,
+        },
+      },
+    },
+  });
+
+  if (!agendamento) {
+    throw new Error("Agendamento não encontrado.");
+  }
+
+  if (agendamento.status === "Cancelado") {
+    throw new Error("Não é possível iniciar um agendamento cancelado.");
+  }
+
+  if (agendamento.status === "Atendido") {
+    throw new Error("Este atendimento já foi finalizado.");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.agendamento.update({
+      where: {
+        id: agendamento.id,
+      },
+      data: {
+        status: "Em atendimento",
+      },
+    });
+
+    await tx.auditoria.create({
+      data: {
+        modulo: "Agenda",
+        acao: "Iniciou atendimento",
+        entidade: "Agendamento",
+        entidadeId: String(agendamento.id),
+        usuario: agendamento.profissional?.nome || "Equipe Studio Realçar",
+        detalhes: `Atendimento iniciado para ${agendamento.cliente.nome}. Procedimento: ${agendamento.procedimento}.`,
+      },
+    });
+  });
+
+  revalidatePath("/agenda");
+  revalidatePath(`/clientes/${agendamento.clienteId}`);
   revalidatePath("/");
 }
 
@@ -338,6 +417,7 @@ export type FinalizarAtendimentoInput = {
 
 export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
   await requirePermission("agenda.gerenciar");
+
   if (!dados.agendamentoId) {
     throw new Error("Agendamento inválido.");
   }
@@ -353,9 +433,11 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
   const valorCobrado = Number.isFinite(Number(dados.valorCobrado))
     ? Number(dados.valorCobrado)
     : 0;
+
   const dataAtendimento = dados.dataAtendimento
     ? new Date(dados.dataAtendimento)
     : new Date();
+
   const statusPagamento = dados.statusPagamento || "Pago";
   const formaPagamento = dados.formaPagamento || "Não informado";
 
@@ -376,7 +458,10 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
   }
 
   const profissional =
-    dados.profissional?.trim() || agendamento.profissional?.nome || "Equipe Studio Realçar";
+    dados.profissional?.trim() ||
+    agendamento.profissional?.nome ||
+    "Equipe Studio Realçar";
+
   const procedimentoRealizado = dados.procedimentoRealizado.trim();
   const observacoes = dados.observacoes?.trim() || null;
 
