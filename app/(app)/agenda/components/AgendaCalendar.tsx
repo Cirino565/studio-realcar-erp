@@ -1,12 +1,13 @@
 "use client";
 
-import { buildWhatsAppMessage, buildWhatsAppUrl } from "@/lib/whatsapp";
-
+import { useMemo, useState } from "react";
 import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   Clock3,
+  Eye,
+  EyeOff,
   MessageCircle,
   Plus,
   UserRound,
@@ -59,28 +60,32 @@ type Props = {
   onMessage: (appointment: AgendamentoAgenda) => void;
 };
 
-const slots = Array.from({ length: 24 }, (_, index) => {
-  const totalMinutes = 8 * 60 + index * 30;
-  const hour = Math.floor(totalMinutes / 60);
-  const minute = totalMinutes % 60;
+const START_HOUR = 6;
+const END_HOUR = 21;
+const SLOT_MINUTES = 30;
+const MINUTE_HEIGHT = 1.28;
+const TOTAL_MINUTES = (END_HOUR - START_HOUR) * 60;
 
-  return {
-    hour,
-    minute,
-    label: `${String(hour).padStart(2, "0")}:${String(minute).padStart(
-      2,
-      "0",
-    )}`,
-  };
-});
+const slots = Array.from(
+  { length: (TOTAL_MINUTES / SLOT_MINUTES) + 1 },
+  (_, index) => {
+    const totalMinutes = START_HOUR * 60 + index * SLOT_MINUTES;
+    const hour = Math.floor(totalMinutes / 60);
+    const minute = totalMinutes % 60;
 
-const statusOptions = [
-  "Agendado",
-  "Confirmado",
-  "Atendido",
-  "Faltou",
-  "Cancelado",
-];
+    return {
+      hour,
+      minute,
+      label: `${String(hour).padStart(2, "0")}:${String(minute).padStart(
+        2,
+        "0",
+      )}`,
+      offset: index * SLOT_MINUTES * MINUTE_HEIGHT,
+    };
+  },
+);
+
+const gridHeight = TOTAL_MINUTES * MINUTE_HEIGHT;
 
 function formatDateInput(date: Date) {
   const year = date.getFullYear();
@@ -99,17 +104,9 @@ function formatTime(value: Date | string) {
 
 function formatLongDate(value: Date) {
   return new Intl.DateTimeFormat("pt-BR", {
-    weekday: "short",
+    weekday: "long",
     day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(value);
-}
-
-function formatMobileDate(value: Date) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "short",
+    month: "long",
     year: "numeric",
   }).format(value);
 }
@@ -149,23 +146,45 @@ function isSameDay(first: Date, second: Date) {
   );
 }
 
-function slotToDate(baseDate: Date, hour: number, minute: number) {
-  return new Date(
-    baseDate.getFullYear(),
-    baseDate.getMonth(),
-    baseDate.getDate(),
-    hour,
-    minute,
-    0,
-  );
-}
-
-function isActiveAppointment(appointment: AgendamentoAgenda) {
-  return appointment.status !== "Cancelado";
+function minutesFromStart(value: Date | string) {
+  const date = new Date(value);
+  return date.getHours() * 60 + date.getMinutes() - START_HOUR * 60;
 }
 
 function appointmentEnd(appointment: AgendamentoAgenda) {
   return addMinutes(new Date(appointment.data), appointment.duracao);
+}
+
+function agendaHref(date: Date, profissionalFiltro: string) {
+  const data = formatDateInput(date);
+  const profissional =
+    profissionalFiltro !== "todas" ? `&profissional=${profissionalFiltro}` : "";
+
+  return `/agenda?data=${data}${profissional}`;
+}
+
+function statusClass(status: string) {
+  if (status === "Confirmado") {
+    return "border-emerald-200/40 bg-emerald-50/15 text-emerald-50";
+  }
+
+  if (status === "Em atendimento") {
+    return "border-amber-200/40 bg-amber-50/15 text-amber-50";
+  }
+
+  if (status === "Atendido") {
+    return "border-sky-200/40 bg-sky-50/15 text-sky-50";
+  }
+
+  if (status === "Faltou") {
+    return "border-orange-200/40 bg-orange-50/15 text-orange-50";
+  }
+
+  if (status === "Cancelado") {
+    return "border-white/25 bg-white/10 text-white/75 line-through";
+  }
+
+  return "border-white/25 bg-white/10 text-white";
 }
 
 function getColorClasses(color: string) {
@@ -177,72 +196,61 @@ function getColorClasses(color: string) {
     normalizedColor.includes("red")
   ) {
     return {
-      avatar: "border-rose-300/30 bg-rose-400/15 text-rose-100",
-      card: "border-rose-300/20 bg-gradient-to-br from-rose-500/15 to-fuchsia-500/10 hover:border-rose-300/35",
-      dot: "bg-rose-300",
-      busy: "border-rose-300/20 bg-rose-400/10 text-rose-200/75",
+      avatar: "border-rose-200/40 bg-rose-600 text-white",
+      header: "border-rose-300/25 bg-rose-500/10 text-rose-100",
+      event:
+        "border-rose-200/35 bg-gradient-to-br from-rose-600 via-rose-600 to-red-700 text-white shadow-rose-950/35",
+      eventSoft:
+        "border-rose-300/20 bg-rose-500/10 text-rose-100 hover:bg-rose-500/15",
+      dot: "bg-rose-100",
+      line: "bg-rose-400/60",
+    };
+  }
+
+  if (
+    normalizedColor.includes("emerald") ||
+    normalizedColor.includes("green") ||
+    normalizedColor.includes("teal")
+  ) {
+    return {
+      avatar: "border-emerald-200/40 bg-emerald-600 text-white",
+      header: "border-emerald-300/25 bg-emerald-500/10 text-emerald-100",
+      event:
+        "border-emerald-200/35 bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700 text-white shadow-emerald-950/35",
+      eventSoft:
+        "border-emerald-300/20 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/15",
+      dot: "bg-emerald-100",
+      line: "bg-emerald-400/60",
     };
   }
 
   return {
-    avatar: "border-violet-300/30 bg-violet-400/15 text-violet-100",
-    card: "border-violet-300/20 bg-gradient-to-br from-violet-500/15 to-cyan-500/10 hover:border-violet-300/35",
-    dot: "bg-violet-300",
-    busy: "border-violet-300/20 bg-violet-400/10 text-violet-200/75",
+    avatar: "border-violet-200/40 bg-violet-600 text-white",
+    header: "border-violet-300/25 bg-violet-500/10 text-violet-100",
+    event:
+      "border-violet-200/35 bg-gradient-to-br from-violet-600 via-fuchsia-600 to-purple-700 text-white shadow-violet-950/35",
+    eventSoft:
+      "border-violet-300/20 bg-violet-500/10 text-violet-100 hover:bg-violet-500/15",
+    dot: "bg-violet-100",
+    line: "bg-violet-400/60",
   };
 }
 
-function statusClass(status: string) {
-  if (status === "Confirmado") {
-    return "border-emerald-300/20 bg-emerald-400/10 text-emerald-200";
+function getAppointmentNote(appointment: AgendamentoAgenda) {
+  const note = appointment.observacoes?.split("\n").find(Boolean)?.trim();
+
+  if (note) {
+    return note;
   }
 
-  if (status === "Atendido") {
-    return "border-blue-300/20 bg-blue-400/10 text-blue-200";
+  if (appointment.valor > 0) {
+    return appointment.valor.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
   }
 
-  if (status === "Faltou") {
-    return "border-amber-300/20 bg-amber-400/10 text-amber-200";
-  }
-
-  if (status === "Cancelado") {
-    return "border-rose-300/20 bg-rose-400/10 text-rose-200";
-  }
-
-  return "border-slate-300/15 bg-white/[0.05] text-slate-300";
-}
-
-function agendaHref(date: Date, profissionalFiltro: string) {
-  const data = formatDateInput(date);
-  const profissional =
-    profissionalFiltro !== "todas" ? `&profissional=${profissionalFiltro}` : "";
-
-  return `/agenda?data=${data}${profissional}`;
-}
-
-function novoAgendamentoHref(
-  date: Date,
-  profissionalId?: number,
-  hora = "09:00",
-) {
-  const data = formatDateInput(date);
-  const profissional = profissionalId ? `&profissionalId=${profissionalId}` : "";
-
-  return `/agenda/novo?data=${data}&hora=${encodeURIComponent(
-    hora,
-  )}${profissional}`;
-}
-
-function appointmentWhatsAppHref(appointment: AgendamentoAgenda) {
-  return buildWhatsAppUrl(
-    appointment.cliente.whatsapp || appointment.cliente.telefone,
-    buildWhatsAppMessage({
-      template: "confirmation",
-      clientName: appointment.cliente.nome,
-      procedure: appointment.procedimento,
-      appointmentDate: appointment.data,
-    }),
-  );
+  return appointment.status;
 }
 
 export default function AgendaCalendar({
@@ -257,9 +265,42 @@ export default function AgendaCalendar({
   onSelectAppointment,
   onMessage,
 }: Props) {
-  const weekDays = getWeekDays(selectedDate);
   const today = new Date();
+  const weekDays = getWeekDays(selectedDate);
   const selectedDateInput = formatDateInput(selectedDate);
+  const [hiddenProfessionalIds, setHiddenProfessionalIds] = useState<number[]>([]);
+
+  const visibleProfessionals = useMemo(() => {
+    const result = profissionais.filter(
+      (profissional) => !hiddenProfessionalIds.includes(profissional.id),
+    );
+
+    return result.length > 0 ? result : profissionais;
+  }, [hiddenProfessionalIds, profissionais]);
+
+  const appointmentsByProfessional = useMemo(() => {
+    return visibleProfessionals.map((profissional) => {
+      const appointments = agendamentos
+        .filter((appointment) => appointment.profissionalId === profissional.id)
+        .sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
+
+      const total = appointments.reduce(
+        (sum, appointment) => sum + (appointment.valor || 0),
+        0,
+      );
+
+      return {
+        profissional,
+        appointments,
+        total,
+      };
+    });
+  }, [agendamentos, visibleProfessionals]);
+
+  function goToDate(date: Date) {
+    onDateChange(date);
+    window.location.href = agendaHref(date, profissionalFiltro);
+  }
 
   function handleDateInputChange(value: string) {
     const [year, month, day] = value.split("-").map(Number);
@@ -268,67 +309,7 @@ export default function AgendaCalendar({
       return;
     }
 
-    onDateChange(new Date(year, month - 1, day));
-  }
-
-  function appointmentsAtSlot(
-    profissionalId: number,
-    hour: number,
-    minute: number,
-  ) {
-    return agendamentos
-      .filter((appointment) => {
-        const appointmentDate = new Date(appointment.data);
-
-        return (
-          appointment.profissionalId === profissionalId &&
-          appointmentDate.getHours() === hour &&
-          appointmentDate.getMinutes() === minute
-        );
-      })
-      .sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
-  }
-
-  function blockedAppointmentAtSlot(
-    profissionalId: number,
-    hour: number,
-    minute: number,
-  ) {
-    const slotDate = slotToDate(selectedDate, hour, minute);
-
-    return agendamentos.find((appointment) => {
-      if (
-        appointment.profissionalId !== profissionalId ||
-        !isActiveAppointment(appointment)
-      ) {
-        return false;
-      }
-
-      const start = new Date(appointment.data);
-      const end = appointmentEnd(appointment);
-
-      return slotDate > start && slotDate < end;
-    });
-  }
-
-  function getProfessionalStats(profissionalId: number) {
-    const appointments = agendamentos.filter(
-      (appointment) => appointment.profissionalId === profissionalId,
-    );
-
-    return {
-      count: appointments.length,
-      total: appointments.reduce(
-        (sum, appointment) => sum + (appointment.valor || 0),
-        0,
-      ),
-    };
-  }
-
-  function getProfessionalAppointments(profissionalId: number) {
-    return agendamentos
-      .filter((appointment) => appointment.profissionalId === profissionalId)
-      .sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
+    goToDate(new Date(year, month - 1, day));
   }
 
   function abrirNovo(profissionalId: number, hora = "09:00") {
@@ -339,263 +320,238 @@ export default function AgendaCalendar({
     });
   }
 
+  function toggleProfessional(profissionalId: number) {
+    setHiddenProfessionalIds((current) => {
+      const isHidden = current.includes(profissionalId);
+
+      if (isHidden) {
+        return current.filter((id) => id !== profissionalId);
+      }
+
+      if (profissionais.length - current.length <= 1) {
+        return current;
+      }
+
+      return [...current, profissionalId];
+    });
+  }
+
   return (
     <div className="premium-card w-full max-w-full overflow-hidden">
-      <div className="border-b border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))]">
-        <div className="hidden p-6 xl:block">
-          <div className="min-w-0 space-y-5">
-            <div className="flex min-w-0 flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-              <div className="min-w-0 space-y-1.5">
-                <div className="flex min-w-0 items-center gap-2 text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  <CalendarDays size={12} />
-                  Agenda profissional
-                </div>
-
-                <h2 className="truncate text-2xl font-semibold capitalize tracking-tight text-white">
-                  {formatLongDate(selectedDate)}
-                </h2>
+      <div className="border-b border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))]">
+        <div className="flex flex-col gap-3 p-3 sm:p-4 xl:p-5">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="min-w-0">
+              <div className="flex min-w-0 items-center gap-2 text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <CalendarDays size={13} />
+                Agenda profissional
               </div>
 
-              <div className="grid min-w-0 gap-2 xl:grid-cols-[240px_220px_auto_auto_auto] xl:items-end">
-                <label className="space-y-1.5">
-                  <span className="text-xs font-medium text-slate-500">
-                    Profissional
-                  </span>
-                  <select
-                    value={profissionalFiltro}
-                    onChange={(event) =>
-                      onProfissionalFiltroChange(event.target.value)
-                    }
-                    className="premium-input h-11 w-full rounded-2xl px-3 py-2 text-sm"
-                  >
-                    <option value="todas">Todas as agendas</option>
-                    {todosProfissionais.map((profissional) => (
-                      <option key={profissional.id} value={profissional.id}>
-                        {profissional.nome}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="space-y-1.5">
-                  <span className="text-xs font-medium text-slate-500">
-                    Data
-                  </span>
-                  <input
-                    type="date"
-                    value={selectedDateInput}
-                    onChange={(event) =>
-                      handleDateInputChange(event.target.value)
-                    }
-                    className="premium-input h-11 w-full rounded-2xl px-3 py-2 text-sm"
-                  />
-                </label>
-
-                <div className="grid min-w-0 grid-cols-3 gap-2 xl:col-span-3">
-                  <a
-                    href={agendaHref(
-                      addDays(selectedDate, -1),
-                      profissionalFiltro,
-                    )}
-                    onClick={() => onDateChange(addDays(selectedDate, -1))}
-                    className="flex h-11 items-center justify-center gap-1.5 rounded-2xl border border-white/[0.10] bg-white/[0.04] px-3 text-sm font-semibold text-slate-100 transition active:scale-[0.98]"
-                  >
-                    <ChevronLeft size={14} />
-                    Anterior
-                  </a>
-
-                  <a
-                    href={agendaHref(today, profissionalFiltro)}
-                    onClick={() => onDateChange(new Date())}
-                    className={`flex h-11 items-center justify-center rounded-2xl px-3 text-sm font-semibold transition active:scale-[0.98] ${
-                      isSameDay(selectedDate, today)
-                        ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-950/25"
-                        : "border border-white/[0.10] bg-white/[0.07] text-slate-100"
-                    }`}
-                  >
-                    Hoje
-                  </a>
-
-                  <a
-                    href={agendaHref(
-                      addDays(selectedDate, 1),
-                      profissionalFiltro,
-                    )}
-                    onClick={() => onDateChange(addDays(selectedDate, 1))}
-                    className="flex h-11 items-center justify-center gap-1.5 rounded-2xl border border-white/[0.10] bg-white/[0.04] px-3 text-sm font-semibold text-slate-100 transition active:scale-[0.98]"
-                  >
-                    Próximo
-                    <ChevronRight size={14} />
-                  </a>
-                </div>
-              </div>
+              <h2 className="mt-1 truncate text-lg font-semibold capitalize tracking-tight text-white sm:text-xl xl:text-2xl">
+                {formatLongDate(selectedDate)}
+              </h2>
             </div>
 
-            <div className="grid grid-cols-7 gap-2">
-              {weekDays.map((day) => {
-                const active = isSameDay(day, selectedDate);
-                const isToday = isSameDay(day, today);
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <div className="grid grid-cols-2 rounded-2xl border border-white/[0.10] bg-white/[0.035] p-1 text-xs font-semibold">
+                <button
+                  type="button"
+                  className="rounded-xl bg-violet-600 px-3 py-2 text-white shadow-lg shadow-violet-950/20"
+                >
+                  Dia
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl px-3 py-2 text-slate-400"
+                  title="Visão semanal será a próxima etapa"
+                >
+                  Semana
+                </button>
+              </div>
 
-                return (
-                  <a
-                    key={day.toISOString()}
-                    href={agendaHref(day, profissionalFiltro)}
-                    onClick={() => onDateChange(day)}
-                    className={`rounded-2xl border px-3 py-2.5 text-left transition ${
-                      active
-                        ? "border-violet-300/35 bg-violet-500/14 text-white shadow-lg shadow-violet-950/10"
-                        : "border-white/[0.08] bg-white/[0.035] text-slate-400 hover:border-white/[0.14] hover:bg-white/[0.05]"
+              <select
+                value={profissionalFiltro}
+                onChange={(event) => onProfissionalFiltroChange(event.target.value)}
+                className="premium-input h-10 min-w-[170px] rounded-2xl px-3 py-2 text-xs sm:text-sm"
+              >
+                <option value="todas">Todas as agendas</option>
+                {todosProfissionais.map((profissional) => (
+                  <option key={profissional.id} value={profissional.id}>
+                    {profissional.nome}
+                  </option>
+                ))}
+              </select>
+
+              <a
+                href={agendaHref(addDays(selectedDate, -1), profissionalFiltro)}
+                className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/[0.10] bg-white/[0.04] text-slate-100 transition active:scale-[0.98]"
+                aria-label="Dia anterior"
+              >
+                <ChevronLeft size={16} />
+              </a>
+
+              <button
+                type="button"
+                onClick={() => goToDate(today)}
+                className={`h-10 rounded-2xl px-4 text-xs font-semibold transition active:scale-[0.98] sm:text-sm ${
+                  isSameDay(selectedDate, today)
+                    ? "bg-violet-600 text-white shadow-lg shadow-violet-950/25"
+                    : "border border-white/[0.10] bg-white/[0.04] text-slate-100"
+                }`}
+              >
+                Hoje
+              </button>
+
+              <a
+                href={agendaHref(addDays(selectedDate, 1), profissionalFiltro)}
+                className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/[0.10] bg-white/[0.04] text-slate-100 transition active:scale-[0.98]"
+                aria-label="Próximo dia"
+              >
+                <ChevronRight size={16} />
+              </a>
+
+              <label className="relative flex h-10 min-w-[132px] items-center justify-center overflow-hidden rounded-2xl border border-white/[0.10] bg-white/[0.04] px-3 text-center text-xs font-semibold text-slate-100 sm:min-w-[150px] sm:text-sm">
+                <span className="pointer-events-none truncate">
+                  {selectedDateInput.split("-").reverse().join("/")}
+                </span>
+                <input
+                  type="date"
+                  value={selectedDateInput}
+                  onChange={(event) => handleDateInputChange(event.target.value)}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  aria-label="Selecionar data"
+                />
+              </label>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const profissional = visibleProfessionals[0] || profissionais[0];
+
+                  if (profissional) {
+                    abrirNovo(profissional.id);
+                  }
+                }}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 text-xs font-semibold text-white shadow-lg shadow-violet-950/25 transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+                disabled={!visibleProfessionals[0] && !profissionais[0]}
+              >
+                <Plus size={15} />
+                Novo
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+            {weekDays.map((day) => {
+              const active = isSameDay(day, selectedDate);
+              const isToday = isSameDay(day, today);
+
+              return (
+                <a
+                  key={day.toISOString()}
+                  href={agendaHref(day, profissionalFiltro)}
+                  className={`min-w-0 rounded-2xl border px-2 py-2 text-center transition sm:px-3 ${
+                    active
+                      ? "border-violet-300/35 bg-violet-500/20 text-white shadow-lg shadow-violet-950/10"
+                      : "border-white/[0.08] bg-white/[0.03] text-slate-400 hover:border-white/[0.14] hover:bg-white/[0.05]"
+                  }`}
+                >
+                  <span className="block truncate text-[0.6rem] font-semibold uppercase tracking-[0.10em] sm:text-[0.65rem]">
+                    {formatShortWeekDay(day)}
+                  </span>
+                  <span className="mt-1 block text-sm font-semibold leading-none sm:text-base">
+                    {day.getDate()}
+                  </span>
+                  <span
+                    className={`mt-1 hidden text-[0.65rem] sm:block ${
+                      isToday ? "text-violet-200" : "text-slate-500"
                     }`}
                   >
-                    <span className="block text-[0.65rem] font-semibold uppercase tracking-[0.12em]">
-                      {formatShortWeekDay(day)}
-                    </span>
-                    <span className="mt-1 block text-lg font-semibold leading-none">
-                      {day.getDate()}
-                    </span>
-                    <span
-                      className={`mt-1 block text-[0.7rem] ${
-                        isToday ? "text-violet-200" : "text-slate-500"
-                      }`}
-                    >
-                      {isToday
-                        ? "Hoje"
-                        : day.toLocaleDateString("pt-BR", { month: "short" })}
-                    </span>
-                  </a>
+                    {isToday
+                      ? "Hoje"
+                      : day.toLocaleDateString("pt-BR", { month: "short" })}
+                  </span>
+                </a>
+              );
+            })}
+          </div>
+
+          {profissionais.length > 1 ? (
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-premium">
+              {profissionais.map((profissional) => {
+                const hidden = hiddenProfessionalIds.includes(profissional.id);
+                const color = getColorClasses(profissional.cor);
+
+                return (
+                  <button
+                    key={profissional.id}
+                    type="button"
+                    onClick={() => toggleProfessional(profissional.id)}
+                    className={`inline-flex shrink-0 items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-semibold transition ${
+                      hidden
+                        ? "border-white/[0.08] bg-white/[0.025] text-slate-500"
+                        : color.eventSoft
+                    }`}
+                    title={hidden ? "Mostrar agenda" : "Ocultar agenda"}
+                  >
+                    {hidden ? <EyeOff size={14} /> : <Eye size={14} />}
+                    {profissional.nome}
+                  </button>
                 );
               })}
             </div>
-          </div>
-        </div>
-
-        <div className="w-full max-w-full space-y-3 overflow-hidden p-2.5 xl:hidden">
-          <div className="min-w-0">
-            <div className="flex min-w-0 items-center gap-2 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-slate-500">
-              <CalendarDays size={12} />
-              Agenda do dia
-            </div>
-
-            <h2 className="mt-1 truncate text-lg font-semibold capitalize tracking-tight text-white">
-              {formatLongDate(selectedDate)}
-            </h2>
-          </div>
-
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-slate-500">
-              Ver agenda
-            </span>
-            <select
-              value={profissionalFiltro}
-              onChange={(event) =>
-                onProfissionalFiltroChange(event.target.value)
-              }
-              className="premium-input h-11 w-full max-w-full rounded-2xl px-3 py-2 text-sm"
-            >
-              <option value="todas">Todas as agendas</option>
-              {todosProfissionais.map((profissional) => (
-                <option key={profissional.id} value={profissional.id}>
-                  {profissional.nome}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <div className="grid w-full max-w-full grid-cols-[38px_minmax(0,1fr)_38px] gap-2 overflow-hidden">
-            <a
-              href={agendaHref(addDays(selectedDate, -1), profissionalFiltro)}
-              onClick={() => onDateChange(addDays(selectedDate, -1))}
-              aria-label="Dia anterior"
-              className="flex h-10 w-[38px] shrink-0 items-center justify-center rounded-2xl border border-white/[0.10] bg-white/[0.04] text-slate-100 transition active:scale-[0.98]"
-            >
-              <ChevronLeft size={16} />
-            </a>
-
-            <label className="relative flex h-10 min-w-0 max-w-full items-center justify-center overflow-hidden rounded-2xl border border-white/[0.10] bg-white/[0.04] px-2 text-center text-xs font-medium text-slate-100">
-              <span className="pointer-events-none block max-w-full truncate">
-                {formatMobileDate(selectedDate)}
-              </span>
-
-              <input
-                type="date"
-                value={selectedDateInput}
-                onChange={(event) => handleDateInputChange(event.target.value)}
-                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                aria-label="Selecionar data"
-              />
-            </label>
-
-            <a
-              href={agendaHref(addDays(selectedDate, 1), profissionalFiltro)}
-              onClick={() => onDateChange(addDays(selectedDate, 1))}
-              aria-label="Próximo dia"
-              className="flex h-10 w-[38px] shrink-0 items-center justify-center rounded-2xl border border-white/[0.10] bg-white/[0.04] text-slate-100 transition active:scale-[0.98]"
-            >
-              <ChevronRight size={16} />
-            </a>
-          </div>
-
-          {!isSameDay(selectedDate, today) ? (
-            <a
-              href={agendaHref(today, profissionalFiltro)}
-              onClick={() => onDateChange(new Date())}
-              className="flex h-9 w-full items-center justify-center rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-xs font-semibold text-white shadow-lg shadow-violet-950/25 active:scale-[0.98]"
-            >
-              Voltar para hoje
-            </a>
           ) : null}
         </div>
       </div>
 
-      <div className="hidden overflow-x-auto scrollbar-premium xl:block">
+      <div className="overflow-x-auto overflow-y-hidden scrollbar-premium">
         <div
-          className="min-w-[980px]"
+          className="relative min-w-[720px] xl:min-w-[980px]"
           style={{
             display: "grid",
-            gridTemplateColumns: `64px repeat(${Math.max(
-              profissionais.length,
+            gridTemplateColumns: `54px repeat(${Math.max(
+              visibleProfessionals.length,
               1,
-            )}, minmax(320px, 1fr))`,
+            )}, minmax(220px, 1fr))`,
           }}
         >
-          <div className="sticky left-0 z-20 border-b border-r border-white/[0.08] bg-[#12192a] px-3 py-4 text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-slate-500">
+          <div className="sticky left-0 z-30 border-b border-r border-white/[0.08] bg-[#12192a] px-2 py-3 text-center text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-slate-500 xl:px-3">
             Hora
           </div>
 
-          {profissionais.map((profissional) => {
+          {appointmentsByProfessional.map(({ profissional, appointments, total }) => {
             const color = getColorClasses(profissional.cor);
-            const stats = getProfessionalStats(profissional.id);
 
             return (
               <div
                 key={profissional.id}
-                className="border-b border-r border-white/[0.08] bg-[#12192a] p-3.5"
+                className="border-b border-r border-white/[0.08] bg-[#12192a] px-2 py-2 xl:px-3"
               >
-                <div className={`rounded-3xl border p-4 ${color.card}`}>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex min-w-0 items-center gap-3">
+                <div className={`rounded-2xl border px-3 py-2.5 ${color.header}`}>
+                  <div className="flex min-w-0 items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2.5">
                       <div
-                        className={`flex size-11 shrink-0 items-center justify-center rounded-2xl border ${color.avatar}`}
+                        className={`flex size-9 shrink-0 items-center justify-center rounded-full border shadow-lg shadow-black/20 ${color.avatar}`}
                       >
-                        <UserRound size={18} />
+                        <UserRound size={17} />
                       </div>
 
                       <div className="min-w-0">
-                        <p className="truncate text-base font-semibold text-white">
+                        <p className="truncate text-sm font-semibold text-white">
                           {profissional.nome}
                         </p>
-                        <p className="truncate text-xs text-slate-400">
+                        <p className="truncate text-[0.68rem] text-slate-400">
                           {profissional.area || "Agenda ativa"}
                         </p>
                       </div>
                     </div>
 
                     <div className="shrink-0 text-right">
-                      <p className="text-sm font-semibold text-white">
-                        {stats.count} atend.
+                      <p className="text-xs font-semibold text-white">
+                        {appointments.length} atend.
                       </p>
-                      <p className="text-xs text-slate-400">
-                        {stats.total.toLocaleString("pt-BR", {
+                      <p className="text-[0.65rem] text-slate-400">
+                        {total.toLocaleString("pt-BR", {
                           style: "currency",
                           currency: "BRL",
                         })}
@@ -607,279 +563,143 @@ export default function AgendaCalendar({
             );
           })}
 
-          {slots.map((slot) => (
-            <div key={slot.label} className="contents">
-              <div className="sticky left-0 z-10 border-r border-t border-white/[0.06] bg-[#0f1728] px-3 py-2 text-[0.75rem] font-medium text-slate-500">
+          <div
+            className="sticky left-0 z-20 border-r border-white/[0.08] bg-[#0f1728]"
+            style={{ height: gridHeight }}
+          >
+            {slots.map((slot) => (
+              <div
+                key={slot.label}
+                className="absolute left-0 right-0 border-t border-white/[0.06] px-1 pt-1 text-right text-[0.65rem] font-medium text-slate-500 xl:px-2 xl:text-[0.72rem]"
+                style={{ top: slot.offset }}
+              >
                 {slot.label}
               </div>
+            ))}
+          </div>
 
-              {profissionais.map((profissional) => {
-                const appointments = appointmentsAtSlot(
-                  profissional.id,
-                  slot.hour,
-                  slot.minute,
-                );
-                const blockedAppointment = blockedAppointmentAtSlot(
-                  profissional.id,
-                  slot.hour,
-                  slot.minute,
-                );
-                const color = getColorClasses(profissional.cor);
+          {appointmentsByProfessional.map(({ profissional, appointments }) => {
+            const color = getColorClasses(profissional.cor);
 
-                return (
-                  <div
+            return (
+              <div
+                key={`grid-${profissional.id}`}
+                className="relative border-r border-white/[0.08] bg-white/[0.01]"
+                style={{ height: gridHeight }}
+              >
+                {slots.slice(0, -1).map((slot) => (
+                  <button
                     key={`${profissional.id}-${slot.label}`}
-                    className="min-h-[44px] border-r border-t border-white/[0.05] bg-white/[0.012] p-1.5 transition hover:bg-white/[0.02]"
+                    type="button"
+                    onClick={() => abrirNovo(profissional.id, slot.label)}
+                    className="absolute left-0 right-0 z-0 border-t border-white/[0.05] px-1 text-left text-[0.65rem] text-transparent transition hover:bg-violet-500/5 hover:text-violet-200"
+                    style={{
+                      top: slot.offset,
+                      height: SLOT_MINUTES * MINUTE_HEIGHT,
+                    }}
+                    title={`Agendar ${slot.label}`}
                   >
-                    {appointments.length ? (
-                      <div className="space-y-2">
-                        {appointments.map((appointment) => (
-                          <div
-                            key={appointment.id}
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => onSelectAppointment(appointment)}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter" || event.key === " ") {
-                                onSelectAppointment(appointment);
-                              }
-                            }}
-                            className={`w-full cursor-pointer rounded-2xl border p-3 text-left shadow-lg shadow-black/10 transition ${color.card}`}
-                          >
-                            <div className="flex min-w-0 items-start justify-between gap-3">
-                              <div className="min-w-0 flex-1">
-                                <div className="mb-2 flex flex-wrap items-center gap-2">
-                                  <span
-                                    className={`size-2 rounded-full ${color.dot}`}
-                                  />
-                                  <p className="text-[0.72rem] font-semibold text-slate-300">
-                                    {formatTime(appointment.data)} -{" "}
-                                    {formatTime(appointmentEnd(appointment))}
-                                  </p>
-                                  <span className="text-[0.72rem] text-slate-500">
-                                    {appointment.duracao} min
-                                  </span>
-                                </div>
+                    <span className="sr-only">Agendar {slot.label}</span>
+                  </button>
+                ))}
 
-                                <p className="truncate text-sm font-semibold text-white">
-                                  {appointment.cliente.nome}
-                                </p>
-                                <p className="mt-1 truncate text-xs text-slate-400">
-                                  {appointment.procedimento}
-                                </p>
-                              </div>
+                {appointments.map((appointment) => {
+                  const startMinutes = minutesFromStart(appointment.data);
+                  const endMinutes = minutesFromStart(appointmentEnd(appointment));
+                  const top = Math.max(0, startMinutes * MINUTE_HEIGHT + 3);
+                  const height = Math.max(
+                    40,
+                    Math.min(TOTAL_MINUTES, endMinutes) * MINUTE_HEIGHT -
+                      Math.max(0, startMinutes) * MINUTE_HEIGHT -
+                      6,
+                  );
+                  const note = getAppointmentNote(appointment);
 
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  onMessage(appointment);
-                                }}
-                                className="rounded-xl border border-emerald-300/20 bg-emerald-400/10 p-2 text-emerald-200 transition hover:bg-emerald-400/20"
-                                aria-label="Gerar mensagem de WhatsApp"
-                              >
-                                <MessageCircle size={14} />
-                              </button>
-                            </div>
+                  return (
+                    <article
+                      key={appointment.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => onSelectAppointment(appointment)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          onSelectAppointment(appointment);
+                        }
+                      }}
+                      className={`absolute left-1.5 right-1.5 z-10 cursor-pointer overflow-hidden rounded-xl border p-2 text-left shadow-lg transition hover:scale-[1.005] hover:brightness-110 xl:left-2 xl:right-2 xl:rounded-2xl xl:p-3 ${color.event}`}
+                      style={{ top, height }}
+                    >
+                      <div className={`absolute left-0 top-0 h-full w-1 ${color.line}`} />
 
-                            <div className="mt-3 flex items-center justify-between gap-2">
-                              <span
-                                className={`rounded-full border px-2.5 py-1 text-[0.65rem] font-semibold ${statusClass(
-                                  appointment.status,
-                                )}`}
-                              >
-                                {appointment.status}
-                              </span>
+                      <div className="relative flex h-full min-w-0 flex-col">
+                        <div className="flex min-w-0 items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="flex items-center gap-1.5 text-[0.65rem] font-bold leading-tight text-white/95 xl:text-[0.72rem]">
+                              <Clock3 size={12} className="shrink-0" />
+                              {formatTime(appointment.data)} - {formatTime(appointmentEnd(appointment))}
+                            </p>
 
-                              {appointment.valor > 0 ? (
-                                <span className="text-xs font-semibold text-slate-200">
-                                  {appointment.valor.toLocaleString("pt-BR", {
-                                    style: "currency",
-                                    currency: "BRL",
-                                  })}
-                                </span>
-                              ) : null}
-                            </div>
+                            <p className="mt-1 truncate text-xs font-extrabold uppercase leading-tight tracking-tight text-white xl:text-sm">
+                              {appointment.cliente.nome}
+                            </p>
                           </div>
-                        ))}
+
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onMessage(appointment);
+                            }}
+                            className="shrink-0 rounded-lg border border-white/20 bg-white/12 p-1.5 text-white transition hover:bg-white/20"
+                            aria-label="Gerar mensagem de WhatsApp"
+                          >
+                            <MessageCircle size={13} />
+                          </button>
+                        </div>
+
+                        <p className="mt-1 line-clamp-2 text-[0.68rem] font-semibold leading-snug text-white/90 xl:text-xs">
+                          {appointment.procedimento}
+                        </p>
+
+                        {height > 74 ? (
+                          <p className="mt-1 line-clamp-2 text-[0.65rem] leading-snug text-white/75 xl:text-[0.72rem]">
+                            {note}
+                          </p>
+                        ) : null}
+
+                        {height > 94 ? (
+                          <div className="mt-auto flex items-center justify-between gap-2 pt-2">
+                            <span
+                              className={`rounded-full border px-2 py-0.5 text-[0.58rem] font-bold uppercase tracking-[0.08em] ${statusClass(
+                                appointment.status,
+                              )}`}
+                            >
+                              {appointment.status}
+                            </span>
+
+                            <span className="text-[0.62rem] font-semibold text-white/75">
+                              {appointment.duracao} min
+                            </span>
+                          </div>
+                        ) : null}
                       </div>
-                    ) : blockedAppointment ? (
-                      <div
-                        className={`flex h-full min-h-[34px] items-center justify-center rounded-2xl border px-2 text-center text-[0.68rem] ${color.busy}`}
-                      >
-                        Ocupado até{" "}
-                        {formatTime(appointmentEnd(blockedAppointment))}
-                      </div>
-                    ) : (
-                      <a
-                        href={novoAgendamentoHref(
-                          selectedDate,
-                          profissional.id,
-                          slot.label,
-                        )}
-                        onClick={() => abrirNovo(profissional.id, slot.label)}
-                        className="flex h-full min-h-[34px] w-full items-center justify-center rounded-2xl border border-dashed border-white/[0.08] bg-transparent text-[0.72rem] font-medium text-slate-600 transition hover:border-violet-300/30 hover:bg-violet-500/10 hover:text-violet-100"
-                      >
-                        <Plus size={12} />
-                        <span className="ml-1.5">Agendar</span>
-                      </a>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+                    </article>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      <div className="w-full max-w-full space-y-3 overflow-hidden p-2.5 pb-28 xl:hidden">
-        {profissionais.map((profissional) => {
-          const color = getColorClasses(profissional.cor);
-          const professionalAppointments = getProfessionalAppointments(
-            profissional.id,
-          );
+      <div className="flex flex-col gap-2 border-t border-white/[0.08] bg-white/[0.02] px-3 py-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between xl:px-5">
+        <span>
+          Arraste para o lado no celular para comparar profissionais e horários.
+        </span>
 
-          return (
-            <section
-              key={profissional.id}
-              className="w-full max-w-full overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.025] p-3"
-            >
-              <div className="mb-3 flex min-w-0 items-start justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div
-                    className={`flex size-10 shrink-0 items-center justify-center rounded-2xl border ${color.avatar}`}
-                  >
-                    <UserRound size={16} />
-                  </div>
-
-                  <div className="min-w-0">
-                    <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                      Clientes do dia
-                    </p>
-                    <h3 className="truncate text-base font-semibold text-white">
-                      {profissional.nome}
-                    </h3>
-                    <p className="truncate text-xs text-slate-400">
-                      {profissional.area || "Agenda ativa"}
-                    </p>
-                  </div>
-                </div>
-
-                <span className="shrink-0 rounded-full border border-white/[0.10] bg-white/[0.04] px-2.5 py-1 text-[0.68rem] font-semibold text-slate-300">
-                  {professionalAppointments.length} atend.
-                </span>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => abrirNovo(profissional.id)}
-                className="mb-3 flex h-10 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-xs font-semibold text-white shadow-lg shadow-violet-950/25 active:scale-[0.98]"
-              >
-                <Plus size={14} />
-                Novo agendamento
-              </button>
-
-              {professionalAppointments.length ? (
-                <div className="space-y-2">
-                  {professionalAppointments.map((appointment) => (
-                    <article
-                      key={appointment.id}
-                      className={`w-full max-w-full overflow-hidden rounded-2xl border p-3 ${color.card}`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => onSelectAppointment(appointment)}
-                        className="block w-full min-w-0 cursor-pointer text-left"
-                      >
-                        <div className="flex min-w-0 items-start justify-between gap-2">
-                          <div className="min-w-0 flex-1">
-                            <p className="flex items-center gap-1.5 text-[0.7rem] font-semibold text-slate-300">
-                              <Clock3 size={13} />
-                              {formatTime(appointment.data)} -{" "}
-                              {formatTime(appointmentEnd(appointment))}
-                            </p>
-
-                            <p className="mt-1 truncate text-sm font-semibold text-white">
-                              {appointment.cliente.nome}
-                            </p>
-
-                            <p className="mt-1 truncate text-xs text-slate-400">
-                              {appointment.procedimento}
-                            </p>
-                          </div>
-
-                          <span
-                            className={`shrink-0 rounded-full border px-2 py-1 text-[0.6rem] font-semibold ${statusClass(
-                              appointment.status,
-                            )}`}
-                          >
-                            {appointment.status}
-                          </span>
-                        </div>
-
-                        <div className="mt-2 flex items-center justify-between gap-2">
-                          <span className="text-[0.68rem] text-slate-400">
-                            {appointment.duracao} min
-                          </span>
-
-                          <span className="text-[0.68rem] font-semibold text-violet-200">
-                            Abrir detalhes
-                          </span>
-                        </div>
-                      </button>
-
-                      <div className="mt-3 grid grid-cols-3 gap-2 border-t border-white/[0.08] pt-3">
-                        <a
-                          href={`/clientes/${appointment.clienteId}`}
-                          className="rounded-xl border border-white/[0.10] bg-white/[0.04] px-2 py-2 text-center text-[0.7rem] font-semibold text-slate-100 active:scale-[0.98]"
-                        >
-                          Cliente
-                        </a>
-
-                        <a
-                          href={appointmentWhatsAppHref(appointment)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center justify-center gap-1 rounded-xl border border-emerald-300/20 bg-emerald-400/10 px-2 py-2 text-[0.7rem] font-semibold text-emerald-200 active:scale-[0.98]"
-                        >
-                          <MessageCircle size={13} />
-                          WhatsApp
-                        </a>
-
-                        <button
-                          type="button"
-                          onClick={() => onSelectAppointment(appointment)}
-                          className="rounded-xl border border-violet-300/20 bg-violet-400/10 px-2 py-2 text-center text-[0.7rem] font-semibold text-violet-100 active:scale-[0.98]"
-                        >
-                          Abrir
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-white/[0.10] bg-white/[0.02] p-4">
-                  <div className="flex items-start gap-3 text-sm text-slate-400">
-                    <Clock3 size={16} className="mt-0.5 shrink-0" />
-                    <div>
-                      <p className="font-medium text-slate-300">
-                        Nenhum atendimento nesta data.
-                      </p>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">
-                        Use o botão acima para criar um novo horário para{" "}
-                        {profissional.nome}.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </section>
-          );
-        })}
-      </div>
-
-      <div className="hidden border-t border-white/[0.08] bg-white/[0.02] px-6 py-3 text-xs text-slate-500 sm:block">
-        Status disponíveis: {statusOptions.join(" · ")}
+        <span>
+          Horários exibidos de {String(START_HOUR).padStart(2, "0")}:00 às {String(END_HOUR).padStart(2, "0")}:00
+        </span>
       </div>
     </div>
   );
