@@ -1,16 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   ChevronDown,
   Clock3,
-  Eye,
-  EyeOff,
   MessageCircle,
   Plus,
   UserRound,
   UsersRound,
+  X,
 } from "lucide-react";
 
 type ProfissionalAgenda = {
@@ -63,7 +62,7 @@ type Props = {
 const START_HOUR = 9;
 const END_HOUR = 19;
 const SLOT_MINUTES = 30;
-const MINUTE_HEIGHT = 1.65;
+const MINUTE_HEIGHT = 1.72;
 const TOTAL_MINUTES = (END_HOUR - START_HOUR) * 60;
 
 const slots = Array.from(
@@ -145,11 +144,8 @@ function addMinutes(date: Date, minutes: number) {
   return next;
 }
 
-function getWeekDays(date: Date) {
-  const first = new Date(date);
-  first.setDate(date.getDate() - date.getDay());
-
-  return Array.from({ length: 7 }, (_, index) => addDays(first, index));
+function getDateStripDays(date: Date) {
+  return Array.from({ length: 35 }, (_, index) => addDays(date, index - 10));
 }
 
 function isSameDay(first: Date, second: Date) {
@@ -189,7 +185,6 @@ function getColorClasses(color: string, index: number) {
   ) {
     return {
       avatar: "bg-red-600 text-white",
-      header: "bg-[#eef0f6] text-slate-700",
       event:
         "border-red-400 bg-gradient-to-br from-red-500 via-rose-500 to-red-600 text-white shadow-red-500/25",
       line: "bg-red-300",
@@ -199,7 +194,6 @@ function getColorClasses(color: string, index: number) {
 
   return {
     avatar: "bg-violet-600 text-white",
-    header: "bg-[#eef0f6] text-slate-700",
     event:
       "border-fuchsia-400 bg-gradient-to-br from-violet-500 via-fuchsia-500 to-purple-600 text-white shadow-purple-500/25",
     line: "bg-fuchsia-300",
@@ -228,17 +222,28 @@ export default function AgendaCalendar({
   selectedDate,
   onDateChange,
   profissionalFiltro,
+  onProfissionalFiltroChange,
   profissionais,
+  todosProfissionais,
   agendamentos,
   onNovoHorario,
   onSelectAppointment,
   onMessage,
 }: Props) {
   const today = new Date();
-  const weekDays = getWeekDays(selectedDate);
+  const stripDays = getDateStripDays(selectedDate);
   const selectedDateInput = formatDateInput(selectedDate);
+  const activeDayRef = useRef<HTMLAnchorElement | null>(null);
   const [hiddenProfessionalIds, setHiddenProfessionalIds] = useState<number[]>([]);
   const [showVisibilityPanel, setShowVisibilityPanel] = useState(false);
+
+  useEffect(() => {
+    activeDayRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+  }, [selectedDateInput]);
 
   const visibleProfessionals = useMemo(() => {
     const result = profissionais.filter(
@@ -316,6 +321,12 @@ export default function AgendaCalendar({
     }
   }
 
+  function selecionarFiltroProfissional(value: string) {
+    setHiddenProfessionalIds([]);
+    onProfissionalFiltroChange(value);
+    setShowVisibilityPanel(false);
+  }
+
   return (
     <section className="relative w-full max-w-full overflow-visible bg-white text-slate-900 shadow-xl shadow-slate-950/10 sm:overflow-hidden sm:rounded-[1.5rem]">
       <div className="border-b border-slate-200 bg-white">
@@ -323,21 +334,19 @@ export default function AgendaCalendar({
           {formatMonthName(selectedDate)}
         </div>
 
-        <div className="grid grid-cols-7 px-1 pb-1 sm:px-3">
-          {weekDays.map((day) => {
+        <div className="flex max-w-full gap-1 overflow-x-auto px-1 pb-1 scrollbar-premium sm:px-3">
+          {stripDays.map((day) => {
             const active = isSameDay(day, selectedDate);
+            const isToday = isSameDay(day, today);
 
             return (
               <a
                 key={day.toISOString()}
+                ref={active ? activeDayRef : null}
                 href={agendaHref(day, profissionalFiltro)}
-                className="min-w-0 rounded-xl px-1 py-1 text-center transition"
+                className="min-w-[48px] shrink-0 rounded-xl px-1 py-1 text-center transition"
               >
-                <span
-                  className={`block truncate text-[0.68rem] font-medium sm:text-xs ${
-                    active ? "text-slate-500" : "text-slate-500"
-                  }`}
-                >
+                <span className="block truncate text-[0.68rem] font-medium text-slate-500 sm:text-xs">
                   {formatShortWeekDay(day).slice(0, 3)}
                 </span>
 
@@ -345,7 +354,9 @@ export default function AgendaCalendar({
                   className={`mx-auto mt-1 flex h-9 w-9 items-center justify-center rounded-lg text-lg font-semibold leading-none sm:h-10 sm:w-10 ${
                     active
                       ? "bg-red-600 text-white shadow-lg shadow-red-500/20"
-                      : "text-slate-700 hover:bg-slate-100"
+                      : isToday
+                        ? "bg-purple-50 text-purple-700"
+                        : "text-slate-700 hover:bg-slate-100"
                   }`}
                 >
                   {String(day.getDate()).padStart(2, "0")}
@@ -392,37 +403,76 @@ export default function AgendaCalendar({
             <button
               type="button"
               onClick={() => setShowVisibilityPanel((current) => !current)}
-              className="flex h-full min-h-[36px] w-full items-center justify-center text-purple-700"
+              className="flex h-full min-h-[38px] w-full items-center justify-center text-purple-700"
               aria-label="Mostrar ou ocultar agendas"
             >
               <UsersRound size={18} />
             </button>
 
             {showVisibilityPanel ? (
-              <div className="absolute left-1 top-10 z-50 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-950/20">
-                <div className="px-2 pb-2 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                  Agendas visíveis
+              <div className="absolute left-1 top-10 z-50 w-60 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-950/20">
+                <div className="flex items-center justify-between px-2 pb-2">
+                  <span className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                    Agendas
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowVisibilityPanel(false)}
+                    className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                    aria-label="Fechar seletor"
+                  >
+                    <X size={14} />
+                  </button>
                 </div>
 
                 <div className="space-y-1">
-                  {profissionais.map((profissional) => {
+                  <button
+                    type="button"
+                    onClick={() => selecionarFiltroProfissional("todas")}
+                    className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium hover:bg-slate-100 ${
+                      profissionalFiltro === "todas"
+                        ? "text-purple-700"
+                        : "text-slate-700"
+                    }`}
+                  >
+                    <span>Todas as agendas</span>
+
+                    {profissionalFiltro === "todas" ? (
+                      <Check size={15} className="text-purple-700" />
+                    ) : null}
+                  </button>
+
+                  {todosProfissionais.map((profissional) => {
+                    const active = profissionalFiltro === String(profissional.id);
                     const hidden = hiddenProfessionalIds.includes(profissional.id);
 
                     return (
-                      <button
+                      <div
                         key={profissional.id}
-                        type="button"
-                        onClick={() => toggleProfessional(profissional.id)}
-                        className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-100"
+                        className="flex items-center gap-1 rounded-xl hover:bg-slate-100"
                       >
-                        <span className="truncate">{profissional.nome}</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            selecionarFiltroProfissional(String(profissional.id))
+                          }
+                          className={`min-w-0 flex-1 px-3 py-2 text-left text-sm font-medium ${
+                            active ? "text-purple-700" : "text-slate-700"
+                          }`}
+                        >
+                          <span className="block truncate">{profissional.nome}</span>
+                        </button>
 
-                        {hidden ? (
-                          <EyeOff size={15} className="text-slate-400" />
-                        ) : (
-                          <Check size={15} className="text-purple-700" />
-                        )}
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleProfessional(profissional.id)}
+                          className="shrink-0 rounded-lg px-2 py-2 text-slate-400 hover:text-purple-700"
+                          title={hidden ? "Mostrar agenda" : "Ocultar agenda"}
+                        >
+                          {hidden ? <X size={14} /> : <Check size={14} />}
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -438,15 +488,21 @@ export default function AgendaCalendar({
                 key={profissional.id}
                 className="min-w-0 border-b border-r border-slate-200 bg-[#eef0f6]"
               >
-                <div className={`flex h-9 min-w-0 items-center justify-center gap-1 px-1 text-xs font-medium ${color.header}`}>
-                  <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${color.avatar}`}>
+                <button
+                  type="button"
+                  onClick={() => setShowVisibilityPanel((current) => !current)}
+                  className="flex h-[38px] w-full min-w-0 items-center justify-center gap-1 px-1 text-xs font-medium text-slate-700"
+                >
+                  <span
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${color.avatar}`}
+                  >
                     <UserRound size={14} />
                   </span>
 
                   <span className="min-w-0 truncate">{profissional.nome}</span>
 
                   <ChevronDown size={13} className="shrink-0 text-slate-500" />
-                </div>
+                </button>
               </div>
             );
           })}
@@ -501,7 +557,7 @@ export default function AgendaCalendar({
 
                   const top = Math.max(0, startMinutes * MINUTE_HEIGHT + 3);
                   const height = Math.max(
-                    48,
+                    52,
                     Math.min(TOTAL_MINUTES, endMinutes) * MINUTE_HEIGHT -
                       Math.max(0, startMinutes) * MINUTE_HEIGHT -
                       6,
@@ -555,15 +611,17 @@ export default function AgendaCalendar({
                           {appointment.procedimento}
                         </p>
 
-                        {height > 72 ? (
+                        {height > 76 ? (
                           <p className="mt-1 line-clamp-2 text-[0.64rem] leading-snug text-white/85 sm:text-[0.72rem]">
                             {note}
                           </p>
                         ) : null}
 
-                        {height > 110 ? (
+                        {height > 112 ? (
                           <div className="mt-auto flex items-center justify-between gap-2 pt-2">
-                            <span className={`rounded-full px-2 py-0.5 text-[0.58rem] font-bold uppercase tracking-[0.08em] ${color.badge}`}>
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[0.58rem] font-bold uppercase tracking-[0.08em] ${color.badge}`}
+                            >
                               {appointment.status}
                             </span>
 

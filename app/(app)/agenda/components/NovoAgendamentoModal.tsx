@@ -17,7 +17,6 @@ import {
   criarAgendamento,
   type HorarioDisponivelAgenda,
 } from "@/actions/agendamento.actions";
-import { Button } from "@/components/ui/button";
 
 import type { NovoHorarioPayload } from "./AgendaCalendar";
 
@@ -162,6 +161,14 @@ function telefoneCliente(cliente: Cliente) {
   return cliente.whatsapp || cliente.telefone || "Sem telefone";
 }
 
+function inputClassName() {
+  return "h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:bg-white focus:ring-4 focus:ring-purple-100";
+}
+
+function labelClassName() {
+  return "text-[0.68rem] font-bold uppercase tracking-[0.16em] text-slate-400";
+}
+
 export default function NovoAgendamentoModal({
   open,
   onClose,
@@ -286,7 +293,8 @@ export default function NovoAgendamentoModal({
   const deveMostrarBusca = tipoCliente === "existente" && !clienteBloqueado;
   const deveMostrarResultados =
     deveMostrarBusca &&
-    (normalizarTexto(buscaCliente).length >= 2 || onlyDigits(buscaCliente).length >= 2);
+    (normalizarTexto(buscaCliente).length >= 2 ||
+      onlyDigits(buscaCliente).length >= 2);
 
   const horariosDisponiveis = horarios.filter((item) => item.disponivel);
   const horariosOcupados = horarios.filter((item) => !item.disponivel).slice(0, 5);
@@ -384,23 +392,23 @@ export default function NovoAgendamentoModal({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-[9999] flex h-[100dvh] w-screen max-w-[100vw] items-stretch justify-center overflow-hidden bg-[#111827] sm:bg-slate-950/80 sm:px-4 sm:py-4 sm:backdrop-blur-xl"
+      className="fixed inset-0 z-[9999] h-[100dvh] w-screen max-w-[100vw] overflow-y-auto bg-slate-100 text-slate-900"
       style={{ touchAction: "pan-y" }}
     >
-      <div className="flex h-[100dvh] w-full max-w-5xl flex-col overflow-hidden bg-[#111827] shadow-2xl shadow-black/50 sm:my-auto sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-[2rem] sm:border sm:border-white/[0.10]">
-        <div className="shrink-0 border-b border-white/[0.08] bg-[#111827] px-4 py-3 sm:bg-white/[0.035] sm:px-6 sm:py-5">
+      <div className="mx-auto flex min-h-[100dvh] w-full max-w-5xl flex-col">
+        <div className="bg-white px-4 pb-3 pt-4 shadow-sm sm:rounded-b-[2rem] sm:px-6 sm:pb-5 sm:pt-5">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-start gap-3">
-              <div className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-100 ring-1 ring-violet-300/20 sm:flex">
+              <div className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-purple-100 text-purple-700 sm:flex">
                 <CalendarPlus size={20} />
               </div>
 
               <div className="min-w-0">
-                <h2 className="truncate text-lg font-semibold tracking-tight text-white sm:text-2xl">
+                <h2 className="truncate text-xl font-bold tracking-tight text-slate-950 sm:text-2xl">
                   {modoRetorno ? "Agendar retorno" : "Criar agendamento"}
                 </h2>
 
-                <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400 sm:text-sm">
+                <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500">
                   {modoRetorno
                     ? "Cliente já selecionada. Escolha data, horário e procedimento."
                     : "Busque a cliente, escolha um horário livre e salve o atendimento."}
@@ -411,7 +419,7 @@ export default function NovoAgendamentoModal({
             <button
               type="button"
               onClick={onClose}
-              className="shrink-0 rounded-2xl border border-white/[0.08] bg-white/[0.04] p-2 text-slate-300 hover:bg-white/[0.08] hover:text-white"
+              className="shrink-0 rounded-2xl border border-slate-200 bg-slate-50 p-2 text-slate-500 shadow-sm hover:bg-slate-100 hover:text-slate-900"
               aria-label="Fechar modal"
             >
               <X size={18} />
@@ -419,482 +427,448 @@ export default function NovoAgendamentoModal({
           </div>
 
           {erro ? (
-            <div className="mt-3 flex items-start gap-2 rounded-2xl border border-rose-300/20 bg-rose-500/10 px-3 py-2 text-xs leading-5 text-rose-100">
+            <div className="mt-3 flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs leading-5 text-rose-700">
               <AlertCircle className="mt-0.5 shrink-0" size={15} />
               <span>{erro}</span>
             </div>
           ) : null}
         </div>
 
-        <div className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-4 scrollbar-premium sm:px-6 sm:py-6">
-          <div className="grid min-w-0 gap-4 lg:grid-cols-[0.92fr_1.08fr] lg:gap-5">
-            <section className="min-w-0 space-y-4 sm:rounded-3xl sm:border sm:border-white/[0.08] sm:bg-white/[0.025] sm:p-5">
-              {clienteBloqueado && clienteSelecionado ? (
-                <div className="rounded-2xl border border-violet-300/20 bg-violet-400/10 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-violet-200/80">
-                        Cliente selecionada
-                      </p>
+        <div className="flex-1 space-y-4 px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-6">
+          <section className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-slate-200/70 sm:p-5">
+            {clienteBloqueado && clienteSelecionado ? (
+              <div className="rounded-2xl border border-purple-200 bg-purple-50 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className={labelClassName()}>Cliente selecionada</p>
 
-                      <p className="mt-1 truncate text-base font-semibold text-white">
-                        {clienteSelecionado.nome}
-                      </p>
+                    <p className="mt-1 truncate text-base font-bold text-slate-950">
+                      {clienteSelecionado.nome}
+                    </p>
 
-                      <p className="mt-1 truncate text-xs text-slate-400">
-                        {telefoneCliente(clienteSelecionado)}
-                      </p>
-                    </div>
-
-                    <CheckCircle2 className="shrink-0 text-violet-200" size={20} />
+                    <p className="mt-1 truncate text-xs text-slate-500">
+                      {telefoneCliente(clienteSelecionado)}
+                    </p>
                   </div>
+
+                  <CheckCircle2 className="shrink-0 text-purple-700" size={20} />
                 </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setTipoCliente("existente");
-                        setErro("");
-                      }}
-                      className={`flex min-w-0 items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-center text-xs font-semibold transition sm:justify-start sm:text-sm ${
-                        tipoCliente === "existente"
-                          ? "border-violet-300/40 bg-violet-500/15 text-white"
-                          : "border-white/[0.08] bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]"
-                      }`}
-                    >
-                      <UsersRound size={16} className="shrink-0" />
-                      <span className="truncate">Cliente cadastrado</span>
-                    </button>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTipoCliente("existente");
+                      setErro("");
+                    }}
+                    className={`flex min-w-0 items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-center text-xs font-bold transition sm:justify-start sm:text-sm ${
+                      tipoCliente === "existente"
+                        ? "border-purple-300 bg-purple-50 text-purple-800"
+                        : "border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100"
+                    }`}
+                  >
+                    <UsersRound size={16} className="shrink-0" />
+                    <span className="truncate">Cliente cadastrado</span>
+                  </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setTipoCliente("novo");
-                        setErro("");
-                      }}
-                      className={`flex min-w-0 items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-center text-xs font-semibold transition sm:justify-start sm:text-sm ${
-                        tipoCliente === "novo"
-                          ? "border-violet-300/40 bg-violet-500/15 text-white"
-                          : "border-white/[0.08] bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]"
-                      }`}
-                    >
-                      <UserPlus size={16} className="shrink-0" />
-                      <span className="truncate">Novo cliente</span>
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTipoCliente("novo");
+                      setErro("");
+                    }}
+                    className={`flex min-w-0 items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-center text-xs font-bold transition sm:justify-start sm:text-sm ${
+                      tipoCliente === "novo"
+                        ? "border-purple-300 bg-purple-50 text-purple-800"
+                        : "border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100"
+                    }`}
+                  >
+                    <UserPlus size={16} className="shrink-0" />
+                    <span className="truncate">Novo cliente</span>
+                  </button>
+                </div>
 
-                  {tipoCliente === "existente" ? (
-                    <div className="space-y-3">
-                      <label className="block space-y-2">
-                        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                          Buscar cliente
-                        </span>
+                {tipoCliente === "existente" ? (
+                  <div className="mt-4 space-y-3">
+                    <label className="block space-y-2">
+                      <span className={labelClassName()}>Buscar cliente</span>
 
-                        <div className="relative min-w-0">
-                          <Search
-                            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"
-                            size={16}
-                          />
-
-                          <input
-                            value={buscaCliente}
-                            onChange={(event) => {
-                              setBuscaCliente(event.target.value);
-                              setErro("");
-                            }}
-                            placeholder="Digite pelo menos 2 letras ou números"
-                            className="premium-input w-full min-w-0 pl-11"
-                          />
-                        </div>
-                      </label>
-
-                      {clienteSelecionado ? (
-                        <div className="rounded-2xl border border-violet-300/25 bg-violet-500/10 p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-violet-200/80">
-                                Selecionado
-                              </p>
-
-                              <p className="mt-1 truncate text-sm font-semibold text-white">
-                                {clienteSelecionado.nome}
-                              </p>
-
-                              <p className="mt-1 truncate text-xs text-slate-400">
-                                {telefoneCliente(clienteSelecionado)}
-                              </p>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setClienteId("");
-                                setBuscaCliente("");
-                              }}
-                              className="rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-slate-300"
-                            >
-                              Trocar
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {!deveMostrarResultados ? (
-                        <div className="rounded-2xl border border-dashed border-white/[0.10] bg-white/[0.02] p-4 text-center text-xs leading-5 text-slate-500">
-                          A lista completa não aparece mais automaticamente.
-                          Pesquise pelo nome ou WhatsApp para encontrar a cliente.
-                        </div>
-                      ) : null}
-
-                      {deveMostrarResultados ? (
-                        <div className="space-y-2">
-                          {clientesFiltrados.length > 0 ? (
-                            clientesFiltrados.map((cliente) => {
-                              const active = clienteId === String(cliente.id);
-
-                              return (
-                                <button
-                                  key={cliente.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setClienteId(String(cliente.id));
-                                    setErro("");
-                                  }}
-                                  className={`w-full rounded-2xl border p-3 text-left transition ${
-                                    active
-                                      ? "border-violet-300/40 bg-violet-500/15"
-                                      : "border-white/[0.08] bg-white/[0.025] hover:bg-white/[0.05]"
-                                  }`}
-                                >
-                                  <p className="truncate text-sm font-semibold text-white">
-                                    {cliente.nome}
-                                  </p>
-
-                                  <p className="mt-1 truncate text-xs text-slate-500">
-                                    {telefoneCliente(cliente)}
-                                  </p>
-                                </button>
-                              );
-                            })
-                          ) : (
-                            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-4 text-center text-xs leading-5 text-slate-400">
-                              Nenhuma cliente encontrada para essa busca.
-                            </div>
-                          )}
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <div className="grid gap-3">
-                      <label className="block space-y-2">
-                        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                          Nome do cliente
-                        </span>
+                      <div className="relative min-w-0">
+                        <Search
+                          className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                          size={16}
+                        />
 
                         <input
-                          value={novoClienteNome}
+                          value={buscaCliente}
                           onChange={(event) => {
-                            setNovoClienteNome(event.target.value);
+                            setBuscaCliente(event.target.value);
                             setErro("");
                           }}
-                          placeholder="Ex.: Jully Oliveira"
-                          className="premium-input w-full"
+                          placeholder="Digite pelo menos 2 letras ou números"
+                          className={`${inputClassName()} pl-11`}
                         />
-                      </label>
+                      </div>
+                    </label>
 
-                      <label className="block space-y-2">
-                        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                          WhatsApp
-                        </span>
+                    {clienteSelecionado ? (
+                      <div className="rounded-2xl border border-purple-200 bg-purple-50 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className={labelClassName()}>Selecionado</p>
 
-                        <input
-                          value={novoClienteWhatsapp}
-                          onChange={(event) =>
-                            setNovoClienteWhatsapp(maskPhone(event.target.value))
-                          }
-                          placeholder="(11) 99999-9999"
-                          className="premium-input w-full"
-                        />
-                      </label>
+                            <p className="mt-1 truncate text-sm font-bold text-slate-950">
+                              {clienteSelecionado.nome}
+                            </p>
 
-                      <label className="block space-y-2">
-                        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                          Origem
-                        </span>
+                            <p className="mt-1 truncate text-xs text-slate-500">
+                              {telefoneCliente(clienteSelecionado)}
+                            </p>
+                          </div>
 
-                        <select
-                          value={novoClienteOrigem}
-                          onChange={(event) =>
-                            setNovoClienteOrigem(event.target.value)
-                          }
-                          className="premium-input w-full"
-                        >
-                          <option value="">Selecione</option>
-
-                          {origensCliente.map((origem) => (
-                            <option key={origem.id} value={origem.nome}>
-                              {origem.nome}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-                  )}
-                </>
-              )}
-            </section>
-
-            <section className="min-w-0 space-y-4 sm:rounded-3xl sm:border sm:border-white/[0.08] sm:bg-white/[0.025] sm:p-5">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block space-y-2 sm:col-span-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Profissional
-                  </span>
-
-                  <select
-                    value={profissionalId}
-                    onChange={(event) => {
-                      setProfissionalId(event.target.value);
-                      setErro("");
-                    }}
-                    className="premium-input w-full"
-                  >
-                    <option value="">Selecione</option>
-
-                    {profissionais.map((profissional) => (
-                      <option key={profissional.id} value={profissional.id}>
-                        {profissional.nome}{" "}
-                        {profissional.area ? `· ${profissional.area}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="block space-y-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Data
-                  </span>
-
-                  <input
-                    type="date"
-                    value={data}
-                    onChange={(event) => {
-                      setData(event.target.value);
-                      setErro("");
-                    }}
-                    className="premium-input w-full"
-                  />
-                </label>
-
-                <label className="block space-y-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Duração
-                  </span>
-
-                  <select
-                    value={duracao}
-                    onChange={(event) => {
-                      setDuracao(event.target.value);
-                      setErro("");
-                    }}
-                    className="premium-input w-full"
-                  >
-                    <option value="30">30 min</option>
-                    <option value="45">45 min</option>
-                    <option value="60">1 hora</option>
-                    <option value="90">1h30</option>
-                    <option value="120">2 horas</option>
-                    <option value="150">2h30</option>
-                    <option value="180">3 horas</option>
-                  </select>
-                </label>
-              </div>
-
-              <div>
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Horários disponíveis
-                  </span>
-
-                  {isLoadingHorarios ? (
-                    <span className="text-xs text-slate-500">Carregando...</span>
-                  ) : null}
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                  {horariosDisponiveis.map((item) => (
-                    <button
-                      key={item.hora}
-                      type="button"
-                      onClick={() => {
-                        setHora(item.hora);
-                        setErro("");
-                      }}
-                      className={`h-11 rounded-2xl border px-2 text-center text-sm font-semibold transition ${
-                        hora === item.hora
-                          ? "border-violet-300/50 bg-violet-500/25 text-white shadow-lg shadow-violet-950/20"
-                          : "border-white/[0.08] bg-white/[0.035] text-slate-300 hover:bg-white/[0.07]"
-                      }`}
-                    >
-                      {item.hora}
-                    </button>
-                  ))}
-
-                  {!isLoadingHorarios && horariosDisponiveis.length === 0 ? (
-                    <div className="col-span-3 rounded-2xl border border-white/[0.08] bg-white/[0.025] p-4 text-xs leading-5 text-slate-400 sm:col-span-4">
-                      Selecione profissional e data para ver horários livres.
-                    </div>
-                  ) : null}
-                </div>
-
-                {horariosOcupados.length > 0 ? (
-                  <details className="mt-3 rounded-2xl border border-white/[0.08] bg-white/[0.025] p-3">
-                    <summary className="cursor-pointer text-xs font-semibold text-slate-400">
-                      Ver horários ocupados
-                    </summary>
-
-                    <div className="mt-3 space-y-2">
-                      {horariosOcupados.map((item) => (
-                        <div
-                          key={item.hora}
-                          className="flex items-center justify-between gap-2 rounded-xl bg-white/[0.03] px-3 py-2 text-xs text-slate-400"
-                        >
-                          <span className="inline-flex items-center gap-1.5">
-                            <Clock3 size={12} />
-                            {item.hora}
-                          </span>
-
-                          <span className="truncate">{item.motivo}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setClienteId("");
+                              setBuscaCliente("");
+                            }}
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600"
+                          >
+                            Trocar
+                          </button>
                         </div>
-                      ))}
-                    </div>
-                  </details>
+                      </div>
+                    ) : null}
+
+                    {!deveMostrarResultados ? (
+                      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-xs leading-5 text-slate-500">
+                        A lista completa não aparece automaticamente. Pesquise pelo nome ou WhatsApp.
+                      </div>
+                    ) : null}
+
+                    {deveMostrarResultados ? (
+                      <div className="space-y-2">
+                        {clientesFiltrados.length > 0 ? (
+                          clientesFiltrados.map((cliente) => {
+                            const active = clienteId === String(cliente.id);
+
+                            return (
+                              <button
+                                key={cliente.id}
+                                type="button"
+                                onClick={() => {
+                                  setClienteId(String(cliente.id));
+                                  setErro("");
+                                }}
+                                className={`w-full rounded-2xl border p-3 text-left transition ${
+                                  active
+                                    ? "border-purple-300 bg-purple-50"
+                                    : "border-slate-200 bg-slate-50 hover:bg-slate-100"
+                                }`}
+                              >
+                                <p className="truncate text-sm font-bold text-slate-950">
+                                  {cliente.nome}
+                                </p>
+
+                                <p className="mt-1 truncate text-xs text-slate-500">
+                                  {telefoneCliente(cliente)}
+                                </p>
+                              </button>
+                            );
+                          })
+                        ) : (
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center text-xs leading-5 text-slate-500">
+                            Nenhuma cliente encontrada para essa busca.
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="mt-4 grid gap-3">
+                    <label className="block space-y-2">
+                      <span className={labelClassName()}>Nome do cliente</span>
+
+                      <input
+                        value={novoClienteNome}
+                        onChange={(event) => {
+                          setNovoClienteNome(event.target.value);
+                          setErro("");
+                        }}
+                        placeholder="Ex.: Jully Oliveira"
+                        className={inputClassName()}
+                      />
+                    </label>
+
+                    <label className="block space-y-2">
+                      <span className={labelClassName()}>WhatsApp</span>
+
+                      <input
+                        value={novoClienteWhatsapp}
+                        onChange={(event) =>
+                          setNovoClienteWhatsapp(maskPhone(event.target.value))
+                        }
+                        placeholder="(11) 99999-9999"
+                        className={inputClassName()}
+                      />
+                    </label>
+
+                    <label className="block space-y-2">
+                      <span className={labelClassName()}>Origem</span>
+
+                      <select
+                        value={novoClienteOrigem}
+                        onChange={(event) =>
+                          setNovoClienteOrigem(event.target.value)
+                        }
+                        className={inputClassName()}
+                      >
+                        <option value="">Selecione</option>
+
+                        {origensCliente.map((origem) => (
+                          <option key={origem.id} value={origem.nome}>
+                            {origem.nome}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+
+          <section className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-slate-200/70 sm:p-5">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block space-y-2 sm:col-span-2">
+                <span className={labelClassName()}>Profissional</span>
+
+                <select
+                  value={profissionalId}
+                  onChange={(event) => {
+                    setProfissionalId(event.target.value);
+                    setErro("");
+                  }}
+                  className={inputClassName()}
+                >
+                  <option value="">Selecione</option>
+
+                  {profissionais.map((profissional) => (
+                    <option key={profissional.id} value={profissional.id}>
+                      {profissional.nome}
+                      {profissional.area ? ` · ${profissional.area}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block space-y-2">
+                <span className={labelClassName()}>Data</span>
+
+                <input
+                  type="date"
+                  value={data}
+                  onChange={(event) => {
+                    setData(event.target.value);
+                    setErro("");
+                  }}
+                  className={inputClassName()}
+                />
+              </label>
+
+              <label className="block space-y-2">
+                <span className={labelClassName()}>Duração</span>
+
+                <select
+                  value={duracao}
+                  onChange={(event) => {
+                    setDuracao(event.target.value);
+                    setErro("");
+                  }}
+                  className={inputClassName()}
+                >
+                  <option value="30">30 min</option>
+                  <option value="45">45 min</option>
+                  <option value="60">1 hora</option>
+                  <option value="90">1h30</option>
+                  <option value="120">2 horas</option>
+                  <option value="150">2h30</option>
+                  <option value="180">3 horas</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="mt-4">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className={labelClassName()}>Horários disponíveis</span>
+
+                {isLoadingHorarios ? (
+                  <span className="text-xs text-slate-400">Carregando...</span>
                 ) : null}
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block space-y-2 sm:col-span-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Procedimento / serviço
-                  </span>
-
-                  <select
-                    value={servicoSelecionadoId}
-                    onChange={(event) => selecionarServico(event.target.value)}
-                    className="premium-input w-full"
-                  >
-                    <option value="">Selecione um serviço cadastrado</option>
-
-                    {servicos.map((servico) => (
-                      <option key={servico.id} value={servico.id}>
-                        {servico.nome} · {servico.duracaoPadrao} min
-                        {servico.valorPadrao > 0
-                          ? ` · ${servico.valorPadrao.toLocaleString("pt-BR", {
-                              style: "currency",
-                              currency: "BRL",
-                            })}`
-                          : ""}
-                      </option>
-                    ))}
-
-                    <option value="outro">Outro procedimento</option>
-                  </select>
-                </label>
-
-                <label className="block space-y-2 sm:col-span-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Nome do procedimento
-                  </span>
-
-                  <input
-                    value={procedimento}
-                    onChange={(event) => {
-                      setProcedimento(event.target.value);
-                      setServicoSelecionadoId("outro");
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {horariosDisponiveis.map((item) => (
+                  <button
+                    key={item.hora}
+                    type="button"
+                    onClick={() => {
+                      setHora(item.hora);
                       setErro("");
                     }}
-                    placeholder="Ex.: Retorno - Limpeza de pele"
-                    className="premium-input w-full"
-                  />
-                </label>
-
-                <label className="block space-y-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Valor previsto
-                  </span>
-
-                  <input
-                    value={valor}
-                    onChange={(event) =>
-                      setValor(formatCurrencyInput(event.target.value))
-                    }
-                    placeholder="0,00"
-                    className="premium-input w-full"
-                  />
-                </label>
-
-                <label className="block space-y-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Status
-                  </span>
-
-                  <select
-                    value={status}
-                    onChange={(event) => setStatus(event.target.value)}
-                    className="premium-input w-full"
+                    className={`h-11 rounded-2xl border px-2 text-center text-sm font-bold transition ${
+                      hora === item.hora
+                        ? "border-purple-400 bg-purple-700 text-white shadow-lg shadow-purple-900/20"
+                        : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-purple-50"
+                    }`}
                   >
-                    <option>Agendado</option>
-                    <option>Confirmado</option>
-                    <option>Em atendimento</option>
-                    <option>Atendido</option>
-                    <option>Faltou</option>
-                    <option>Cancelado</option>
-                  </select>
-                </label>
+                    {item.hora}
+                  </button>
+                ))}
 
-                <label className="block space-y-2 sm:col-span-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Observações
-                  </span>
-
-                  <textarea
-                    value={observacoes}
-                    onChange={(event) => setObservacoes(event.target.value)}
-                    placeholder="Preferências, restrições, sinal, comanda ou observações do atendimento."
-                    className="premium-input h-24 w-full resize-none"
-                  />
-                </label>
+                {!isLoadingHorarios && horariosDisponiveis.length === 0 ? (
+                  <div className="col-span-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-500 sm:col-span-4">
+                    Selecione profissional e data para ver horários livres.
+                  </div>
+                ) : null}
               </div>
-            </section>
-          </div>
-        </div>
 
-        <div className="shrink-0 border-t border-white/[0.08] bg-[#111827] p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:bg-white/[0.02] sm:p-6">
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={salvando}
-              className="h-11"
-            >
-              Cancelar
-            </Button>
+              {horariosOcupados.length > 0 ? (
+                <details className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <summary className="cursor-pointer text-xs font-bold text-slate-500">
+                    Ver horários ocupados
+                  </summary>
 
-            <Button
+                  <div className="mt-3 space-y-2">
+                    {horariosOcupados.map((item) => (
+                      <div
+                        key={item.hora}
+                        className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-xs text-slate-500"
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          <Clock3 size={12} />
+                          {item.hora}
+                        </span>
+
+                        <span className="truncate">{item.motivo}</span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              ) : null}
+            </div>
+          </section>
+
+          <section className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-slate-200/70 sm:p-5">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block space-y-2 sm:col-span-2">
+                <span className={labelClassName()}>Procedimento / serviço</span>
+
+                <select
+                  value={servicoSelecionadoId}
+                  onChange={(event) => selecionarServico(event.target.value)}
+                  className={inputClassName()}
+                >
+                  <option value="">Selecione um serviço cadastrado</option>
+
+                  {servicos.map((servico) => (
+                    <option key={servico.id} value={servico.id}>
+                      {servico.nome} · {servico.duracaoPadrao} min
+                      {servico.valorPadrao > 0
+                        ? ` · ${servico.valorPadrao.toLocaleString("pt-BR", {
+                            style: "currency",
+                            currency: "BRL",
+                          })}`
+                        : ""}
+                    </option>
+                  ))}
+
+                  <option value="outro">Outro procedimento</option>
+                </select>
+              </label>
+
+              <label className="block space-y-2 sm:col-span-2">
+                <span className={labelClassName()}>Nome do procedimento</span>
+
+                <input
+                  value={procedimento}
+                  onChange={(event) => {
+                    setProcedimento(event.target.value);
+                    setServicoSelecionadoId("outro");
+                    setErro("");
+                  }}
+                  placeholder="Ex.: Retorno - Limpeza de pele"
+                  className={inputClassName()}
+                />
+              </label>
+
+              <label className="block space-y-2">
+                <span className={labelClassName()}>Valor previsto</span>
+
+                <input
+                  value={valor}
+                  onChange={(event) =>
+                    setValor(formatCurrencyInput(event.target.value))
+                  }
+                  placeholder="0,00"
+                  className={inputClassName()}
+                />
+              </label>
+
+              <label className="block space-y-2">
+                <span className={labelClassName()}>Status</span>
+
+                <select
+                  value={status}
+                  onChange={(event) => setStatus(event.target.value)}
+                  className={inputClassName()}
+                >
+                  <option>Agendado</option>
+                  <option>Confirmado</option>
+                  <option>Em atendimento</option>
+                  <option>Atendido</option>
+                  <option>Faltou</option>
+                  <option>Cancelado</option>
+                </select>
+              </label>
+
+              <label className="block space-y-2 sm:col-span-2">
+                <span className={labelClassName()}>Observações</span>
+
+                <textarea
+                  value={observacoes}
+                  onChange={(event) => setObservacoes(event.target.value)}
+                  placeholder="Preferências, restrições, sinal, comanda ou observações do atendimento."
+                  className="min-h-24 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:bg-white focus:ring-4 focus:ring-purple-100"
+                />
+              </label>
+            </div>
+          </section>
+
+          <div className="grid gap-2 pb-4 sm:grid-cols-2 sm:pb-0">
+            <button
               type="button"
               onClick={salvar}
               disabled={salvando}
-              className="h-11"
+              className="h-12 rounded-2xl bg-gradient-to-r from-purple-700 to-fuchsia-600 px-5 text-sm font-bold text-white shadow-lg shadow-purple-900/20 transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 sm:order-2"
             >
               {salvando
                 ? "Salvando..."
                 : modoRetorno
                   ? "Salvar retorno"
                   : "Salvar atendimento"}
-            </Button>
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={salvando}
+              className="h-12 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 sm:order-1"
+            >
+              Cancelar
+            </button>
           </div>
         </div>
       </div>
