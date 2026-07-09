@@ -60,10 +60,10 @@ type Props = {
   onMessage: (appointment: AgendamentoAgenda) => void;
 };
 
-const START_HOUR = 6;
-const END_HOUR = 21;
+const START_HOUR = 9;
+const END_HOUR = 10;
 const SLOT_MINUTES = 30;
-const MINUTE_HEIGHT = 0.86;
+const MINUTE_HEIGHT = 1.35;
 const TOTAL_MINUTES = (END_HOUR - START_HOUR) * 60;
 
 const slots = Array.from(
