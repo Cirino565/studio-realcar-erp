@@ -579,12 +579,24 @@ function montarHorario(baseDate: Date, hora: string) {
   );
 }
 
+const CLINICA_HORA_ABERTURA = 9;
+const CLINICA_HORA_FECHAMENTO = 19;
+const CLINICA_INTERVALO_MINUTOS = 30;
+
 function gerarSlotsDisponibilidade() {
   const slots: string[] = [];
 
-  for (let hour = 6; hour <= 20; hour += 1) {
-    slots.push(`${String(hour).padStart(2, "0")}:00`);
-    slots.push(`${String(hour).padStart(2, "0")}:30`);
+  for (
+    let minutos = CLINICA_HORA_ABERTURA * 60;
+    minutos < CLINICA_HORA_FECHAMENTO * 60;
+    minutos += CLINICA_INTERVALO_MINUTOS
+  ) {
+    const hour = Math.floor(minutos / 60);
+    const minute = minutos % 60;
+
+    slots.push(
+      `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
+    );
   }
 
   return slots;

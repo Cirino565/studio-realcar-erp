@@ -61,9 +61,9 @@ type Props = {
 };
 
 const START_HOUR = 9;
-const END_HOUR = 10;
+const END_HOUR = 19;
 const SLOT_MINUTES = 30;
-const MINUTE_HEIGHT = 1.35;
+const MINUTE_HEIGHT = 1.55;
 const TOTAL_MINUTES = (END_HOUR - START_HOUR) * 60;
 
 const slots = Array.from(
