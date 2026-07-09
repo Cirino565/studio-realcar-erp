@@ -190,7 +190,7 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
   });
 
   return (
-    <div className="w-full max-w-full overflow-x-hidden pb-24 lg:space-y-8 lg:pb-0">
+    <div className="w-full max-w-full overflow-x-hidden pb-0">
       <AgendaClient
         clientes={clientes}
         agendamentos={agendamentos.map((agendamento) => ({

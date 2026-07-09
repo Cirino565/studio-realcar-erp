@@ -342,32 +342,32 @@ export default function AgendaCalendar({
   }
 
   return (
-    <div className="premium-card relative w-full max-w-[100vw] overflow-hidden sm:max-w-full">
-      <div className="border-b border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))]">
-        <div className="flex flex-col gap-2.5 p-2.5 sm:gap-3 sm:p-4 xl:p-5">
-          <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between">
+    <section className="relative w-full max-w-full overflow-hidden bg-[#111827] sm:rounded-[28px] sm:border sm:border-white/[0.08] sm:bg-white/[0.03] sm:shadow-2xl sm:shadow-black/20">
+      <div className="border-b border-white/[0.06] bg-[#111827] sm:bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))]">
+        <div className="flex flex-col gap-2 p-2 sm:gap-3 sm:p-4 xl:p-5">
+          <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
             <div className="min-w-0">
               <div className="hidden min-w-0 items-center gap-2 text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-slate-500 sm:flex">
                 <CalendarDays size={13} />
                 Agenda profissional
               </div>
 
-              <h2 className="truncate text-base font-semibold capitalize tracking-tight text-white sm:mt-1 sm:text-xl xl:text-2xl">
+              <h2 className="truncate text-sm font-semibold capitalize tracking-tight text-white sm:mt-1 sm:text-xl xl:text-2xl">
                 {formatLongDate(selectedDate)}
               </h2>
             </div>
 
-            <div className="grid min-w-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
-              <div className="grid h-10 grid-cols-2 rounded-2xl border border-white/[0.10] bg-white/[0.035] p-1 text-xs font-semibold">
+            <div className="grid min-w-0 grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
+              <div className="grid h-9 grid-cols-2 rounded-2xl border border-white/[0.10] bg-white/[0.035] p-1 text-xs font-semibold sm:h-10">
                 <button
                   type="button"
-                  className="rounded-xl bg-violet-600 px-3 py-2 text-white shadow-lg shadow-violet-950/20"
+                  className="rounded-xl bg-violet-600 px-3 py-1.5 text-white shadow-lg shadow-violet-950/20 sm:py-2"
                 >
                   Dia
                 </button>
                 <button
                   type="button"
-                  className="rounded-xl px-3 py-2 text-slate-400"
+                  className="rounded-xl px-3 py-1.5 text-slate-400 sm:py-2"
                   title="Visão semanal será a próxima etapa"
                 >
                   Semana
@@ -377,7 +377,7 @@ export default function AgendaCalendar({
               <select
                 value={profissionalFiltro}
                 onChange={(event) => onProfissionalFiltroChange(event.target.value)}
-                className="premium-input h-10 min-w-0 rounded-2xl px-3 py-2 text-xs sm:min-w-[170px] sm:text-sm"
+                className="premium-input h-9 min-w-0 rounded-2xl px-3 py-1.5 text-xs sm:h-10 sm:min-w-[170px] sm:text-sm"
               >
                 <option value="todas">Todas as agendas</option>
                 {todosProfissionais.map((profissional) => (
@@ -389,7 +389,7 @@ export default function AgendaCalendar({
 
               <a
                 href={agendaHref(addDays(selectedDate, -1), profissionalFiltro)}
-                className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/[0.10] bg-white/[0.04] text-slate-100 transition active:scale-[0.98]"
+                className="flex h-9 w-full items-center justify-center rounded-2xl border border-white/[0.10] bg-white/[0.04] text-slate-100 transition active:scale-[0.98] sm:h-10 sm:w-10"
                 aria-label="Dia anterior"
               >
                 <ChevronLeft size={16} />
@@ -398,7 +398,7 @@ export default function AgendaCalendar({
               <button
                 type="button"
                 onClick={() => goToDate(today)}
-                className={`h-10 rounded-2xl px-4 text-xs font-semibold transition active:scale-[0.98] sm:text-sm ${
+                className={`h-9 rounded-2xl px-3 text-xs font-semibold transition active:scale-[0.98] sm:h-10 sm:px-4 sm:text-sm ${
                   isSameDay(selectedDate, today)
                     ? "bg-violet-600 text-white shadow-lg shadow-violet-950/25"
                     : "border border-white/[0.10] bg-white/[0.04] text-slate-100"
@@ -409,13 +409,13 @@ export default function AgendaCalendar({
 
               <a
                 href={agendaHref(addDays(selectedDate, 1), profissionalFiltro)}
-                className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/[0.10] bg-white/[0.04] text-slate-100 transition active:scale-[0.98]"
+                className="flex h-9 w-full items-center justify-center rounded-2xl border border-white/[0.10] bg-white/[0.04] text-slate-100 transition active:scale-[0.98] sm:h-10 sm:w-10"
                 aria-label="Próximo dia"
               >
                 <ChevronRight size={16} />
               </a>
 
-              <label className="relative flex h-10 min-w-[132px] items-center justify-center overflow-hidden rounded-2xl border border-white/[0.10] bg-white/[0.04] px-3 text-center text-xs font-semibold text-slate-100 sm:min-w-[150px] sm:text-sm">
+              <label className="relative flex h-9 min-w-0 items-center justify-center overflow-hidden rounded-2xl border border-white/[0.10] bg-white/[0.04] px-3 text-center text-xs font-semibold text-slate-100 sm:h-10 sm:min-w-[150px] sm:text-sm">
                 <span className="pointer-events-none truncate">
                   {selectedDateInput.split("-").reverse().join("/")}
                 </span>
@@ -509,7 +509,7 @@ export default function AgendaCalendar({
         </div>
       </div>
 
-      <div className="max-w-full overflow-x-auto overflow-y-hidden scrollbar-premium">
+      <div className="w-full max-w-full overflow-x-auto scrollbar-premium">
         <div
           className="relative w-full min-w-0"
           style={{
@@ -719,17 +719,6 @@ export default function AgendaCalendar({
       >
         <Plus size={22} />
       </button>
-
-      <div className="hidden flex-col gap-2 border-t border-white/[0.08] bg-white/[0.02] px-3 py-3 text-xs text-slate-500 sm:flex sm:flex-row sm:items-center sm:justify-between xl:px-5">
-        <span>
-          Arraste para o lado no celular para comparar profissionais e horários.
-        </span>
-
-        <span>
-          Horários exibidos de {String(START_HOUR).padStart(2, "0")}:00 às{" "}
-          {String(END_HOUR).padStart(2, "0")}:00
-        </span>
-      </div>
-    </div>
+    </section>
   );
 }

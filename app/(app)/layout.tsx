@@ -22,7 +22,7 @@ export default async function AppLayout({
         <div className="flex min-w-0 flex-1 flex-col lg:pl-72">
           <Header />
 
-          <main className="min-w-0 flex-1 overflow-x-hidden px-3 py-3 pb-28 sm:px-4 sm:py-4 sm:pb-32 lg:px-6 lg:py-6 lg:pb-6">
+          <main className="min-w-0 flex-1 overflow-x-hidden px-2 py-2 pb-[calc(env(safe-area-inset-bottom)+76px)] sm:px-4 sm:py-4 sm:pb-6 lg:px-6 lg:py-6 lg:pb-6">
             <div className="mx-auto w-full max-w-full min-w-0">
               {children}
             </div>
