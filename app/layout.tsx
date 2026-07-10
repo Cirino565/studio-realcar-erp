@@ -1,4 +1,6 @@
 import type { Viewport } from "next";
+import { cookies } from "next/headers";
+
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -12,39 +14,49 @@ const themeScript = `
 (function () {
   try {
     var savedTheme = window.localStorage.getItem("studio-theme");
-    var theme = savedTheme === "dark" ? "dark" : "light";
+
+    if (savedTheme !== "light" && savedTheme !== "dark") {
+      return;
+    }
+
     var root = document.documentElement;
 
     root.classList.remove("theme-light", "theme-dark");
-    root.classList.add("theme-" + theme);
-    root.dataset.theme = theme;
-    root.style.colorScheme = theme;
+    root.classList.add("theme-" + savedTheme);
+    root.dataset.theme = savedTheme;
+    root.style.colorScheme = savedTheme;
 
-    var themeColor = document.querySelector('meta[name="theme-color"]');
-    if (themeColor) {
-      themeColor.setAttribute(
-        "content",
-        theme === "dark" ? "#0b1220" : "#f8fafc"
-      );
-    }
+    document.cookie =
+      "studio-theme=" +
+      savedTheme +
+      "; Path=/; Max-Age=31536000; SameSite=Lax";
   } catch (error) {
-    document.documentElement.classList.add("theme-light");
-    document.documentElement.dataset.theme = "light";
-    document.documentElement.style.colorScheme = "light";
+    // O tema definido pelo servidor permanece ativo.
   }
 })();
 `;
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = await cookies();
+  const savedTheme = cookieStore.get("studio-theme")?.value;
+  const initialTheme = savedTheme === "dark" ? "dark" : "light";
+
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
+    <html
+      lang="pt-BR"
+      className={`theme-${initialTheme}`}
+      data-theme={initialTheme}
+      style={{ colorScheme: initialTheme }}
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
+
       <body className="min-h-screen w-full overflow-x-hidden">
         {children}
       </body>
