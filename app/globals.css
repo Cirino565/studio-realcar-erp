@@ -493,3 +493,203 @@ body {
     font-size: 16px !important;
   }
 }
+/* Application light premium shell */
+.app-shell-light {
+  min-height: 100dvh;
+  width: 100%;
+  overflow-x: hidden;
+  background:
+    radial-gradient(circle at top left, rgba(139, 92, 246, 0.08), transparent 28rem),
+    radial-gradient(circle at top right, rgba(236, 72, 153, 0.05), transparent 30rem),
+    #f8fafc;
+  color: #0f172a;
+  color-scheme: light;
+}
+
+.app-shell-light .premium-card,
+.app-shell-light .premium-card-soft,
+.app-shell-light .premium-table {
+  border-color: #e2e8f0 !important;
+  background: #ffffff !important;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.app-shell-light .premium-title {
+  color: #0f172a !important;
+  font-weight: 700;
+}
+
+.app-shell-light .premium-subtitle {
+  color: #64748b !important;
+}
+
+.app-shell-light .premium-input,
+.app-shell-light input,
+.app-shell-light select,
+.app-shell-light textarea {
+  border-color: #e2e8f0 !important;
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  color-scheme: light;
+}
+
+.app-shell-light input::placeholder,
+.app-shell-light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+.app-shell-light input:focus,
+.app-shell-light select:focus,
+.app-shell-light textarea:focus {
+  border-color: #a78bfa !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.11) !important;
+}
+
+.app-shell-light select option,
+.app-shell-light select optgroup {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+.app-shell-light select option:checked {
+  background-color: #ede9fe !important;
+  color: #5b21b6 !important;
+}
+
+.app-shell-light .premium-chip {
+  border-color: #e2e8f0 !important;
+  background: #f8fafc !important;
+  color: #475569 !important;
+}
+
+.app-shell-light .border-white\/10,
+.app-shell-light .border-white\/15,
+.app-shell-light .border-white\/20,
+.app-shell-light .border-white\/\[0\.07\],
+.app-shell-light .border-white\/\[0\.08\],
+.app-shell-light .border-white\/\[0\.10\],
+.app-shell-light .border-white\/\[0\.12\],
+.app-shell-light .border-white\/\[0\.14\] {
+  border-color: #e2e8f0 !important;
+}
+
+.app-shell-light .bg-white\/5,
+.app-shell-light .bg-white\/10,
+.app-shell-light .bg-white\/\[0\.02\],
+.app-shell-light .bg-white\/\[0\.025\],
+.app-shell-light .bg-white\/\[0\.03\],
+.app-shell-light .bg-white\/\[0\.035\],
+.app-shell-light .bg-white\/\[0\.04\],
+.app-shell-light .bg-white\/\[0\.045\],
+.app-shell-light .bg-white\/\[0\.05\],
+.app-shell-light .bg-white\/\[0\.055\],
+.app-shell-light .bg-white\/\[0\.06\],
+.app-shell-light .bg-white\/\[0\.07\],
+.app-shell-light .bg-white\/\[0\.075\],
+.app-shell-light .bg-white\/\[0\.08\],
+.app-shell-light .bg-white\/\[0\.10\] {
+  background-color: #ffffff !important;
+}
+
+.app-shell-light [class*="bg-[#111827]"],
+.app-shell-light [class*="bg-[#11131d]"],
+.app-shell-light [class*="bg-[#151a2a]"],
+.app-shell-light [class*="bg-[#171d2d]"],
+.app-shell-light [class*="bg-[#171d2a]"],
+.app-shell-light [class*="bg-[#1d2437]"],
+.app-shell-light [class*="bg-[#20283b]"],
+.app-shell-light [class*="bg-[#0b1220]"] {
+  background-color: #ffffff !important;
+}
+
+.app-shell-light .bg-slate-950\/20,
+.app-shell-light .bg-slate-950\/25,
+.app-shell-light .bg-slate-950\/30,
+.app-shell-light .bg-slate-950\/35,
+.app-shell-light .bg-slate-950\/40,
+.app-shell-light .bg-slate-950\/55,
+.app-shell-light .bg-slate-950\/60,
+.app-shell-light .bg-slate-950\/70,
+.app-shell-light .bg-slate-950\/80,
+.app-shell-light .bg-slate-900\/55,
+.app-shell-light .bg-slate-900\/60 {
+  background-color: rgba(248, 250, 252, 0.96) !important;
+}
+
+.app-shell-light .divide-white\/\[0\.06\] > :not([hidden]) ~ :not([hidden]),
+.app-shell-light .divide-white\/\[0\.08\] > :not([hidden]) ~ :not([hidden]) {
+  border-color: #f1f5f9 !important;
+}
+
+.app-shell-light .text-slate-100,
+.app-shell-light .text-slate-200 {
+  color: #1e293b !important;
+}
+
+.app-shell-light .text-slate-300 {
+  color: #475569 !important;
+}
+
+.app-shell-light .text-slate-400 {
+  color: #64748b !important;
+}
+
+.app-shell-light .text-slate-500 {
+  color: #64748b !important;
+}
+
+.app-shell-light .text-white {
+  color: #0f172a !important;
+}
+
+.app-shell-light [class*="from-violet-"][class*="to-fuchsia-"] .text-white,
+.app-shell-light [class*="from-violet-"][class*="to-fuchsia-"].text-white,
+.app-shell-light [class*="bg-violet-"] .text-white,
+.app-shell-light [class*="bg-violet-"].text-white,
+.app-shell-light [class*="bg-fuchsia-"] .text-white,
+.app-shell-light [class*="bg-fuchsia-"].text-white,
+.app-shell-light [class*="bg-emerald-"] .text-white,
+.app-shell-light [class*="bg-emerald-"].text-white,
+.app-shell-light [class*="bg-rose-"] .text-white,
+.app-shell-light [class*="bg-rose-"].text-white,
+.app-shell-light [class*="bg-cyan-"] .text-white,
+.app-shell-light [class*="bg-cyan-"].text-white,
+.app-shell-light [class*="bg-blue-"] .text-white,
+.app-shell-light [class*="bg-blue-"].text-white,
+.app-shell-light button[class*="from-violet-"],
+.app-shell-light a[class*="from-violet-"] {
+  color: #ffffff !important;
+}
+
+.app-shell-light .text-emerald-300 {
+  color: #047857 !important;
+}
+
+.app-shell-light .text-rose-300 {
+  color: #be123c !important;
+}
+
+.app-shell-light .text-violet-200,
+.app-shell-light .text-violet-300 {
+  color: #6d28d9 !important;
+}
+
+.app-shell-light .shadow-black\/10,
+.app-shell-light .shadow-black\/15,
+.app-shell-light .shadow-black\/20,
+.app-shell-light .shadow-black\/30,
+.app-shell-light .shadow-black\/40,
+.app-shell-light .shadow-black\/50 {
+  --tw-shadow-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+@media (max-width: 639px) {
+  .app-shell-light input,
+  .app-shell-light select,
+  .app-shell-light textarea {
+    font-size: 16px !important;
+  }
+}

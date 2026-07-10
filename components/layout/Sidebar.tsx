@@ -73,40 +73,59 @@ function SidebarLink({ item, ativo }: { item: MenuItem; ativo: boolean }) {
   return (
     <Link
       href={item.href}
-      className={`group relative flex items-center gap-3 rounded-2xl px-3.5 py-3 text-sm transition-all duration-200 ${
+      className={`group relative flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition-all duration-200 ${
         ativo
-          ? "bg-white/[0.12] text-white shadow-[0_18px_40px_rgba(15,23,42,0.42)] ring-1 ring-white/10"
-          : "text-slate-400 hover:bg-white/[0.07] hover:text-slate-100"
+          ? "bg-violet-50 text-violet-800 shadow-sm ring-1 ring-violet-100"
+          : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"
       }`}
     >
       <span
-        className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all ${
+        className={`flex size-9 items-center justify-center rounded-xl transition-all ${
           ativo
-            ? "bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white shadow-lg shadow-violet-950/40"
-            : "bg-white/[0.07] text-slate-400 group-hover:bg-white/[0.07] group-hover:text-white"
+            ? "bg-violet-600 text-white shadow-md shadow-violet-600/20"
+            : "bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-violet-700 group-hover:shadow-sm"
         }`}
       >
-        <Icon className="h-4 w-4" />
+        <Icon className="size-4" />
       </span>
-      <span className="min-w-0 flex-1 truncate font-medium">{item.nome}</span>
+
+      <span className="min-w-0 flex-1 truncate font-semibold">{item.nome}</span>
+
       <ChevronRight
-        className={`h-4 w-4 transition-all ${
-          ativo ? "text-violet-200 opacity-100" : "text-slate-400 opacity-0 group-hover:opacity-100"
+        className={`size-4 transition-all ${
+          ativo
+            ? "text-violet-500 opacity-100"
+            : "text-slate-300 opacity-0 group-hover:opacity-100"
         }`}
       />
     </Link>
   );
 }
 
-function MenuSection({ titulo, items, pathname }: { titulo: string; items: MenuItem[]; pathname: string }) {
+function MenuSection({
+  titulo,
+  items,
+  pathname,
+}: {
+  titulo: string;
+  items: MenuItem[];
+  pathname: string;
+}) {
   if (items.length === 0) return null;
 
   return (
     <div className="space-y-2">
-      <p className="px-3 text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-slate-400">{titulo}</p>
-      <div className="space-y-1.5">
+      <p className="px-3 text-[0.65rem] font-bold uppercase tracking-[0.2em] text-slate-400">
+        {titulo}
+      </p>
+
+      <div className="space-y-1">
         {items.map((item) => (
-          <SidebarLink key={item.href} item={item} ativo={isActive(pathname, item.href)} />
+          <SidebarLink
+            key={item.href}
+            item={item}
+            ativo={isActive(pathname, item.href)}
+          />
         ))}
       </div>
     </div>
@@ -115,38 +134,69 @@ function MenuSection({ titulo, items, pathname }: { titulo: string; items: MenuI
 
 export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
   const pathname = usePathname();
-  const menusPrincipaisVisiveis = mainMenus.filter((item) => podeVerMenu(item, permissoes, isAdmin));
-  const menusAdminVisiveis = adminMenus.filter((item) => podeVerMenu(item, permissoes, isAdmin));
-  const menusMobileVisiveis = mobilePreferredMenus.filter((item) => podeVerMenu(item, permissoes, isAdmin)).slice(0, 5);
+
+  const menusPrincipaisVisiveis = mainMenus.filter((item) =>
+    podeVerMenu(item, permissoes, isAdmin),
+  );
+
+  const menusAdminVisiveis = adminMenus.filter((item) =>
+    podeVerMenu(item, permissoes, isAdmin),
+  );
+
+  const menusMobileVisiveis = mobilePreferredMenus
+    .filter((item) => podeVerMenu(item, permissoes, isAdmin))
+    .slice(0, 5);
 
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-white/[0.12] bg-[#151a2a]/88 shadow-2xl shadow-black/30 backdrop-blur-2xl lg:flex lg:flex-col">
-        <div className="border-b border-white/[0.12] px-5 py-5">
-          <Link href={menusPrincipaisVisiveis[0]?.href ?? "/agenda"} className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-rose-400 shadow-lg shadow-fuchsia-950/30">
-              <Sparkles className="h-5 w-5 text-white" />
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 flex-col border-r border-slate-200 bg-white shadow-xl shadow-slate-900/[0.04] lg:flex">
+        <div className="border-b border-slate-200 px-5 py-5">
+          <Link
+            href={menusPrincipaisVisiveis[0]?.href ?? "/agenda"}
+            className="flex items-center gap-3"
+          >
+            <div className="flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 via-fuchsia-600 to-rose-500 text-white shadow-lg shadow-violet-600/20">
+              <Sparkles className="size-5" />
             </div>
+
             <div className="min-w-0">
-              <h1 className="truncate text-lg font-semibold tracking-tight text-white">Studio Realçar</h1>
-              <p className="text-xs font-medium text-slate-400">ERP Premium</p>
+              <h1 className="truncate text-lg font-bold tracking-tight text-slate-950">
+                Studio Realçar
+              </h1>
+              <p className="text-xs font-medium text-slate-500">
+                Gestão clínica
+              </p>
             </div>
           </Link>
         </div>
 
-        <nav className="flex-1 space-y-7 overflow-y-auto px-4 py-6 scrollbar-premium">
-          <MenuSection titulo="Operação" items={menusPrincipaisVisiveis} pathname={pathname} />
-          <MenuSection titulo="Administração" items={menusAdminVisiveis} pathname={pathname} />
+        <nav className="scrollbar-premium flex-1 space-y-6 overflow-y-auto px-4 py-5">
+          <MenuSection
+            titulo="Operação"
+            items={menusPrincipaisVisiveis}
+            pathname={pathname}
+          />
+
+          <MenuSection
+            titulo="Administração"
+            items={menusAdminVisiveis}
+            pathname={pathname}
+          />
         </nav>
 
-        <div className="border-t border-white/[0.12] p-4">
-          <div className="rounded-3xl border border-white/[0.12] bg-white/[0.07] p-4 shadow-inner shadow-white/[0.03]">
+        <div className="border-t border-slate-200 p-4">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
             <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-white">Versão Comercial</p>
-                <p className="mt-1 text-xs text-slate-400">Alpha 2.2 · Permissões por perfil</p>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-slate-900">
+                  Sistema operacional
+                </p>
+                <p className="mt-0.5 truncate text-xs text-slate-500">
+                  Permissões por perfil
+                </p>
               </div>
-              <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[0.68rem] font-semibold text-emerald-300">
+
+              <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[0.65rem] font-bold text-emerald-700">
                 Online
               </span>
             </div>
@@ -154,9 +204,19 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
         </div>
       </aside>
 
-      {menusMobileVisiveis.length > 0 && (
-        <nav className="fixed inset-x-3 bottom-3 z-40 rounded-3xl border border-white/[0.10] bg-[#151a2a]/92 p-2 shadow-2xl shadow-black/40 backdrop-blur-2xl lg:hidden" style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}>
-          <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${menusMobileVisiveis.length}, minmax(0, 1fr))` }}>
+      {menusMobileVisiveis.length > 0 ? (
+        <nav
+          className="fixed inset-x-2 bottom-2 z-40 rounded-2xl border border-slate-200 bg-white/95 p-1.5 shadow-2xl shadow-slate-900/15 backdrop-blur-xl lg:hidden"
+          style={{
+            paddingBottom: "max(0.375rem, env(safe-area-inset-bottom))",
+          }}
+        >
+          <div
+            className="grid gap-1"
+            style={{
+              gridTemplateColumns: `repeat(${menusMobileVisiveis.length}, minmax(0, 1fr))`,
+            }}
+          >
             {menusMobileVisiveis.map((item) => {
               const Icon = item.icon;
               const ativo = isActive(pathname, item.href);
@@ -165,18 +225,24 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 text-[0.68rem] font-medium transition-all ${
-                    ativo ? "bg-white/[0.12] text-white" : "text-slate-400 hover:text-slate-200"
+                  className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[0.63rem] font-semibold transition-all ${
+                    ativo
+                      ? "bg-violet-50 text-violet-800"
+                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                   }`}
                 >
-                  <Icon className={`h-4 w-4 ${ativo ? "text-violet-300" : ""}`} />
+                  <Icon
+                    className={`size-4 ${
+                      ativo ? "text-violet-600" : "text-slate-400"
+                    }`}
+                  />
                   <span className="max-w-full truncate">{item.nome}</span>
                 </Link>
               );
             })}
           </div>
         </nav>
-      )}
+      ) : null}
     </>
   );
 }
