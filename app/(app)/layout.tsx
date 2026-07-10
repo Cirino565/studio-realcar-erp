@@ -15,7 +15,7 @@ export default async function AppLayout({
   const permissoes = getUserPermissionKeys(usuario);
 
   return (
-    <div className="app-shell-light min-h-[100dvh] w-full overflow-x-hidden bg-slate-50 text-slate-900">
+    <div className="app-shell min-h-[100dvh] w-full overflow-x-hidden bg-slate-50 text-slate-900">
       <div className="flex min-h-[100dvh] w-full overflow-x-hidden">
         <Sidebar permissoes={permissoes} isAdmin={isAdminUser(usuario)} />
 

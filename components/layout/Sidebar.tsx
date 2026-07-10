@@ -149,7 +149,7 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
 
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 flex-col border-r border-slate-200 bg-white shadow-xl shadow-slate-900/[0.04] lg:flex">
+      <aside className="app-sidebar fixed inset-y-0 left-0 z-40 hidden w-72 flex-col border-r shadow-xl lg:flex">
         <div className="border-b border-slate-200 px-5 py-5">
           <Link
             href={menusPrincipaisVisiveis[0]?.href ?? "/agenda"}
@@ -206,7 +206,7 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
 
       {menusMobileVisiveis.length > 0 ? (
         <nav
-          className="fixed inset-x-2 bottom-2 z-40 rounded-2xl border border-slate-200 bg-white/95 p-1.5 shadow-2xl shadow-slate-900/15 backdrop-blur-xl lg:hidden"
+          className="app-bottom-nav fixed inset-x-2 bottom-2 z-40 rounded-2xl border p-1.5 shadow-2xl backdrop-blur-xl lg:hidden"
           style={{
             paddingBottom: "max(0.375rem, env(safe-area-inset-bottom))",
           }}
