@@ -102,7 +102,9 @@ function formatTime(value: Date | string) {
 }
 
 function formatMonthName(value: Date) {
-  return new Intl.DateTimeFormat("pt-BR", { month: "long" }).format(value);
+  return new Intl.DateTimeFormat("pt-BR", {
+    month: "long",
+  }).format(value);
 }
 
 function formatDateTitle(value: Date, today: Date) {
@@ -125,7 +127,9 @@ function formatDateTitle(value: Date, today: Date) {
 }
 
 function formatShortWeekDay(value: Date) {
-  return new Intl.DateTimeFormat("pt-BR", { weekday: "short" })
+  return new Intl.DateTimeFormat("pt-BR", {
+    weekday: "short",
+  })
     .format(value)
     .replace(".", "");
 }
@@ -145,7 +149,10 @@ function addMinutes(date: Date, minutes: number) {
 }
 
 function getDateStripDays(date: Date) {
-  return Array.from({ length: 35 }, (_, index) => addDays(date, index - 10));
+  return Array.from(
+    { length: 35 },
+    (_, index) => addDays(date, index - 10),
+  );
 }
 
 function isSameDay(first: Date, second: Date) {
@@ -158,22 +165,39 @@ function isSameDay(first: Date, second: Date) {
 
 function minutesFromStart(value: Date | string) {
   const date = new Date(value);
-  return date.getHours() * 60 + date.getMinutes() - START_HOUR * 60;
+
+  return (
+    date.getHours() * 60 +
+    date.getMinutes() -
+    START_HOUR * 60
+  );
 }
 
 function appointmentEnd(appointment: AgendamentoAgenda) {
-  return addMinutes(new Date(appointment.data), appointment.duracao);
+  return addMinutes(
+    new Date(appointment.data),
+    appointment.duracao,
+  );
 }
 
-function agendaHref(date: Date, profissionalFiltro: string) {
+function agendaHref(
+  date: Date,
+  profissionalFiltro: string,
+) {
   const data = formatDateInput(date);
+
   const profissional =
-    profissionalFiltro !== "todas" ? `&profissional=${profissionalFiltro}` : "";
+    profissionalFiltro !== "todas"
+      ? `&profissional=${profissionalFiltro}`
+      : "";
 
   return `/agenda?data=${data}${profissional}`;
 }
 
-function getColorClasses(color: string, index: number) {
+function getColorClasses(
+  color: string,
+  index: number,
+) {
   const normalizedColor = (color || "").toLowerCase();
 
   if (
@@ -201,8 +225,13 @@ function getColorClasses(color: string, index: number) {
   };
 }
 
-function getAppointmentNote(appointment: AgendamentoAgenda) {
-  const note = appointment.observacoes?.split("\n").find(Boolean)?.trim();
+function getAppointmentNote(
+  appointment: AgendamentoAgenda,
+) {
+  const note = appointment.observacoes
+    ?.split("\n")
+    .find(Boolean)
+    ?.trim();
 
   if (note) {
     return note;
@@ -233,9 +262,19 @@ export default function AgendaCalendar({
   const today = new Date();
   const stripDays = getDateStripDays(selectedDate);
   const selectedDateInput = formatDateInput(selectedDate);
-  const activeDayRef = useRef<HTMLAnchorElement | null>(null);
-  const [hiddenProfessionalIds, setHiddenProfessionalIds] = useState<number[]>([]);
-  const [showVisibilityPanel, setShowVisibilityPanel] = useState(false);
+
+  const activeDayRef =
+    useRef<HTMLAnchorElement | null>(null);
+
+  const [
+    hiddenProfessionalIds,
+    setHiddenProfessionalIds,
+  ] = useState<number[]>([]);
+
+  const [
+    showVisibilityPanel,
+    setShowVisibilityPanel,
+  ] = useState(false);
 
   useEffect(() => {
     activeDayRef.current?.scrollIntoView({
@@ -247,27 +286,43 @@ export default function AgendaCalendar({
 
   const visibleProfessionals = useMemo(() => {
     const result = profissionais.filter(
-      (profissional) => !hiddenProfessionalIds.includes(profissional.id),
+      (profissional) =>
+        !hiddenProfessionalIds.includes(
+          profissional.id,
+        ),
     );
 
-    return result.length > 0 ? result : profissionais;
+    return result.length > 0
+      ? result
+      : profissionais;
   }, [hiddenProfessionalIds, profissionais]);
 
   const appointmentsByProfessional = useMemo(() => {
-    return visibleProfessionals.map((profissional, index) => {
-      const appointments = agendamentos
-        .filter((appointment) => appointment.profissionalId === profissional.id)
-        .sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
+    return visibleProfessionals.map(
+      (profissional, index) => {
+        const appointments = agendamentos
+          .filter(
+            (appointment) =>
+              appointment.profissionalId ===
+              profissional.id,
+          )
+          .sort(
+            (a, b) =>
+              new Date(a.data).getTime() -
+              new Date(b.data).getTime(),
+          );
 
-      return {
-        profissional,
-        appointments,
-        index,
-      };
-    });
+        return {
+          profissional,
+          appointments,
+          index,
+        };
+      },
+    );
   }, [agendamentos, visibleProfessionals]);
 
-  const shouldEnableHorizontalScroll = visibleProfessionals.length > 2;
+  const shouldEnableHorizontalScroll =
+    visibleProfessionals.length > 2;
 
   const gridMinWidth =
     visibleProfessionals.length <= 2
@@ -276,20 +331,31 @@ export default function AgendaCalendar({
 
   function goToDate(date: Date) {
     onDateChange(date);
-    window.location.href = agendaHref(date, profissionalFiltro);
+
+    window.location.href = agendaHref(
+      date,
+      profissionalFiltro,
+    );
   }
 
   function handleDateInputChange(value: string) {
-    const [year, month, day] = value.split("-").map(Number);
+    const [year, month, day] = value
+      .split("-")
+      .map(Number);
 
     if (!year || !month || !day) {
       return;
     }
 
-    goToDate(new Date(year, month - 1, day));
+    goToDate(
+      new Date(year, month - 1, day),
+    );
   }
 
-  function abrirNovo(profissionalId: number, hora = "09:00") {
+  function abrirNovo(
+    profissionalId: number,
+    hora = "09:00",
+  ) {
     onNovoHorario({
       data: selectedDateInput,
       hora,
@@ -297,15 +363,24 @@ export default function AgendaCalendar({
     });
   }
 
-  function toggleProfessional(profissionalId: number) {
+  function toggleProfessional(
+    profissionalId: number,
+  ) {
     setHiddenProfessionalIds((current) => {
-      const isHidden = current.includes(profissionalId);
+      const isHidden =
+        current.includes(profissionalId);
 
       if (isHidden) {
-        return current.filter((id) => id !== profissionalId);
+        return current.filter(
+          (id) => id !== profissionalId,
+        );
       }
 
-      if (profissionais.length - current.length <= 1) {
+      if (
+        profissionais.length -
+          current.length <=
+        1
+      ) {
         return current;
       }
 
@@ -314,40 +389,61 @@ export default function AgendaCalendar({
   }
 
   function abrirNovoPadrao() {
-    const profissional = visibleProfessionals[0] || profissionais[0];
+    const profissional =
+      visibleProfessionals[0] ||
+      profissionais[0];
 
     if (profissional) {
       abrirNovo(profissional.id);
     }
   }
 
-  function selecionarFiltroProfissional(value: string) {
+  function selecionarFiltroProfissional(
+    value: string,
+  ) {
     setHiddenProfessionalIds([]);
     onProfissionalFiltroChange(value);
     setShowVisibilityPanel(false);
   }
 
   return (
-    <section className="relative w-full max-w-full overflow-visible bg-white text-slate-900 shadow-xl shadow-slate-950/10 sm:overflow-hidden sm:rounded-[1.5rem]">
-      <div className="border-b border-slate-200 bg-white">
-        <div className="px-2 pt-1 text-center text-[0.68rem] font-medium capitalize leading-none text-slate-400 sm:px-4">
+    <section className="relative w-full max-w-full overflow-visible bg-white text-slate-900 shadow-xl shadow-slate-950/10 dark:bg-slate-950 dark:text-slate-100 dark:shadow-black/30 sm:overflow-hidden sm:rounded-[1.5rem]">
+      <div className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+        <div className="px-2 pt-1 text-center text-[0.68rem] font-medium capitalize leading-none text-slate-400 dark:text-slate-500 sm:px-4">
           {formatMonthName(selectedDate)}
         </div>
 
         <div className="flex max-w-full gap-1 overflow-x-auto px-1 pb-1 scrollbar-premium sm:px-3">
           {stripDays.map((day) => {
-            const active = isSameDay(day, selectedDate);
-            const isToday = isSameDay(day, today);
+            const active = isSameDay(
+              day,
+              selectedDate,
+            );
+
+            const isToday = isSameDay(
+              day,
+              today,
+            );
 
             return (
               <a
                 key={day.toISOString()}
-                ref={active ? activeDayRef : null}
-                href={agendaHref(day, profissionalFiltro)}
+                ref={
+                  active
+                    ? activeDayRef
+                    : null
+                }
+                href={agendaHref(
+                  day,
+                  profissionalFiltro,
+                )}
                 className="min-w-[48px] shrink-0 rounded-xl px-1 py-1 text-center transition"
               >
-                <span className="block truncate text-[0.68rem] font-medium text-slate-500 sm:text-xs">
-                  {formatShortWeekDay(day).slice(0, 3)}
+                <span className="block truncate text-[0.68rem] font-medium text-slate-500 dark:text-slate-400 sm:text-xs">
+                  {formatShortWeekDay(day).slice(
+                    0,
+                    3,
+                  )}
                 </span>
 
                 <span
@@ -355,26 +451,35 @@ export default function AgendaCalendar({
                     active
                       ? "bg-red-600 text-white shadow-lg shadow-red-500/20"
                       : isToday
-                        ? "bg-purple-50 text-purple-700"
-                        : "text-slate-700 hover:bg-slate-100"
+                        ? "bg-teal-50 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300"
+                        : "text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
                   }`}
                 >
-                  {String(day.getDate()).padStart(2, "0")}
+                  {String(
+                    day.getDate(),
+                  ).padStart(2, "0")}
                 </span>
               </a>
             );
           })}
         </div>
 
-        <label className="relative block cursor-pointer border-t border-slate-100 py-2 text-center text-sm font-semibold capitalize text-purple-700 sm:text-base">
+        <label className="relative block cursor-pointer border-t border-slate-100 py-2 text-center text-sm font-semibold capitalize text-teal-700 dark:border-slate-800 dark:text-teal-300 sm:text-base">
           <span className="pointer-events-none">
-            {formatDateTitle(selectedDate, today)}
+            {formatDateTitle(
+              selectedDate,
+              today,
+            )}
           </span>
 
           <input
             type="date"
             value={selectedDateInput}
-            onChange={(event) => handleDateInputChange(event.target.value)}
+            onChange={(event) =>
+              handleDateInputChange(
+                event.target.value,
+              )
+            }
             className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
             aria-label="Selecionar data"
           />
@@ -399,27 +504,35 @@ export default function AgendaCalendar({
             )}, minmax(0, 1fr))`,
           }}
         >
-          <div className="relative z-30 border-b border-r border-slate-200 bg-[#eef0f6]">
+          <div className="relative z-30 border-b border-r border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900">
             <button
               type="button"
-              onClick={() => setShowVisibilityPanel((current) => !current)}
-              className="flex h-full min-h-[38px] w-full items-center justify-center text-purple-700"
+              onClick={() =>
+                setShowVisibilityPanel(
+                  (current) => !current,
+                )
+              }
+              className="flex h-full min-h-[38px] w-full items-center justify-center text-teal-700 dark:text-teal-300"
               aria-label="Mostrar ou ocultar agendas"
             >
               <UsersRound size={18} />
             </button>
 
             {showVisibilityPanel ? (
-              <div className="absolute left-1 top-10 z-50 w-60 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-950/20">
+              <div className="absolute left-1 top-10 z-50 w-60 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-950/20 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40">
                 <div className="flex items-center justify-between px-2 pb-2">
-                  <span className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  <span className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
                     Agendas
                   </span>
 
                   <button
                     type="button"
-                    onClick={() => setShowVisibilityPanel(false)}
-                    className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                    onClick={() =>
+                      setShowVisibilityPanel(
+                        false,
+                      )
+                    }
+                    className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                     aria-label="Fechar seletor"
                   >
                     <X size={14} />
@@ -429,221 +542,397 @@ export default function AgendaCalendar({
                 <div className="space-y-1">
                   <button
                     type="button"
-                    onClick={() => selecionarFiltroProfissional("todas")}
-                    className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium hover:bg-slate-100 ${
-                      profissionalFiltro === "todas"
-                        ? "text-purple-700"
-                        : "text-slate-700"
+                    onClick={() =>
+                      selecionarFiltroProfissional(
+                        "todas",
+                      )
+                    }
+                    className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800 ${
+                      profissionalFiltro ===
+                      "todas"
+                        ? "text-teal-700 dark:text-teal-300"
+                        : "text-slate-700 dark:text-slate-300"
                     }`}
                   >
-                    <span>Todas as agendas</span>
+                    <span>
+                      Todas as agendas
+                    </span>
 
-                    {profissionalFiltro === "todas" ? (
-                      <Check size={15} className="text-purple-700" />
+                    {profissionalFiltro ===
+                    "todas" ? (
+                      <Check
+                        size={15}
+                        className="text-teal-700 dark:text-teal-300"
+                      />
                     ) : null}
                   </button>
 
-                  {todosProfissionais.map((profissional) => {
-                    const active = profissionalFiltro === String(profissional.id);
-                    const hidden = hiddenProfessionalIds.includes(profissional.id);
+                  {todosProfissionais.map(
+                    (profissional) => {
+                      const active =
+                        profissionalFiltro ===
+                        String(
+                          profissional.id,
+                        );
 
-                    return (
-                      <div
-                        key={profissional.id}
-                        className="flex items-center gap-1 rounded-xl hover:bg-slate-100"
-                      >
-                        <button
-                          type="button"
-                          onClick={() =>
-                            selecionarFiltroProfissional(String(profissional.id))
+                      const hidden =
+                        hiddenProfessionalIds.includes(
+                          profissional.id,
+                        );
+
+                      return (
+                        <div
+                          key={
+                            profissional.id
                           }
-                          className={`min-w-0 flex-1 px-3 py-2 text-left text-sm font-medium ${
-                            active ? "text-purple-700" : "text-slate-700"
-                          }`}
+                          className="flex items-center gap-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800"
                         >
-                          <span className="block truncate">{profissional.nome}</span>
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              selecionarFiltroProfissional(
+                                String(
+                                  profissional.id,
+                                ),
+                              )
+                            }
+                            className={`min-w-0 flex-1 px-3 py-2 text-left text-sm font-medium ${
+                              active
+                                ? "text-teal-700 dark:text-teal-300"
+                                : "text-slate-700 dark:text-slate-300"
+                            }`}
+                          >
+                            <span className="block truncate">
+                              {
+                                profissional.nome
+                              }
+                            </span>
+                          </button>
 
-                        <button
-                          type="button"
-                          onClick={() => toggleProfessional(profissional.id)}
-                          className="shrink-0 rounded-lg px-2 py-2 text-slate-400 hover:text-purple-700"
-                          title={hidden ? "Mostrar agenda" : "Ocultar agenda"}
-                        >
-                          {hidden ? <X size={14} /> : <Check size={14} />}
-                        </button>
-                      </div>
-                    );
-                  })}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              toggleProfessional(
+                                profissional.id,
+                              )
+                            }
+                            className="shrink-0 rounded-lg px-2 py-2 text-slate-400 hover:text-teal-700 dark:text-slate-500 dark:hover:text-teal-300"
+                            title={
+                              hidden
+                                ? "Mostrar agenda"
+                                : "Ocultar agenda"
+                            }
+                          >
+                            {hidden ? (
+                              <X size={14} />
+                            ) : (
+                              <Check
+                                size={14}
+                              />
+                            )}
+                          </button>
+                        </div>
+                      );
+                    },
+                  )}
                 </div>
               </div>
             ) : null}
           </div>
 
-          {appointmentsByProfessional.map(({ profissional, index }) => {
-            const color = getColorClasses(profissional.cor, index);
+          {appointmentsByProfessional.map(
+            ({ profissional, index }) => {
+              const color =
+                getColorClasses(
+                  profissional.cor,
+                  index,
+                );
 
-            return (
-              <div
-                key={profissional.id}
-                className="min-w-0 border-b border-r border-slate-200 bg-[#eef0f6]"
-              >
-                <button
-                  type="button"
-                  onClick={() => setShowVisibilityPanel((current) => !current)}
-                  className="flex h-[38px] w-full min-w-0 items-center justify-center gap-1 px-1 text-xs font-medium text-slate-700"
+              return (
+                <div
+                  key={profissional.id}
+                  className="min-w-0 border-b border-r border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900"
                 >
-                  <span
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${color.avatar}`}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowVisibilityPanel(
+                        (current) =>
+                          !current,
+                      )
+                    }
+                    className="flex h-[38px] w-full min-w-0 items-center justify-center gap-1 px-1 text-xs font-medium text-slate-700 dark:text-slate-300"
                   >
-                    <UserRound size={14} />
-                  </span>
+                    <span
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${color.avatar}`}
+                    >
+                      <UserRound
+                        size={14}
+                      />
+                    </span>
 
-                  <span className="min-w-0 truncate">{profissional.nome}</span>
+                    <span className="min-w-0 truncate">
+                      {profissional.nome}
+                    </span>
 
-                  <ChevronDown size={13} className="shrink-0 text-slate-500" />
-                </button>
-              </div>
-            );
-          })}
+                    <ChevronDown
+                      size={13}
+                      className="shrink-0 text-slate-500 dark:text-slate-400"
+                    />
+                  </button>
+                </div>
+              );
+            },
+          )}
 
           <div
-            className="relative border-r border-slate-200 bg-white"
-            style={{ height: gridHeight }}
+            className="relative border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+            style={{
+              height: gridHeight,
+            }}
           >
             {slots.map((slot) => (
               <div
                 key={slot.label}
-                className="absolute left-0 right-0 border-t border-slate-200 pr-1 pt-1 text-right text-[0.68rem] font-medium text-slate-500 sm:text-xs"
-                style={{ top: slot.offset }}
+                className="absolute left-0 right-0 border-t border-slate-200 pr-1 pt-1 text-right text-[0.68rem] font-medium text-slate-500 dark:border-slate-800 dark:text-slate-400 sm:text-xs"
+                style={{
+                  top: slot.offset,
+                }}
               >
                 {slot.label}
               </div>
             ))}
           </div>
 
-          {appointmentsByProfessional.map(({ profissional, appointments, index }) => {
-            const color = getColorClasses(profissional.cor, index);
+          {appointmentsByProfessional.map(
+            ({
+              profissional,
+              appointments,
+              index,
+            }) => {
+              const color =
+                getColorClasses(
+                  profissional.cor,
+                  index,
+                );
 
-            return (
-              <div
-                key={`grid-${profissional.id}`}
-                className="relative border-r border-slate-100 bg-white"
-                style={{ height: gridHeight }}
-              >
-                {slots.slice(0, -1).map((slot) => (
-                  <button
-                    key={`${profissional.id}-${slot.label}`}
-                    type="button"
-                    onClick={() => abrirNovo(profissional.id, slot.label)}
-                    className="absolute left-0 right-0 z-0 border-t border-slate-200 text-transparent transition hover:bg-purple-50"
-                    style={{
-                      top: slot.offset,
-                      height: SLOT_MINUTES * MINUTE_HEIGHT,
-                    }}
-                    title={`Agendar ${slot.label}`}
-                  >
-                    <span className="sr-only">Agendar {slot.label}</span>
-                  </button>
-                ))}
-
-                {appointments.map((appointment) => {
-                  const startMinutes = minutesFromStart(appointment.data);
-                  const endMinutes = minutesFromStart(appointmentEnd(appointment));
-
-                  if (endMinutes <= 0 || startMinutes >= TOTAL_MINUTES) {
-                    return null;
-                  }
-
-                  const top = Math.max(0, startMinutes * MINUTE_HEIGHT + 3);
-                  const height = Math.max(
-                    52,
-                    Math.min(TOTAL_MINUTES, endMinutes) * MINUTE_HEIGHT -
-                      Math.max(0, startMinutes) * MINUTE_HEIGHT -
-                      6,
-                  );
-                  const note = getAppointmentNote(appointment);
-
-                  return (
-                    <article
-                      key={appointment.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => onSelectAppointment(appointment)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          onSelectAppointment(appointment);
+              return (
+                <div
+                  key={`grid-${profissional.id}`}
+                  className="relative border-r border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-950"
+                  style={{
+                    height: gridHeight,
+                  }}
+                >
+                  {slots
+                    .slice(0, -1)
+                    .map((slot) => (
+                      <button
+                        key={`${profissional.id}-${slot.label}`}
+                        type="button"
+                        onClick={() =>
+                          abrirNovo(
+                            profissional.id,
+                            slot.label,
+                          )
                         }
-                      }}
-                      className={`absolute left-1 right-1 z-10 cursor-pointer overflow-hidden rounded-lg border p-1.5 text-left shadow-lg transition hover:brightness-105 sm:left-1.5 sm:right-1.5 sm:rounded-xl sm:p-2 ${color.event}`}
-                      style={{ top, height }}
-                    >
-                      <div className={`absolute left-0 top-0 h-full w-1 ${color.line}`} />
+                        className="absolute left-0 right-0 z-0 border-t border-slate-200 text-transparent transition hover:bg-teal-50 dark:border-slate-800 dark:hover:bg-teal-500/10"
+                        style={{
+                          top: slot.offset,
+                          height:
+                            SLOT_MINUTES *
+                            MINUTE_HEIGHT,
+                        }}
+                        title={`Agendar ${slot.label}`}
+                      >
+                        <span className="sr-only">
+                          Agendar{" "}
+                          {slot.label}
+                        </span>
+                      </button>
+                    ))}
 
-                      <div className="relative flex h-full min-w-0 flex-col">
-                        <div className="flex min-w-0 items-start justify-between gap-1">
-                          <div className="min-w-0">
-                            <p className="flex items-center gap-1 text-[0.64rem] font-bold leading-tight text-white sm:text-xs">
-                              <Clock3 size={11} className="shrink-0" />
-                              {formatTime(appointment.data)} -{" "}
-                              {formatTime(appointmentEnd(appointment))}
+                  {appointments.map(
+                    (appointment) => {
+                      const startMinutes =
+                        minutesFromStart(
+                          appointment.data,
+                        );
+
+                      const endMinutes =
+                        minutesFromStart(
+                          appointmentEnd(
+                            appointment,
+                          ),
+                        );
+
+                      if (
+                        endMinutes <= 0 ||
+                        startMinutes >=
+                          TOTAL_MINUTES
+                      ) {
+                        return null;
+                      }
+
+                      const top = Math.max(
+                        0,
+                        startMinutes *
+                          MINUTE_HEIGHT +
+                          3,
+                      );
+
+                      const height =
+                        Math.max(
+                          52,
+                          Math.min(
+                            TOTAL_MINUTES,
+                            endMinutes,
+                          ) *
+                            MINUTE_HEIGHT -
+                            Math.max(
+                              0,
+                              startMinutes,
+                            ) *
+                              MINUTE_HEIGHT -
+                            6,
+                        );
+
+                      const note =
+                        getAppointmentNote(
+                          appointment,
+                        );
+
+                      return (
+                        <article
+                          key={
+                            appointment.id
+                          }
+                          role="button"
+                          tabIndex={0}
+                          onClick={() =>
+                            onSelectAppointment(
+                              appointment,
+                            )
+                          }
+                          onKeyDown={(
+                            event,
+                          ) => {
+                            if (
+                              event.key ===
+                                "Enter" ||
+                              event.key ===
+                                " "
+                            ) {
+                              onSelectAppointment(
+                                appointment,
+                              );
+                            }
+                          }}
+                          className={`absolute left-1 right-1 z-10 cursor-pointer overflow-hidden rounded-lg border p-1.5 text-left shadow-lg transition hover:brightness-105 sm:left-1.5 sm:right-1.5 sm:rounded-xl sm:p-2 ${color.event}`}
+                          style={{
+                            top,
+                            height,
+                          }}
+                        >
+                          <div
+                            className={`absolute left-0 top-0 h-full w-1 ${color.line}`}
+                          />
+
+                          <div className="relative flex h-full min-w-0 flex-col">
+                            <div className="flex min-w-0 items-start justify-between gap-1">
+                              <div className="min-w-0">
+                                <p className="flex items-center gap-1 text-[0.64rem] font-bold leading-tight text-white sm:text-xs">
+                                  <Clock3
+                                    size={11}
+                                    className="shrink-0"
+                                  />
+
+                                  {formatTime(
+                                    appointment.data,
+                                  )}{" "}
+                                  -{" "}
+                                  {formatTime(
+                                    appointmentEnd(
+                                      appointment,
+                                    ),
+                                  )}
+                                </p>
+
+                                <p className="mt-1 line-clamp-2 text-[0.72rem] font-semibold uppercase leading-tight text-white sm:text-sm">
+                                  {
+                                    appointment
+                                      .cliente
+                                      .nome
+                                  }
+                                </p>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={(
+                                  event,
+                                ) => {
+                                  event.stopPropagation();
+
+                                  onMessage(
+                                    appointment,
+                                  );
+                                }}
+                                className="hidden shrink-0 rounded-lg bg-white/15 p-1.5 text-white transition hover:bg-white/25 sm:block"
+                                aria-label="Gerar mensagem de WhatsApp"
+                              >
+                                <MessageCircle
+                                  size={13}
+                                />
+                              </button>
+                            </div>
+
+                            <p className="mt-1 line-clamp-2 text-[0.68rem] font-medium leading-snug text-white/95 sm:text-xs">
+                              {
+                                appointment.procedimento
+                              }
                             </p>
 
-                            <p className="mt-1 line-clamp-2 text-[0.72rem] font-semibold uppercase leading-tight text-white sm:text-sm">
-                              {appointment.cliente.nome}
-                            </p>
+                            {height > 76 ? (
+                              <p className="mt-1 line-clamp-2 text-[0.64rem] leading-snug text-white/85 sm:text-[0.72rem]">
+                                {note}
+                              </p>
+                            ) : null}
+
+                            {height > 112 ? (
+                              <div className="mt-auto flex items-center justify-between gap-2 pt-2">
+                                <span
+                                  className={`rounded-full px-2 py-0.5 text-[0.58rem] font-bold uppercase tracking-[0.08em] ${color.badge}`}
+                                >
+                                  {
+                                    appointment.status
+                                  }
+                                </span>
+
+                                <span className="text-[0.62rem] font-semibold text-white/80">
+                                  {
+                                    appointment.duracao
+                                  }{" "}
+                                  min
+                                </span>
+                              </div>
+                            ) : null}
                           </div>
-
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onMessage(appointment);
-                            }}
-                            className="hidden shrink-0 rounded-lg bg-white/15 p-1.5 text-white transition hover:bg-white/25 sm:block"
-                            aria-label="Gerar mensagem de WhatsApp"
-                          >
-                            <MessageCircle size={13} />
-                          </button>
-                        </div>
-
-                        <p className="mt-1 line-clamp-2 text-[0.68rem] font-medium leading-snug text-white/95 sm:text-xs">
-                          {appointment.procedimento}
-                        </p>
-
-                        {height > 76 ? (
-                          <p className="mt-1 line-clamp-2 text-[0.64rem] leading-snug text-white/85 sm:text-[0.72rem]">
-                            {note}
-                          </p>
-                        ) : null}
-
-                        {height > 112 ? (
-                          <div className="mt-auto flex items-center justify-between gap-2 pt-2">
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[0.58rem] font-bold uppercase tracking-[0.08em] ${color.badge}`}
-                            >
-                              {appointment.status}
-                            </span>
-
-                            <span className="text-[0.62rem] font-semibold text-white/80">
-                              {appointment.duracao} min
-                            </span>
-                          </div>
-                        ) : null}
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            );
-          })}
+                        </article>
+                      );
+                    },
+                  )}
+                </div>
+              );
+            },
+          )}
         </div>
       </div>
 
       <button
         type="button"
         onClick={() => goToDate(today)}
-        className="fixed bottom-[calc(env(safe-area-inset-bottom)+96px)] left-1/2 z-[60] -translate-x-1/2 rounded-md bg-purple-700 px-5 py-3 text-sm font-bold text-white shadow-xl shadow-purple-900/25 active:scale-[0.98] sm:absolute sm:bottom-5"
+        className="fixed bottom-[calc(env(safe-area-inset-bottom)+96px)] left-1/2 z-[60] -translate-x-1/2 rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-bold text-white shadow-xl shadow-teal-900/20 transition hover:bg-teal-800 active:scale-[0.98] dark:bg-teal-500 dark:shadow-black/35 dark:hover:bg-teal-400 sm:absolute sm:bottom-5"
       >
         Hoje
       </button>
@@ -651,8 +940,11 @@ export default function AgendaCalendar({
       <button
         type="button"
         onClick={abrirNovoPadrao}
-        className="fixed bottom-[calc(env(safe-area-inset-bottom)+92px)] right-5 z-[60] flex h-14 w-14 items-center justify-center rounded-full bg-purple-700 text-white shadow-2xl shadow-purple-900/35 active:scale-[0.98] sm:absolute sm:bottom-5 sm:right-5"
-        disabled={!visibleProfessionals[0] && !profissionais[0]}
+        className="fixed bottom-[calc(env(safe-area-inset-bottom)+92px)] right-5 z-[60] flex h-14 w-14 items-center justify-center rounded-full bg-teal-700 text-white shadow-2xl shadow-teal-900/25 transition hover:bg-teal-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-teal-500 dark:shadow-black/40 dark:hover:bg-teal-400 sm:absolute sm:bottom-5 sm:right-5"
+        disabled={
+          !visibleProfessionals[0] &&
+          !profissionais[0]
+        }
         aria-label="Novo agendamento"
       >
         <Plus size={26} />
