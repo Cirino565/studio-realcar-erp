@@ -1,0 +1,59 @@
+MELHORIAS ADMIN + MOBILE + WHATSAPP
+Studio Realçar
+
+ARQUIVOS ALTERADOS
+
+1. components/layout/Sidebar.tsx
+   - Mantém até 4 módulos principais na barra inferior.
+   - Adiciona o botão "Mais" quando existem mais de 5 módulos permitidos.
+   - O menu "Mais" passa a exibir Estoque, Relatórios, Marketing e módulos administrativos conforme as permissões.
+   - Vivian e Gaby continuam vendo somente os módulos permitidos para seus perfis.
+
+2. app/(app)/configuracoes/components/ConfiguracoesClient.tsx
+   - Remove o comportamento flutuante do bloco "Salvar configurações" no celular.
+   - O bloco permanece sticky somente no desktop.
+   - Evita que Mensagens, Identidade, Auxiliares e Anamnese fiquem cobertas no final da tela.
+
+3. components/clientes/ClienteTable.tsx
+4. app/(app)/clientes/components/ClienteQuickMessageModal.tsx
+   - O botão WhatsApp da lista de clientes não abre mais uma mensagem automática direta.
+   - Primeiro abre a tela de escolha do modelo.
+   - Permite revisar e editar o texto antes de abrir o WhatsApp.
+   - Bloqueia a abertura direcionada quando a cliente não possui telefone.
+
+5. app/(app)/agenda/components/AgendaClient.tsx
+6. app/(app)/agenda/components/AppointmentDetailsModal.tsx
+7. app/(app)/agenda/components/AppointmentMessageModal.tsx
+   - Integra o seletor de mensagens na agenda.
+   - Cliques de WhatsApp na agenda e nos detalhes abrem os modelos antes do WhatsApp.
+   - Permite revisar e editar a mensagem.
+   - O modal ganhou rolagem adequada no celular.
+
+COMO APLICAR
+
+Extraia este ZIP na raiz do projeto e confirme a substituição dos arquivos.
+
+Depois execute:
+
+npm run build
+
+Se o build passar:
+
+git add .
+git commit -m "improve admin mobile navigation and whatsapp flow"
+git push
+
+TESTES NO RAILWAY
+
+1. Admin no celular: abrir "Mais" e confirmar Estoque e Configurações.
+2. Configurações > Mensagens: rolar até o final e ler todas as linhas.
+3. Configurações > Identidade, Auxiliares e Anamnese: confirmar que nada fica escondido.
+4. Clientes > WhatsApp: escolher um modelo, editar o texto e só então abrir o WhatsApp.
+5. Agenda > atendimento > mensagem: escolher um modelo, editar e abrir o WhatsApp.
+6. Testar claro e dark premium.
+7. Confirmar que Vivian e Gaby continuam vendo somente os módulos autorizados.
+
+VALIDAÇÃO REALIZADA AQUI
+
+Os sete arquivos TSX foram formatados e passaram por validação sintática com TypeScript 5.8.3.
+O build completo precisa ser executado no projeto real, pois o ZIP recebido para auditoria não contém todas as dependências e todos os arquivos do repositório.

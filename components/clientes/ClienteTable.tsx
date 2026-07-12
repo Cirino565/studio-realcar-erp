@@ -11,7 +11,6 @@ import {
 import { Button } from "@/components/ui/button";
 import type { Cliente } from "@/lib/types";
 import { formatarData, formatarMoeda } from "@/lib/format";
-import { buildClientWhatsAppMessage, buildWhatsAppUrl } from "@/lib/whatsapp";
 
 type Props = {
   clientes: Cliente[];
@@ -19,17 +18,6 @@ type Props = {
   onEditar: (cliente: Cliente) => void;
   onMensagem: (cliente: Cliente) => void;
 };
-
-
-function whatsappClienteHref(cliente: Cliente) {
-  return buildWhatsAppUrl(
-    cliente.whatsapp || cliente.telefone,
-    buildClientWhatsAppMessage({
-      template: "returnInvite",
-      clientName: cliente.nome,
-    })
-  );
-}
 
 function getInitials(nome: string) {
   return nome
@@ -56,7 +44,8 @@ export default function ClienteTable({
           Nenhum cliente encontrado
         </h3>
         <p className="mt-2 max-w-md text-sm leading-6 text-slate-400">
-          Ajuste os filtros ou cadastre um novo cliente para alimentar sua base de relacionamento.
+          Ajuste os filtros ou cadastre um novo cliente para alimentar sua base
+          de relacionamento.
         </p>
       </div>
     );
@@ -70,9 +59,13 @@ export default function ClienteTable({
             <tr>
               <th className="px-5 py-4 text-left font-semibold">Cliente</th>
               <th className="px-5 py-4 text-left font-semibold">Contato</th>
-              <th className="px-5 py-4 text-left font-semibold">Procedimento</th>
+              <th className="px-5 py-4 text-left font-semibold">
+                Procedimento
+              </th>
               <th className="px-5 py-4 text-left font-semibold">Valor gasto</th>
-              <th className="px-5 py-4 text-left font-semibold">Última visita</th>
+              <th className="px-5 py-4 text-left font-semibold">
+                Última visita
+              </th>
               <th className="px-5 py-4 text-left font-semibold">Status</th>
               <th className="px-5 py-4 text-right font-semibold">Ações</th>
             </tr>
@@ -112,7 +105,9 @@ export default function ClienteTable({
                 </td>
 
                 <td className="px-5 py-4 text-slate-300">
-                  {cliente.procedimentoInteresse || cliente.procedimento || "Não informado"}
+                  {cliente.procedimentoInteresse ||
+                    cliente.procedimento ||
+                    "Não informado"}
                 </td>
 
                 <td className="px-5 py-4 font-semibold text-emerald-300">
@@ -140,20 +135,40 @@ export default function ClienteTable({
 
                 <td className="px-5 py-4">
                   <div className="flex justify-end gap-2">
-                    <Button type="button" size="icon-sm" variant="outline" asChild>
-                      <Link href={`/clientes/${cliente.id}`} aria-label="Ver perfil">
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="outline"
+                      asChild
+                    >
+                      <Link
+                        href={`/clientes/${cliente.id}`}
+                        aria-label="Ver perfil"
+                      >
                         <Eye size={16} />
                       </Link>
                     </Button>
 
-                    <Button type="button" size="icon-sm" variant="outline" asChild>
-                      <a href={whatsappClienteHref(cliente)} target="_blank" rel="noopener noreferrer" aria-label="Mensagem WhatsApp">
-                        <MessageCircle size={16} />
-                      </a>
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="outline"
+                      onClick={() => onMensagem(cliente)}
+                      aria-label="Escolher mensagem para WhatsApp"
+                    >
+                      <MessageCircle size={16} />
                     </Button>
 
-                    <Button type="button" size="icon-sm" variant="outline" asChild>
-                      <Link href={`/clientes/${cliente.id}/editar`} aria-label="Editar cliente">
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="outline"
+                      asChild
+                    >
+                      <Link
+                        href={`/clientes/${cliente.id}/editar`}
+                        aria-label="Editar cliente"
+                      >
                         <Pencil size={16} />
                       </Link>
                     </Button>
@@ -214,7 +229,9 @@ export default function ClienteTable({
               <div>
                 <p className="text-xs text-slate-500">Procedimento</p>
                 <p className="mt-1 text-slate-200">
-                  {cliente.procedimentoInteresse || cliente.procedimento || "Não informado"}
+                  {cliente.procedimentoInteresse ||
+                    cliente.procedimento ||
+                    "Não informado"}
                 </p>
               </div>
               <div>
@@ -239,11 +256,14 @@ export default function ClienteTable({
                 </Link>
               </Button>
 
-              <Button type="button" size="sm" variant="outline" asChild>
-                <a href={whatsappClienteHref(cliente)} target="_blank" rel="noopener noreferrer">
-                  <MessageCircle size={15} />
-                  WhatsApp
-                </a>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => onMensagem(cliente)}
+              >
+                <MessageCircle size={15} />
+                WhatsApp
               </Button>
 
               <Button type="button" size="sm" variant="outline" asChild>

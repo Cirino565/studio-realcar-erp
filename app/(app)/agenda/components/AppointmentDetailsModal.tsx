@@ -7,7 +7,6 @@ import {
   CalendarClock,
   CheckCircle2,
   ClipboardList,
-  ExternalLink,
   MessageCircle,
   Phone,
   PlayCircle,
@@ -18,8 +17,6 @@ import {
 
 import { iniciarAtendimento } from "@/actions/agendamento.actions";
 import { Button } from "@/components/ui/button";
-import { WhatsAppLink } from "@/components/ui/whatsapp-link";
-import { buildWhatsAppMessage, buildWhatsAppUrl } from "@/lib/whatsapp";
 
 type AppointmentDetails = {
   id: number;
@@ -173,19 +170,6 @@ export default function AppointmentDetailsModal({
     currentAppointment.duracao,
   );
 
-  const message = buildWhatsAppMessage({
-    template: "reminder",
-    clientName: currentAppointment.cliente.nome,
-    procedure: currentAppointment.procedimento,
-    appointmentDate: currentAppointment.data,
-  });
-
-  const whatsappUrl = buildWhatsAppUrl(
-    currentAppointment.cliente.whatsapp ||
-      currentAppointment.cliente.telefone,
-    message,
-  );
-
   const phone =
     currentAppointment.cliente.whatsapp ||
     currentAppointment.cliente.telefone ||
@@ -193,8 +177,7 @@ export default function AppointmentDetailsModal({
 
   const atendimentoFinalizado = currentAppointment.status === "Atendido";
   const atendimentoCancelado = currentAppointment.status === "Cancelado";
-  const atendimentoEmAndamento =
-    currentAppointment.status === "Em atendimento";
+  const atendimentoEmAndamento = currentAppointment.status === "Em atendimento";
 
   function handleIniciar() {
     setError(null);
@@ -524,9 +507,7 @@ export default function AppointmentDetailsModal({
                   className="h-auto min-h-20 flex-col gap-2 rounded-2xl border-slate-200 bg-slate-50 px-3 py-4 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700"
                 >
                   <MessageCircle size={19} />
-                  <span className="text-xs font-semibold">
-                    Criar mensagem
-                  </span>
+                  <span className="text-xs font-semibold">Criar mensagem</span>
                 </Button>
 
                 <Button
@@ -562,13 +543,12 @@ export default function AppointmentDetailsModal({
         <footer className="shrink-0 border-t border-slate-200 bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-5">
           <div className="grid gap-3 sm:grid-cols-2">
             <Button
-              asChild
+              type="button"
+              onClick={() => onWhatsApp(currentAppointment)}
               className="h-11 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700"
             >
-              <WhatsAppLink href={whatsappUrl}>
-                <ExternalLink size={16} />
-                Abrir WhatsApp
-              </WhatsAppLink>
+              <MessageCircle size={16} />
+              Escolher mensagem
             </Button>
 
             <Button

@@ -1,7 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Check, Copy, ExternalLink, MessageCircle, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Check,
+  Copy,
+  ExternalLink,
+  MessageCircle,
+  PencilLine,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { WhatsAppLink } from "@/components/ui/whatsapp-link";
@@ -36,9 +43,10 @@ export default function AppointmentMessageModal({
 }: Props) {
   const [selectedTemplate, setSelectedTemplate] =
     useState<WhatsAppTemplateType>("reminder");
+  const [message, setMessage] = useState("");
   const [copied, setCopied] = useState(false);
 
-  const message = useMemo(() => {
+  const generatedMessage = useMemo(() => {
     if (!appointment) return "";
 
     return buildWhatsAppMessage({
@@ -49,17 +57,31 @@ export default function AppointmentMessageModal({
     });
   }, [appointment, selectedTemplate]);
 
+  useEffect(() => {
+    if (!open || !appointment) return;
+
+    setSelectedTemplate("reminder");
+    setCopied(false);
+  }, [open, appointment?.id]);
+
+  useEffect(() => {
+    if (!open || !appointment) return;
+
+    setMessage(generatedMessage);
+    setCopied(false);
+  }, [open, appointment?.id, generatedMessage]);
+
   const whatsappUrl = useMemo(() => {
     if (!appointment) return "";
 
     return buildWhatsAppUrl(
       appointment.cliente.whatsapp || appointment.cliente.telefone,
-      message
+      message.trim(),
     );
   }, [appointment, message]);
 
   async function copyMessage() {
-    if (!message) return;
+    if (!message.trim()) return;
 
     await navigator.clipboard.writeText(message);
     setCopied(true);
@@ -72,30 +94,31 @@ export default function AppointmentMessageModal({
   if (!open || !appointment) return null;
 
   const hasPhone = Boolean(
-    appointment.cliente.whatsapp || appointment.cliente.telefone
+    appointment.cliente.whatsapp || appointment.cliente.telefone,
   );
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-xl">
-      <div className="w-full max-w-4xl overflow-hidden rounded-[2rem] border border-white/[0.10] bg-[#11131d] shadow-2xl shadow-black/50">
-        <div className="flex items-start justify-between gap-6 border-b border-white/[0.08] bg-white/[0.035] p-6">
+    <div className="fixed inset-0 z-[110] flex items-start justify-center overflow-y-auto bg-slate-950/80 px-3 py-4 backdrop-blur-xl sm:items-center sm:px-4">
+      <div className="w-full max-w-4xl overflow-hidden rounded-[1.5rem] border border-white/[0.10] bg-[#11131d] shadow-2xl shadow-black/50 sm:rounded-[2rem]">
+        <div className="flex items-start justify-between gap-4 border-b border-white/[0.08] bg-white/[0.035] p-4 sm:gap-6 sm:p-6">
           <div>
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-200">
               <MessageCircle size={14} />
               WhatsApp manual
             </div>
-            <h2 className="text-2xl font-semibold tracking-tight text-white">
+            <h2 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
               Mensagem para {appointment.cliente.nome}
             </h2>
             <p className="mt-2 text-sm text-slate-400">
-              Gere a mensagem pronta, copie ou abra o WhatsApp com o texto preenchido.
+              Escolha o objetivo da mensagem, revise o texto e edite antes de
+              abrir o WhatsApp.
             </p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-2 text-slate-300 hover:bg-white/[0.08] hover:text-white"
+            className="shrink-0 rounded-2xl border border-white/[0.08] bg-white/[0.04] p-2 text-slate-300 hover:bg-white/[0.08] hover:text-white"
             aria-label="Fechar modal"
           >
             <X size={18} />
@@ -103,12 +126,12 @@ export default function AppointmentMessageModal({
         </div>
 
         <div className="grid gap-0 lg:grid-cols-[320px_1fr]">
-          <div className="border-b border-white/[0.08] bg-white/[0.02] p-5 lg:border-b-0 lg:border-r">
+          <div className="border-b border-white/[0.08] bg-white/[0.02] p-4 sm:p-5 lg:border-b-0 lg:border-r">
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
               Modelos
             </p>
 
-            <div className="space-y-2">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
               {WHATSAPP_TEMPLATE_OPTIONS.map((template) => {
                 const active = template.id === selectedTemplate;
 
@@ -135,7 +158,7 @@ export default function AppointmentMessageModal({
             </div>
           </div>
 
-          <div className="p-5 sm:p-6">
+          <div className="p-4 sm:p-6">
             <div className="mb-4 grid gap-3 sm:grid-cols-3">
               <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4">
                 <p className="text-xs text-slate-500">Cliente</p>
@@ -154,29 +177,60 @@ export default function AppointmentMessageModal({
               <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4">
                 <p className="text-xs text-slate-500">Contato</p>
                 <p className="mt-1 truncate text-sm font-semibold text-white">
-                  {hasPhone ? appointment.cliente.whatsapp || appointment.cliente.telefone : "Sem telefone"}
+                  {hasPhone
+                    ? appointment.cliente.whatsapp ||
+                      appointment.cliente.telefone
+                    : "Sem telefone"}
                 </p>
               </div>
             </div>
 
-            <textarea
-              value={message}
-              readOnly
-              className="h-72 w-full resize-none rounded-3xl border border-white/[0.10] bg-slate-950/60 p-5 text-sm leading-6 text-slate-100 outline-none"
-            />
+            <label className="grid gap-2">
+              <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                <PencilLine size={14} />
+                Revise e edite a mensagem
+              </span>
+              <textarea
+                value={message}
+                onChange={(event) => {
+                  setMessage(event.target.value);
+                  setCopied(false);
+                }}
+                className="h-72 w-full resize-y rounded-3xl border border-white/[0.10] bg-slate-950/60 p-5 text-sm leading-6 text-slate-100 outline-none"
+              />
+            </label>
+
+            {!hasPhone ? (
+              <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+                Cadastre um telefone ou WhatsApp para abrir a conversa desta
+                cliente.
+              </div>
+            ) : null}
 
             <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-end">
-              <Button type="button" variant="outline" onClick={copyMessage}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={copyMessage}
+                disabled={!message.trim()}
+              >
                 {copied ? <Check size={16} /> : <Copy size={16} />}
                 {copied ? "Copiado" : "Copiar mensagem"}
               </Button>
 
-              <Button type="button" asChild>
-                <WhatsAppLink href={whatsappUrl}>
+              {hasPhone ? (
+                <Button type="button" asChild>
+                  <WhatsAppLink href={whatsappUrl}>
+                    <ExternalLink size={16} />
+                    Abrir no WhatsApp
+                  </WhatsAppLink>
+                </Button>
+              ) : (
+                <Button type="button" disabled>
                   <ExternalLink size={16} />
-                  Abrir no WhatsApp
-                </WhatsAppLink>
-              </Button>
+                  Sem telefone
+                </Button>
+              )}
             </div>
           </div>
         </div>

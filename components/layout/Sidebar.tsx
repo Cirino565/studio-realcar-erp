@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState, type ComponentType } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -12,46 +13,105 @@ import {
   KeyRound,
   LayoutDashboard,
   Megaphone,
+  Menu,
   Package,
   Settings,
   ShieldCheck,
   Sparkles,
   Users,
   Wallet,
+  X,
 } from "lucide-react";
 
 const mainMenus = [
-  { nome: "Dashboard", icon: LayoutDashboard, href: "/", permissao: "dashboard.visualizar" },
-  { nome: "Clientes", icon: Users, href: "/clientes", permissao: "clientes.visualizar" },
-  { nome: "Agenda", icon: Calendar, href: "/agenda", permissao: "agenda.visualizar" },
-  { nome: "Financeiro", icon: Wallet, href: "/financeiro", permissao: "financeiro.visualizar" },
-  { nome: "Estoque", icon: Package, href: "/estoque", permissao: "estoque.visualizar" },
-  { nome: "Relatórios", icon: FileBarChart2, href: "/relatorios", permissao: "relatorios.visualizar" },
-  { nome: "Marketing", icon: Megaphone, href: "/marketing", permissao: "marketing.visualizar" },
+  {
+    nome: "Dashboard",
+    icon: LayoutDashboard,
+    href: "/",
+    permissao: "dashboard.visualizar",
+  },
+  {
+    nome: "Clientes",
+    icon: Users,
+    href: "/clientes",
+    permissao: "clientes.visualizar",
+  },
+  {
+    nome: "Agenda",
+    icon: Calendar,
+    href: "/agenda",
+    permissao: "agenda.visualizar",
+  },
+  {
+    nome: "Financeiro",
+    icon: Wallet,
+    href: "/financeiro",
+    permissao: "financeiro.visualizar",
+  },
+  {
+    nome: "Estoque",
+    icon: Package,
+    href: "/estoque",
+    permissao: "estoque.visualizar",
+  },
+  {
+    nome: "Relatórios",
+    icon: FileBarChart2,
+    href: "/relatorios",
+    permissao: "relatorios.visualizar",
+  },
+  {
+    nome: "Marketing",
+    icon: Megaphone,
+    href: "/marketing",
+    permissao: "marketing.visualizar",
+  },
 ];
 
 const adminMenus = [
-  { nome: "Usuários", icon: ShieldCheck, href: "/usuarios", permissao: "usuarios.gerenciar" },
-  { nome: "Permissões", icon: KeyRound, href: "/permissoes", permissao: "permissoes.gerenciar" },
-  { nome: "Auditoria", icon: Activity, href: "/auditoria", permissao: "auditoria.visualizar" },
-  { nome: "Backup", icon: Archive, href: "/backup", permissao: "backup.gerenciar" },
-  { nome: "Automações", icon: Bot, href: "/automacoes", permissao: "automacoes.gerenciar" },
-  { nome: "Configurações", icon: Settings, href: "/configuracoes", permissao: "configuracoes.gerenciar" },
-];
-
-const mobilePreferredMenus = [
-  mainMenus[0],
-  mainMenus[1],
-  mainMenus[2],
-  mainMenus[3],
-  adminMenus[5],
+  {
+    nome: "Usuários",
+    icon: ShieldCheck,
+    href: "/usuarios",
+    permissao: "usuarios.gerenciar",
+  },
+  {
+    nome: "Permissões",
+    icon: KeyRound,
+    href: "/permissoes",
+    permissao: "permissoes.gerenciar",
+  },
+  {
+    nome: "Auditoria",
+    icon: Activity,
+    href: "/auditoria",
+    permissao: "auditoria.visualizar",
+  },
+  {
+    nome: "Backup",
+    icon: Archive,
+    href: "/backup",
+    permissao: "backup.gerenciar",
+  },
+  {
+    nome: "Automações",
+    icon: Bot,
+    href: "/automacoes",
+    permissao: "automacoes.gerenciar",
+  },
+  {
+    nome: "Configurações",
+    icon: Settings,
+    href: "/configuracoes",
+    permissao: "configuracoes.gerenciar",
+  },
 ];
 
 type MenuItem = {
   nome: string;
   href: string;
   permissao: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
 };
 
 type SidebarProps = {
@@ -134,6 +194,11 @@ function MenuSection({
 
 export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
   const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
 
   const menusPrincipaisVisiveis = mainMenus.filter((item) =>
     podeVerMenu(item, permissoes, isAdmin),
@@ -143,9 +208,30 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
     podeVerMenu(item, permissoes, isAdmin),
   );
 
-  const menusMobileVisiveis = mobilePreferredMenus
-    .filter((item) => podeVerMenu(item, permissoes, isAdmin))
-    .slice(0, 5);
+  const menusMobileOrdenados = [
+    ...menusPrincipaisVisiveis,
+    ...menusAdminVisiveis,
+  ];
+
+  const possuiMenuExtra = menusMobileOrdenados.length > 5;
+  const menusMobileDiretos = possuiMenuExtra
+    ? menusMobileOrdenados.slice(0, 4)
+    : menusMobileOrdenados.slice(0, 5);
+  const menusMobileExtras = possuiMenuExtra
+    ? menusMobileOrdenados.slice(4)
+    : [];
+
+  const menusMobileExtrasPrincipais = menusMobileExtras.filter((item) =>
+    mainMenus.some((menu) => menu.href === item.href),
+  );
+  const menusMobileExtrasAdmin = menusMobileExtras.filter((item) =>
+    adminMenus.some((menu) => menu.href === item.href),
+  );
+  const menuExtraAtivo = menusMobileExtras.some((item) =>
+    isActive(pathname, item.href),
+  );
+  const quantidadeColunasMobile =
+    menusMobileDiretos.length + (possuiMenuExtra ? 1 : 0);
 
   return (
     <>
@@ -204,7 +290,7 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
         </div>
       </aside>
 
-      {menusMobileVisiveis.length > 0 ? (
+      {quantidadeColunasMobile > 0 ? (
         <nav
           className="app-bottom-nav fixed inset-x-2 bottom-2 z-40 rounded-2xl border p-1.5 shadow-2xl backdrop-blur-xl lg:hidden"
           style={{
@@ -214,10 +300,10 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
           <div
             className="grid gap-1"
             style={{
-              gridTemplateColumns: `repeat(${menusMobileVisiveis.length}, minmax(0, 1fr))`,
+              gridTemplateColumns: `repeat(${quantidadeColunasMobile}, minmax(0, 1fr))`,
             }}
           >
-            {menusMobileVisiveis.map((item) => {
+            {menusMobileDiretos.map((item) => {
               const Icon = item.icon;
               const ativo = isActive(pathname, item.href);
 
@@ -240,8 +326,81 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
                 </Link>
               );
             })}
+
+            {possuiMenuExtra ? (
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(true)}
+                className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[0.63rem] font-semibold transition-all ${
+                  menuExtraAtivo
+                    ? "bg-violet-50 text-violet-800"
+                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+                aria-label="Abrir outros módulos"
+                aria-expanded={mobileMenuOpen}
+              >
+                <Menu
+                  className={`size-4 ${
+                    menuExtraAtivo ? "text-violet-600" : "text-slate-400"
+                  }`}
+                />
+                <span className="max-w-full truncate">Mais</span>
+              </button>
+            ) : null}
           </div>
         </nav>
+      ) : null}
+
+      {mobileMenuOpen ? (
+        <div
+          className="fixed inset-0 z-[70] lg:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Outros módulos"
+        >
+          <button
+            type="button"
+            aria-label="Fechar outros módulos"
+            onClick={() => setMobileMenuOpen(false)}
+            className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
+          />
+
+          <section className="app-bottom-nav absolute inset-x-2 bottom-2 flex max-h-[min(78dvh,42rem)] flex-col overflow-hidden rounded-[1.75rem] border shadow-2xl">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3.5">
+              <div>
+                <p className="text-sm font-bold text-slate-950">
+                  Outros módulos
+                </p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Acesse estoque, relatórios e administração.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(false)}
+                aria-label="Fechar menu"
+                className="app-header-action flex size-9 shrink-0 items-center justify-center rounded-xl border transition"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <nav className="scrollbar-premium flex-1 space-y-6 overflow-y-auto px-3 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+              <MenuSection
+                titulo="Operação"
+                items={menusMobileExtrasPrincipais}
+                pathname={pathname}
+              />
+
+              <MenuSection
+                titulo="Administração"
+                items={menusMobileExtrasAdmin}
+                pathname={pathname}
+              />
+            </nav>
+          </section>
+        </div>
       ) : null}
     </>
   );

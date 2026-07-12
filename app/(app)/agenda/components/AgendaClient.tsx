@@ -4,11 +4,11 @@ import { useMemo, useState } from "react";
 import { CalendarDays, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { buildWhatsAppMessage, buildWhatsAppUrl } from "@/lib/whatsapp";
 
 import AgendaCalendar, { type NovoHorarioPayload } from "./AgendaCalendar";
 import AgendaHeader from "./AgendaHeader";
 import AppointmentDetailsModal from "./AppointmentDetailsModal";
+import AppointmentMessageModal from "./AppointmentMessageModal";
 import FinalizarAtendimentoModal from "./FinalizarAtendimentoModal";
 import NovoAgendamentoModal from "./NovoAgendamentoModal";
 
@@ -130,10 +130,14 @@ export default function AgendaClient({
     initialProfissionalFiltro || "todas",
   );
 
-  const [novoHorario, setNovoHorario] =
-    useState<NovoAgendamentoPayload | null>(null);
+  const [novoHorario, setNovoHorario] = useState<NovoAgendamentoPayload | null>(
+    null,
+  );
 
   const [selectedAppointment, setSelectedAppointment] =
+    useState<AgendamentoAgenda | null>(null);
+
+  const [messageAppointment, setMessageAppointment] =
     useState<AgendamentoAgenda | null>(null);
 
   const [finishAppointment, setFinishAppointment] =
@@ -171,17 +175,8 @@ export default function AgendaClient({
   }
 
   function abrirWhatsApp(appointment: AgendamentoAgenda) {
-    const url = buildWhatsAppUrl(
-      appointment.cliente.whatsapp || appointment.cliente.telefone,
-      buildWhatsAppMessage({
-        template: "confirmation",
-        clientName: appointment.cliente.nome,
-        procedure: appointment.procedimento,
-        appointmentDate: appointment.data,
-      }),
-    );
-
-    window.open(url, "_blank", "noopener,noreferrer");
+    setSelectedAppointment(null);
+    setMessageAppointment(appointment);
   }
 
   function abrirFinalizacao(appointment: AgendamentoAgenda) {
@@ -234,8 +229,8 @@ export default function AgendaClient({
                 </h1>
 
                 <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Cadastre uma profissional ativa nas configurações para a agenda
-                  exibir os horários.
+                  Cadastre uma profissional ativa nas configurações para a
+                  agenda exibir os horários.
                 </p>
               </div>
 
@@ -280,6 +275,12 @@ export default function AgendaClient({
         onWhatsApp={abrirWhatsApp}
         onFinalizar={abrirFinalizacao}
         onReagendar={abrirReagendamento}
+      />
+
+      <AppointmentMessageModal
+        open={Boolean(messageAppointment)}
+        appointment={messageAppointment}
+        onClose={() => setMessageAppointment(null)}
       />
 
       <FinalizarAtendimentoModal

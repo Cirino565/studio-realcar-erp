@@ -1,7 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Check, Copy, ExternalLink, MessageCircle, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Check,
+  Copy,
+  ExternalLink,
+  MessageCircle,
+  PencilLine,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { WhatsAppLink } from "@/components/ui/whatsapp-link";
@@ -26,9 +33,10 @@ export default function ClienteQuickMessageModal({
 }: Props) {
   const [selectedTemplate, setSelectedTemplate] =
     useState<WhatsAppClientTemplateType>("returnInvite");
+  const [message, setMessage] = useState("");
   const [copied, setCopied] = useState(false);
 
-  const message = useMemo(() => {
+  const generatedMessage = useMemo(() => {
     if (!cliente) return "";
 
     return buildClientWhatsAppMessage({
@@ -37,14 +45,31 @@ export default function ClienteQuickMessageModal({
     });
   }, [cliente, selectedTemplate]);
 
+  useEffect(() => {
+    if (!open || !cliente) return;
+
+    setSelectedTemplate("returnInvite");
+    setCopied(false);
+  }, [open, cliente?.id]);
+
+  useEffect(() => {
+    if (!open || !cliente) return;
+
+    setMessage(generatedMessage);
+    setCopied(false);
+  }, [open, cliente?.id, generatedMessage]);
+
   const whatsappUrl = useMemo(() => {
     if (!cliente) return "";
 
-    return buildWhatsAppUrl(cliente.whatsapp || cliente.telefone, message);
+    return buildWhatsAppUrl(
+      cliente.whatsapp || cliente.telefone,
+      message.trim(),
+    );
   }, [cliente, message]);
 
   async function copyMessage() {
-    if (!message) return;
+    if (!message.trim()) return;
 
     await navigator.clipboard.writeText(message);
     setCopied(true);
@@ -67,18 +92,19 @@ export default function ClienteQuickMessageModal({
               <MessageCircle size={14} />
               WhatsApp manual
             </div>
-            <h2 className="text-2xl font-semibold tracking-tight text-white">
+            <h2 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
               Mensagem para {cliente.nome}
             </h2>
             <p className="mt-2 text-sm text-slate-400">
-              Use modelos rápidos para relacionamento, retorno e reativação.
+              Escolha um modelo, revise o texto e edite o que precisar antes de
+              abrir o WhatsApp.
             </p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-2 text-slate-300 hover:bg-white/[0.08] hover:text-white"
+            className="shrink-0 rounded-2xl border border-white/[0.08] bg-white/[0.04] p-2 text-slate-300 hover:bg-white/[0.08] hover:text-white"
             aria-label="Fechar modal"
           >
             <X size={18} />
@@ -86,12 +112,12 @@ export default function ClienteQuickMessageModal({
         </div>
 
         <div className="grid gap-0 lg:grid-cols-[320px_1fr]">
-          <div className="border-b border-white/[0.08] bg-white/[0.02] p-5 lg:border-b-0 lg:border-r">
+          <div className="border-b border-white/[0.08] bg-white/[0.02] p-4 sm:p-5 lg:border-b-0 lg:border-r">
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
               Modelos
             </p>
 
-            <div className="space-y-2">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
               {WHATSAPP_CLIENT_TEMPLATE_OPTIONS.map((template) => {
                 const active = template.id === selectedTemplate;
 
@@ -137,29 +163,59 @@ export default function ClienteQuickMessageModal({
               <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4">
                 <p className="text-xs text-slate-500">Contato</p>
                 <p className="mt-1 truncate text-sm font-semibold text-white">
-                  {hasPhone ? cliente.whatsapp || cliente.telefone : "Sem telefone"}
+                  {hasPhone
+                    ? cliente.whatsapp || cliente.telefone
+                    : "Sem telefone"}
                 </p>
               </div>
             </div>
 
-            <textarea
-              value={message}
-              readOnly
-              className="h-72 w-full resize-none rounded-3xl border border-white/[0.10] bg-slate-950/60 p-5 text-sm leading-6 text-slate-100 outline-none"
-            />
+            <label className="grid gap-2">
+              <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                <PencilLine size={14} />
+                Revise e edite a mensagem
+              </span>
+              <textarea
+                value={message}
+                onChange={(event) => {
+                  setMessage(event.target.value);
+                  setCopied(false);
+                }}
+                className="h-72 w-full resize-y rounded-3xl border border-white/[0.10] bg-slate-950/60 p-5 text-sm leading-6 text-slate-100 outline-none"
+              />
+            </label>
+
+            {!hasPhone ? (
+              <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+                Cadastre um telefone ou WhatsApp para abrir a conversa desta
+                cliente.
+              </div>
+            ) : null}
 
             <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-end">
-              <Button type="button" variant="outline" onClick={copyMessage}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={copyMessage}
+                disabled={!message.trim()}
+              >
                 {copied ? <Check size={16} /> : <Copy size={16} />}
                 {copied ? "Copiado" : "Copiar mensagem"}
               </Button>
 
-              <Button type="button" asChild>
-                <WhatsAppLink href={whatsappUrl}>
+              {hasPhone ? (
+                <Button type="button" asChild disabled={!message.trim()}>
+                  <WhatsAppLink href={whatsappUrl}>
+                    <ExternalLink size={16} />
+                    Abrir no WhatsApp
+                  </WhatsAppLink>
+                </Button>
+              ) : (
+                <Button type="button" disabled>
                   <ExternalLink size={16} />
-                  Abrir no WhatsApp
-                </WhatsAppLink>
-              </Button>
+                  Sem telefone
+                </Button>
+              )}
             </div>
           </div>
         </div>
