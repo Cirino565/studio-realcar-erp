@@ -2,6 +2,7 @@ import { ClienteClinicoTabs } from "@/app/(app)/clientes/components/ClienteClini
 import type { ClienteClinicoData } from "@/app/(app)/clientes/types";
 import { requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import ClienteProfileHeader from "@/app/(app)/clientes/components/ClienteProfileHeader";
 
 type ClientePageProps = {
   params: Promise<{ id: string }> | { id: string };
@@ -165,5 +166,11 @@ export default async function ClientePage({ params }: ClientePageProps) {
     })),
   };
 
-  return <ClienteClinicoTabs data={data} />;
+  return (
+  <div className="app-mobile-safe space-y-5 sm:space-y-6">
+    <ClienteProfileHeader data={data} />
+
+    <ClienteClinicoTabs data={data} />
+  </div>
+);
 }

@@ -1,0 +1,178 @@
+"use client";
+
+import Link from "next/link";
+import {
+  CalendarPlus,
+  Camera,
+  FileText,
+  MessageCircle,
+  Sparkles,
+  Stethoscope,
+} from "lucide-react";
+
+import type { ClienteClinicoData } from "../types";
+import { formatarData, formatarMoeda } from "@/lib/format";
+
+type Props = {
+  data: ClienteClinicoData;
+};
+
+function getInitials(nome: string) {
+  return nome
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((parte) => parte[0]?.toUpperCase())
+    .join("");
+}
+
+export default function ClienteProfileHeader({ data }: Props) {
+  const totalProcedimentos = data.procedimentos.length;
+
+  const valorInvestido = data.procedimentos.reduce(
+    (total, procedimento) => total + procedimento.valor,
+    0,
+  );
+
+  const ultimoProcedimento = data.procedimentos[0];
+
+  const ultimaEvolucao = data.evolucoes[0];
+
+  const totalFotos = data.fotos.length;
+
+  const telefone = "";
+
+  return (
+    <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,0.14),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(13,148,136,0.10),transparent_32%)]" />
+
+      <div className="relative space-y-5">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="flex size-16 shrink-0 items-center justify-center rounded-3xl bg-gradient-to-br from-violet-600 to-fuchsia-500 text-xl font-bold text-white shadow-lg shadow-violet-500/20">
+              {getInitials(data.nome)}
+            </div>
+
+            <div className="min-w-0">
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                <Sparkles className="size-3.5" />
+                Cliente ativa
+              </div>
+
+              <h1 className="mt-2 truncate text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+                {data.nome}
+              </h1>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Histórico clínico, evolução e relacionamento.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/agenda?cliente=${data.id}`}
+              className="inline-flex h-10 items-center gap-2 rounded-xl bg-teal-700 px-4 text-sm font-semibold text-white transition hover:bg-teal-800"
+            >
+              <CalendarPlus className="size-4" />
+              Agendar
+            </Link>
+
+            <button
+              type="button"
+              disabled={!telefone}
+              className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <MessageCircle className="size-4" />
+              WhatsApp
+            </button>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-center gap-2 text-slate-500">
+              <Stethoscope className="size-4" />
+              <span className="text-xs font-semibold uppercase tracking-wide">
+                Procedimentos
+              </span>
+            </div>
+
+            <p className="mt-2 text-2xl font-bold text-slate-900">
+              {totalProcedimentos}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-center gap-2 text-slate-500">
+              <Sparkles className="size-4" />
+              <span className="text-xs font-semibold uppercase tracking-wide">
+                Investimento
+              </span>
+            </div>
+
+            <p className="mt-2 text-2xl font-bold text-emerald-700">
+              {formatarMoeda(valorInvestido)}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-center gap-2 text-slate-500">
+              <CalendarPlus className="size-4" />
+              <span className="text-xs font-semibold uppercase tracking-wide">
+                Último procedimento
+              </span>
+            </div>
+
+            <p className="mt-2 truncate text-sm font-semibold text-slate-900">
+              {ultimoProcedimento?.nome ?? "Nenhum"}
+            </p>
+
+            {ultimoProcedimento ? (
+              <p className="mt-1 text-xs text-slate-500">
+                {formatarData(ultimoProcedimento.dataProcedimento)}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-center gap-2 text-slate-500">
+              <Camera className="size-4" />
+              <span className="text-xs font-semibold uppercase tracking-wide">
+                Fotos
+              </span>
+            </div>
+
+            <p className="mt-2 text-2xl font-bold text-slate-900">
+              {totalFotos}
+            </p>
+
+            <p className="mt-1 text-xs text-slate-500">
+              Evolução visual registrada
+            </p>
+          </div>
+        </div>
+
+        {(ultimaEvolucao || data.anamnese) && (
+          <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
+            <div className="flex items-start gap-3">
+              <FileText className="mt-0.5 size-5 text-violet-700" />
+
+              <div>
+                <p className="font-semibold text-violet-900">
+                  Última atualização clínica
+                </p>
+
+                <p className="mt-1 text-sm text-violet-700">
+                  {ultimaEvolucao
+                    ? ultimaEvolucao.titulo
+                    : "Anamnese registrada"}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
