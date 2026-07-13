@@ -63,20 +63,20 @@ export default function StatCard({
   const valueClassName = cor ?? styles.value;
 
   return (
-    <div className="group relative min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-white/[0.06] sm:p-4">
+    <div className="group relative min-w-0 overflow-hidden rounded-xl border border-slate-200/90 bg-white p-3 shadow-sm transition-all duration-200 hover:-translate-y-px hover:shadow-md dark:border-white/10 dark:bg-white/[0.06] sm:p-4">
       <div
         className={`absolute inset-x-0 top-0 h-1 ${styles.accent}`}
         aria-hidden="true"
       />
 
       <div className="flex min-w-0 items-start justify-between gap-2">
-        <p className="min-w-0 text-xs font-semibold leading-4 text-slate-500 dark:text-slate-300 sm:text-sm">
+        <p className="min-w-0 pr-1 text-[11px] font-semibold leading-4 text-slate-500 dark:text-slate-300 sm:text-xs">
           {titulo}
         </p>
 
         {Icon ? (
           <div
-            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl sm:h-9 sm:w-9 ${styles.icon}`}
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${styles.icon} sm:h-9 sm:w-9`}
           >
             <Icon className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
           </div>
@@ -84,14 +84,14 @@ export default function StatCard({
       </div>
 
       <p
-        className={`mt-2 min-w-0 break-words text-lg font-bold leading-tight tracking-tight sm:text-2xl ${valueClassName}`}
+        className={`mt-2 min-w-0 break-words text-lg font-bold leading-tight tracking-tight tabular-nums sm:text-2xl ${valueClassName}`}
         title={valor}
       >
         {valor}
       </p>
 
       {descricao ? (
-        <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-500 dark:text-slate-400 sm:text-xs">
+        <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
           {descricao}
         </p>
       ) : null}

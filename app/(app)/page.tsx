@@ -6,6 +6,7 @@ import {
   BadgeCheck,
   CalendarClock,
   CalendarDays,
+  CheckCircle2,
   ClipboardList,
   PackageSearch,
   Sparkles,
@@ -38,16 +39,19 @@ export default async function Home() {
   await requirePagePermission("dashboard.visualizar");
 
   const hoje = new Date();
+
   const inicioHoje = new Date(
     hoje.getFullYear(),
     hoje.getMonth(),
     hoje.getDate(),
   );
+
   const fimHoje = new Date(
     hoje.getFullYear(),
     hoje.getMonth(),
     hoje.getDate() + 1,
   );
+
   const inicioMesAtual = inicioDoMes(hoje);
   const fimMesAtual = fimDoMes(hoje);
 
@@ -63,36 +67,82 @@ export default async function Home() {
     automacoesAtivas,
   ] = await Promise.all([
     prisma.cliente.count(),
-    prisma.cliente.count({ where: { status: "Ativa" } }),
-    prisma.agendamento.count({
-      where: { data: { gte: inicioHoje, lt: fimHoje } },
+
+    prisma.cliente.count({
+      where: {
+        status: "Ativa",
+      },
     }),
+
     prisma.agendamento.count({
-      where: { data: { gte: inicioMesAtual, lt: fimMesAtual } },
+      where: {
+        data: {
+          gte: inicioHoje,
+          lt: fimHoje,
+        },
+      },
     }),
+
+    prisma.agendamento.count({
+      where: {
+        data: {
+          gte: inicioMesAtual,
+          lt: fimMesAtual,
+        },
+      },
+    }),
+
     prisma.agendamento.findMany({
-      where: { data: { gte: hoje } },
-      include: { cliente: true },
-      orderBy: { data: "asc" },
+      where: {
+        data: {
+          gte: hoje,
+        },
+      },
+      include: {
+        cliente: true,
+        profissional: true,
+      },
+      orderBy: {
+        data: "asc",
+      },
       take: 6,
     }),
+
     prisma.lancamento.findMany({
-      where: { data: { gte: inicioMesAtual, lt: fimMesAtual } },
-      orderBy: { data: "desc" },
+      where: {
+        data: {
+          gte: inicioMesAtual,
+          lt: fimMesAtual,
+        },
+      },
+      orderBy: {
+        data: "desc",
+      },
     }),
+
     prisma.produto.findMany({
       select: {
         quantidade: true,
         estoqueMinimo: true,
         valorCompra: true,
       },
-      orderBy: { quantidade: "asc" },
+      orderBy: {
+        quantidade: "asc",
+      },
     }),
+
     prisma.lead.findMany({
-      orderBy: { createdAt: "desc" },
+      orderBy: {
+        createdAt: "desc",
+      },
       take: 6,
     }),
-    prisma.automacao.count({ where: { status: "Ativa" } }),
+
+    prisma.automacao.count({
+      where: {
+        status: "Ativa",
+      },
+    }),
   ]);
 
   const entradasMes = lancamentosMes
@@ -104,13 +154,20 @@ export default async function Home() {
     .reduce((total, lancamento) => total + lancamento.valor, 0);
 
   const saldoMes = entradasMes - saidasMes;
+
   const ticketMedio =
-    agendamentosMes > 0 ? entradasMes / agendamentosMes : 0;
+    agendamentosMes > 0
+      ? entradasMes / agendamentosMes
+      : 0;
+
   const margemMes =
-    entradasMes > 0 ? (saldoMes / entradasMes) * 100 : 0;
+    entradasMes > 0
+      ? (saldoMes / entradasMes) * 100
+      : 0;
 
   const estoqueBaixo = produtos.filter(
-    (produto) => produto.quantidade <= produto.estoqueMinimo,
+    (produto) =>
+      produto.quantidade <= produto.estoqueMinimo,
   ).length;
 
   const valorEstoque = produtos.reduce(
@@ -119,13 +176,11 @@ export default async function Home() {
     0,
   );
 
-  const maiorFluxo = Math.max(entradasMes, saidasMes, 1);
-  const percentualEntrada = percentual(entradasMes, maiorFluxo);
-  const percentualSaida = percentual(saidasMes, maiorFluxo);
   const percentualClientesAtivos = percentual(
     clientesAtivos,
     totalClientes,
   );
+
   const percentualAgenda = percentual(
     agendamentosHoje,
     Math.max(agendamentosMes, 1),
@@ -145,7 +200,7 @@ export default async function Home() {
     },
     {
       titulo: "Repor estoque",
-      descricao: `${estoqueBaixo} produto(s) com estoque abaixo do mínimo.`,
+      descricao: `${estoqueBaixo} produto(s) abaixo do mínimo.`,
       href: "/estoque",
       icon: PackageSearch,
       indicador: estoqueBaixo > 0 ? "Atenção" : "Ok",
@@ -156,7 +211,7 @@ export default async function Home() {
     },
     {
       titulo: "Nutrir leads",
-      descricao: `${leads.length} oportunidade(s) recente(s) para acompanhamento.`,
+      descricao: `${leads.length} oportunidade(s) recente(s).`,
       href: "/marketing",
       icon: ClipboardList,
       indicador: leads.length > 0 ? "Aberto" : "Baixo",
@@ -168,92 +223,103 @@ export default async function Home() {
   ];
 
   const atalhos = [
-    { titulo: "Novo cliente", href: "/clientes", icon: Users },
-    { titulo: "Agendar horário", href: "/agenda", icon: CalendarDays },
     {
-      titulo: "Lançar financeiro",
+      titulo: "Nova cliente",
+      href: "/clientes",
+      icon: Users,
+    },
+    {
+      titulo: "Novo atendimento",
+      href: "/agenda",
+      icon: CalendarDays,
+    },
+    {
+      titulo: "Financeiro",
       href: "/financeiro",
       icon: WalletCards,
     },
-    { titulo: "Ver estoque", href: "/estoque", icon: PackageSearch },
+    {
+      titulo: "Estoque",
+      href: "/estoque",
+      icon: PackageSearch,
+    },
   ];
+    return (
+    <div className="min-w-0 space-y-4 pb-2 sm:space-y-6">
+      <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 lg:p-6">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,0.14),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(13,148,136,0.12),transparent_32%)]" />
 
-  return (
-    <div className="min-w-0 space-y-4 pb-2 sm:space-y-6 sm:pb-6">
-      <section className="relative min-w-0 overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-6 lg:p-7">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,0.15),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(13,148,136,0.10),transparent_34%)]" />
-
-        <div className="relative grid min-w-0 gap-5 xl:grid-cols-[1.15fr_0.85fr] xl:items-end">
-          <div className="min-w-0">
-            <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-slate-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700">
-              <Sparkles className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">
-                Painel executivo Studio Realçar
-              </span>
+        <div className="relative grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700">
+              <Sparkles className="size-3.5" />
+              Painel executivo Studio Realçar
             </div>
 
-            <h1 className="mt-4 max-w-3xl text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
-              Visão clara da clínica para decisões rápidas.
+            <h1 className="mt-3 max-w-3xl text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+              Visão completa da clínica para decisões rápidas.
             </h1>
 
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">
-              Receita, agenda, clientes, estoque e oportunidades organizados
-              em uma visão compacta para a rotina diária.
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+              Acompanhe desempenho financeiro, agenda, clientes e operação em
+              uma única visão.
             </p>
           </div>
 
-          <div className="grid min-w-0 grid-cols-2 gap-2.5 sm:gap-3">
-            <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
-              <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs">
-                Margem do mês
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Receita
+              </p>
+              <p className="mt-1 text-xl font-bold text-slate-900">
+                {formatarMoeda(entradasMes)}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Margem
               </p>
               <p
-                className={`mt-1.5 truncate text-lg font-bold sm:text-2xl ${
-                  margemMes >= 0 ? "text-emerald-700" : "text-rose-700"
+                className={`mt-1 text-xl font-bold ${
+                  margemMes >= 0
+                    ? "text-emerald-700"
+                    : "text-rose-700"
                 }`}
               >
                 {formatarPercentual(margemMes)}
               </p>
             </div>
 
-            <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
-              <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs">
-                Automações
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Ocupação
               </p>
-              <p className="mt-1.5 truncate text-lg font-bold text-slate-900 sm:text-2xl">
-                {automacoesAtivas}
+
+              <p className="mt-1 text-xl font-bold text-slate-900">
+                {percentualAgenda}%
               </p>
             </div>
 
-            <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
-              <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs">
-                Agenda no mês
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Clientes ativos
               </p>
-              <p className="mt-1.5 truncate text-lg font-bold text-slate-900 sm:text-2xl">
-                {agendamentosMes}
-              </p>
-            </div>
 
-            <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
-              <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs">
-                Estoque
-              </p>
-              <p
-                className="mt-1.5 truncate text-base font-bold text-slate-900 sm:text-xl"
-                title={formatarMoeda(valorEstoque)}
-              >
-                {formatarMoeda(valorEstoque)}
+              <p className="mt-1 text-xl font-bold text-slate-900">
+                {clientesAtivos}
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-4">
+
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatCard
           titulo="Receita mensal"
           valor={formatarMoeda(entradasMes)}
-          descricao="Entradas do mês atual."
+          descricao="Entradas registradas no mês."
           icon={WalletCards}
           tone="emerald"
         />
@@ -261,15 +327,19 @@ export default async function Home() {
         <StatCard
           titulo="Saldo mensal"
           valor={formatarMoeda(saldoMes)}
-          descricao="Entradas menos saídas."
-          icon={saldoMes >= 0 ? ArrowUpRight : ArrowDownRight}
+          descricao="Resultado após despesas."
+          icon={
+            saldoMes >= 0
+              ? ArrowUpRight
+              : ArrowDownRight
+          }
           tone={saldoMes >= 0 ? "cyan" : "rose"}
         />
 
         <StatCard
           titulo="Ticket médio"
           valor={formatarMoeda(ticketMedio)}
-          descricao="Média por atendimento."
+          descricao="Valor médio por atendimento."
           icon={BadgeCheck}
           tone="violet"
         />
@@ -277,185 +347,199 @@ export default async function Home() {
         <StatCard
           titulo="Clientes ativos"
           valor={`${clientesAtivos}/${totalClientes}`}
-          descricao="Ativos sobre o total."
+          descricao="Base ativa da clínica."
           icon={Users}
           tone="blue"
         />
       </section>
 
-      <section className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="premium-card min-w-0 p-4 sm:p-5">
-          <div className="flex min-w-0 flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <h2 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
+
+      <section className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+
+        <div className="premium-card p-4 sm:p-5">
+          <div className="border-b border-slate-200 pb-4">
+            <h2 className="text-lg font-bold text-slate-900">
+              Hoje na clínica
+            </h2>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Resumo operacional do dia.
+            </p>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-emerald-50 p-3">
+              <p className="text-xs font-semibold text-emerald-700">
+                Atendimentos
+              </p>
+              <p className="mt-1 text-2xl font-bold text-emerald-900">
+                {agendamentosHoje}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-violet-50 p-3">
+              <p className="text-xs font-semibold text-violet-700">
+                Leads
+              </p>
+              <p className="mt-1 text-2xl font-bold text-violet-900">
+                {leads.length}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-amber-50 p-3">
+              <p className="text-xs font-semibold text-amber-700">
+                Estoque crítico
+              </p>
+              <p className="mt-1 text-2xl font-bold text-amber-900">
+                {estoqueBaixo}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-cyan-50 p-3">
+              <p className="text-xs font-semibold text-cyan-700">
+                Automações
+              </p>
+              <p className="mt-1 text-2xl font-bold text-cyan-900">
+                {automacoesAtivas}
+              </p>
+            </div>
+          </div>
+        </div>
+
+
+        <div className="premium-card p-4 sm:p-5">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">
                 Saúde operacional
               </h2>
+
               <p className="mt-1 text-sm text-slate-500">
-                Indicadores essenciais da operação no mês.
+                Indicadores essenciais.
               </p>
             </div>
 
             <Link
               href="/relatorios"
-              className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+              className="text-sm font-semibold text-violet-700"
             >
-              Ver relatórios
-              <ArrowUpRight className="h-4 w-4" />
+              Relatórios
             </Link>
           </div>
 
+
           <div className="mt-4 space-y-4">
-            <div>
-              <div className="mb-1.5 flex min-w-0 items-center justify-between gap-3 text-sm">
-                <span className="truncate font-semibold text-slate-700">
-                  Entradas do mês
-                </span>
-                <span className="shrink-0 font-medium text-slate-600">
-                  {formatarMoeda(entradasMes)}
-                </span>
-              </div>
-              <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-emerald-500"
-                  style={{ width: `${percentualEntrada}%` }}
-                />
-              </div>
-            </div>
+            {[
+              {
+                titulo: "Entradas do mês",
+                valor: entradasMes,
+                percentual: percentual(
+                  entradasMes,
+                  Math.max(entradasMes, 1),
+                ),
+                cor: "bg-emerald-500",
+              },
+              {
+                titulo: "Saídas do mês",
+                valor: saidasMes,
+                percentual: percentual(
+                  saidasMes,
+                  Math.max(entradasMes, 1),
+                ),
+                cor: "bg-rose-500",
+              },
+              {
+                titulo: "Clientes ativos",
+                valor: clientesAtivos,
+                percentual: percentualClientesAtivos,
+                cor: "bg-violet-500",
+              },
+            ].map((item) => (
+              <div key={item.titulo}>
+                <div className="mb-1 flex justify-between text-sm">
+                  <span className="font-semibold text-slate-700">
+                    {item.titulo}
+                  </span>
 
-            <div>
-              <div className="mb-1.5 flex min-w-0 items-center justify-between gap-3 text-sm">
-                <span className="truncate font-semibold text-slate-700">
-                  Saídas do mês
-                </span>
-                <span className="shrink-0 font-medium text-slate-600">
-                  {formatarMoeda(saidasMes)}
-                </span>
-              </div>
-              <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-rose-500"
-                  style={{ width: `${percentualSaida}%` }}
-                />
-              </div>
-            </div>
+                  <span className="text-slate-500">
+                    {typeof item.valor === "number" &&
+                    item.titulo !== "Clientes ativos"
+                      ? formatarMoeda(item.valor)
+                      : item.percentual + "%"}
+                  </span>
+                </div>
 
-            <div>
-              <div className="mb-1.5 flex min-w-0 items-center justify-between gap-3 text-sm">
-                <span className="truncate font-semibold text-slate-700">
-                  Clientes ativos
-                </span>
-                <span className="shrink-0 font-medium text-slate-600">
-                  {percentualClientesAtivos}%
-                </span>
+                <div className="h-2 rounded-full bg-slate-100">
+                  <div
+                    className={`h-full rounded-full ${item.cor}`}
+                    style={{
+                      width: `${item.percentual}%`,
+                    }}
+                  />
+                </div>
               </div>
-              <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-violet-500"
-                  style={{ width: `${percentualClientesAtivos}%` }}
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="mb-1.5 flex min-w-0 items-center justify-between gap-3 text-sm">
-                <span className="truncate font-semibold text-slate-700">
-                  Agenda de hoje no mês
-                </span>
-                <span className="shrink-0 font-medium text-slate-600">
-                  {percentualAgenda}%
-                </span>
-              </div>
-              <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-cyan-500"
-                  style={{ width: `${percentualAgenda}%` }}
-                />
-              </div>
-            </div>
+            ))}
           </div>
         </div>
 
-        <div className="premium-card min-w-0 p-4 sm:p-5">
-          <div className="border-b border-slate-200 pb-4">
-            <h2 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
-              Ações rápidas
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Atalhos compactos para a rotina.
-            </p>
-          </div>
-
-          <div className="mt-4 grid min-w-0 grid-cols-2 gap-2.5">
-            {atalhos.map((atalho) => {
-              const Icon = atalho.icon;
-
-              return (
-                <Link
-                  key={atalho.titulo}
-                  href={atalho.href}
-                  className="group flex min-w-0 flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 transition hover:border-violet-300 hover:bg-violet-50 sm:p-4"
-                >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
-                    <Icon className="h-5 w-5" />
-                  </div>
-
-                  <div className="flex min-w-0 items-center justify-between gap-2">
-                    <span className="min-w-0 text-sm font-semibold leading-5 text-slate-800">
-                      {atalho.titulo}
-                    </span>
-                    <ArrowUpRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:text-violet-700" />
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
       </section>
-
-      <section className="grid min-w-0 grid-cols-1 gap-4 2xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="premium-card min-w-0 p-4 sm:p-5">
-          <div className="flex min-w-0 flex-col gap-2 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <h2 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
+            <section className="grid gap-4 2xl:grid-cols-[1.1fr_0.9fr]">
+        <div className="premium-card p-4 sm:p-5">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">
                 Próximos atendimentos
               </h2>
+
               <p className="mt-1 text-sm text-slate-500">
-                Os seis próximos horários da agenda.
+                Agenda futura da clínica.
               </p>
             </div>
 
             <Link
               href="/agenda"
-              className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-violet-700 hover:text-violet-800"
+              className="inline-flex items-center gap-1 text-sm font-semibold text-violet-700"
             >
               Abrir agenda
-              <ArrowUpRight className="h-4 w-4" />
+              <ArrowUpRight className="size-4" />
             </Link>
           </div>
+
 
           <div className="mt-4 space-y-2.5">
             {proximosAgendamentos.length > 0 ? (
               proximosAgendamentos.map((agendamento) => (
                 <div
                   key={agendamento.id}
-                  className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center"
+                  className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[auto_1fr_auto]"
                 >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-50 text-cyan-700">
-                    <CalendarDays className="h-5 w-5" />
+                  <div className="flex size-10 items-center justify-center rounded-xl bg-cyan-50 text-cyan-700">
+                    <CalendarDays className="size-5" />
                   </div>
+
 
                   <div className="min-w-0">
                     <p className="truncate font-semibold text-slate-900">
                       {agendamento.cliente.nome}
                     </p>
-                    <p className="mt-0.5 truncate text-sm text-slate-500">
+
+                    <p className="truncate text-sm text-slate-500">
                       {agendamento.procedimento}
                     </p>
+
+                    {agendamento.profissional ? (
+  <p className="mt-1 text-xs text-slate-400">
+    {agendamento.profissional.nome}
+  </p>
+) : null}
                   </div>
 
-                  <p className="col-start-2 inline-flex w-fit max-w-full rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 sm:col-start-auto sm:text-sm">
-                    {formatarDataHora(agendamento.data)}
-                  </p>
+
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">
+                      {formatarDataHora(agendamento.data)}
+                    </span>
+                  </div>
                 </div>
               ))
             ) : (
@@ -466,17 +550,20 @@ export default async function Home() {
           </div>
         </div>
 
-        <div className="premium-card min-w-0 p-4 sm:p-5">
+
+        <div className="premium-card p-4 sm:p-5">
           <div className="border-b border-slate-200 pb-4">
-            <h2 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
+            <h2 className="text-lg font-bold text-slate-900">
               Prioridades do dia
             </h2>
+
             <p className="mt-1 text-sm text-slate-500">
-              Pontos que merecem acompanhamento.
+              Pontos que precisam de atenção.
             </p>
           </div>
 
-          <div className="mt-4 space-y-2.5">
+
+          <div className="mt-4 space-y-3">
             {prioridades.map((prioridade) => {
               const Icon = prioridade.icon;
 
@@ -484,25 +571,26 @@ export default async function Home() {
                 <Link
                   key={prioridade.titulo}
                   href={prioridade.href}
-                  className="group grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 transition hover:border-violet-300 hover:bg-violet-50"
+                  className="grid grid-cols-[auto_1fr] gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 transition hover:border-violet-300 hover:bg-violet-50"
                 >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-600 shadow-sm">
-                    <Icon className="h-5 w-5" />
+                  <div className="flex size-10 items-center justify-center rounded-xl bg-white text-slate-600 shadow-sm">
+                    <Icon className="size-5" />
                   </div>
 
                   <div className="min-w-0">
-                    <div className="flex min-w-0 items-center justify-between gap-2">
+                    <div className="flex items-center justify-between gap-2">
                       <p className="truncate font-semibold text-slate-900">
                         {prioridade.titulo}
                       </p>
+
                       <span
-                        className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${prioridade.indicadorClass}`}
+                        className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${prioridade.indicadorClass}`}
                       >
                         {prioridade.indicador}
                       </span>
                     </div>
 
-                    <p className="mt-1 text-sm leading-5 text-slate-500">
+                    <p className="mt-1 text-sm text-slate-500">
                       {prioridade.descricao}
                     </p>
                   </div>
@@ -513,50 +601,31 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="premium-card-soft min-w-0 p-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-              <ArrowUpRight className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="font-semibold text-slate-900">Entradas</p>
-              <p className="mt-0.5 text-sm leading-5 text-slate-500">
-                {formatarMoeda(entradasMes)} registrados no mês.
-              </p>
-            </div>
-          </div>
-        </div>
 
-        <div className="premium-card-soft min-w-0 p-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-700">
-              <ArrowDownRight className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="font-semibold text-slate-900">Saídas</p>
-              <p className="mt-0.5 text-sm leading-5 text-slate-500">
-                {formatarMoeda(saidasMes)} registrados no mês.
-              </p>
-            </div>
-          </div>
-        </div>
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {atalhos.map((atalho) => {
+          const Icon = atalho.icon;
 
-        <div className="premium-card-soft min-w-0 p-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-700">
-              <BadgeCheck className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="font-semibold text-slate-900">
-                Base operacional
-              </p>
-              <p className="mt-0.5 text-sm leading-5 text-slate-500">
-                Indicadores prontos para acompanhamento diário.
-              </p>
-            </div>
-          </div>
-        </div>
+          return (
+            <Link
+              key={atalho.titulo}
+              href={atalho.href}
+              className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-violet-300 hover:bg-violet-50"
+            >
+              <div className="flex size-10 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+                <Icon className="size-5" />
+              </div>
+
+              <div className="mt-3 flex items-center justify-between gap-2">
+                <span className="text-sm font-semibold text-slate-800">
+                  {atalho.titulo}
+                </span>
+
+                <ArrowUpRight className="size-4 text-slate-400 transition group-hover:text-violet-700" />
+              </div>
+            </Link>
+          );
+        })}
       </section>
     </div>
   );
