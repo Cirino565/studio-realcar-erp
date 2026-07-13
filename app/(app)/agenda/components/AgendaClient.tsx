@@ -77,6 +77,7 @@ type Props = {
   servicos: ServicoAgenda[];
   initialDate: string;
   initialProfissionalFiltro: string;
+  initialClienteId?: string | null;
 };
 
 function parseLocalDate(value: string) {
@@ -121,6 +122,7 @@ export default function AgendaClient({
   servicos,
   initialDate,
   initialProfissionalFiltro,
+  initialClienteId,
 }: Props) {
   const [selectedDate, setSelectedDate] = useState(() =>
     parseLocalDate(initialDate),
@@ -130,8 +132,16 @@ export default function AgendaClient({
     initialProfissionalFiltro || "todas",
   );
 
-  const [novoHorario, setNovoHorario] = useState<NovoAgendamentoPayload | null>(
-    null,
+  const [novoHorario, setNovoHorario] =
+  useState<NovoAgendamentoPayload | null>(() =>
+    initialClienteId
+      ? {
+          clienteId: Number(initialClienteId),
+          data: initialDate,
+          hora: "09:00",
+          status: "Agendado",
+        }
+      : null,
   );
 
   const [selectedAppointment, setSelectedAppointment] =

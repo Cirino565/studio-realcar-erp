@@ -94,6 +94,7 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
   const usuarioAdmin = isAdminUser(usuario);
 
   const resolvedSearchParams = searchParams ? await searchParams : {};
+
   const dataSelecionada = getDataSelecionada(
     getParam(resolvedSearchParams, "data"),
   );
@@ -101,6 +102,11 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
   const profissionalFiltroParam = getParam(
     resolvedSearchParams,
     "profissional",
+  );
+
+  const clienteIdParam = getParam(
+    resolvedSearchParams,
+    "clienteId",
   );
 
   const [clientes, profissionais, origensCliente, servicos] = await Promise.all([
@@ -204,6 +210,7 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
         servicos={servicos}
         initialDate={toDateInput(dataSelecionada)}
         initialProfissionalFiltro={profissionalFiltro}
+        initialClienteId={clienteIdParam}
       />
     </div>
   );

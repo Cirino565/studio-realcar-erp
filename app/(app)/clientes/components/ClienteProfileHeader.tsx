@@ -71,9 +71,8 @@ export default function ClienteProfileHeader({ data }: Props) {
 
           <div className="flex flex-wrap gap-2">
             <Link
-              href={`/agenda?cliente=${data.id}`}
-              className="inline-flex h-10 items-center gap-2 rounded-xl bg-teal-700 px-4 text-sm font-semibold text-white transition hover:bg-teal-800"
-            >
+  href={`/agenda?clienteId=${data.id}`}
+  className="inline-flex h-10 items-center gap-2 rounded-xl bg-teal-700 px-4 text-sm font-semibold text-white transition hover:bg-teal-800"           >
               <CalendarPlus className="size-4" />
               Agendar
             </Link>
