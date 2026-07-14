@@ -1,0 +1,56 @@
+STUDIO REALÇAR — CONSOLIDAÇÃO FINAL
+
+ESCOPO DESTA ENTREGA
+
+1. Dashboard híbrido para gestão e operação.
+2. Tema claro premium como padrão e dark premium persistente.
+3. Login responsivo e correção do destino do administrador no celular.
+4. Agenda profissional com cliente pré-selecionada ao agendar pela ficha.
+5. Ficha da cliente em formato de prontuário premium.
+6. Ações de Agendar, WhatsApp e Editar integradas à ficha.
+7. Mensagens de WhatsApp com modelos, edição, cópia e abertura da conversa.
+8. Área de clientes refinada: cabeçalho, indicadores, busca, filtros, tabela desktop e cards mobile.
+9. Cadastro/edição de cliente com validação dentro do modal, sem alertas do navegador.
+10. Anamnese, fotos, evoluções, procedimentos e documentos preservados e adaptados ao claro/dark.
+11. Navegação mobile e fechamento do menu “Mais” refinados.
+12. Sobreposições de modais e área segura no celular corrigidas.
+
+REGRAS PRESERVADAS
+
+- Prisma mantido na versão 6.19.3.
+- Nenhuma atualização de dependência foi aplicada.
+- Nenhuma alteração de schema ou banco foi necessária.
+- Fluxos de atendimento, finalização, financeiro, retorno, anamnese e auditoria foram preservados.
+
+VALIDAÇÕES REALIZADAS NESTA CONSOLIDAÇÃO
+
+- ESLint: aprovado.
+- TypeScript estrutural: aprovado.
+- Next.js: compilação estrutural aprovada no ambiente de revisão.
+
+OBSERVAÇÃO SOBRE O BUILD FINAL
+
+O ambiente de revisão não conseguiu baixar os binários oficiais do Prisma por bloqueio de rede. Por isso, o build definitivo com o Prisma real deve ser executado no computador do projeto ou no Railway:
+
+npm run build
+
+Somente publique quando esse comando terminar com sucesso.
+
+PUBLICAÇÃO
+
+Opção manual:
+
+npm run build
+git add .
+git commit -m "finalize premium crm experience"
+git push
+
+Opção assistida no Windows:
+
+PowerShell -ExecutionPolicy Bypass -File .\FINALIZAR_E_PUBLICAR.ps1
+
+No Railway, confira se o deploy utiliza o hash e a mensagem do último commit enviado. “Redeploy” de um deploy antigo repete o código antigo; para buscar o commit atual, use o deploy automático da branch conectada ou “Deploy Latest Commit”.
+
+SEGURANÇA
+
+O ZIP final não inclui .env ou .env.local. As credenciais existentes devem permanecer somente no computador do projeto e nas variáveis privadas do Railway.

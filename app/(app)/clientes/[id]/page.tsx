@@ -71,7 +71,7 @@ export default async function ClientePage({ params }: ClientePageProps) {
 
   if (!id || !Number.isInteger(clienteId) || clienteId <= 0) {
     return (
-      <div className="p-6 text-white">
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm dark:border-white/10 dark:bg-white/[0.06] dark:text-white">
         <h1>Cliente inválido</h1>
       </div>
     );
@@ -93,7 +93,7 @@ export default async function ClientePage({ params }: ClientePageProps) {
 
   if (!cliente) {
     return (
-      <div className="p-6 text-white">
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm dark:border-white/10 dark:bg-white/[0.06] dark:text-white">
         <h1>Cliente não encontrado</h1>
       </div>
     );
@@ -167,13 +167,10 @@ export default async function ClientePage({ params }: ClientePageProps) {
   };
 
   return (
-  <div className="app-mobile-safe space-y-5 sm:space-y-6">
-    <ClienteProfileHeader
-      data={data}
-      cliente={cliente}
-    />
+    <div className="app-mobile-safe space-y-5 sm:space-y-6">
+      <ClienteProfileHeader data={data} cliente={cliente} />
 
-    <ClienteClinicoTabs data={data} />
-  </div>
-);
+      <ClienteClinicoTabs data={data} />
+    </div>
+  );
 }

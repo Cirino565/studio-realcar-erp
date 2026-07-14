@@ -1,59 +1,105 @@
-MELHORIAS ADMIN + MOBILE + WHATSAPP
-Studio Realçar
+STUDIO REALÇAR — VERSÃO CONSOLIDADA
 
-ARQUIVOS ALTERADOS
+ANTES DE COMEÇAR
 
-1. components/layout/Sidebar.tsx
-   - Mantém até 4 módulos principais na barra inferior.
-   - Adiciona o botão "Mais" quando existem mais de 5 módulos permitidos.
-   - O menu "Mais" passa a exibir Estoque, Relatórios, Marketing e módulos administrativos conforme as permissões.
-   - Vivian e Gaby continuam vendo somente os módulos permitidos para seus perfis.
+1. Faça uma cópia da pasta estável atual.
+2. Extraia este ZIP sobre uma cópia do projeto, confirmando a substituição dos arquivos.
+3. Confirme que o terminal está aberto na pasta correta:
 
-2. app/(app)/configuracoes/components/ConfiguracoesClient.tsx
-   - Remove o comportamento flutuante do bloco "Salvar configurações" no celular.
-   - O bloco permanece sticky somente no desktop.
-   - Evita que Mensagens, Identidade, Auxiliares e Anamnese fiquem cobertas no final da tela.
+   git rev-parse --show-toplevel
 
-3. components/clientes/ClienteTable.tsx
-4. app/(app)/clientes/components/ClienteQuickMessageModal.tsx
-   - O botão WhatsApp da lista de clientes não abre mais uma mensagem automática direta.
-   - Primeiro abre a tela de escolha do modelo.
-   - Permite revisar e editar o texto antes de abrir o WhatsApp.
-   - Bloqueia a abertura direcionada quando a cliente não possui telefone.
+4. Não atualize Prisma, npm ou outras dependências nesta etapa.
+5. Não use prisma db push. Esta entrega não exige alteração de schema ou banco.
 
-5. app/(app)/agenda/components/AgendaClient.tsx
-6. app/(app)/agenda/components/AppointmentDetailsModal.tsx
-7. app/(app)/agenda/components/AppointmentMessageModal.tsx
-   - Integra o seletor de mensagens na agenda.
-   - Cliques de WhatsApp na agenda e nos detalhes abrem os modelos antes do WhatsApp.
-   - Permite revisar e editar a mensagem.
-   - O modal ganhou rolagem adequada no celular.
+ARQUIVOS DE AMBIENTE
 
-COMO APLICAR
+Por segurança, os arquivos .env e .env.local com credenciais não são incluídos no ZIP final. Ao extrair sobre o projeto existente, mantenha os seus arquivos atuais e as variáveis configuradas no Railway. Use apenas os arquivos *.example como referência.
 
-Extraia este ZIP na raiz do projeto e confirme a substituição dos arquivos.
+VALIDAÇÃO OBRIGATÓRIA
 
-Depois execute:
+Execute:
 
 npm run build
 
-Se o build passar:
+Avisos já conhecidos e não bloqueadores:
+
+- package.json#prisma será removido apenas no Prisma 7.
+- A convenção middleware será substituída futuramente por proxy.
+- O npm pode informar que existe uma versão mais recente.
+
+Não corrija esses avisos agora. O importante é o build terminar com sucesso.
+
+PUBLICAÇÃO MANUAL
+
+Após o build passar:
 
 git add .
-git commit -m "improve admin mobile navigation and whatsapp flow"
+git commit -m "finalize premium crm experience"
 git push
 
-TESTES NO RAILWAY
+PUBLICAÇÃO ASSISTIDA NO WINDOWS
 
-1. Admin no celular: abrir "Mais" e confirmar Estoque e Configurações.
-2. Configurações > Mensagens: rolar até o final e ler todas as linhas.
-3. Configurações > Identidade, Auxiliares e Anamnese: confirmar que nada fica escondido.
-4. Clientes > WhatsApp: escolher um modelo, editar o texto e só então abrir o WhatsApp.
-5. Agenda > atendimento > mensagem: escolher um modelo, editar e abrir o WhatsApp.
-6. Testar claro e dark premium.
-7. Confirmar que Vivian e Gaby continuam vendo somente os módulos autorizados.
+Também é possível executar:
 
-VALIDAÇÃO REALIZADA AQUI
+PowerShell -ExecutionPolicy Bypass -File .\FINALIZAR_E_PUBLICAR.ps1
 
-Os sete arquivos TSX foram formatados e passaram por validação sintática com TypeScript 5.8.3.
-O build completo precisa ser executado no projeto real, pois o ZIP recebido para auditoria não contém todas as dependências e todos os arquivos do repositório.
+O script executa o build, cria o commit quando houver alterações e envia a branch atual ao GitHub.
+
+RAILWAY
+
+1. Aguarde o deploy automático do commit novo.
+2. Confira a mensagem/hash do commit mostrado pelo Railway.
+3. Se necessário, use “Deploy Latest Commit”.
+4. Evite “Redeploy” sobre um deploy antigo, pois ele republica a mesma versão antiga.
+5. Teste em aba anônima ou atualize sem cache quando o navegador mantiver a interface anterior.
+
+CHECKLIST FINAL
+
+LOGIN E PERMISSÕES
+
+- Admin no computador abre o Dashboard.
+- Admin no celular abre o Dashboard.
+- Usuário com cargo Profissional abre a Agenda conforme as permissões.
+- Usuários restritos veem somente os módulos permitidos.
+
+DASHBOARD
+
+- Indicadores carregam corretamente.
+- Próximos atendimentos exibem cliente, procedimento, profissional e horário.
+- Ações rápidas abrem os módulos corretos.
+- Claro e dark apresentam bom contraste.
+
+CLIENTES
+
+- Busca por nome, telefone, CPF, WhatsApp, origem e procedimento.
+- Filtros de status, procedimento, retorno e ordenação.
+- Cadastro e edição preservam Instagram e nascimento.
+- Exclusão funciona somente após confirmação.
+- Tabela desktop e cards mobile não extrapolam a tela.
+
+FICHA E PRONTUÁRIO
+
+- Cabeçalho da cliente mostra status e indicadores.
+- Agendar abre a Agenda com a cliente já selecionada.
+- WhatsApp abre os modelos de mensagem e permite editar.
+- Anamnese salva respostas e observações condicionais.
+- Fotos, evoluções, procedimentos e documentos podem ser criados e excluídos.
+- Abas funcionam sem recarregar toda a página.
+
+AGENDA
+
+- Dia selecionado, botão Hoje e botão + funcionam.
+- Horários permanecem entre 09:00 e 19:00.
+- Cliente pré-selecionada permanece bloqueada no novo agendamento.
+- Disponibilidade, serviço, duração, valor e salvamento funcionam.
+- Detalhes, início, finalização, retorno e WhatsApp continuam funcionando.
+
+TEMA E MOBILE
+
+- Dark persiste após atualizar, navegar e reabrir o navegador.
+- Claro persiste da mesma forma.
+- Menu inferior não cobre formulários ou modais.
+- Não existem duas rolagens verticais concorrentes.
+- Inputs não causam zoom automático no Safari/iPhone.
+
+Consulte ALTERACOES_FINAIS.txt para o resumo técnico desta entrega.

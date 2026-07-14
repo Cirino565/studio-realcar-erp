@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ComponentType } from "react";
+import { useState, type ComponentType } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -127,12 +127,21 @@ function podeVerMenu(item: MenuItem, permissoes: string[], isAdmin?: boolean) {
   return Boolean(isAdmin) || permissoes.includes(item.permissao);
 }
 
-function SidebarLink({ item, ativo }: { item: MenuItem; ativo: boolean }) {
+function SidebarLink({
+  item,
+  ativo,
+  onNavigate,
+}: {
+  item: MenuItem;
+  ativo: boolean;
+  onNavigate?: () => void;
+}) {
   const Icon = item.icon;
 
   return (
     <Link
       href={item.href}
+      onClick={onNavigate}
       className={`group relative flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition-all duration-200 ${
         ativo
           ? "bg-violet-50 text-violet-800 shadow-sm ring-1 ring-violet-100"
@@ -166,10 +175,12 @@ function MenuSection({
   titulo,
   items,
   pathname,
+  onNavigate,
 }: {
   titulo: string;
   items: MenuItem[];
   pathname: string;
+  onNavigate?: () => void;
 }) {
   if (items.length === 0) return null;
 
@@ -185,6 +196,7 @@ function MenuSection({
             key={item.href}
             item={item}
             ativo={isActive(pathname, item.href)}
+            onNavigate={onNavigate}
           />
         ))}
       </div>
@@ -195,10 +207,6 @@ function MenuSection({
 export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [pathname]);
 
   const menusPrincipaisVisiveis = mainMenus.filter((item) =>
     podeVerMenu(item, permissoes, isAdmin),
@@ -311,6 +319,7 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
                   className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[0.63rem] font-semibold transition-all ${
                     ativo
                       ? "bg-violet-50 text-violet-800"
@@ -391,12 +400,14 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
                 titulo="Operação"
                 items={menusMobileExtrasPrincipais}
                 pathname={pathname}
+                onNavigate={() => setMobileMenuOpen(false)}
               />
 
               <MenuSection
                 titulo="Administração"
                 items={menusMobileExtrasAdmin}
                 pathname={pathname}
+                onNavigate={() => setMobileMenuOpen(false)}
               />
             </nav>
           </section>

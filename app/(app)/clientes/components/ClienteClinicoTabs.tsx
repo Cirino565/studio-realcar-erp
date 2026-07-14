@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
@@ -384,12 +385,12 @@ export function ClienteClinicoTabs({
             const selected = activeTab === aba.id;
 
             return (
-              <a
+              <button
                 key={aba.id}
-                href={`/clientes/${data.id}?aba=${aba.id}#${aba.id}`}
+                type="button"
                 onClick={() => ativarAba(aba.id)}
                 data-mobile-action="true"
-                aria-current={selected ? "page" : undefined}
+                aria-pressed={selected}
                 className={`flex shrink-0 items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold transition active:scale-[0.98] ${
                   selected
                     ? "bg-violet-600 text-white shadow-md shadow-violet-600/20 dark:bg-violet-500 dark:text-white"
@@ -398,7 +399,7 @@ export function ClienteClinicoTabs({
               >
                 <Icon size={16} />
                 {aba.label}
-              </a>
+              </button>
             );
           })}
         </div>

@@ -6,7 +6,6 @@ import {
   BadgeCheck,
   CalendarClock,
   CalendarDays,
-  CheckCircle2,
   ClipboardList,
   PackageSearch,
   Sparkles,
@@ -124,7 +123,6 @@ export default async function Home() {
       select: {
         quantidade: true,
         estoqueMinimo: true,
-        valorCompra: true,
       },
       orderBy: {
         quantidade: "asc",
@@ -169,12 +167,6 @@ export default async function Home() {
     (produto) =>
       produto.quantidade <= produto.estoqueMinimo,
   ).length;
-
-  const valorEstoque = produtos.reduce(
-    (total, produto) =>
-      total + produto.quantidade * produto.valorCompra,
-    0,
-  );
 
   const percentualClientesAtivos = percentual(
     clientesAtivos,
@@ -314,7 +306,6 @@ export default async function Home() {
         </div>
       </section>
 
-
       <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatCard
           titulo="Receita mensal"
@@ -352,7 +343,6 @@ export default async function Home() {
           tone="blue"
         />
       </section>
-
 
       <section className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
 
@@ -406,7 +396,6 @@ export default async function Home() {
           </div>
         </div>
 
-
         <div className="premium-card p-4 sm:p-5">
           <div className="flex items-center justify-between border-b border-slate-200 pb-4">
             <div>
@@ -426,7 +415,6 @@ export default async function Home() {
               Relatórios
             </Link>
           </div>
-
 
           <div className="mt-4 space-y-4">
             {[
@@ -505,7 +493,6 @@ export default async function Home() {
             </Link>
           </div>
 
-
           <div className="mt-4 space-y-2.5">
             {proximosAgendamentos.length > 0 ? (
               proximosAgendamentos.map((agendamento) => (
@@ -517,7 +504,6 @@ export default async function Home() {
                     <CalendarDays className="size-5" />
                   </div>
 
-
                   <div className="min-w-0">
                     <p className="truncate font-semibold text-slate-900">
                       {agendamento.cliente.nome}
@@ -528,12 +514,11 @@ export default async function Home() {
                     </p>
 
                     {agendamento.profissional ? (
-  <p className="mt-1 text-xs text-slate-400">
-    {agendamento.profissional.nome}
-  </p>
-) : null}
+                      <p className="mt-1 text-xs text-slate-400">
+                        {agendamento.profissional.nome}
+                      </p>
+                    ) : null}
                   </div>
-
 
                   <div className="flex items-center gap-2">
                     <span className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">
@@ -550,7 +535,6 @@ export default async function Home() {
           </div>
         </div>
 
-
         <div className="premium-card p-4 sm:p-5">
           <div className="border-b border-slate-200 pb-4">
             <h2 className="text-lg font-bold text-slate-900">
@@ -561,7 +545,6 @@ export default async function Home() {
               Pontos que precisam de atenção.
             </p>
           </div>
-
 
           <div className="mt-4 space-y-3">
             {prioridades.map((prioridade) => {
@@ -600,7 +583,6 @@ export default async function Home() {
           </div>
         </div>
       </section>
-
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {atalhos.map((atalho) => {

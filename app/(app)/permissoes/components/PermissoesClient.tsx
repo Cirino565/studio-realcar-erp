@@ -391,7 +391,7 @@ function ResumoCard({ titulo, valor, detalhe, icon: Icon }: { titulo: string; va
 
 function Modal({ titulo, children, onClose }: { titulo: string; children: ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/80 p-4 backdrop-blur-sm sm:items-center">
+    <div className="app-modal-backdrop fixed inset-0 z-50 flex items-end justify-center bg-slate-950/80 p-4 backdrop-blur-sm sm:items-center">
       <div className="w-full max-w-xl rounded-[2rem] border border-white/10 bg-slate-900 p-5 shadow-2xl shadow-slate-950 md:p-6">
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>

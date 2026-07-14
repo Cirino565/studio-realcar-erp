@@ -1,7 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AlertCircle, Save, UserRound, X } from "lucide-react";
 import type { OrigemCliente, ProcedimentoInteresse } from "@prisma/client";
+
+import { Button } from "@/components/ui/button";
 import type { Cliente } from "@/lib/types";
 
 type FormData = {
@@ -50,18 +53,6 @@ const PROCEDIMENTOS_FALLBACK = [
   "Outro",
 ];
 
-const inicial: FormData = {
-  nome: "",
-  telefone: "",
-  whatsapp: "",
-  cpf: "",
-  instagram: "",
-  origem: "Indicação",
-  procedimentoInteresse: "Avaliação",
-  nascimento: "",
-  observacoes: "",
-};
-
 function somenteNumeros(value: string) {
   return value.replace(/\D/g, "");
 }
@@ -83,17 +74,38 @@ function formatarCpf(value: string) {
 
   if (digits.length <= 3) return digits;
   if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
-  if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+  if (digits.length <= 9) {
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+  }
 
   return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
 }
 
-function montarFormulario(cliente: Cliente | null, origemPadrao: string, procedimentoPadrao: string): FormData {
+function formatarDataInput(value: Date | string | null | undefined) {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toISOString().slice(0, 10);
+}
+
+function montarFormulario(
+  cliente: Cliente | null,
+  origemPadrao: string,
+  procedimentoPadrao: string,
+): FormData {
   if (!cliente) {
     return {
-      ...inicial,
+      nome: "",
+      telefone: "",
+      whatsapp: "",
+      cpf: "",
+      instagram: "",
       origem: origemPadrao,
       procedimentoInteresse: procedimentoPadrao,
+      nascimento: "",
+      observacoes: "",
     };
   }
 
@@ -104,61 +116,80 @@ function montarFormulario(cliente: Cliente | null, origemPadrao: string, procedi
     cpf: formatarCpf(cliente.cpf ?? ""),
     instagram: cliente.instagram ?? "",
     origem: cliente.origem ?? origemPadrao,
-    procedimentoInteresse: cliente.procedimentoInteresse ?? cliente.procedimento ?? procedimentoPadrao,
-    nascimento: cliente.nascimento ? new Date(cliente.nascimento).toISOString().split("T")[0] : "",
+    procedimentoInteresse:
+      cliente.procedimentoInteresse ??
+      cliente.procedimento ??
+      procedimentoPadrao,
+    nascimento: formatarDataInput(cliente.nascimento),
     observacoes: cliente.observacoes ?? "",
   };
 }
 
-function NovoClienteForm({ cliente, onClose, onSalvar, origens, procedimentosInteresse }: Omit<Props, "open">) {
+function Label({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="mb-2 block text-[0.68rem] font-bold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">
+      {children}
+    </span>
+  );
+}
+
+function NovoClienteForm({
+  cliente,
+  onClose,
+  onSalvar,
+  origens,
+  procedimentosInteresse,
+}: Omit<Props, "open">) {
   const origensDisponiveis = useMemo(
     () => (origens.length > 0 ? origens.map((origem) => origem.nome) : ORIGENS_FALLBACK),
-    [origens]
+    [origens],
   );
+
   const procedimentosDisponiveis = useMemo(
     () =>
       procedimentosInteresse.length > 0
         ? procedimentosInteresse.map((procedimento) => procedimento.nome)
         : PROCEDIMENTOS_FALLBACK,
-    [procedimentosInteresse]
+    [procedimentosInteresse],
   );
 
   const origemPadrao = origensDisponiveis[0] ?? "Indicação";
   const procedimentoPadrao = procedimentosDisponiveis[0] ?? "Avaliação";
-  const formInicial = useMemo(
-    () => montarFormulario(cliente, origemPadrao, procedimentoPadrao),
-    [cliente, origemPadrao, procedimentoPadrao]
+
+  const [form, setForm] = useState<FormData>(() =>
+    montarFormulario(cliente, origemPadrao, procedimentoPadrao),
   );
-  const [form, setForm] = useState<FormData>(formInicial);
+  const [erro, setErro] = useState("");
 
   function alterarCampo(campo: keyof FormData, valor: string) {
+    setErro("");
     setForm((atual) => ({ ...atual, [campo]: valor }));
   }
 
   function salvar() {
     if (!form.nome.trim()) {
-      alert("Informe o nome do cliente.");
+      setErro("Informe o nome completo da cliente.");
       return;
     }
 
     if (!somenteNumeros(form.whatsapp) && !somenteNumeros(form.telefone)) {
-      alert("Informe pelo menos o WhatsApp ou telefone do cliente.");
+      setErro("Informe pelo menos o WhatsApp ou o telefone da cliente.");
       return;
     }
 
-    const telefoneFormatado = formatarTelefone(form.telefone || form.whatsapp);
-    const whatsappFormatado = formatarTelefone(form.whatsapp || form.telefone);
-
     onSalvar({
       ...form,
-      telefone: telefoneFormatado,
-      whatsapp: whatsappFormatado,
+      nome: form.nome.trim(),
+      telefone: formatarTelefone(form.telefone || form.whatsapp),
+      whatsapp: formatarTelefone(form.whatsapp || form.telefone),
       cpf: formatarCpf(form.cpf),
-      instagram: "",
-      nascimento: "",
-      procedimentoInteresse: form.procedimentoInteresse || procedimentoPadrao,
+      instagram: form.instagram.trim(),
+      origem: form.origem || origemPadrao,
+      procedimentoInteresse:
+        form.procedimentoInteresse || procedimentoPadrao,
+      nascimento: form.nascimento,
+      observacoes: form.observacoes.trim(),
     });
-    onClose();
   }
 
   return (
@@ -167,98 +198,130 @@ function NovoClienteForm({ cliente, onClose, onSalvar, origens, procedimentosInt
         event.preventDefault();
         salvar();
       }}
-      className="max-h-[calc(100dvh-2rem)] w-full max-w-3xl overflow-hidden rounded-[1.5rem] border border-white/[0.10] bg-[#111827] shadow-2xl shadow-black/40 sm:rounded-[2rem]"
+      className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-3xl flex-col overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-2xl shadow-slate-950/20 dark:border-white/10 dark:bg-[#111827] dark:shadow-black/50"
     >
-      <div className="border-b border-white/[0.08] bg-white/[0.035] px-4 py-4 sm:px-8 sm:py-5">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
-              {cliente ? "Editar cliente" : "Novo cliente"}
-            </h2>
-            <p className="mt-1 text-sm text-slate-400">Cadastro clínico, comercial, origem e interesse do cliente.</p>
+      <header className="flex items-start justify-between gap-4 border-b border-slate-200 bg-slate-50/80 px-4 py-4 dark:border-white/10 dark:bg-white/[0.035] sm:px-6 sm:py-5">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="hidden size-11 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300 sm:flex">
+            <UserRound size={20} />
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04] text-slate-400 transition hover:bg-rose-500/10 hover:text-rose-200"
-            aria-label="Fechar modal"
-          >
-            ✕
-          </button>
+          <div className="min-w-0">
+            <h2 className="text-xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-2xl">
+              {cliente ? "Editar cliente" : "Nova cliente"}
+            </h2>
+            <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
+              Cadastro clínico, comercial, origem e interesse principal.
+            </p>
+          </div>
         </div>
-      </div>
 
-      <div className="max-h-[calc(100dvh-12rem)] space-y-5 overflow-y-auto px-4 py-5 sm:px-8 sm:py-6">
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-rose-50 hover:text-rose-700 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-300 dark:hover:bg-rose-500/10 dark:hover:text-rose-300"
+          aria-label="Fechar modal"
+        >
+          <X size={18} />
+        </button>
+      </header>
+
+      <div className="scrollbar-premium flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
+        {erro ? (
+          <div
+            role="alert"
+            className="flex items-start gap-2.5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200"
+          >
+            <AlertCircle size={17} className="mt-0.5 shrink-0" />
+            <span>{erro}</span>
+          </div>
+        ) : null}
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Nome completo
-            </label>
+          <label className="sm:col-span-2">
+            <Label>Nome completo</Label>
             <input
               name="nome"
               value={form.nome}
               onChange={(event) => alterarCampo("nome", event.target.value)}
-              placeholder="Ex: Jully Oliveira"
-              className="premium-input"
+              placeholder="Ex.: Jully Oliveira"
+              className="premium-input w-full"
               autoComplete="name"
+              autoFocus={!cliente}
             />
-          </div>
+          </label>
 
-          <div>
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              WhatsApp
-            </label>
+          <label>
+            <Label>WhatsApp</Label>
             <input
               name="whatsapp"
               value={form.whatsapp}
-              onChange={(event) => alterarCampo("whatsapp", formatarTelefone(event.target.value))}
+              onChange={(event) =>
+                alterarCampo("whatsapp", formatarTelefone(event.target.value))
+              }
               placeholder="(11) 99999-9999"
-              className="premium-input"
+              className="premium-input w-full"
               inputMode="tel"
               autoComplete="tel"
             />
-            <p className="mt-2 text-xs text-slate-500">Usado para abrir o WhatsApp já com a mensagem pronta.</p>
-          </div>
+          </label>
 
-          <div>
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Telefone alternativo
-            </label>
+          <label>
+            <Label>Telefone alternativo</Label>
             <input
               name="telefone"
               value={form.telefone}
-              onChange={(event) => alterarCampo("telefone", formatarTelefone(event.target.value))}
+              onChange={(event) =>
+                alterarCampo("telefone", formatarTelefone(event.target.value))
+              }
               placeholder="(11) 99999-9999"
-              className="premium-input"
+              className="premium-input w-full"
               inputMode="tel"
-              autoComplete="tel"
             />
-          </div>
+          </label>
 
-          <div>
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              CPF
-            </label>
+          <label>
+            <Label>CPF</Label>
             <input
               name="cpf"
               value={form.cpf}
               onChange={(event) => alterarCampo("cpf", formatarCpf(event.target.value))}
               placeholder="000.000.000-00"
-              className="premium-input"
+              className="premium-input w-full"
               inputMode="numeric"
             />
-          </div>
+          </label>
 
-          <div>
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Origem
-            </label>
+          <label>
+            <Label>Data de nascimento</Label>
+            <input
+              name="nascimento"
+              type="date"
+              value={form.nascimento}
+              onChange={(event) => alterarCampo("nascimento", event.target.value)}
+              className="premium-input w-full"
+            />
+          </label>
+
+          <label>
+            <Label>Instagram</Label>
+            <input
+              name="instagram"
+              value={form.instagram}
+              onChange={(event) => alterarCampo("instagram", event.target.value)}
+              placeholder="@usuario"
+              className="premium-input w-full"
+              autoCapitalize="none"
+            />
+          </label>
+
+          <label>
+            <Label>Origem</Label>
             <select
               name="origem"
               value={form.origem}
               onChange={(event) => alterarCampo("origem", event.target.value)}
-              className="premium-input"
+              className="premium-input w-full"
             >
               {origensDisponiveis.map((origem) => (
                 <option key={origem} value={origem}>
@@ -266,17 +329,17 @@ function NovoClienteForm({ cliente, onClose, onSalvar, origens, procedimentosInt
                 </option>
               ))}
             </select>
-          </div>
+          </label>
 
-          <div className="sm:col-span-2">
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Procedimento de interesse
-            </label>
+          <label className="sm:col-span-2">
+            <Label>Procedimento de interesse</Label>
             <select
               name="procedimentoInteresse"
               value={form.procedimentoInteresse}
-              onChange={(event) => alterarCampo("procedimentoInteresse", event.target.value)}
-              className="premium-input"
+              onChange={(event) =>
+                alterarCampo("procedimentoInteresse", event.target.value)
+              }
+              className="premium-input w-full"
             >
               {procedimentosDisponiveis.map((procedimento) => (
                 <option key={procedimento} value={procedimento}>
@@ -284,59 +347,52 @@ function NovoClienteForm({ cliente, onClose, onSalvar, origens, procedimentosInt
                 </option>
               ))}
             </select>
-            <p className="mt-2 text-xs text-slate-500">
-              As opções são editadas em Configurações &gt; Cadastros auxiliares.
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              As opções podem ser gerenciadas em Configurações &gt; Cadastros
+              auxiliares.
             </p>
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-white/[0.08] bg-white/[0.035] p-4">
-          <p className="text-sm font-semibold text-slate-200">Data de cadastro</p>
-          <p className="mt-1 text-sm text-slate-400">
-            Esse campo é preenchido automaticamente pelo sistema no momento em que o cliente é salvo.
-          </p>
-        </div>
-
-        <div>
-          <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Observações
           </label>
+        </div>
+
+        <label>
+          <Label>Observações</Label>
           <textarea
             name="observacoes"
             value={form.observacoes}
             onChange={(event) => alterarCampo("observacoes", event.target.value)}
-            placeholder="Observações comerciais, preferências, restrições iniciais ou informações importantes."
-            className="premium-input min-h-32"
+            placeholder="Preferências, restrições iniciais ou informações importantes."
+            className="premium-input min-h-28 w-full resize-y"
           />
-        </div>
+        </label>
       </div>
 
-      <div className="flex flex-col-reverse gap-3 border-t border-white/[0.08] bg-white/[0.025] px-4 py-4 sm:flex-row sm:justify-end sm:px-8 sm:py-5">
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-2xl border border-white/[0.10] bg-white/[0.04] px-5 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.08]"
-        >
+      <footer className="grid gap-2 border-t border-slate-200 bg-slate-50/80 px-4 py-4 dark:border-white/10 dark:bg-white/[0.025] sm:grid-cols-2 sm:px-6">
+        <Button type="button" variant="outline" onClick={onClose}>
           Cancelar
-        </button>
-        <button
-          type="submit"
-          className="rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-950/30 transition hover:from-violet-500 hover:to-fuchsia-500"
-        >
+        </Button>
+        <Button type="submit">
+          <Save size={16} />
           {cliente ? "Salvar alterações" : "Salvar cliente"}
-        </button>
-      </div>
+        </Button>
+      </footer>
     </form>
   );
 }
 
-export default function NovoClienteModal({ open, onClose, cliente, onSalvar, origens, procedimentosInteresse }: Props) {
+export default function NovoClienteModal({
+  open,
+  onClose,
+  cliente,
+  onSalvar,
+  origens,
+  procedimentosInteresse,
+}: Props) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/75 p-3 pt-4 backdrop-blur-md sm:items-center sm:p-4">
+    <div className="app-modal-backdrop fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-slate-950/55 p-3 backdrop-blur-sm sm:items-center sm:p-4">
       <NovoClienteForm
-        key={cliente?.id ?? "novo-cliente"}
+        key={cliente?.id ?? "nova-cliente"}
         cliente={cliente}
         onClose={onClose}
         onSalvar={onSalvar}

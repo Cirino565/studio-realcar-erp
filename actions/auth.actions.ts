@@ -89,17 +89,15 @@ export async function login(_state: LoginState, formData: FormData) {
   });
 
   const requestHeaders = await headers();
-const userAgent = requestHeaders.get("user-agent");
-const isMobile = isMobileUserAgent(userAgent);
+  const userAgent = requestHeaders.get("user-agent");
+  const isMobile = isMobileUserAgent(userAgent);
+  const isProfessional = user.cargo?.trim().toLowerCase() === "profissional";
 
-const isProfessional =
-  user.cargo?.toLowerCase() === "profissional";
+  if (isMobile && isProfessional) {
+    redirect("/agenda");
+  }
 
-if (isMobile && isProfessional) {
-  redirect("/agenda");
-}
-
-redirect(getDefaultPathForUser(user));
+  redirect(getDefaultPathForUser(user));
 }
 
 export async function logout() {

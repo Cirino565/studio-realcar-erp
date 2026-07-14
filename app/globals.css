@@ -1113,3 +1113,28 @@ body {
       box-shadow 180ms ease;
   }
 }
+
+/* Final modal and interaction polish */
+.app-shell .app-modal-backdrop {
+  background-color: rgba(15, 23, 42, 0.56) !important;
+}
+
+.theme-dark .app-shell .app-modal-backdrop {
+  background-color: rgba(2, 6, 23, 0.78) !important;
+}
+
+.app-shell :where(button, a, input, select, textarea):focus-visible {
+  outline: none;
+}
+
+.app-shell :where(a, button)[aria-disabled="true"] {
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+@media (max-width: 639px) {
+  .app-shell .app-modal-backdrop {
+    align-items: flex-start;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+}

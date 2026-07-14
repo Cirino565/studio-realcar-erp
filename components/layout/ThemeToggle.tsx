@@ -1,14 +1,17 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { Moon, Sun } from "lucide-react";
-import { useEffect, useState } from "react";
 
 type ThemeMode = "light" | "dark";
 
 const STORAGE_KEY = "studio-theme";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+const listeners = new Set<() => void>();
 
 function getStoredTheme(): ThemeMode | null {
+  if (typeof window === "undefined") return null;
+
   try {
     const savedTheme = window.localStorage.getItem(STORAGE_KEY);
 
@@ -23,9 +26,38 @@ function getStoredTheme(): ThemeMode | null {
 }
 
 function getDocumentTheme(): ThemeMode {
+  if (typeof document === "undefined") return "light";
+
   return document.documentElement.classList.contains("theme-dark")
     ? "dark"
     : "light";
+}
+
+function getSnapshot(): ThemeMode {
+  return getStoredTheme() ?? getDocumentTheme();
+}
+
+function getServerSnapshot(): ThemeMode {
+  return "light";
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === STORAGE_KEY) listener();
+  };
+
+  window.addEventListener("storage", handleStorage);
+
+  return () => {
+    listeners.delete(listener);
+    window.removeEventListener("storage", handleStorage);
+  };
+}
+
+function emitThemeChange() {
+  listeners.forEach((listener) => listener());
 }
 
 function applyTheme(theme: ThemeMode) {
@@ -51,29 +83,18 @@ function applyTheme(theme: ThemeMode) {
   if (themeColor) {
     themeColor.content = theme === "dark" ? "#0b1220" : "#f8fafc";
   }
+
+  emitThemeChange();
 }
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState<ThemeMode | null>(null);
-
-  useEffect(() => {
-    const initialTheme = getStoredTheme() ?? getDocumentTheme();
-
-    applyTheme(initialTheme);
-    setTheme(initialTheme);
-  }, []);
-
-  function toggleTheme() {
-    const currentTheme = theme ?? getStoredTheme() ?? getDocumentTheme();
-    const nextTheme: ThemeMode =
-      currentTheme === "light" ? "dark" : "light";
-
-    applyTheme(nextTheme);
-    setTheme(nextTheme);
-  }
-
+  const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const isDark = theme === "dark";
   const label = isDark ? "Ativar modo claro" : "Ativar modo escuro";
+
+  function toggleTheme() {
+    applyTheme(isDark ? "light" : "dark");
+  }
 
   return (
     <button

@@ -1,17 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Plus, UsersRound } from "lucide-react";
-
-import ClienteSearch from "@/components/clientes/ClienteSearch";
-import ClienteResumo from "@/components/clientes/ClientesResumo";
-import ClienteTable from "@/components/clientes/ClienteTable";
-import NovoClienteModal from "@/components/clientes/NovoClienteModal";
-import { Button } from "@/components/ui/button";
-
-import type { Cliente } from "@/lib/types";
+import { useRouter } from "next/navigation";
 import type { OrigemCliente, ProcedimentoInteresse } from "@prisma/client";
 
 import {
@@ -19,6 +10,13 @@ import {
   criarCliente,
   excluirCliente,
 } from "@/actions/cliente.actions";
+import ClienteSearch from "@/components/clientes/ClienteSearch";
+import ClienteResumo from "@/components/clientes/ClientesResumo";
+import ClienteTable from "@/components/clientes/ClienteTable";
+import NovoClienteModal from "@/components/clientes/NovoClienteModal";
+import { Button } from "@/components/ui/button";
+import type { Cliente } from "@/lib/types";
+
 import ClienteQuickMessageModal from "./ClienteQuickMessageModal";
 
 type ClienteAgendamentoResumo = {
@@ -103,7 +101,7 @@ export default function ClientesClient({
       const atendeStatus = status === "todos" || cliente.status === status;
 
       const agendamentosValidos = (cliente.agendamentos ?? []).filter(
-        (agendamento) => agendamento.status !== "Cancelado"
+        (agendamento) => agendamento.status !== "Cancelado",
       );
 
       const agendamentosDoProcedimento =
@@ -112,7 +110,7 @@ export default function ClientesClient({
           : agendamentosValidos.filter(
               (agendamento) =>
                 agendamento.procedimento.toLowerCase() ===
-                procedimentoFiltro.toLowerCase()
+                procedimentoFiltro.toLowerCase(),
             );
 
       const atendeProcedimento =
@@ -140,17 +138,17 @@ export default function ClientesClient({
           .filter((agendamento) => new Date(agendamento.data) <= hoje)
           .sort(
             (a, b) =>
-              new Date(b.data).getTime() - new Date(a.data).getTime()
+              new Date(b.data).getTime() - new Date(a.data).getTime(),
           )[0];
 
         const possuiRetornoFuturo = historicoBase.some(
-          (agendamento) => new Date(agendamento.data) > hoje
+          (agendamento) => new Date(agendamento.data) > hoje,
         );
 
         atendeRetorno = Boolean(
           ultimoAtendimento &&
             new Date(ultimoAtendimento.data) <= limite &&
-            !possuiRetornoFuturo
+            !possuiRetornoFuturo,
         );
       }
 
@@ -159,9 +157,7 @@ export default function ClientesClient({
 
     return [...filtrados].sort((a, b) => {
       if (ordenacao === "recentes") {
-        return (
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       }
 
       if (ordenacao === "maior-valor") {
@@ -194,7 +190,7 @@ export default function ClientesClient({
     setMensagemAberta(true);
   }
 
-  async function salvarCliente(dados: ClienteFormData) {
+  function salvarCliente(dados: ClienteFormData) {
     startTransition(async () => {
       if (clienteSelecionado) {
         await atualizarCliente({
@@ -205,14 +201,14 @@ export default function ClientesClient({
         await criarCliente(dados);
       }
 
-      router.refresh();
       setModalAberto(false);
       setClienteSelecionado(null);
+      router.refresh();
     });
   }
 
   function removerCliente(id: number) {
-    if (!confirm("Deseja realmente excluir este cliente?")) return;
+    if (!window.confirm("Deseja realmente excluir esta cliente?")) return;
 
     startTransition(async () => {
       await excluirCliente(id);
@@ -223,28 +219,29 @@ export default function ClientesClient({
   return (
     <>
       <div className="app-mobile-safe space-y-5 sm:space-y-6">
-        <section className="premium-card relative overflow-hidden p-5 sm:p-8">
-          <div className="absolute right-0 top-0 size-64 rounded-full bg-violet-500/15 blur-3xl" />
-          <div className="absolute bottom-0 left-1/4 size-48 rounded-full bg-cyan-500/10 blur-3xl" />
+        <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.06] sm:p-7">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,0.14),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(13,148,136,0.09),transparent_34%)]" />
 
-          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/[0.10] bg-white/[0.05] px-3 py-1 text-xs font-medium text-slate-300">
+          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0">
+              <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 dark:border-violet-400/20 dark:bg-violet-500/15 dark:text-violet-200">
                 <UsersRound size={14} />
                 CRM de relacionamento
               </div>
 
-              <h1 className="premium-title">Clientes</h1>
-              <p className="premium-subtitle">
-                Centralize cadastro, contato, histórico básico e ações rápidas de WhatsApp.
+              <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+                Clientes
+              </h1>
+
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400">
+                Cadastros, histórico, oportunidades de retorno e mensagens de
+                WhatsApp organizados em uma única central.
               </p>
             </div>
 
-            <Button size="lg" asChild>
-              <Link href="/clientes/novo">
-                <Plus size={18} />
-                Novo cliente
-              </Link>
+            <Button size="lg" type="button" onClick={novoCliente}>
+              <Plus size={18} />
+              Nova cliente
             </Button>
           </div>
         </section>
@@ -294,11 +291,11 @@ export default function ClientesClient({
         }}
       />
 
-      {isPending && (
-        <div className="fixed bottom-5 right-5 z-50 rounded-2xl border border-violet-400/20 bg-violet-600 px-4 py-3 text-sm font-semibold text-white">
-          Salvando...
+      {isPending ? (
+        <div className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-[110] inline-flex items-center rounded-2xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-xl shadow-violet-600/25 lg:bottom-5 lg:right-5">
+          Salvando alterações...
         </div>
-      )}
+      ) : null}
     </>
   );
 }

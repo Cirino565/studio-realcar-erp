@@ -472,7 +472,7 @@ function AutomacaoModal({ isPending, onClose, onSave }: { isPending: boolean; on
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/80 p-3 backdrop-blur-sm sm:items-center sm:p-6">
+    <div className="app-modal-backdrop fixed inset-0 z-50 flex items-end justify-center bg-slate-950/80 p-3 backdrop-blur-sm sm:items-center sm:p-6">
       <form onSubmit={submit} className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-[2rem] border border-white/[0.10] bg-slate-900 p-5 shadow-2xl shadow-black/40 sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
