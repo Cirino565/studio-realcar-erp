@@ -168,7 +168,10 @@ export default async function ClientePage({ params }: ClientePageProps) {
 
   return (
   <div className="app-mobile-safe space-y-5 sm:space-y-6">
-    <ClienteProfileHeader data={data} />
+    <ClienteProfileHeader
+      data={data}
+      cliente={cliente}
+    />
 
     <ClienteClinicoTabs data={data} />
   </div>
