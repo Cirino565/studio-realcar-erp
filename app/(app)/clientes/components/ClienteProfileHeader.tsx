@@ -2,12 +2,9 @@
 
 import ClienteProfileActions from "./ClienteProfileActions";
 import type { Cliente } from "@/lib/types";
-import Link from "next/link";
 import {
-  CalendarPlus,
   Camera,
   FileText,
-  MessageCircle,
   Sparkles,
   Stethoscope,
 } from "lucide-react";
@@ -41,12 +38,8 @@ export default function ClienteProfileHeader({
   );
 
   const ultimoProcedimento = data.procedimentos[0];
-
   const ultimaEvolucao = data.evolucoes[0];
-
   const totalFotos = data.fotos.length;
-
-  const telefone = "";
 
   return (
     <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
@@ -76,22 +69,6 @@ export default function ClienteProfileHeader({
           </div>
 
           <ClienteProfileActions cliente={cliente} />
-            <Link
-  href={`/agenda?clienteId=${data.id}`}
-  className="inline-flex h-10 items-center gap-2 rounded-xl bg-teal-700 px-4 text-sm font-semibold text-white transition hover:bg-teal-800"           >
-              <CalendarPlus className="size-4" />
-              Agendar
-            </Link>
-
-            <button
-              type="button"
-              disabled={!telefone}
-              className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <MessageCircle className="size-4" />
-              WhatsApp
-            </button>
-          </div>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -123,7 +100,7 @@ export default function ClienteProfileHeader({
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-center gap-2 text-slate-500">
-              <CalendarPlus className="size-4" />
+              <Stethoscope className="size-4" />
               <span className="text-xs font-semibold uppercase tracking-wide">
                 Último procedimento
               </span>
