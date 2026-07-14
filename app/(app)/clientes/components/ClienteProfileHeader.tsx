@@ -1,5 +1,7 @@
 "use client";
 
+import ClienteProfileActions from "./ClienteProfileActions";
+import type { Cliente } from "@/lib/types";
 import Link from "next/link";
 import {
   CalendarPlus,
@@ -15,6 +17,7 @@ import { formatarData, formatarMoeda } from "@/lib/format";
 
 type Props = {
   data: ClienteClinicoData;
+  cliente: Cliente;
 };
 
 function getInitials(nome: string) {
@@ -26,7 +29,10 @@ function getInitials(nome: string) {
     .join("");
 }
 
-export default function ClienteProfileHeader({ data }: Props) {
+export default function ClienteProfileHeader({
+  data,
+  cliente,
+}: Props) {
   const totalProcedimentos = data.procedimentos.length;
 
   const valorInvestido = data.procedimentos.reduce(
@@ -69,7 +75,7 @@ export default function ClienteProfileHeader({ data }: Props) {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <ClienteProfileActions cliente={cliente} />
             <Link
   href={`/agenda?clienteId=${data.id}`}
   className="inline-flex h-10 items-center gap-2 rounded-xl bg-teal-700 px-4 text-sm font-semibold text-white transition hover:bg-teal-800"           >
