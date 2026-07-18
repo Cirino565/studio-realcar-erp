@@ -163,11 +163,11 @@ function telefoneCliente(cliente: Cliente) {
 }
 
 function inputClassName() {
-  return "h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:bg-white focus:ring-4 focus:ring-purple-100";
+  return "h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:bg-white focus:ring-4 focus:ring-purple-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-purple-400 dark:focus:bg-slate-900 dark:focus:ring-purple-900/40";
 }
 
 function labelClassName() {
-  return "text-[0.68rem] font-bold uppercase tracking-[0.16em] text-slate-400";
+  return "text-[0.68rem] font-bold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-400";
 }
 
 function isDarkThemeActive() {
@@ -239,7 +239,6 @@ export default function NovoAgendamentoModal({
     if (!open) return;
 
     const atualizarTema = () => setTemaEscuro(isDarkThemeActive());
-
     atualizarTema();
 
     const observer = new MutationObserver(atualizarTema);
@@ -351,9 +350,7 @@ export default function NovoAgendamentoModal({
       onlyDigits(buscaCliente).length >= 2);
 
   const horariosDisponiveis = horarios.filter((item) => item.disponivel);
-  const horariosOcupados = horarios
-    .filter((item) => !item.disponivel)
-    .slice(0, 5);
+  const horariosOcupados = horarios.filter((item) => !item.disponivel).slice(0, 5);
 
   const cardInfoStyle = temaEscuro
     ? {
@@ -370,9 +367,6 @@ export default function NovoAgendamentoModal({
   const cardInfoSecondaryStyle = temaEscuro
     ? { color: "#cbd5e1" }
     : { color: "#64748b" };
-
-  const inputBloqueadoClassName =
-    "h-12 w-full cursor-not-allowed rounded-2xl border border-purple-200 bg-purple-50 px-4 text-sm font-bold text-slate-900 outline-none";
 
   function selecionarServico(value: string) {
     setServicoSelecionadoId(value);
@@ -467,23 +461,23 @@ export default function NovoAgendamentoModal({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-[9999] h-[100dvh] w-screen max-w-[100vw] overflow-y-auto bg-slate-100 text-slate-900"
+      className="fixed inset-0 z-[9999] h-[100dvh] w-screen max-w-[100vw] overflow-y-auto bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-white"
       style={{ touchAction: "pan-y" }}
     >
       <div className="mx-auto flex min-h-[100dvh] w-full max-w-5xl flex-col">
-        <div className="bg-white px-4 pb-3 pt-4 shadow-sm sm:rounded-b-[2rem] sm:px-6 sm:pb-5 sm:pt-5">
+        <div className="bg-white px-4 pb-3 pt-4 shadow-sm dark:bg-slate-900 sm:rounded-b-[2rem] sm:px-6 sm:pb-5 sm:pt-5">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-start gap-3">
-              <div className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-purple-100 text-purple-700 sm:flex">
+              <div className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300 sm:flex">
                 <CalendarPlus size={20} />
               </div>
 
               <div className="min-w-0">
-                <h2 className="truncate text-xl font-bold tracking-tight text-slate-950 sm:text-2xl">
+                <h2 className="truncate text-xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-2xl">
                   {modoRetorno ? "Agendar retorno" : "Criar agendamento"}
                 </h2>
 
-                <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500">
+                <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-300">
                   {modoRetorno
                     ? "Cliente já selecionada. Escolha data, horário e procedimento."
                     : agendamentoDiretoAgenda
@@ -496,7 +490,7 @@ export default function NovoAgendamentoModal({
             <button
               type="button"
               onClick={onClose}
-              className="shrink-0 rounded-2xl border border-slate-200 bg-slate-50 p-2 text-slate-500 shadow-sm hover:bg-slate-100 hover:text-slate-900"
+              className="shrink-0 rounded-2xl border border-slate-200 bg-slate-50 p-2 text-slate-500 shadow-sm hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
               aria-label="Fechar modal"
             >
               <X size={18} />
@@ -504,7 +498,7 @@ export default function NovoAgendamentoModal({
           </div>
 
           {erro ? (
-            <div className="mt-3 flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs leading-5 text-rose-700">
+            <div className="mt-3 flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs leading-5 text-rose-700 dark:border-rose-500/40 dark:bg-rose-950/40 dark:text-rose-200">
               <AlertCircle className="mt-0.5 shrink-0" size={15} />
               <span>{erro}</span>
             </div>
@@ -512,7 +506,7 @@ export default function NovoAgendamentoModal({
         </div>
 
         <div className="flex-1 space-y-4 px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-6">
-          <section className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-slate-200/70 sm:p-5">
+          <section className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-700 sm:p-5">
             {clienteBloqueado && clienteSelecionado ? (
               <div className="rounded-2xl border p-4" style={cardInfoStyle}>
                 <div className="flex items-start justify-between gap-3">
@@ -526,10 +520,7 @@ export default function NovoAgendamentoModal({
                       {clienteSelecionado.nome}
                     </p>
 
-                    <p
-                      className="mt-1 truncate text-xs"
-                      style={cardInfoSecondaryStyle}
-                    >
+                    <p className="mt-1 truncate text-xs" style={cardInfoSecondaryStyle}>
                       {telefoneCliente(clienteSelecionado)}
                     </p>
                   </div>
@@ -552,8 +543,8 @@ export default function NovoAgendamentoModal({
                     }}
                     className={`flex min-w-0 items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-center text-xs font-bold transition sm:justify-start sm:text-sm ${
                       tipoCliente === "existente"
-                        ? "border-purple-300 bg-purple-50 text-purple-800"
-                        : "border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100"
+                        ? "border-purple-300 bg-purple-50 text-purple-800 dark:border-purple-500/50 dark:bg-purple-950/40 dark:text-purple-200"
+                        : "border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                     }`}
                   >
                     <UsersRound size={16} className="shrink-0" />
@@ -568,8 +559,8 @@ export default function NovoAgendamentoModal({
                     }}
                     className={`flex min-w-0 items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-center text-xs font-bold transition sm:justify-start sm:text-sm ${
                       tipoCliente === "novo"
-                        ? "border-purple-300 bg-purple-50 text-purple-800"
-                        : "border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100"
+                        ? "border-purple-300 bg-purple-50 text-purple-800 dark:border-purple-500/50 dark:bg-purple-950/40 dark:text-purple-200"
+                        : "border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                     }`}
                   >
                     <UserPlus size={16} className="shrink-0" />
@@ -627,7 +618,7 @@ export default function NovoAgendamentoModal({
                               setClienteId("");
                               setBuscaCliente("");
                             }}
-                            className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600"
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
                           >
                             Trocar
                           </button>
@@ -636,7 +627,7 @@ export default function NovoAgendamentoModal({
                     ) : null}
 
                     {!deveMostrarResultados ? (
-                      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-xs leading-5 text-slate-500">
+                      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-xs leading-5 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                         A lista completa não aparece automaticamente. Pesquise pelo nome ou WhatsApp.
                       </div>
                     ) : null}
@@ -657,22 +648,22 @@ export default function NovoAgendamentoModal({
                                 }}
                                 className={`w-full rounded-2xl border p-3 text-left transition ${
                                   active
-                                    ? "border-purple-300 bg-purple-50"
-                                    : "border-slate-200 bg-slate-50 hover:bg-slate-100"
+                                    ? "border-purple-400 bg-purple-950/70 shadow-lg shadow-purple-950/20"
+                                    : "border-slate-700 bg-slate-900/70 hover:border-slate-600 hover:bg-slate-800"
                                 }`}
                               >
-                                <p className="truncate text-sm font-bold text-slate-950">
+                                <p className="truncate text-sm font-bold text-white">
                                   {cliente.nome}
                                 </p>
 
-                                <p className="mt-1 truncate text-xs text-slate-500">
+                                <p className="mt-1 truncate text-xs text-slate-300">
                                   {telefoneCliente(cliente)}
                                 </p>
                               </button>
                             );
                           })
                         ) : (
-                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center text-xs leading-5 text-slate-500">
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center text-xs leading-5 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                             Nenhuma cliente encontrada para essa busca.
                           </div>
                         )}
@@ -733,7 +724,7 @@ export default function NovoAgendamentoModal({
             )}
           </section>
 
-          <section className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-slate-200/70 sm:p-5">
+          <section className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-700 sm:p-5">
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block space-y-2 sm:col-span-2">
                 <span className={labelClassName()}>Profissional</span>
@@ -747,7 +738,7 @@ export default function NovoAgendamentoModal({
                   }}
                   className={
                     agendamentoDiretoAgenda
-                      ? inputBloqueadoClassName
+                      ? "h-12 w-full cursor-not-allowed rounded-2xl border border-purple-200 bg-purple-50 px-4 text-sm font-bold text-slate-900 outline-none"
                       : inputClassName()
                   }
                 >
@@ -775,7 +766,7 @@ export default function NovoAgendamentoModal({
                   }}
                   className={
                     agendamentoDiretoAgenda
-                      ? inputBloqueadoClassName
+                      ? "h-12 w-full cursor-not-allowed rounded-2xl border border-purple-200 bg-purple-50 px-4 text-sm font-bold text-slate-900 outline-none"
                       : inputClassName()
                   }
                 />
@@ -788,7 +779,7 @@ export default function NovoAgendamentoModal({
                   <input
                     value={hora}
                     readOnly
-                    className={inputBloqueadoClassName}
+                    className="h-12 w-full cursor-not-allowed rounded-2xl border border-purple-200 bg-purple-50 px-4 text-sm font-bold text-slate-900 outline-none"
                   />
                 ) : (
                   <select
@@ -833,7 +824,7 @@ export default function NovoAgendamentoModal({
                       className={`h-11 rounded-2xl border px-2 text-center text-sm font-bold transition ${
                         hora === item.hora
                           ? "border-purple-400 bg-purple-700 text-white shadow-lg shadow-purple-900/20"
-                          : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-purple-50"
+                          : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-purple-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                       }`}
                     >
                       {item.hora}
@@ -841,15 +832,15 @@ export default function NovoAgendamentoModal({
                   ))}
 
                   {!isLoadingHorarios && horariosDisponiveis.length === 0 ? (
-                    <div className="col-span-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-500 sm:col-span-4">
+                    <div className="col-span-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 sm:col-span-4">
                       Selecione profissional e data para ver horários livres.
                     </div>
                   ) : null}
                 </div>
 
                 {horariosOcupados.length > 0 ? (
-                  <details className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                    <summary className="cursor-pointer text-xs font-bold text-slate-500">
+                  <details className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
+                    <summary className="cursor-pointer text-xs font-bold text-slate-500 dark:text-slate-300">
                       Ver horários ocupados
                     </summary>
 
@@ -857,7 +848,7 @@ export default function NovoAgendamentoModal({
                       {horariosOcupados.map((item) => (
                         <div
                           key={item.hora}
-                          className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-xs text-slate-500"
+                          className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-xs text-slate-500 dark:bg-slate-900 dark:text-slate-300"
                         >
                           <span className="inline-flex items-center gap-1.5">
                             <Clock3 size={12} />
@@ -874,7 +865,7 @@ export default function NovoAgendamentoModal({
             ) : null}
           </section>
 
-          <section className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-slate-200/70 sm:p-5">
+          <section className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-700 sm:p-5">
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block space-y-2 sm:col-span-2">
                 <span className={labelClassName()}>Procedimento / serviço</span>
@@ -975,7 +966,7 @@ export default function NovoAgendamentoModal({
                   value={observacoes}
                   onChange={(event) => setObservacoes(event.target.value)}
                   placeholder="Preferências, restrições, sinal, comanda ou observações do atendimento."
-                  className="min-h-24 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:bg-white focus:ring-4 focus:ring-purple-100"
+                  className="min-h-24 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:bg-white focus:ring-4 focus:ring-purple-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-purple-400 dark:focus:bg-slate-900 dark:focus:ring-purple-900/40"
                 />
               </label>
             </div>
@@ -999,7 +990,7 @@ export default function NovoAgendamentoModal({
               type="button"
               onClick={onClose}
               disabled={salvando}
-              className="h-12 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 sm:order-1"
+              className="h-12 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:order-1"
             >
               Cancelar
             </button>
