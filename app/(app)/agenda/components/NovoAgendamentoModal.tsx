@@ -163,7 +163,7 @@ function inputClassName() {
 }
 
 function labelClassName() {
-  return "text-[0.68rem] font-bold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-400";
+  return "text-[0.66rem] font-bold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-400";
 }
 
 function isDarkThemeActive() {
@@ -477,10 +477,10 @@ export default function NovoAgendamentoModal({
           ) : null}
         </div>
 
-        <div className="flex-1 space-y-4 px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-6">
-          <section className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-700 sm:p-5">
+        <div className="flex-1 space-y-3 px-4 py-3 pb-[calc(0.85rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-6">
+          <section className="rounded-[1.35rem] bg-white p-3 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-700 sm:p-5">
             {clienteBloqueado && clienteSelecionado ? (
-              <div className="rounded-2xl border p-4" style={cardInfoStyle}>
+              <div className="rounded-2xl border p-3" style={cardInfoStyle}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className={labelClassName()}>Cliente selecionada</p>
@@ -507,7 +507,7 @@ export default function NovoAgendamentoModal({
                       setTipoCliente("existente");
                       setErro("");
                     }}
-                    className={`flex min-w-0 items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-center text-xs font-bold transition sm:justify-start sm:text-sm ${
+                    className={`flex min-w-0 items-center justify-center gap-2 rounded-2xl border px-3 py-2.5 text-center text-xs font-bold transition sm:justify-start sm:text-sm ${
                       tipoCliente === "existente"
                         ? "border-purple-300 bg-purple-50 text-purple-800 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                         : "border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
@@ -523,7 +523,7 @@ export default function NovoAgendamentoModal({
                       setTipoCliente("novo");
                       setErro("");
                     }}
-                    className={`flex min-w-0 items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-center text-xs font-bold transition sm:justify-start sm:text-sm ${
+                    className={`flex min-w-0 items-center justify-center gap-2 rounded-2xl border px-3 py-2.5 text-center text-xs font-bold transition sm:justify-start sm:text-sm ${
                       tipoCliente === "novo"
                         ? "border-purple-300 bg-purple-50 text-purple-800 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                         : "border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
@@ -535,7 +535,7 @@ export default function NovoAgendamentoModal({
                 </div>
 
                 {tipoCliente === "existente" ? (
-                  <div className="mt-4 space-y-3">
+                  <div className="mt-3 space-y-3">
                     <label className="block space-y-2">
                       <span className={labelClassName()}>Buscar cliente</span>
                       <div className="relative min-w-0">
@@ -596,7 +596,7 @@ export default function NovoAgendamentoModal({
                                   setClienteId(String(cliente.id));
                                   setErro("");
                                 }}
-                                className={`w-full rounded-2xl border px-3 py-3 text-left transition ${
+                                className={`w-full rounded-2xl border px-3 py-2.5 text-left transition ${
                                   active
                                     ? "border-purple-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-900"
                                     : "border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
@@ -624,7 +624,7 @@ export default function NovoAgendamentoModal({
                     )}
                   </div>
                 ) : (
-                  <div className="mt-4 grid gap-3">
+                  <div className="mt-3 grid gap-3">
                     <label className="block space-y-2">
                       <span className={labelClassName()}>Nome do cliente</span>
                       <input
@@ -669,7 +669,7 @@ export default function NovoAgendamentoModal({
             )}
           </section>
 
-          <section className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-700 sm:p-5">
+          <section className="rounded-[1.35rem] bg-white p-3 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-700 sm:p-5">
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block space-y-2 sm:col-span-2">
                 <span className={labelClassName()}>Profissional</span>
@@ -743,7 +743,7 @@ export default function NovoAgendamentoModal({
             </div>
 
             {!agendamentoDiretoAgenda ? (
-              <div className="mt-4">
+              <div className="mt-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <span className={labelClassName()}>Horários disponíveis</span>
                   {isLoadingHorarios ? <span className="text-xs text-slate-400">Carregando...</span> : null}
@@ -801,7 +801,7 @@ export default function NovoAgendamentoModal({
             ) : null}
           </section>
 
-          <section className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-700 sm:p-5">
+          <section className="rounded-[1.35rem] bg-white p-3 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-700 sm:p-5">
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block space-y-2 sm:col-span-2">
                 <span className={labelClassName()}>Procedimento / serviço</span>
@@ -892,7 +892,7 @@ export default function NovoAgendamentoModal({
                   value={observacoes}
                   onChange={(event) => setObservacoes(event.target.value)}
                   placeholder="Preferências, restrições, sinal, comanda ou observações do atendimento."
-                  className="min-h-24 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:bg-white focus:ring-4 focus:ring-purple-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-purple-400 dark:focus:bg-slate-900 dark:focus:ring-purple-900/40"
+                  className="min-h-20 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:bg-white focus:ring-4 focus:ring-purple-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-purple-400 dark:focus:bg-slate-900 dark:focus:ring-purple-900/40"
                 />
               </label>
             </div>
