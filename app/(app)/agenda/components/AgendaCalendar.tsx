@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Check,
   ChevronDown,
@@ -90,7 +91,6 @@ function formatDateInput(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
-
   return `${year}-${month}-${day}`;
 }
 
@@ -178,10 +178,8 @@ function appointmentEnd(appointment: AgendamentoAgenda) {
 
 function agendaHref(date: Date, profissionalFiltro: string) {
   const data = formatDateInput(date);
-
   const profissional =
     profissionalFiltro !== "todas" ? `&profissional=${profissionalFiltro}` : "";
-
   return `/agenda?data=${data}${profissional}`;
 }
 
@@ -240,11 +238,15 @@ export default function AgendaCalendar({
   onSelectAppointment,
   onMessage,
 }: Props) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const today = new Date();
   const stripDays = getDateStripDays(selectedDate);
   const selectedDateInput = formatDateInput(selectedDate);
 
-  const activeDayRef = useRef<HTMLAnchorElement | null>(null);
+  const activeDayRef = useRef<HTMLButtonElement | null>(null);
 
   const [hiddenProfessionalIds, setHiddenProfessionalIds] = useState<number[]>([]);
   const [showVisibilityPanel, setShowVisibilityPanel] = useState(false);
@@ -294,7 +296,16 @@ export default function AgendaCalendar({
 
   function goToDate(date: Date) {
     onDateChange(date);
-    window.location.href = agendaHref(date, profissionalFiltro);
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("data", formatDateInput(date));
+    if (profissionalFiltro !== "todas") {
+      params.set("profissional", profissionalFiltro);
+    } else {
+      params.delete("profissional");
+    }
+
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }
 
   function handleDateInputChange(value: string) {
@@ -342,6 +353,16 @@ export default function AgendaCalendar({
   function selecionarFiltroProfissional(value: string) {
     setHiddenProfessionalIds([]);
     onProfissionalFiltroChange(value);
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("data", selectedDateInput);
+    if (value !== "todas") {
+      params.set("profissional", value);
+    } else {
+      params.delete("profissional");
+    }
+
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     setShowVisibilityPanel(false);
   }
 
@@ -358,10 +379,11 @@ export default function AgendaCalendar({
             const isToday = isSameDay(day, today);
 
             return (
-              <a
+              <button
                 key={day.toISOString()}
                 ref={active ? activeDayRef : null}
-                href={agendaHref(day, profissionalFiltro)}
+                type="button"
+                onClick={() => goToDate(day)}
                 className="min-w-[48px] shrink-0 rounded-xl px-1 py-1 text-center transition"
               >
                 <span className="block truncate text-[0.68rem] font-medium text-slate-500 dark:text-slate-400 sm:text-xs">
@@ -379,7 +401,7 @@ export default function AgendaCalendar({
                 >
                   {String(day.getDate()).padStart(2, "0")}
                 </span>
-              </a>
+              </button>
             );
           })}
         </div>
@@ -616,7 +638,9 @@ export default function AgendaCalendar({
                             <p className="flex items-center gap-1 text-[0.64rem] font-bold leading-tight text-white sm:text-xs">
                               <Clock3 size={11} className="shrink-0" />
                               {formatTime(appointment.data)} -{" "}
-                              {formatTime(addMinutes(new Date(appointment.data), appointment.duracao))}
+                              {formatTime(
+                                addMinutes(new Date(appointment.data), appointment.duracao),
+                              )}
                             </p>
 
                             <p className="mt-1 line-clamp-2 text-[0.72rem] font-semibold uppercase leading-tight text-white sm:text-sm">
