@@ -179,8 +179,27 @@ async function resolverCliente(dados: NovoAgendamento) {
 function addMinutes(date: Date, minutes: number) {
   const next = new Date(date);
   next.setMinutes(next.getMinutes() + minutes);
-
   return next;
+}
+
+function parseLocalDateTime(value: string) {
+  const [datePart, timePart] = value.split("T");
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hour = 0, minute = 0] = timePart
+    .replace(/Z$/i, "")
+    .slice(0, 5)
+    .split(":")
+    .map(Number);
+
+  return new Date(year, month - 1, day, hour, minute, 0, 0);
+}
+
+function formatHourMinute(value: Date) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "America/Sao_Paulo",
+  }).format(value);
 }
 
 async function validarConflitoAgenda({
@@ -236,21 +255,13 @@ async function validarConflitoAgenda({
   const conflito = agendamentosDoDia.find((agendamento) => {
     const inicioExistente = new Date(agendamento.data);
     const fimExistente = addMinutes(inicioExistente, agendamento.duracao);
-
     return inicioExistente < fimNovo && fimExistente > inicioNovo;
   });
 
   if (!conflito) return;
 
-  const inicio = new Intl.DateTimeFormat("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(conflito.data);
-
-  const fim = new Intl.DateTimeFormat("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(addMinutes(conflito.data, conflito.duracao));
+  const inicio = formatHourMinute(conflito.data);
+  const fim = formatHourMinute(addMinutes(conflito.data, conflito.duracao));
 
   throw new Error(
     `Este horário conflita com ${conflito.cliente.nome}, agendado das ${inicio} às ${fim}. Escolha outro horário ou ajuste a duração.`,
@@ -260,7 +271,7 @@ async function validarConflitoAgenda({
 export async function criarAgendamento(dados: NovoAgendamento) {
   await requirePermission("agenda.gerenciar");
 
-  const data = new Date(dados.data);
+  const data = parseLocalDateTime(dados.data);
   const duracao = dados.duracao || 60;
 
   await validarConflitoAgenda({
@@ -294,7 +305,7 @@ export async function atualizarAgendamento({
 }: NovoAgendamento & { id: number }) {
   await requirePermission("agenda.gerenciar");
 
-  const data = new Date(dados.data);
+  const data = parseLocalDateTime(dados.data);
   const duracao = dados.duracao || 60;
 
   await validarConflitoAgenda({
