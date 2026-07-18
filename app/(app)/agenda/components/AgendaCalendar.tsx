@@ -159,11 +159,11 @@ function isSameDay(first: Date, second: Date) {
 }
 
 function getLocalTimeParts(value: Date | string) {
-  const raw = typeof value === "string" ? value : value.toISOString();
-  const timePart = raw.includes("T") ? raw.split("T")[1] : "00:00:00";
-  const cleaned = timePart.replace(/Z$/i, "").slice(0, 5);
-  const [hour = "0", minute = "0"] = cleaned.split(":");
-  return { hour: Number(hour), minute: Number(minute) };
+  const date = new Date(value);
+  return {
+    hour: date.getHours(),
+    minute: date.getMinutes(),
+  };
 }
 
 function minutesFromStart(value: Date | string) {
