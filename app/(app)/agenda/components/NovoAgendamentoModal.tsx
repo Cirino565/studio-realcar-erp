@@ -142,10 +142,7 @@ function parseCurrency(value: string) {
 }
 
 function valorParaInput(value?: number) {
-  if (!value || value <= 0) {
-    return "";
-  }
-
+  if (!value || value <= 0) return "";
   return String(value).replace(".", ",");
 }
 
@@ -154,7 +151,6 @@ function getHojeInput() {
   const year = hoje.getFullYear();
   const month = String(hoje.getMonth() + 1).padStart(2, "0");
   const day = String(hoje.getDate()).padStart(2, "0");
-
   return `${year}-${month}-${day}`;
 }
 
@@ -163,7 +159,7 @@ function telefoneCliente(cliente: Cliente) {
 }
 
 function inputClassName() {
-  return "h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:bg-white focus:ring-4 focus:ring-purple-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-purple-400 dark:focus:bg-slate-900 dark:focus:ring-purple-900/40";
+  return "h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:bg-white focus:ring-4 focus:ring-purple-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-purple-400 dark:focus:bg-slate-900 dark:focus:ring-purple-900/40";
 }
 
 function labelClassName() {
@@ -195,9 +191,7 @@ export default function NovoAgendamentoModal({
   servicos,
   initialPayload,
 }: Props) {
-  const [tipoCliente, setTipoCliente] = useState<"existente" | "novo">(
-    "existente",
-  );
+  const [tipoCliente, setTipoCliente] = useState<"existente" | "novo">("existente");
   const [clienteId, setClienteId] = useState("");
   const [clienteBloqueado, setClienteBloqueado] = useState(false);
   const [buscaCliente, setBuscaCliente] = useState("");
@@ -222,18 +216,8 @@ export default function NovoAgendamentoModal({
   useLockBodyScroll(open);
 
   const agendamentoDiretoAgenda = Boolean(
-    initialPayload?.profissionalId &&
-      initialPayload?.data &&
-      initialPayload?.hora,
+    initialPayload?.profissionalId && initialPayload?.data && initialPayload?.hora,
   );
-
-  const profissionalSelecionado = useMemo(() => {
-    if (!profissionalId) return null;
-
-    return profissionais.find(
-      (profissional) => String(profissional.id) === String(profissionalId),
-    );
-  }, [profissionalId, profissionais]);
 
   useEffect(() => {
     if (!open) return;
@@ -257,9 +241,7 @@ export default function NovoAgendamentoModal({
   }, [open]);
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
+    if (!open) return;
 
     const temClientePreSelecionado = Boolean(initialPayload?.clienteId);
 
@@ -319,7 +301,6 @@ export default function NovoAgendamentoModal({
 
   const clienteSelecionado = useMemo(() => {
     if (!clienteId) return null;
-
     return clientes.find((cliente) => String(cliente.id) === String(clienteId));
   }, [clienteId, clientes]);
 
@@ -346,16 +327,15 @@ export default function NovoAgendamentoModal({
   const deveMostrarBusca = tipoCliente === "existente" && !clienteBloqueado;
   const deveMostrarResultados =
     deveMostrarBusca &&
-    (normalizarTexto(buscaCliente).length >= 2 ||
-      onlyDigits(buscaCliente).length >= 2);
+    (normalizarTexto(buscaCliente).length >= 2 || onlyDigits(buscaCliente).length >= 2);
 
   const horariosDisponiveis = horarios.filter((item) => item.disponivel);
   const horariosOcupados = horarios.filter((item) => !item.disponivel).slice(0, 5);
 
   const cardInfoStyle = temaEscuro
     ? {
-        backgroundColor: "#1e1530",
-        borderColor: "#8b5cf6",
+        backgroundColor: "#171827",
+        borderColor: "#334155",
         color: "#ffffff",
       }
     : {
@@ -364,9 +344,7 @@ export default function NovoAgendamentoModal({
         color: "#0f172a",
       };
 
-  const cardInfoSecondaryStyle = temaEscuro
-    ? { color: "#cbd5e1" }
-    : { color: "#64748b" };
+  const cardInfoSecondaryStyle = temaEscuro ? { color: "#cbd5e1" } : { color: "#64748b" };
 
   function selecionarServico(value: string) {
     setServicoSelecionadoId(value);
@@ -386,11 +364,7 @@ export default function NovoAgendamentoModal({
 
     setProcedimento(servico.nome);
     setDuracao(String(servico.duracaoPadrao));
-    setValor(
-      servico.valorPadrao > 0
-        ? String(servico.valorPadrao).replace(".", ",")
-        : "",
-    );
+    setValor(servico.valorPadrao > 0 ? String(servico.valorPadrao).replace(".", ",") : "");
   }
 
   if (!open) return null;
@@ -450,9 +424,7 @@ export default function NovoAgendamentoModal({
     } catch (error) {
       setSalvando(false);
       setErro(
-        error instanceof Error
-          ? error.message
-          : "Não foi possível salvar o agendamento.",
+        error instanceof Error ? error.message : "Não foi possível salvar o agendamento.",
       );
     }
   }
@@ -512,19 +484,13 @@ export default function NovoAgendamentoModal({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className={labelClassName()}>Cliente selecionada</p>
-
-                    <p
-                      className="mt-1 truncate text-base font-bold"
-                      style={{ color: cardInfoStyle.color }}
-                    >
+                    <p className="mt-1 truncate text-base font-bold" style={{ color: cardInfoStyle.color }}>
                       {clienteSelecionado.nome}
                     </p>
-
                     <p className="mt-1 truncate text-xs" style={cardInfoSecondaryStyle}>
                       {telefoneCliente(clienteSelecionado)}
                     </p>
                   </div>
-
                   <CheckCircle2
                     className="shrink-0"
                     style={{ color: temaEscuro ? "#c4b5fd" : "#6d28d9" }}
@@ -543,7 +509,7 @@ export default function NovoAgendamentoModal({
                     }}
                     className={`flex min-w-0 items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-center text-xs font-bold transition sm:justify-start sm:text-sm ${
                       tipoCliente === "existente"
-                        ? "border-purple-300 bg-purple-50 text-purple-800 dark:border-purple-500/50 dark:bg-purple-950/40 dark:text-purple-200"
+                        ? "border-purple-300 bg-purple-50 text-purple-800 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                         : "border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                     }`}
                   >
@@ -559,7 +525,7 @@ export default function NovoAgendamentoModal({
                     }}
                     className={`flex min-w-0 items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-center text-xs font-bold transition sm:justify-start sm:text-sm ${
                       tipoCliente === "novo"
-                        ? "border-purple-300 bg-purple-50 text-purple-800 dark:border-purple-500/50 dark:bg-purple-950/40 dark:text-purple-200"
+                        ? "border-purple-300 bg-purple-50 text-purple-800 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                         : "border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                     }`}
                   >
@@ -572,13 +538,11 @@ export default function NovoAgendamentoModal({
                   <div className="mt-4 space-y-3">
                     <label className="block space-y-2">
                       <span className={labelClassName()}>Buscar cliente</span>
-
                       <div className="relative min-w-0">
                         <Search
                           className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
                           size={16}
                         />
-
                         <input
                           value={buscaCliente}
                           onChange={(event) => {
@@ -596,18 +560,10 @@ export default function NovoAgendamentoModal({
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className={labelClassName()}>Selecionado</p>
-
-                            <p
-                              className="mt-1 truncate text-sm font-bold"
-                              style={{ color: cardInfoStyle.color }}
-                            >
+                            <p className="mt-1 truncate text-sm font-bold" style={{ color: cardInfoStyle.color }}>
                               {clienteSelecionado.nome}
                             </p>
-
-                            <p
-                              className="mt-1 truncate text-xs"
-                              style={cardInfoSecondaryStyle}
-                            >
+                            <p className="mt-1 truncate text-xs" style={cardInfoSecondaryStyle}>
                               {telefoneCliente(clienteSelecionado)}
                             </p>
                           </div>
@@ -618,17 +574,11 @@ export default function NovoAgendamentoModal({
                               setClienteId("");
                               setBuscaCliente("");
                             }}
-                            className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                           >
                             Trocar
                           </button>
                         </div>
-                      </div>
-                    ) : null}
-
-                    {!deveMostrarResultados ? (
-                      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-xs leading-5 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                        A lista completa não aparece automaticamente. Pesquise pelo nome ou WhatsApp.
                       </div>
                     ) : null}
 
@@ -646,17 +596,16 @@ export default function NovoAgendamentoModal({
                                   setClienteId(String(cliente.id));
                                   setErro("");
                                 }}
-                                className={`w-full rounded-2xl border p-3 text-left transition ${
+                                className={`w-full rounded-2xl border px-3 py-3 text-left transition ${
                                   active
-                                    ? "border-purple-400 bg-purple-950/70 shadow-lg shadow-purple-950/20"
-                                    : "border-slate-700 bg-slate-900/70 hover:border-slate-600 hover:bg-slate-800"
+                                    ? "border-purple-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-900"
+                                    : "border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
                                 }`}
                               >
-                                <p className="truncate text-sm font-bold text-white">
+                                <p className="truncate text-sm font-bold text-slate-900 dark:text-white">
                                   {cliente.nome}
                                 </p>
-
-                                <p className="mt-1 truncate text-xs text-slate-300">
+                                <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
                                   {telefoneCliente(cliente)}
                                 </p>
                               </button>
@@ -668,13 +617,16 @@ export default function NovoAgendamentoModal({
                           </div>
                         )}
                       </div>
-                    ) : null}
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-xs leading-5 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        A lista completa não aparece automaticamente. Pesquise pelo nome ou WhatsApp.
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="mt-4 grid gap-3">
                     <label className="block space-y-2">
                       <span className={labelClassName()}>Nome do cliente</span>
-
                       <input
                         value={novoClienteNome}
                         onChange={(event) => {
@@ -688,12 +640,9 @@ export default function NovoAgendamentoModal({
 
                     <label className="block space-y-2">
                       <span className={labelClassName()}>WhatsApp</span>
-
                       <input
                         value={novoClienteWhatsapp}
-                        onChange={(event) =>
-                          setNovoClienteWhatsapp(maskPhone(event.target.value))
-                        }
+                        onChange={(event) => setNovoClienteWhatsapp(maskPhone(event.target.value))}
                         placeholder="(11) 99999-9999"
                         className={inputClassName()}
                       />
@@ -701,16 +650,12 @@ export default function NovoAgendamentoModal({
 
                     <label className="block space-y-2">
                       <span className={labelClassName()}>Origem</span>
-
                       <select
                         value={novoClienteOrigem}
-                        onChange={(event) =>
-                          setNovoClienteOrigem(event.target.value)
-                        }
+                        onChange={(event) => setNovoClienteOrigem(event.target.value)}
                         className={inputClassName()}
                       >
                         <option value="">Selecione</option>
-
                         {origensCliente.map((origem) => (
                           <option key={origem.id} value={origem.nome}>
                             {origem.nome}
@@ -728,7 +673,6 @@ export default function NovoAgendamentoModal({
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block space-y-2 sm:col-span-2">
                 <span className={labelClassName()}>Profissional</span>
-
                 <select
                   value={profissionalId}
                   disabled={agendamentoDiretoAgenda}
@@ -738,12 +682,11 @@ export default function NovoAgendamentoModal({
                   }}
                   className={
                     agendamentoDiretoAgenda
-                      ? "h-12 w-full cursor-not-allowed rounded-2xl border border-purple-200 bg-purple-50 px-4 text-sm font-bold text-slate-900 outline-none"
+                      ? "h-11 w-full cursor-not-allowed rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                       : inputClassName()
                   }
                 >
                   <option value="">Selecione</option>
-
                   {profissionais.map((profissional) => (
                     <option key={profissional.id} value={profissional.id}>
                       {profissional.nome}
@@ -755,7 +698,6 @@ export default function NovoAgendamentoModal({
 
               <label className="block space-y-2">
                 <span className={labelClassName()}>Data</span>
-
                 <input
                   type="date"
                   value={data}
@@ -766,7 +708,7 @@ export default function NovoAgendamentoModal({
                   }}
                   className={
                     agendamentoDiretoAgenda
-                      ? "h-12 w-full cursor-not-allowed rounded-2xl border border-purple-200 bg-purple-50 px-4 text-sm font-bold text-slate-900 outline-none"
+                      ? "h-11 w-full cursor-not-allowed rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                       : inputClassName()
                   }
                 />
@@ -774,12 +716,11 @@ export default function NovoAgendamentoModal({
 
               <label className="block space-y-2">
                 <span className={labelClassName()}>Horário</span>
-
                 {agendamentoDiretoAgenda ? (
                   <input
                     value={hora}
                     readOnly
-                    className="h-12 w-full cursor-not-allowed rounded-2xl border border-purple-200 bg-purple-50 px-4 text-sm font-bold text-slate-900 outline-none"
+                    className="h-11 w-full cursor-not-allowed rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                   />
                 ) : (
                   <select
@@ -791,7 +732,6 @@ export default function NovoAgendamentoModal({
                     className={inputClassName()}
                   >
                     <option value="">Selecione um horário</option>
-
                     {horariosDisponiveis.map((item) => (
                       <option key={item.hora} value={item.hora}>
                         {item.hora}
@@ -806,10 +746,7 @@ export default function NovoAgendamentoModal({
               <div className="mt-4">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <span className={labelClassName()}>Horários disponíveis</span>
-
-                  {isLoadingHorarios ? (
-                    <span className="text-xs text-slate-400">Carregando...</span>
-                  ) : null}
+                  {isLoadingHorarios ? <span className="text-xs text-slate-400">Carregando...</span> : null}
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
@@ -821,10 +758,10 @@ export default function NovoAgendamentoModal({
                         setHora(item.hora);
                         setErro("");
                       }}
-                      className={`h-11 rounded-2xl border px-2 text-center text-sm font-bold transition ${
+                      className={`h-10 rounded-2xl border px-2 text-center text-sm font-bold transition ${
                         hora === item.hora
-                          ? "border-purple-400 bg-purple-700 text-white shadow-lg shadow-purple-900/20"
-                          : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-purple-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                          ? "border-purple-300 bg-purple-50 text-purple-800 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                       }`}
                     >
                       {item.hora}
@@ -854,7 +791,6 @@ export default function NovoAgendamentoModal({
                             <Clock3 size={12} />
                             {item.hora}
                           </span>
-
                           <span className="truncate">{item.motivo}</span>
                         </div>
                       ))}
@@ -869,14 +805,12 @@ export default function NovoAgendamentoModal({
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block space-y-2 sm:col-span-2">
                 <span className={labelClassName()}>Procedimento / serviço</span>
-
                 <select
                   value={servicoSelecionadoId}
                   onChange={(event) => selecionarServico(event.target.value)}
                   className={inputClassName()}
                 >
                   <option value="">Selecione um serviço cadastrado</option>
-
                   {servicos.map((servico) => (
                     <option key={servico.id} value={servico.id}>
                       {servico.nome} · {servico.duracaoPadrao} min
@@ -888,14 +822,12 @@ export default function NovoAgendamentoModal({
                         : ""}
                     </option>
                   ))}
-
                   <option value="outro">Outro procedimento</option>
                 </select>
               </label>
 
               <label className="block space-y-2 sm:col-span-2">
                 <span className={labelClassName()}>Duração</span>
-
                 <select
                   value={duracao}
                   onChange={(event) => {
@@ -916,7 +848,6 @@ export default function NovoAgendamentoModal({
 
               <label className="block space-y-2 sm:col-span-2">
                 <span className={labelClassName()}>Nome do procedimento</span>
-
                 <input
                   value={procedimento}
                   onChange={(event) => {
@@ -931,12 +862,9 @@ export default function NovoAgendamentoModal({
 
               <label className="block space-y-2">
                 <span className={labelClassName()}>Valor previsto</span>
-
                 <input
                   value={valor}
-                  onChange={(event) =>
-                    setValor(formatCurrencyInput(event.target.value))
-                  }
+                  onChange={(event) => setValor(formatCurrencyInput(event.target.value))}
                   placeholder="0,00"
                   className={inputClassName()}
                 />
@@ -944,7 +872,6 @@ export default function NovoAgendamentoModal({
 
               <label className="block space-y-2">
                 <span className={labelClassName()}>Status</span>
-
                 <select
                   value={status}
                   onChange={(event) => setStatus(event.target.value)}
@@ -961,7 +888,6 @@ export default function NovoAgendamentoModal({
 
               <label className="block space-y-2 sm:col-span-2">
                 <span className={labelClassName()}>Observações</span>
-
                 <textarea
                   value={observacoes}
                   onChange={(event) => setObservacoes(event.target.value)}
