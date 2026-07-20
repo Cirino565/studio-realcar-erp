@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 
 import {
-  atualizarAgendamento,
   buscarDisponibilidadeAgenda,
   criarAgendamento,
   type HorarioDisponivelAgenda,
@@ -51,8 +50,6 @@ type ServicoAgenda = {
 };
 
 type NovoAgendamentoPayload = NovoHorarioPayload & {
-  agendamentoId?: number;
-  modo?: "novo" | "retorno" | "edicao";
   clienteId?: number;
   procedimento?: string;
   duracao?: number;
@@ -80,7 +77,12 @@ function useLockBodyScroll(open: boolean) {
     const body = document.body;
 
     const originalHtmlOverflow = html.style.overflow;
+    const originalHtmlOverflowX = html.style.overflowX;
+    const originalHtmlOverscrollBehavior = html.style.overscrollBehavior;
     const originalBodyOverflow = body.style.overflow;
+    const originalBodyOverflowX = body.style.overflowX;
+    const originalBodyOverscrollBehavior = body.style.overscrollBehavior;
+    const originalBodyTouchAction = body.style.touchAction;
     const originalPosition = body.style.position;
     const originalTop = body.style.top;
     const originalWidth = body.style.width;
@@ -88,7 +90,13 @@ function useLockBodyScroll(open: boolean) {
     const originalRight = body.style.right;
 
     html.style.overflow = "hidden";
+    html.style.overflowX = "hidden";
+    html.style.overscrollBehavior = "none";
+
     body.style.overflow = "hidden";
+    body.style.overflowX = "hidden";
+    body.style.overscrollBehavior = "none";
+    body.style.touchAction = "pan-y";
     body.style.position = "fixed";
     body.style.top = `-${scrollY}px`;
     body.style.left = "0";
@@ -97,7 +105,13 @@ function useLockBodyScroll(open: boolean) {
 
     return () => {
       html.style.overflow = originalHtmlOverflow;
+      html.style.overflowX = originalHtmlOverflowX;
+      html.style.overscrollBehavior = originalHtmlOverscrollBehavior;
+
       body.style.overflow = originalBodyOverflow;
+      body.style.overflowX = originalBodyOverflowX;
+      body.style.overscrollBehavior = originalBodyOverscrollBehavior;
+      body.style.touchAction = originalBodyTouchAction;
       body.style.position = originalPosition;
       body.style.top = originalTop;
       body.style.width = originalWidth;
@@ -218,20 +232,8 @@ export default function NovoAgendamentoModal({
 
   useLockBodyScroll(open);
 
-  const modoEdicao = Boolean(
-    initialPayload?.modo === "edicao" && initialPayload?.agendamentoId,
-  );
-
-  const modoRetorno = Boolean(
-    !modoEdicao &&
-      (initialPayload?.modo === "retorno" || initialPayload?.clienteId),
-  );
-
   const agendamentoDiretoAgenda = Boolean(
-    !modoEdicao &&
-      initialPayload?.profissionalId &&
-      initialPayload?.data &&
-      initialPayload?.hora,
+    initialPayload?.profissionalId && initialPayload?.data && initialPayload?.hora,
   );
 
   useEffect(() => {
@@ -305,7 +307,6 @@ export default function NovoAgendamentoModal({
           profissionalId: Number(profissionalId),
           data,
           duracao: Number(duracao) || 60,
-          ignoreId: modoEdicao ? initialPayload?.agendamentoId : undefined,
         });
 
         setHorarios(resultado);
@@ -313,14 +314,7 @@ export default function NovoAgendamentoModal({
         setHorarios([]);
       }
     });
-  }, [
-    open,
-    profissionalId,
-    data,
-    duracao,
-    modoEdicao,
-    initialPayload?.agendamentoId,
-  ]);
+  }, [open, profissionalId, data, duracao]);
 
   const clienteSelecionado = useMemo(() => {
     if (!clienteId) return null;
@@ -346,6 +340,7 @@ export default function NovoAgendamentoModal({
       .slice(0, 6);
   }, [buscaCliente, clientes]);
 
+  const modoRetorno = Boolean(initialPayload?.clienteId);
   const deveMostrarBusca = tipoCliente === "existente" && !clienteBloqueado;
   const deveMostrarResultados =
     deveMostrarBusca &&
@@ -419,7 +414,7 @@ export default function NovoAgendamentoModal({
     const dataCompleta = `${data}T${hora}:00`;
 
     try {
-      const payload = {
+      await criarAgendamento({
         clienteId: tipoCliente === "existente" ? Number(clienteId) : undefined,
         novoCliente:
           tipoCliente === "novo"
@@ -438,16 +433,7 @@ export default function NovoAgendamentoModal({
         valor: parseCurrency(valor),
         status,
         observacoes,
-      };
-
-      if (modoEdicao && initialPayload?.agendamentoId) {
-        await atualizarAgendamento({
-          id: initialPayload.agendamentoId,
-          ...payload,
-        });
-      } else {
-        await criarAgendamento(payload);
-      }
+      });
 
       setSalvando(false);
       onClose();
@@ -464,10 +450,14 @@ export default function NovoAgendamentoModal({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-[9999] h-[100dvh] w-screen max-w-[100vw] overflow-y-auto bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-white"
-      style={{ touchAction: "pan-y" }}
+      className="fixed inset-0 z-[9999] h-[100dvh] w-full max-w-full overflow-x-hidden overflow-y-auto overscroll-y-contain bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-white"
+      style={{
+        touchAction: "pan-y",
+        overscrollBehaviorX: "none",
+        maxWidth: "100%",
+      }}
     >
-      <div className="mx-auto flex min-h-[100dvh] w-full max-w-5xl flex-col">
+      <div className="mx-auto flex min-h-[100dvh] w-full max-w-5xl flex-col overflow-x-hidden">
         <div className="bg-white px-4 pb-3 pt-4 shadow-sm dark:bg-slate-900 sm:rounded-b-[2rem] sm:px-6 sm:pb-5 sm:pt-5">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-start gap-3">
@@ -477,21 +467,15 @@ export default function NovoAgendamentoModal({
 
               <div className="min-w-0">
                 <h2 className="truncate text-xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-2xl">
-                  {modoEdicao
-                    ? "Editar agendamento"
-                    : modoRetorno
-                      ? "Agendar retorno"
-                      : "Criar agendamento"}
+                  {modoRetorno ? "Agendar retorno" : "Criar agendamento"}
                 </h2>
 
                 <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-300">
-                  {modoEdicao
-                    ? "Corrija os dados necessários e salve as alterações do agendamento."
-                    : modoRetorno
-                      ? "Cliente já selecionada. Escolha data, horário e procedimento."
-                      : agendamentoDiretoAgenda
-                        ? "Horário e profissional definidos diretamente pela agenda."
-                        : "Busque a cliente, escolha um horário livre e salve o atendimento."}
+                  {modoRetorno
+                    ? "Cliente já selecionada. Escolha data, horário e procedimento."
+                    : agendamentoDiretoAgenda
+                      ? "Horário e profissional definidos diretamente pela agenda."
+                      : "Busque a cliente, escolha um horário livre e salve o atendimento."}
                 </p>
               </div>
             </div>
@@ -944,11 +928,9 @@ export default function NovoAgendamentoModal({
             >
               {salvando
                 ? "Salvando..."
-                : modoEdicao
-                  ? "Salvar alterações"
-                  : modoRetorno
-                    ? "Salvar retorno"
-                    : "Salvar atendimento"}
+                : modoRetorno
+                  ? "Salvar retorno"
+                  : "Salvar atendimento"}
             </button>
 
             <button
