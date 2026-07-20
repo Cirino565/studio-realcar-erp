@@ -1,11 +1,66 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, Save, UserRound, X } from "lucide-react";
 import type { OrigemCliente, ProcedimentoInteresse } from "@prisma/client";
 
 import { Button } from "@/components/ui/button";
 import type { Cliente } from "@/lib/types";
+
+
+function useLockBodyScroll(open: boolean) {
+  useEffect(() => {
+    if (!open) return;
+
+    const html = document.documentElement;
+    const body = document.body;
+    const scrollY = window.scrollY;
+
+    const previous = {
+      htmlOverflow: html.style.overflow,
+      htmlOverflowX: html.style.overflowX,
+      htmlOverscrollBehavior: html.style.overscrollBehavior,
+      bodyOverflow: body.style.overflow,
+      bodyOverflowX: body.style.overflowX,
+      bodyOverscrollBehavior: body.style.overscrollBehavior,
+      bodyPosition: body.style.position,
+      bodyTop: body.style.top,
+      bodyLeft: body.style.left,
+      bodyRight: body.style.right,
+      bodyWidth: body.style.width,
+    };
+
+    html.style.overflow = "hidden";
+    html.style.overflowX = "hidden";
+    html.style.overscrollBehavior = "none";
+
+    body.style.overflow = "hidden";
+    body.style.overflowX = "hidden";
+    body.style.overscrollBehavior = "none";
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+
+    return () => {
+      html.style.overflow = previous.htmlOverflow;
+      html.style.overflowX = previous.htmlOverflowX;
+      html.style.overscrollBehavior = previous.htmlOverscrollBehavior;
+
+      body.style.overflow = previous.bodyOverflow;
+      body.style.overflowX = previous.bodyOverflowX;
+      body.style.overscrollBehavior = previous.bodyOverscrollBehavior;
+      body.style.position = previous.bodyPosition;
+      body.style.top = previous.bodyTop;
+      body.style.left = previous.bodyLeft;
+      body.style.right = previous.bodyRight;
+      body.style.width = previous.bodyWidth;
+
+      window.scrollTo(0, scrollY);
+    };
+  }, [open]);
+}
 
 type FormData = {
   nome: string;
@@ -198,9 +253,9 @@ function NovoClienteForm({
         event.preventDefault();
         salvar();
       }}
-      className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-3xl flex-col overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-2xl shadow-slate-950/20 dark:border-white/10 dark:bg-[#111827] dark:shadow-black/50"
+      className="flex max-h-[calc(100dvh-1.5rem)] w-full min-w-0 max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-2xl shadow-slate-950/20 dark:border-white/10 dark:bg-[#111827] dark:shadow-black/50 sm:max-h-[calc(100dvh-2rem)] sm:max-w-3xl"
     >
-      <header className="flex items-start justify-between gap-4 border-b border-slate-200 bg-slate-50/80 px-4 py-4 dark:border-white/10 dark:bg-white/[0.035] sm:px-6 sm:py-5">
+      <header className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 bg-slate-50/80 px-4 py-4 dark:border-white/10 dark:bg-white/[0.035] sm:px-6 sm:py-5">
         <div className="flex min-w-0 items-start gap-3">
           <div className="hidden size-11 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300 sm:flex">
             <UserRound size={20} />
@@ -226,7 +281,10 @@ function NovoClienteForm({
         </button>
       </header>
 
-      <div className="scrollbar-premium flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
+      <div
+        className="scrollbar-premium min-h-0 min-w-0 flex-1 space-y-5 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-5 sm:px-6 sm:py-6"
+        style={{ touchAction: "pan-y", overscrollBehaviorX: "none" }}
+      >
         {erro ? (
           <div
             role="alert"
@@ -237,7 +295,7 @@ function NovoClienteForm({
           </div>
         ) : null}
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="sm:col-span-2">
             <Label>Nome completo</Label>
             <input
@@ -245,9 +303,8 @@ function NovoClienteForm({
               value={form.nome}
               onChange={(event) => alterarCampo("nome", event.target.value)}
               placeholder="Ex.: Jully Oliveira"
-              className="premium-input w-full"
+              className="premium-input w-full min-w-0 max-w-full text-base sm:text-sm"
               autoComplete="name"
-              autoFocus={!cliente}
             />
           </label>
 
@@ -260,7 +317,7 @@ function NovoClienteForm({
                 alterarCampo("whatsapp", formatarTelefone(event.target.value))
               }
               placeholder="(11) 99999-9999"
-              className="premium-input w-full"
+              className="premium-input w-full min-w-0 max-w-full text-base sm:text-sm"
               inputMode="tel"
               autoComplete="tel"
             />
@@ -275,7 +332,7 @@ function NovoClienteForm({
                 alterarCampo("telefone", formatarTelefone(event.target.value))
               }
               placeholder="(11) 99999-9999"
-              className="premium-input w-full"
+              className="premium-input w-full min-w-0 max-w-full text-base sm:text-sm"
               inputMode="tel"
             />
           </label>
@@ -287,7 +344,7 @@ function NovoClienteForm({
               value={form.cpf}
               onChange={(event) => alterarCampo("cpf", formatarCpf(event.target.value))}
               placeholder="000.000.000-00"
-              className="premium-input w-full"
+              className="premium-input w-full min-w-0 max-w-full text-base sm:text-sm"
               inputMode="numeric"
             />
           </label>
@@ -299,7 +356,7 @@ function NovoClienteForm({
               type="date"
               value={form.nascimento}
               onChange={(event) => alterarCampo("nascimento", event.target.value)}
-              className="premium-input w-full"
+              className="premium-input w-full min-w-0 max-w-full text-base sm:text-sm"
             />
           </label>
 
@@ -310,7 +367,7 @@ function NovoClienteForm({
               value={form.instagram}
               onChange={(event) => alterarCampo("instagram", event.target.value)}
               placeholder="@usuario"
-              className="premium-input w-full"
+              className="premium-input w-full min-w-0 max-w-full text-base sm:text-sm"
               autoCapitalize="none"
             />
           </label>
@@ -321,7 +378,7 @@ function NovoClienteForm({
               name="origem"
               value={form.origem}
               onChange={(event) => alterarCampo("origem", event.target.value)}
-              className="premium-input w-full"
+              className="premium-input w-full min-w-0 max-w-full text-base sm:text-sm"
             >
               {origensDisponiveis.map((origem) => (
                 <option key={origem} value={origem}>
@@ -339,7 +396,7 @@ function NovoClienteForm({
               onChange={(event) =>
                 alterarCampo("procedimentoInteresse", event.target.value)
               }
-              className="premium-input w-full"
+              className="premium-input w-full min-w-0 max-w-full text-base sm:text-sm"
             >
               {procedimentosDisponiveis.map((procedimento) => (
                 <option key={procedimento} value={procedimento}>
@@ -361,12 +418,12 @@ function NovoClienteForm({
             value={form.observacoes}
             onChange={(event) => alterarCampo("observacoes", event.target.value)}
             placeholder="Preferências, restrições iniciais ou informações importantes."
-            className="premium-input min-h-28 w-full resize-y"
+            className="premium-input min-h-28 w-full min-w-0 max-w-full resize-y text-base sm:text-sm"
           />
         </label>
       </div>
 
-      <footer className="grid gap-2 border-t border-slate-200 bg-slate-50/80 px-4 py-4 dark:border-white/10 dark:bg-white/[0.025] sm:grid-cols-2 sm:px-6">
+      <footer className="grid shrink-0 gap-2 border-t border-slate-200 bg-slate-50/80 px-4 py-4 dark:border-white/10 dark:bg-white/[0.025] sm:grid-cols-2 sm:px-6">
         <Button type="button" variant="outline" onClick={onClose}>
           Cancelar
         </Button>
@@ -387,10 +444,15 @@ export default function NovoClienteModal({
   origens,
   procedimentosInteresse,
 }: Props) {
+  useLockBodyScroll(open);
+
   if (!open) return null;
 
   return (
-    <div className="app-modal-backdrop fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-slate-950/55 p-3 backdrop-blur-sm sm:items-center sm:p-4">
+    <div
+      className="app-modal-backdrop fixed inset-0 z-[100] flex h-[100dvh] w-full max-w-full items-start justify-center overflow-hidden bg-slate-950/55 p-3 backdrop-blur-sm sm:items-center sm:p-4"
+      style={{ touchAction: "pan-y", overscrollBehaviorX: "none" }}
+    >
       <NovoClienteForm
         key={cliente?.id ?? "nova-cliente"}
         cliente={cliente}
