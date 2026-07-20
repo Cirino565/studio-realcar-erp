@@ -617,10 +617,12 @@ export async function buscarDisponibilidadeAgenda({
   profissionalId,
   data,
   duracao = 60,
+  ignoreId,
 }: {
   profissionalId?: number;
   data: string;
   duracao?: number;
+  ignoreId?: number;
 }): Promise<HorarioDisponivelAgenda[]> {
   await requirePermission("agenda.visualizar");
 
@@ -641,6 +643,7 @@ export async function buscarDisponibilidadeAgenda({
       status: {
         notIn: ["Cancelado"],
       },
+      ...(ignoreId ? { id: { not: ignoreId } } : {}),
     },
     select: {
       id: true,

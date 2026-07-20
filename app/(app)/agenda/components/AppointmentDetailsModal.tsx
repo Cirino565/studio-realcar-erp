@@ -9,14 +9,19 @@ import {
   CheckCircle2,
   ClipboardList,
   MessageCircle,
+  Pencil,
   Phone,
   PlayCircle,
   Sparkles,
+  Trash2,
   UserRound,
   X,
 } from "lucide-react";
 
-import { iniciarAtendimento } from "@/actions/agendamento.actions";
+import {
+  excluirAgendamento,
+  iniciarAtendimento,
+} from "@/actions/agendamento.actions";
 import { Button } from "@/components/ui/button";
 
 type AppointmentDetails = {
@@ -50,6 +55,7 @@ type Props = {
   appointment: AppointmentDetails | null;
   onClose: () => void;
   onWhatsApp: (appointment: AppointmentDetails) => void;
+  onEditar: (appointment: AppointmentDetails) => void;
   onFinalizar: (appointment: AppointmentDetails) => void;
   onReagendar: (appointment: AppointmentDetails) => void;
 };
@@ -150,16 +156,19 @@ export default function AppointmentDetailsModal({
   appointment,
   onClose,
   onWhatsApp,
+  onEditar,
   onFinalizar,
   onReagendar,
 }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useLockBodyScroll(open);
 
   useEffect(() => {
     setError(null);
+    setIsDeleting(false);
   }, [open, appointment?.id]);
 
   if (!open || !appointment) return null;
@@ -207,6 +216,41 @@ export default function AppointmentDetailsModal({
         );
       }
     });
+  }
+
+  const podeGerenciarAgendamento =
+    !atendimentoFinalizado && !atendimentoEmAndamento;
+
+  async function handleExcluir() {
+    setError(null);
+
+    if (!podeGerenciarAgendamento) {
+      setError(
+        "Atendimentos em andamento ou finalizados não podem ser excluídos diretamente.",
+      );
+      return;
+    }
+
+    const confirmou = window.confirm(
+      `Excluir o agendamento de ${currentAppointment.cliente.nome}? Esta ação não poderá ser desfeita.`,
+    );
+
+    if (!confirmou) return;
+
+    setIsDeleting(true);
+
+    try {
+      await excluirAgendamento(currentAppointment.id);
+      onClose();
+      window.location.reload();
+    } catch (error) {
+      setIsDeleting(false);
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível excluir o agendamento.",
+      );
+    }
   }
 
   return (
@@ -480,6 +524,48 @@ export default function AppointmentDetailsModal({
                   Reagendar ou criar retorno
                 </Button>
               </div>
+            </section>
+
+            <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  Gerenciar agendamento
+                </p>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Corrija dados lançados incorretamente ou exclua um agendamento ainda não finalizado.
+                </p>
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onEditar(currentAppointment)}
+                  disabled={!podeGerenciarAgendamento || isDeleting}
+                  className="h-11 rounded-xl border-slate-200 bg-white text-slate-700 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Pencil size={16} />
+                  Editar agendamento
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleExcluir}
+                  disabled={!podeGerenciarAgendamento || isDeleting}
+                  className="h-11 rounded-xl border-rose-200 bg-white text-rose-700 hover:bg-rose-50 hover:text-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Trash2 size={16} />
+                  {isDeleting ? "Excluindo..." : "Excluir agendamento"}
+                </Button>
+              </div>
+
+              {!podeGerenciarAgendamento ? (
+                <p className="mt-3 text-xs leading-5 text-slate-500">
+                  Atendimentos em andamento ou finalizados ficam protegidos para evitar inconsistências no prontuário e no financeiro.
+                </p>
+              ) : null}
             </section>
 
             <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">

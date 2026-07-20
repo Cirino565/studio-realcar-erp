@@ -61,6 +61,8 @@ type AgendamentoAgenda = {
 };
 
 type NovoAgendamentoPayload = NovoHorarioPayload & {
+  agendamentoId?: number;
+  modo?: "novo" | "retorno" | "edicao";
   clienteId?: number;
   procedimento?: string;
   duracao?: number;
@@ -98,10 +100,33 @@ function toDateInput(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function toSaoPauloDateInput(value: Date | string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "America/Sao_Paulo",
+  }).formatToParts(new Date(value));
+
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+
+  if (!year || !month || !day) return "";
+
+  return `${year}-${month}-${day}`;
+}
+
 function toTimeInput(value: Date | string) {
-  const date = new Date(value);
-  const hour = String(date.getHours()).padStart(2, "0");
-  const minute = String(date.getMinutes()).padStart(2, "0");
+  const parts = new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "America/Sao_Paulo",
+  }).formatToParts(new Date(value));
+
+  const hour = parts.find((part) => part.type === "hour")?.value || "00";
+  const minute = parts.find((part) => part.type === "minute")?.value || "00";
 
   return `${hour}:${minute}`;
 }
@@ -111,6 +136,7 @@ function formatarDataCurta(value: Date | string) {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
+    timeZone: "America/Sao_Paulo",
   }).format(new Date(value));
 }
 
@@ -133,16 +159,16 @@ export default function AgendaClient({
   );
 
   const [novoHorario, setNovoHorario] =
-  useState<NovoAgendamentoPayload | null>(() =>
-    initialClienteId
-      ? {
-          clienteId: Number(initialClienteId),
-          data: initialDate,
-          hora: "09:00",
-          status: "Agendado",
-        }
-      : null,
-  );
+    useState<NovoAgendamentoPayload | null>(() =>
+      initialClienteId
+        ? {
+            clienteId: Number(initialClienteId),
+            data: initialDate,
+            hora: "09:00",
+            status: "Agendado",
+          }
+        : null,
+    );
 
   const [selectedAppointment, setSelectedAppointment] =
     useState<AgendamentoAgenda | null>(null);
@@ -181,12 +207,33 @@ export default function AgendaClient({
   }
 
   function abrirNovoHorario(payload: NovoHorarioPayload) {
-    setNovoHorario(payload);
+    setNovoHorario({
+      ...payload,
+      modo: "novo",
+    });
   }
 
   function abrirWhatsApp(appointment: AgendamentoAgenda) {
     setSelectedAppointment(null);
     setMessageAppointment(appointment);
+  }
+
+  function abrirEdicao(appointment: AgendamentoAgenda) {
+    setSelectedAppointment(null);
+
+    setNovoHorario({
+      agendamentoId: appointment.id,
+      modo: "edicao",
+      data: toSaoPauloDateInput(appointment.data),
+      hora: toTimeInput(appointment.data),
+      profissionalId: appointment.profissionalId || undefined,
+      clienteId: appointment.clienteId,
+      procedimento: appointment.procedimento,
+      duracao: appointment.duracao || 60,
+      valor: appointment.valor || 0,
+      status: appointment.status,
+      observacoes: appointment.observacoes || "",
+    });
   }
 
   function abrirFinalizacao(appointment: AgendamentoAgenda) {
@@ -204,7 +251,8 @@ export default function AgendaClient({
     setFinishAppointment(null);
 
     setNovoHorario({
-      data: toDateInput(dataRetorno),
+      modo: "retorno",
+      data: toSaoPauloDateInput(dataRetorno),
       hora: toTimeInput(dataBase),
       profissionalId: appointment.profissionalId || undefined,
       clienteId: appointment.clienteId,
@@ -283,6 +331,7 @@ export default function AgendaClient({
         appointment={selectedAppointment}
         onClose={() => setSelectedAppointment(null)}
         onWhatsApp={abrirWhatsApp}
+        onEditar={abrirEdicao}
         onFinalizar={abrirFinalizacao}
         onReagendar={abrirReagendamento}
       />

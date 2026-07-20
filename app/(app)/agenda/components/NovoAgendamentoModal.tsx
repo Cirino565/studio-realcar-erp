@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import {
+  atualizarAgendamento,
   buscarDisponibilidadeAgenda,
   criarAgendamento,
   type HorarioDisponivelAgenda,
@@ -50,6 +51,8 @@ type ServicoAgenda = {
 };
 
 type NovoAgendamentoPayload = NovoHorarioPayload & {
+  agendamentoId?: number;
+  modo?: "novo" | "retorno" | "edicao";
   clienteId?: number;
   procedimento?: string;
   duracao?: number;
@@ -215,8 +218,20 @@ export default function NovoAgendamentoModal({
 
   useLockBodyScroll(open);
 
+  const modoEdicao = Boolean(
+    initialPayload?.modo === "edicao" && initialPayload?.agendamentoId,
+  );
+
+  const modoRetorno = Boolean(
+    !modoEdicao &&
+      (initialPayload?.modo === "retorno" || initialPayload?.clienteId),
+  );
+
   const agendamentoDiretoAgenda = Boolean(
-    initialPayload?.profissionalId && initialPayload?.data && initialPayload?.hora,
+    !modoEdicao &&
+      initialPayload?.profissionalId &&
+      initialPayload?.data &&
+      initialPayload?.hora,
   );
 
   useEffect(() => {
@@ -290,6 +305,7 @@ export default function NovoAgendamentoModal({
           profissionalId: Number(profissionalId),
           data,
           duracao: Number(duracao) || 60,
+          ignoreId: modoEdicao ? initialPayload?.agendamentoId : undefined,
         });
 
         setHorarios(resultado);
@@ -297,7 +313,14 @@ export default function NovoAgendamentoModal({
         setHorarios([]);
       }
     });
-  }, [open, profissionalId, data, duracao]);
+  }, [
+    open,
+    profissionalId,
+    data,
+    duracao,
+    modoEdicao,
+    initialPayload?.agendamentoId,
+  ]);
 
   const clienteSelecionado = useMemo(() => {
     if (!clienteId) return null;
@@ -323,7 +346,6 @@ export default function NovoAgendamentoModal({
       .slice(0, 6);
   }, [buscaCliente, clientes]);
 
-  const modoRetorno = Boolean(initialPayload?.clienteId);
   const deveMostrarBusca = tipoCliente === "existente" && !clienteBloqueado;
   const deveMostrarResultados =
     deveMostrarBusca &&
@@ -397,7 +419,7 @@ export default function NovoAgendamentoModal({
     const dataCompleta = `${data}T${hora}:00`;
 
     try {
-      await criarAgendamento({
+      const payload = {
         clienteId: tipoCliente === "existente" ? Number(clienteId) : undefined,
         novoCliente:
           tipoCliente === "novo"
@@ -416,7 +438,16 @@ export default function NovoAgendamentoModal({
         valor: parseCurrency(valor),
         status,
         observacoes,
-      });
+      };
+
+      if (modoEdicao && initialPayload?.agendamentoId) {
+        await atualizarAgendamento({
+          id: initialPayload.agendamentoId,
+          ...payload,
+        });
+      } else {
+        await criarAgendamento(payload);
+      }
 
       setSalvando(false);
       onClose();
@@ -446,15 +477,21 @@ export default function NovoAgendamentoModal({
 
               <div className="min-w-0">
                 <h2 className="truncate text-xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-2xl">
-                  {modoRetorno ? "Agendar retorno" : "Criar agendamento"}
+                  {modoEdicao
+                    ? "Editar agendamento"
+                    : modoRetorno
+                      ? "Agendar retorno"
+                      : "Criar agendamento"}
                 </h2>
 
                 <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-300">
-                  {modoRetorno
-                    ? "Cliente já selecionada. Escolha data, horário e procedimento."
-                    : agendamentoDiretoAgenda
-                      ? "Horário e profissional definidos diretamente pela agenda."
-                      : "Busque a cliente, escolha um horário livre e salve o atendimento."}
+                  {modoEdicao
+                    ? "Corrija os dados necessários e salve as alterações do agendamento."
+                    : modoRetorno
+                      ? "Cliente já selecionada. Escolha data, horário e procedimento."
+                      : agendamentoDiretoAgenda
+                        ? "Horário e profissional definidos diretamente pela agenda."
+                        : "Busque a cliente, escolha um horário livre e salve o atendimento."}
                 </p>
               </div>
             </div>
@@ -907,9 +944,11 @@ export default function NovoAgendamentoModal({
             >
               {salvando
                 ? "Salvando..."
-                : modoRetorno
-                  ? "Salvar retorno"
-                  : "Salvar atendimento"}
+                : modoEdicao
+                  ? "Salvar alterações"
+                  : modoRetorno
+                    ? "Salvar retorno"
+                    : "Salvar atendimento"}
             </button>
 
             <button
