@@ -183,15 +183,31 @@ function addMinutes(date: Date, minutes: number) {
 }
 
 function parseLocalDateTime(value: string) {
-  const [datePart, timePart] = value.split("T");
-  const [year, month, day] = datePart.split("-").map(Number);
-  const [hour = 0, minute = 0] = timePart
+  const [datePart, rawTimePart = "00:00"] = value.split("T");
+  const timePart = rawTimePart
     .replace(/Z$/i, "")
-    .slice(0, 5)
-    .split(":")
-    .map(Number);
+    .slice(0, 5);
 
-  return new Date(year, month - 1, day, hour, minute, 0, 0);
+  return new Date(`${datePart}T${timePart}:00-03:00`);
+}
+
+function formatDateSaoPaulo(value: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "America/Sao_Paulo",
+  }).formatToParts(value);
+
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+
+  if (!year || !month || !day) {
+    throw new Error("Não foi possível interpretar a data do agendamento.");
+  }
+
+  return `${year}-${month}-${day}`;
 }
 
 function formatHourMinute(value: Date) {
@@ -217,16 +233,9 @@ async function validarConflitoAgenda({
 
   const inicioNovo = data;
   const fimNovo = addMinutes(inicioNovo, duracao);
-  const inicioDia = new Date(
-    data.getFullYear(),
-    data.getMonth(),
-    data.getDate(),
-  );
-  const fimDia = new Date(
-    data.getFullYear(),
-    data.getMonth(),
-    data.getDate() + 1,
-  );
+  const dataSaoPaulo = formatDateSaoPaulo(data);
+  const inicioDia = parseLocalDateTime(`${dataSaoPaulo}T00:00`);
+  const fimDia = addMinutes(inicioDia, 24 * 60);
 
   const agendamentosDoDia = await prisma.agendamento.findMany({
     where: {
@@ -577,17 +586,8 @@ export type HorarioDisponivelAgenda = {
   motivo?: string;
 };
 
-function montarHorario(baseDate: Date, hora: string) {
-  const [hours, minutes] = hora.split(":").map(Number);
-
-  return new Date(
-    baseDate.getFullYear(),
-    baseDate.getMonth(),
-    baseDate.getDate(),
-    hours,
-    minutes,
-    0,
-  );
+function montarHorario(data: string, hora: string) {
+  return parseLocalDateTime(`${data}T${hora}`);
 }
 
 const CLINICA_HORA_ABERTURA = 9;
@@ -628,17 +628,8 @@ export async function buscarDisponibilidadeAgenda({
     return [];
   }
 
-  const dataBase = new Date(`${data}T00:00:00`);
-  const inicioDia = new Date(
-    dataBase.getFullYear(),
-    dataBase.getMonth(),
-    dataBase.getDate(),
-  );
-  const fimDia = new Date(
-    dataBase.getFullYear(),
-    dataBase.getMonth(),
-    dataBase.getDate() + 1,
-  );
+  const inicioDia = parseLocalDateTime(`${data}T00:00`);
+  const fimDia = addMinutes(inicioDia, 24 * 60);
 
   const agendamentosDoDia = await prisma.agendamento.findMany({
     where: {
@@ -667,7 +658,7 @@ export async function buscarDisponibilidadeAgenda({
   });
 
   return gerarSlotsDisponibilidade().map((hora) => {
-    const inicioNovo = montarHorario(dataBase, hora);
+    const inicioNovo = montarHorario(data, hora);
     const fimNovo = addMinutes(inicioNovo, duracao);
 
     const conflito = agendamentosDoDia.find((agendamento) => {
@@ -684,15 +675,10 @@ export async function buscarDisponibilidadeAgenda({
       };
     }
 
-    const inicio = new Intl.DateTimeFormat("pt-BR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(conflito.data);
-
-    const fim = new Intl.DateTimeFormat("pt-BR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(addMinutes(conflito.data, conflito.duracao));
+    const inicio = formatHourMinute(conflito.data);
+    const fim = formatHourMinute(
+      addMinutes(conflito.data, conflito.duracao),
+    );
 
     return {
       hora,
