@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { criarCliente } from "@/actions/cliente.actions";
+import ClientePageScrollLock from "@/components/clientes/ClientePageScrollLock";
 import ClienteServerForm from "@/components/clientes/ClienteServerForm";
 import { requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -32,17 +33,29 @@ export default async function NovoClientePage() {
   await requirePagePermission("clientes.gerenciar");
 
   const [origens, procedimentosInteresse] = await Promise.all([
-    prisma.origemCliente.findMany({ where: { status: "Ativa" }, orderBy: [{ ordem: "asc" }, { nome: "asc" }] }),
-    prisma.procedimentoInteresse.findMany({ where: { status: "Ativo" }, orderBy: [{ ordem: "asc" }, { nome: "asc" }] }),
+    prisma.origemCliente.findMany({
+      where: { status: "Ativa" },
+      orderBy: [{ ordem: "asc" }, { nome: "asc" }],
+    }),
+    prisma.procedimentoInteresse.findMany({
+      where: { status: "Ativo" },
+      orderBy: [{ ordem: "asc" }, { nome: "asc" }],
+    }),
   ]);
 
   return (
-    <ClienteServerForm
-      titulo="Novo cliente"
-      descricao="Cadastro direto por página, compatível com celular e sem depender de modal."
-      origens={origens}
-      procedimentosInteresse={procedimentosInteresse}
-      action={salvarNovoCliente}
-    />
+    <>
+      <ClientePageScrollLock />
+
+      <div className="w-full min-w-0 max-w-full overflow-x-hidden [touch-action:pan-y]">
+        <ClienteServerForm
+          titulo="Novo cliente"
+          descricao="Cadastro direto por página, compatível com celular e sem depender de modal."
+          origens={origens}
+          procedimentosInteresse={procedimentosInteresse}
+          action={salvarNovoCliente}
+        />
+      </div>
+    </>
   );
 }
