@@ -5,11 +5,67 @@ import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
 
-const TIPOS_PERGUNTA = new Set(["SIM_NAO", "TEXTO_CURTO", "TEXTO_LONGO", "MULTIPLA_ESCOLHA", "ACEITE"]);
+const TIPOS_PERGUNTA = new Set([
+  "SIM_NAO",
+  "TEXTO_CURTO",
+  "TEXTO_LONGO",
+  "MULTIPLA_ESCOLHA",
+  "ACEITE",
+]);
+
+const MODELOS_STUDIO_REALCAR = [
+  "Microlabial",
+  "Intradermoterapia",
+  "Hidratação facial",
+  "Protocolo clareamento",
+  "Protocolo secativo",
+  "Endermoterapia facial ou corporal",
+  "Ultrassom facial ou corporal",
+  "Microagulhamento",
+  "Limpeza de pele",
+  "Facial",
+  "Despigmentação micropigmentação ND YAG",
+  "Ultrassom microfocado",
+  "Laser",
+  "Criolipólise",
+  "Drenagem corporal",
+  "Fios de PDO Liso",
+  "PEIM",
+] as const;
+
+const PERGUNTAS_INICIAIS = [
+  {
+    pergunta: "Qual é a principal queixa, objetivo ou expectativa para este atendimento?",
+    tipo: "TEXTO_LONGO",
+    obrigatoria: true,
+  },
+  {
+    pergunta: "Possui alergias conhecidas ou já apresentou reação adversa a algum produto ou procedimento?",
+    tipo: "SIM_NAO",
+    obrigatoria: true,
+  },
+  {
+    pergunta: "Faz uso contínuo de medicamentos ou realizou algum tratamento recente que deva ser informado?",
+    tipo: "SIM_NAO",
+    obrigatoria: true,
+  },
+  {
+    pergunta: "Existe alguma informação de saúde, sensibilidade, restrição ou observação importante para este atendimento?",
+    tipo: "TEXTO_LONGO",
+    obrigatoria: false,
+  },
+  {
+    pergunta: "Declaro que as informações prestadas nesta ficha são verdadeiras e que recebi as orientações referentes ao atendimento.",
+    tipo: "ACEITE",
+    obrigatoria: true,
+  },
+] as const;
 
 function getString(formData: FormData, key: string) {
   const value = formData.get(key);
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : null;
 }
 
 function getNumber(formData: FormData, key: string) {
@@ -36,89 +92,79 @@ async function auditar(acao: string, entidade: string, detalhes: string) {
   });
 }
 
-export async function criarModelosAnamnesePadrao() {
-  await requirePermission("configuracoes.gerenciar");
-  const servicos = await prisma.procedimentoServico.findMany({
-    where: { status: "Ativo" },
-    orderBy: [{ ordem: "asc" }, { nome: "asc" }],
+async function resolverProcedimentoId(
+  procedimentoNome: string | null,
+  procedimentoIdInformado?: number | null,
+) {
+  if (procedimentoIdInformado) return procedimentoIdInformado;
+  if (!procedimentoNome) return null;
+
+  const servico = await prisma.procedimentoServico.findFirst({
+    where: {
+      nome: {
+        equals: procedimentoNome,
+        mode: "insensitive",
+      },
+    },
+    select: { id: true },
   });
 
-  const base = servicos.length > 0
-    ? servicos
-    : [
-        { id: null, nome: "Limpeza de pele", ordem: 1 },
-        { id: null, nome: "Botox", ordem: 2 },
-        { id: null, nome: "Cílios", ordem: 3 },
-        { id: null, nome: "Sobrancelha", ordem: 4 },
-      ];
+  return servico?.id ?? null;
+}
 
-  const perguntasPorProcedimento: Record<string, { pergunta: string; tipo?: string; obrigatoria?: boolean; opcoes?: string }[]> = {
-    "Limpeza de pele": [
-      { pergunta: "Usa ácidos, retinol ou produtos sensibilizantes nos últimos 7 dias?", tipo: "SIM_NAO", obrigatoria: true },
-      { pergunta: "Fez peeling, laser, microagulhamento ou procedimento recente no rosto?", tipo: "SIM_NAO", obrigatoria: true },
-      { pergunta: "Tem alergia a cosméticos, anestésicos ou algum ativo?", tipo: "SIM_NAO", obrigatoria: true },
-      { pergunta: "Está em uso de isotretinoína ou medicamento sensibilizante?", tipo: "SIM_NAO", obrigatoria: true },
-      { pergunta: "Principal queixa", tipo: "MULTIPLA_ESCOLHA", obrigatoria: true, opcoes: "Acne\nOleosidade\nManchas\nCravos\nSensibilidade\nOutro" },
-      { pergunta: "Cliente recebeu orientações de cuidados pós-procedimento", tipo: "ACEITE", obrigatoria: true },
-    ],
-    Botox: [
-      { pergunta: "Está gestante ou lactante?", tipo: "SIM_NAO", obrigatoria: true },
-      { pergunta: "Possui doença neuromuscular ou usa anticoagulante?", tipo: "SIM_NAO", obrigatoria: true },
-      { pergunta: "Já realizou aplicação anterior?", tipo: "SIM_NAO" },
-      { pergunta: "Tem alergia conhecida a algum componente?", tipo: "SIM_NAO", obrigatoria: true },
-      { pergunta: "Cliente está ciente das orientações e cuidados pós-procedimento", tipo: "ACEITE", obrigatoria: true },
-    ],
-    Cílios: [
-      { pergunta: "Tem alergia a cola ou histórico de irritação ocular?", tipo: "SIM_NAO", obrigatoria: true },
-      { pergunta: "Usa lente de contato?", tipo: "SIM_NAO" },
-      { pergunta: "Está com conjuntivite, sensibilidade ou inflamação nos olhos?", tipo: "SIM_NAO", obrigatoria: true },
-      { pergunta: "Já fez extensão de cílios antes?", tipo: "SIM_NAO" },
-      { pergunta: "Cliente recebeu orientações de manutenção e higienização", tipo: "ACEITE", obrigatoria: true },
-    ],
-    Sobrancelha: [
-      { pergunta: "Tem alergia a henna, tintura, cera ou pigmentos?", tipo: "SIM_NAO", obrigatoria: true },
-      { pergunta: "Fez procedimento recente na pele da região?", tipo: "SIM_NAO" },
-      { pergunta: "Usa ácidos ou produtos sensibilizantes no rosto?", tipo: "SIM_NAO" },
-      { pergunta: "Formato desejado ou observação estética", tipo: "TEXTO_LONGO" },
-    ],
-  };
+function revalidarAnamnese() {
+  revalidatePath("/configuracoes");
+  revalidatePath("/clientes");
+}
 
-  for (const [index, servico] of base.entries()) {
-    const nome = servico.nome;
+export async function criarModelosAnamnesePadrao() {
+  await requirePermission("configuracoes.gerenciar");
+
+  for (const [index, procedimentoNome] of MODELOS_STUDIO_REALCAR.entries()) {
     const modeloExistente = await prisma.anamneseModelo.findFirst({
-      where: { procedimentoNome: nome },
-    });
-
-    const modelo = modeloExistente ?? await prisma.anamneseModelo.create({
-      data: {
-        nome: `Anamnese - ${nome}`,
-        procedimentoId: servico.id ?? null,
-        procedimentoNome: nome,
-        status: "Ativo",
-        ordem: index + 1,
-        descricao: `Modelo padrão de anamnese para ${nome}.`,
+      where: {
+        procedimentoNome: {
+          equals: procedimentoNome,
+          mode: "insensitive",
+        },
+      },
+      include: {
+        perguntas: { select: { id: true } },
       },
     });
 
-    const chave = Object.keys(perguntasPorProcedimento).find((item) =>
-      nome.toLowerCase().includes(item.toLowerCase()) || item.toLowerCase().includes(nome.toLowerCase())
-    );
-    const perguntas = perguntasPorProcedimento[chave || ""] || [
-      { pergunta: "Qual é a principal queixa ou objetivo do cliente?", tipo: "TEXTO_LONGO", obrigatoria: true },
-      { pergunta: "Possui alergias, restrições ou medicamentos em uso?", tipo: "SIM_NAO", obrigatoria: true },
-      { pergunta: "Existe alguma contraindicação para o procedimento?", tipo: "SIM_NAO", obrigatoria: true },
-      { pergunta: "Cliente recebeu orientações e concorda com o procedimento", tipo: "ACEITE", obrigatoria: true },
-    ];
+    const procedimentoId = await resolverProcedimentoId(procedimentoNome);
 
-    const existentes = await prisma.anamnesePergunta.count({ where: { modeloId: modelo.id } });
-    if (existentes === 0) {
+    const modelo = modeloExistente
+      ? await prisma.anamneseModelo.update({
+          where: { id: modeloExistente.id },
+          data: {
+            procedimentoId,
+            status: modeloExistente.status || "Ativo",
+            ordem: modeloExistente.ordem || index + 1,
+          },
+        })
+      : await prisma.anamneseModelo.create({
+          data: {
+            nome: `Anamnese - ${procedimentoNome}`,
+            procedimentoId,
+            procedimentoNome,
+            status: "Ativo",
+            ordem: index + 1,
+            descricao: `Modelo inicial editável para ${procedimentoNome}. Revise perguntas, termos e contraindicações com a responsável técnica antes do uso definitivo.`,
+          },
+        });
+
+    const totalPerguntas = modeloExistente?.perguntas.length ?? 0;
+
+    if (totalPerguntas === 0) {
       await prisma.anamnesePergunta.createMany({
-        data: perguntas.map((pergunta, perguntaIndex) => ({
+        data: PERGUNTAS_INICIAIS.map((item, perguntaIndex) => ({
           modeloId: modelo.id,
-          pergunta: pergunta.pergunta,
-          tipo: pergunta.tipo || "SIM_NAO",
-          obrigatoria: Boolean(pergunta.obrigatoria),
-          opcoes: pergunta.opcoes || null,
+          pergunta: item.pergunta,
+          tipo: item.tipo,
+          obrigatoria: item.obrigatoria,
+          opcoes: null,
           ativa: true,
           ordem: perguntaIndex + 1,
         })),
@@ -126,19 +172,30 @@ export async function criarModelosAnamnesePadrao() {
     }
   }
 
-  await auditar("Criou modelos de anamnese padrão", "AnamneseModelo", "Modelos e perguntas padrão");
-  revalidatePath("/configuracoes");
-  revalidatePath("/clientes");
+  await auditar(
+    "Criou modelos de anamnese Studio Realçar",
+    "AnamneseModelo",
+    `${MODELOS_STUDIO_REALCAR.length} modelos verificados/criados sem duplicar modelos existentes`,
+  );
+  revalidarAnamnese();
 }
 
 export async function criarModeloAnamnese(formData: FormData) {
   await requirePermission("configuracoes.gerenciar");
+
   const procedimentoNome = getString(formData, "procedimentoNome");
   const nomeInformado = getString(formData, "nome");
-  const procedimentoId = getNumber(formData, "procedimentoId") || null;
+  const procedimentoIdInformado = getNumber(formData, "procedimentoId") || null;
+  const nome =
+    nomeInformado ||
+    (procedimentoNome ? `Anamnese - ${procedimentoNome}` : null);
 
-  const nome = nomeInformado || (procedimentoNome ? `Anamnese - ${procedimentoNome}` : null);
   if (!nome) return;
+
+  const procedimentoId = await resolverProcedimentoId(
+    procedimentoNome,
+    procedimentoIdInformado,
+  );
 
   await prisma.anamneseModelo.create({
     data: {
@@ -152,8 +209,129 @@ export async function criarModeloAnamnese(formData: FormData) {
   });
 
   await auditar("Criou modelo de anamnese", "AnamneseModelo", nome);
-  revalidatePath("/configuracoes");
-  revalidatePath("/clientes");
+  revalidarAnamnese();
+}
+
+export async function atualizarModeloAnamnese(formData: FormData) {
+  await requirePermission("configuracoes.gerenciar");
+
+  const id = getNumber(formData, "id");
+  const nome = getString(formData, "nome");
+  const procedimentoNome = getString(formData, "procedimentoNome");
+  const procedimentoIdInformado = getNumber(formData, "procedimentoId") || null;
+
+  if (!id || !nome) return;
+
+  const procedimentoId = await resolverProcedimentoId(
+    procedimentoNome,
+    procedimentoIdInformado,
+  );
+
+  await prisma.anamneseModelo.update({
+    where: { id },
+    data: {
+      nome,
+      procedimentoId,
+      procedimentoNome,
+      descricao: getString(formData, "descricao"),
+      status: getString(formData, "status") || "Ativo",
+      ordem: getNumber(formData, "ordem"),
+    },
+  });
+
+  await auditar("Atualizou modelo de anamnese", "AnamneseModelo", nome);
+  revalidarAnamnese();
+}
+
+export async function duplicarModeloAnamnese(id: number) {
+  await requirePermission("configuracoes.gerenciar");
+  if (!id) return;
+
+  const origem = await prisma.anamneseModelo.findUnique({
+    where: { id },
+    include: {
+      perguntas: { orderBy: [{ ordem: "asc" }, { id: "asc" }] },
+    },
+  });
+
+  if (!origem) return;
+
+  const copia = await prisma.anamneseModelo.create({
+    data: {
+      nome: `${origem.nome} (Cópia)`,
+      procedimentoId: null,
+      procedimentoNome: null,
+      descricao: origem.descricao,
+      status: "Inativo",
+      ordem: origem.ordem + 1,
+    },
+  });
+
+  if (origem.perguntas.length > 0) {
+    await prisma.anamnesePergunta.createMany({
+      data: origem.perguntas.map((pergunta) => ({
+        modeloId: copia.id,
+        pergunta: pergunta.pergunta,
+        tipo: pergunta.tipo,
+        opcoes: pergunta.opcoes,
+        obrigatoria: pergunta.obrigatoria,
+        ativa: pergunta.ativa,
+        ordem: pergunta.ordem,
+      })),
+    });
+  }
+
+  await auditar(
+    "Duplicou modelo de anamnese",
+    "AnamneseModelo",
+    `${origem.nome} -> ${copia.nome}`,
+  );
+  revalidarAnamnese();
+}
+
+export async function excluirModeloAnamnese(id: number) {
+  await requirePermission("configuracoes.gerenciar");
+  if (!id) return;
+
+  const modelo = await prisma.anamneseModelo.findUnique({
+    where: { id },
+    select: { id: true, nome: true, status: true },
+  });
+
+  if (!modelo) return;
+
+  const possuiHistorico =
+    (await prisma.clienteAnamneseResposta.count({
+      where: { modeloId: id },
+    })) > 0;
+
+  if (possuiHistorico) {
+    await prisma.$transaction([
+      prisma.anamneseModelo.update({
+        where: { id },
+        data: { status: "Inativo" },
+      }),
+      prisma.anamnesePergunta.updateMany({
+        where: { modeloId: id },
+        data: { ativa: false },
+      }),
+    ]);
+
+    await auditar(
+      "Desativou modelo de anamnese com histórico",
+      "AnamneseModelo",
+      modelo.nome,
+    );
+  } else {
+    await prisma.anamneseModelo.delete({ where: { id } });
+    await auditar(
+      "Excluiu modelo de anamnese",
+      "AnamneseModelo",
+      modelo.nome,
+    );
+  }
+
+  revalidarAnamnese();
 }
 
 export async function criarPerguntaAnamnese(formData: FormData) {
@@ -171,14 +349,13 @@ export async function criarPerguntaAnamnese(formData: FormData) {
       tipo: TIPOS_PERGUNTA.has(tipo) ? tipo : "SIM_NAO",
       opcoes: getString(formData, "opcoes"),
       obrigatoria: getBoolean(formData, "obrigatoria"),
-      ativa: getBoolean(formData, "ativa") || true,
+      ativa: true,
       ordem: getNumber(formData, "ordem"),
     },
   });
 
   await auditar("Criou pergunta de anamnese", "AnamnesePergunta", pergunta);
-  revalidatePath("/configuracoes");
-  revalidatePath("/clientes");
+  revalidarAnamnese();
 }
 
 export async function atualizarPerguntaAnamnese(formData: FormData) {
@@ -202,8 +379,7 @@ export async function atualizarPerguntaAnamnese(formData: FormData) {
   });
 
   await auditar("Atualizou pergunta de anamnese", "AnamnesePergunta", pergunta);
-  revalidatePath("/configuracoes");
-  revalidatePath("/clientes");
+  revalidarAnamnese();
 }
 
 export async function excluirPerguntaAnamnese(id: number) {
@@ -211,18 +387,31 @@ export async function excluirPerguntaAnamnese(id: number) {
   const pergunta = await prisma.anamnesePergunta.findUnique({ where: { id } });
   if (!pergunta) return;
 
-  const possuiRespostas = await prisma.clienteAnamneseResposta.count({ where: { perguntaId: id } });
+  const possuiRespostas =
+    (await prisma.clienteAnamneseResposta.count({
+      where: { perguntaId: id },
+    })) > 0;
 
-  if (possuiRespostas > 0) {
-    await prisma.anamnesePergunta.update({ where: { id }, data: { ativa: false } });
-    await auditar("Desativou pergunta de anamnese com histórico", "AnamnesePergunta", pergunta.pergunta);
+  if (possuiRespostas) {
+    await prisma.anamnesePergunta.update({
+      where: { id },
+      data: { ativa: false },
+    });
+    await auditar(
+      "Desativou pergunta de anamnese com histórico",
+      "AnamnesePergunta",
+      pergunta.pergunta,
+    );
   } else {
     await prisma.anamnesePergunta.delete({ where: { id } });
-    await auditar("Excluiu pergunta de anamnese", "AnamnesePergunta", pergunta.pergunta);
+    await auditar(
+      "Excluiu pergunta de anamnese",
+      "AnamnesePergunta",
+      pergunta.pergunta,
+    );
   }
 
-  revalidatePath("/configuracoes");
-  revalidatePath("/clientes");
+  revalidarAnamnese();
 }
 
 export async function salvarRespostasAnamneseRapida(formData: FormData) {
@@ -232,7 +421,9 @@ export async function salvarRespostasAnamneseRapida(formData: FormData) {
   const procedimento = getString(formData, "procedimento");
   const profissional = getString(formData, "profissional");
   const dataFichaTexto = getString(formData, "dataFicha");
-  const dataFicha = dataFichaTexto ? new Date(`${dataFichaTexto}T12:00:00`) : new Date();
+  const dataFicha = dataFichaTexto
+    ? new Date(`${dataFichaTexto}T12:00:00`)
+    : new Date();
   const total = getNumber(formData, "totalPerguntas");
 
   if (!clienteId || !total) return;
@@ -261,10 +452,17 @@ export async function salvarRespostasAnamneseRapida(formData: FormData) {
   }).filter((item): item is NonNullable<typeof item> => Boolean(item));
 
   const resumoRespostas = respostas
-    .map((item) => `${item.perguntaTexto}\nResposta: ${item.resposta || "-"}${item.observacao ? `\nObservação: ${item.observacao}` : ""}`)
+    .map(
+      (item) =>
+        `${item.perguntaTexto}\nResposta: ${item.resposta || "-"}${
+          item.observacao ? `\nObservação: ${item.observacao}` : ""
+        }`,
+    )
     .join("\n\n---\n\n");
 
-  const termoConsentimento = respostas.some((item) => item.tipo === "ACEITE" && item.resposta === "Aceito");
+  const termoConsentimento = respostas.some(
+    (item) => item.tipo === "ACEITE" && item.resposta === "Aceito",
+  );
 
   await prisma.$transaction(async (tx) => {
     await tx.clienteAnamneseResposta.deleteMany({
@@ -310,7 +508,11 @@ export async function salvarRespostasAnamneseRapida(formData: FormData) {
     }
   });
 
-  await auditar("Salvou anamnese do cliente", "ClienteAnamnese", `${clienteId} - ${procedimento || "Sem procedimento"}`);
+  await auditar(
+    "Salvou anamnese do cliente",
+    "ClienteAnamnese",
+    `${clienteId} - ${procedimento || "Sem procedimento"}`,
+  );
   revalidatePath(`/clientes/${clienteId}`);
   revalidatePath("/clientes");
 }
