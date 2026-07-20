@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import type { Cliente, OrigemCliente, ProcedimentoInteresse } from "@prisma/client";
 
 import { Button } from "@/components/ui/button";
@@ -13,24 +13,24 @@ type Props = {
 };
 
 const ORIGENS_FALLBACK = [
-  "Indicação",
+  "IndicaÃ§Ã£o",
   "Google Ads",
   "Facebook Ads",
   "Instagram",
   "WhatsApp",
-  "Busca orgânica",
+  "Busca orgÃ¢nica",
   "Cliente antigo",
   "Passou na frente",
   "Outro",
 ];
 
 const PROCEDIMENTOS_FALLBACK = [
-  "Avaliação",
+  "AvaliaÃ§Ã£o",
   "Limpeza de pele",
   "Botox",
   "Preenchimento",
   "Bioestimulador",
-  "Depilação",
+  "DepilaÃ§Ã£o",
   "Massagem",
   "Drenagem",
   "Peeling",
@@ -91,17 +91,17 @@ export default function ClienteServerForm({
       : PROCEDIMENTOS_FALLBACK;
 
   const origemPadrao =
-    cliente?.origem || origensDisponiveis[0] || "Indicação";
+    cliente?.origem || origensDisponiveis[0] || "IndicaÃ§Ã£o";
 
   const procedimentoPadrao =
     cliente?.procedimentoInteresse ||
     cliente?.procedimento ||
     procedimentosDisponiveis[0] ||
-    "Avaliação";
+    "AvaliaÃ§Ã£o";
 
   return (
     <div
-      className="app-mobile-safe mx-auto w-full min-w-0 max-w-4xl overflow-x-hidden overscroll-x-none space-y-5 sm:space-y-6"
+      className="app-mobile-safe cliente-form-locked mx-auto w-full min-w-0 max-w-4xl overflow-x-hidden overscroll-x-none space-y-5 sm:space-y-6"
       style={{
         touchAction: "pan-y",
         overscrollBehaviorX: "none",
@@ -217,14 +217,14 @@ export default function ClienteServerForm({
 
             <label className="min-w-0 space-y-2 sm:col-span-2">
               <span className="block break-words text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                Observações
+                ObservaÃ§Ãµes
               </span>
 
               <textarea
                 name="observacoes"
                 defaultValue={cliente?.observacoes ?? ""}
                 rows={5}
-                placeholder="Preferências, restrições, observações comerciais ou informações úteis para o atendimento."
+                placeholder="PreferÃªncias, restriÃ§Ãµes, observaÃ§Ãµes comerciais ou informaÃ§Ãµes Ãºteis para o atendimento."
                 className="premium-input min-h-32 w-full min-w-0 max-w-full resize-y py-3"
               />
             </label>
@@ -254,3 +254,4 @@ export default function ClienteServerForm({
     </div>
   );
 }
+

@@ -1138,3 +1138,22 @@ body {
     padding-bottom: calc(1rem + env(safe-area-inset-bottom));
   }
 }
+
+/* STUDIO MOBILE HORIZONTAL LOCK */
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
+}
+
+.cliente-form-locked {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
+  touch-action: pan-y;
+}
