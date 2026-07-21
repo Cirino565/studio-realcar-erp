@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   CalendarDays,
   Check,
@@ -100,6 +101,32 @@ function formatWeekday(date: Date) {
     .format(date)
     .replace(".", "")
     .slice(0, 3);
+}
+
+function formatMonthYear(date: Date) {
+  const value = new Intl.DateTimeFormat("pt-BR", {
+    month: "long",
+    year: "numeric",
+  }).format(date);
+
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function formatSelectedDateTitle(date: Date) {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = new Intl.DateTimeFormat("pt-BR", {
+    month: "long",
+  }).format(date);
+
+  return `${day} de ${month.charAt(0).toUpperCase() + month.slice(1)}`;
+}
+
+function getCalendarDays(viewDate: Date) {
+  const firstDay = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+  const firstVisible = new Date(firstDay);
+  firstVisible.setDate(firstDay.getDate() - firstDay.getDay());
+
+  return Array.from({ length: 42 }, (_, index) => addDays(firstVisible, index));
 }
 
 
@@ -234,11 +261,23 @@ export default function AgendaCalendar({
 
   const [hiddenProfessionalIds, setHiddenProfessionalIds] = useState<number[]>([]);
   const [showVisibilityPanel, setShowVisibilityPanel] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarViewDate, setCalendarViewDate] = useState(
+    () => new Date(selectedDate),
+  );
+  const [calendarDraftDate, setCalendarDraftDate] = useState(
+    () => new Date(selectedDate),
+  );
 
   const weekDays = useMemo(() => {
     const weekStart = startOfWeek(selectedDate);
     return Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
   }, [selectedDate]);
+
+  const calendarDays = useMemo(
+    () => getCalendarDays(calendarViewDate),
+    [calendarViewDate],
+  );
 
   const slots = useMemo(() => {
     if (isSunday) return [];
@@ -294,10 +333,27 @@ export default function AgendaCalendar({
     window.location.href = agendaHref(date, profissionalFiltro);
   }
 
-  function handleDateInputChange(value: string) {
-    const [year, month, day] = value.split("-").map(Number);
-    if (!year || !month || !day) return;
-    goToDate(new Date(year, month - 1, day));
+  function openCalendar() {
+    const selected = new Date(selectedDate);
+    setCalendarDraftDate(selected);
+    setCalendarViewDate(new Date(selected.getFullYear(), selected.getMonth(), 1));
+    setCalendarOpen(true);
+  }
+
+  function closeCalendar() {
+    setCalendarOpen(false);
+  }
+
+  function changeCalendarMonth(amount: number) {
+    setCalendarViewDate((current) =>
+      new Date(current.getFullYear(), current.getMonth() + amount, 1),
+    );
+  }
+
+  function confirmCalendarDate() {
+    const next = new Date(calendarDraftDate);
+    setCalendarOpen(false);
+    goToDate(next);
   }
 
   function abrirNovo(profissionalId: number, hora = "09:00") {
@@ -343,7 +399,8 @@ export default function AgendaCalendar({
   }, [isSunday, selectedDate, today, totalMinutes]);
 
   return (
-    <section className="relative w-full max-w-full overflow-hidden border border-slate-300 bg-white text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:rounded-xl">
+    <>
+      <section className="relative w-full max-w-full overflow-hidden border border-slate-300 bg-white text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:rounded-xl">
       <div className="border-b border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-900">
         <div className="flex min-h-14 flex-col gap-2 px-2 py-2 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center lg:gap-4 lg:px-3">
           <div className="flex min-w-0 items-center gap-1.5">
@@ -379,20 +436,19 @@ export default function AgendaCalendar({
               </button>
             </div>
 
-            <label className="relative flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-violet-700 transition hover:bg-violet-50 dark:text-violet-200 dark:hover:bg-violet-500/10" title={formatDateCompact(selectedDate)}>
+            <button
+              type="button"
+              onClick={openCalendar}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-violet-700 transition hover:bg-violet-50 dark:text-violet-200 dark:hover:bg-violet-500/10"
+              title={formatDateCompact(selectedDate)}
+              aria-label="Abrir calendário"
+            >
               <CalendarDays size={19} />
-              <input
-                type="date"
-                value={selectedDateInput}
-                onChange={(event) => handleDateInputChange(event.target.value)}
-                className="absolute inset-0 cursor-pointer opacity-0"
-                aria-label="Selecionar data"
-              />
-            </label>
+            </button>
           </div>
 
           <div className="order-3 min-w-0 overflow-x-auto lg:order-none lg:overflow-visible">
-            <div className="mx-auto flex min-w-max items-stretch justify-center overflow-hidden rounded-md border border-violet-300 bg-white dark:border-violet-500/50 dark:bg-slate-950">
+            <div className="mx-auto flex w-fit min-w-max items-center justify-center gap-1">
               {weekDays.map((day) => {
                 const active = isSameDay(day, selectedDate);
                 const todayItem = isSameDay(day, today);
@@ -401,12 +457,12 @@ export default function AgendaCalendar({
                   <a
                     key={formatDateInput(day)}
                     href={agendaHref(day, profissionalFiltro)}
-                    className={`flex min-w-[84px] items-center justify-center gap-1.5 border-r border-violet-200 px-2.5 py-2 text-center text-xs font-semibold transition last:border-r-0 dark:border-violet-500/40 ${
+                    className={`flex h-9 w-[82px] flex-none items-center justify-center gap-1 rounded-md border px-2 text-center text-xs font-semibold transition ${
                       active
-                        ? "bg-violet-700 text-white"
+                        ? "border-violet-700 bg-violet-700 text-white shadow-sm"
                         : todayItem
-                          ? "bg-violet-50 text-violet-800 hover:bg-violet-100 dark:bg-violet-500/10 dark:text-violet-100"
-                          : "text-violet-700 hover:bg-violet-50 dark:text-violet-200 dark:hover:bg-violet-500/10"
+                          ? "border-violet-300 bg-violet-50 text-violet-800 hover:bg-violet-100 dark:border-violet-500/50 dark:bg-violet-500/10 dark:text-violet-100"
+                          : "border-violet-200 bg-white text-violet-700 hover:border-violet-300 hover:bg-violet-50 dark:border-violet-500/40 dark:bg-slate-950 dark:text-violet-200 dark:hover:bg-violet-500/10"
                     }`}
                   >
                     <span className="capitalize">{formatWeekday(day)}</span>
@@ -703,6 +759,151 @@ export default function AgendaCalendar({
           </div>
         </div>
       )}
-    </section>
+      </section>
+
+      {calendarOpen && typeof document !== "undefined"
+        ? createPortal(
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[1px]">
+              <button
+                type="button"
+                aria-label="Fechar calendário"
+                onClick={closeCalendar}
+                className="absolute inset-0"
+              />
+
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Selecionar data"
+                className="relative z-10 w-full max-w-[340px] overflow-hidden rounded-xl bg-white shadow-2xl shadow-slate-950/30 dark:bg-slate-900"
+              >
+                <div className="bg-gradient-to-br from-violet-700 to-fuchsia-600 px-6 pb-5 pt-4 text-white">
+                  <p className="text-[0.68rem] font-bold uppercase tracking-[0.18em] text-violet-100">
+                    Data
+                  </p>
+                  <p className="mt-1 text-2xl font-bold tracking-tight">
+                    {formatSelectedDateTitle(calendarDraftDate)}
+                  </p>
+                </div>
+
+                <div className="px-5 pb-4 pt-5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-bold text-slate-700 dark:text-slate-100">
+                      {formatMonthYear(calendarViewDate)}
+                    </p>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => changeCalendarMonth(-1)}
+                        className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition hover:bg-violet-50 hover:text-violet-700 dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:text-violet-200"
+                        aria-label="Mês anterior"
+                      >
+                        <ChevronLeft size={20} />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => changeCalendarMonth(1)}
+                        className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition hover:bg-violet-50 hover:text-violet-700 dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:text-violet-200"
+                        aria-label="Próximo mês"
+                      >
+                        <ChevronRight size={20} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-7 text-center">
+                    {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map(
+                      (label) => (
+                        <span
+                          key={label}
+                          className="py-2 text-[0.68rem] font-semibold text-slate-500 dark:text-slate-400"
+                        >
+                          {label}
+                        </span>
+                      ),
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-7 gap-y-1 text-center">
+                    {calendarDays.map((day) => {
+                      const inCurrentMonth =
+                        day.getMonth() === calendarViewDate.getMonth();
+                      const selected = isSameDay(day, calendarDraftDate);
+                      const todayDay = isSameDay(day, today);
+
+                      return (
+                        <button
+                          key={formatDateInput(day)}
+                          type="button"
+                          onClick={() => {
+                            setCalendarDraftDate(new Date(day));
+                            if (!inCurrentMonth) {
+                              setCalendarViewDate(
+                                new Date(day.getFullYear(), day.getMonth(), 1),
+                              );
+                            }
+                          }}
+                          className={`mx-auto flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold transition ${
+                            selected
+                              ? "bg-violet-700 text-white shadow-md shadow-violet-700/25"
+                              : todayDay
+                                ? "ring-1 ring-violet-400 text-violet-700 hover:bg-violet-50 dark:text-violet-200"
+                                : inCurrentMonth
+                                  ? "text-slate-700 hover:bg-violet-50 hover:text-violet-700 dark:text-slate-200 dark:hover:bg-violet-500/10"
+                                  : "text-slate-300 hover:bg-slate-50 dark:text-slate-600 dark:hover:bg-slate-800"
+                          }`}
+                        >
+                          {day.getDate()}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-3 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const currentToday = new Date();
+                        setCalendarDraftDate(currentToday);
+                        setCalendarViewDate(
+                          new Date(
+                            currentToday.getFullYear(),
+                            currentToday.getMonth(),
+                            1,
+                          ),
+                        );
+                      }}
+                      className="px-2 py-2 text-xs font-bold uppercase tracking-wide text-violet-700 transition hover:text-violet-900 dark:text-violet-300"
+                    >
+                      Hoje
+                    </button>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={closeCalendar}
+                        className="rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-wide text-violet-700 transition hover:bg-violet-50 dark:text-violet-300 dark:hover:bg-violet-500/10"
+                      >
+                        Cancelar
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={confirmCalendarDate}
+                        className="rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-wide text-violet-700 transition hover:bg-violet-50 dark:text-violet-300 dark:hover:bg-violet-500/10"
+                      >
+                        OK
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
   );
 }
