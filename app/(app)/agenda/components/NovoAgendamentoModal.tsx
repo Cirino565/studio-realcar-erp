@@ -4,16 +4,18 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   AlertCircle,
-  CalendarPlus,
+  CalendarDays,
   CheckCircle2,
+  ChevronDown,
   Clock3,
   Search,
   UserPlus,
-  UsersRound,
+  UserRound,
   X,
 } from "lucide-react";
 
 import {
+  atualizarAgendamento,
   buscarDisponibilidadeAgenda,
   criarAgendamento,
   type HorarioDisponivelAgenda,
@@ -50,6 +52,8 @@ type ServicoAgenda = {
 };
 
 type NovoAgendamentoPayload = NovoHorarioPayload & {
+  agendamentoId?: number;
+  modo?: "novo" | "retorno" | "edicao";
   clienteId?: number;
   procedimento?: string;
   duracao?: number;
@@ -78,45 +82,28 @@ function useLockBodyScroll(open: boolean) {
 
     const originalHtmlOverflow = html.style.overflow;
     const originalHtmlOverflowX = html.style.overflowX;
-    const originalHtmlOverscrollBehavior = html.style.overscrollBehavior;
     const originalBodyOverflow = body.style.overflow;
     const originalBodyOverflowX = body.style.overflowX;
-    const originalBodyOverscrollBehavior = body.style.overscrollBehavior;
-    const originalBodyTouchAction = body.style.touchAction;
     const originalPosition = body.style.position;
     const originalTop = body.style.top;
     const originalWidth = body.style.width;
-    const originalLeft = body.style.left;
-    const originalRight = body.style.right;
 
     html.style.overflow = "hidden";
     html.style.overflowX = "hidden";
-    html.style.overscrollBehavior = "none";
-
     body.style.overflow = "hidden";
     body.style.overflowX = "hidden";
-    body.style.overscrollBehavior = "none";
-    body.style.touchAction = "pan-y";
     body.style.position = "fixed";
     body.style.top = `-${scrollY}px`;
-    body.style.left = "0";
-    body.style.right = "0";
     body.style.width = "100%";
 
     return () => {
       html.style.overflow = originalHtmlOverflow;
       html.style.overflowX = originalHtmlOverflowX;
-      html.style.overscrollBehavior = originalHtmlOverscrollBehavior;
-
       body.style.overflow = originalBodyOverflow;
       body.style.overflowX = originalBodyOverflowX;
-      body.style.overscrollBehavior = originalBodyOverscrollBehavior;
-      body.style.touchAction = originalBodyTouchAction;
       body.style.position = originalPosition;
       body.style.top = originalTop;
       body.style.width = originalWidth;
-      body.style.left = originalLeft;
-      body.style.right = originalRight;
       window.scrollTo(0, scrollY);
     };
   }, [open]);
@@ -154,13 +141,19 @@ function formatCurrencyInput(value: string) {
 
 function parseCurrency(value: string) {
   const parsed = Number(value.replace(".", "").replace(",", "."));
-
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function valorParaInput(value?: number) {
   if (!value || value <= 0) return "";
-  return String(value).replace(".", ",");
+  return value.toFixed(2).replace(".", ",");
+}
+
+function formatCurrency(value: number) {
+  return value.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
 }
 
 function getHojeInput() {
@@ -175,28 +168,12 @@ function telefoneCliente(cliente: Cliente) {
   return cliente.whatsapp || cliente.telefone || "Não informado";
 }
 
-function inputClassName() {
-  return "h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:bg-white focus:ring-4 focus:ring-purple-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-purple-400 dark:focus:bg-slate-900 dark:focus:ring-purple-900/40";
+function fieldClassName() {
+  return "h-10 w-full min-w-0 border-0 border-b border-slate-300 bg-transparent px-0 text-[15px] font-medium text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-600 focus:ring-0 dark:border-slate-600 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-violet-400";
 }
 
 function labelClassName() {
-  return "text-[0.66rem] font-bold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-400";
-}
-
-function isDarkThemeActive() {
-  if (typeof window === "undefined") return false;
-
-  const html = document.documentElement;
-  const body = document.body;
-
-  return (
-    html.classList.contains("dark") ||
-    body.classList.contains("dark") ||
-    html.dataset.theme === "dark" ||
-    body.dataset.theme === "dark" ||
-    html.getAttribute("data-theme") === "dark" ||
-    body.getAttribute("data-theme") === "dark"
-  );
+  return "mb-1 block text-[11px] font-medium text-slate-500 dark:text-slate-400";
 }
 
 export default function NovoAgendamentoModal({
@@ -226,45 +203,37 @@ export default function NovoAgendamentoModal({
   const [observacoes, setObservacoes] = useState("");
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [mostrarMaisCampos, setMostrarMaisCampos] = useState(false);
   const [horarios, setHorarios] = useState<HorarioDisponivelAgenda[]>([]);
-  const [temaEscuro, setTemaEscuro] = useState(false);
   const [isLoadingHorarios, startHorariosTransition] = useTransition();
 
   useLockBodyScroll(open);
 
+  const modoEdicao = Boolean(
+    initialPayload?.modo === "edicao" && initialPayload?.agendamentoId,
+  );
+
+  const modoRetorno = Boolean(
+    !modoEdicao &&
+      (initialPayload?.modo === "retorno" || initialPayload?.clienteId),
+  );
+
   const agendamentoDiretoAgenda = Boolean(
-    initialPayload?.profissionalId && initialPayload?.data && initialPayload?.hora,
+    !modoEdicao &&
+      initialPayload?.profissionalId &&
+      initialPayload?.data &&
+      initialPayload?.hora,
   );
 
   useEffect(() => {
     if (!open) return;
 
-    const atualizarTema = () => setTemaEscuro(isDarkThemeActive());
-    atualizarTema();
-
-    const observer = new MutationObserver(atualizarTema);
-
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class", "data-theme"],
-    });
-
-    observer.observe(document.body, {
-      attributes: true,
-      attributeFilter: ["class", "data-theme"],
-    });
-
-    return () => observer.disconnect();
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-
     const temClientePreSelecionado = Boolean(initialPayload?.clienteId);
+    const deveBloquearCliente = Boolean(temClientePreSelecionado && !modoEdicao);
 
     setErro("");
-    setClienteBloqueado(temClientePreSelecionado);
     setTipoCliente("existente");
+    setClienteBloqueado(deveBloquearCliente);
     setClienteId(initialPayload?.clienteId ? String(initialPayload.clienteId) : "");
     setBuscaCliente("");
     setNovoClienteNome("");
@@ -285,15 +254,25 @@ export default function NovoAgendamentoModal({
     setValor(valorParaInput(initialPayload?.valor));
     setStatus(initialPayload?.status || "Agendado");
     setObservacoes(initialPayload?.observacoes || "");
+    setMostrarMaisCampos(Boolean(initialPayload?.observacoes || modoEdicao));
 
     if (initialPayload?.procedimento) {
-      setServicoSelecionadoId("outro");
+      const servicoCorrespondente = servicos.find(
+        (item) => normalizarTexto(item.nome) === normalizarTexto(initialPayload.procedimento),
+      );
+
+      if (servicoCorrespondente) {
+        setServicoSelecionadoId(String(servicoCorrespondente.id));
+      } else {
+        setServicoSelecionadoId("outro");
+      }
+
       setProcedimento(initialPayload.procedimento);
     } else {
       setServicoSelecionadoId("");
       setProcedimento("");
     }
-  }, [open, initialPayload, profissionais]);
+  }, [open, initialPayload, profissionais, servicos, modoEdicao]);
 
   useEffect(() => {
     if (!open || !profissionalId || !data) {
@@ -307,6 +286,7 @@ export default function NovoAgendamentoModal({
           profissionalId: Number(profissionalId),
           data,
           duracao: Number(duracao) || 60,
+          ignoreId: modoEdicao ? initialPayload?.agendamentoId : undefined,
         });
 
         setHorarios(resultado);
@@ -314,11 +294,18 @@ export default function NovoAgendamentoModal({
         setHorarios([]);
       }
     });
-  }, [open, profissionalId, data, duracao]);
+  }, [
+    open,
+    profissionalId,
+    data,
+    duracao,
+    modoEdicao,
+    initialPayload?.agendamentoId,
+  ]);
 
   const clienteSelecionado = useMemo(() => {
     if (!clienteId) return null;
-    return clientes.find((cliente) => String(cliente.id) === String(clienteId));
+    return clientes.find((cliente) => String(cliente.id) === String(clienteId)) || null;
   }, [clienteId, clientes]);
 
   const clientesFiltrados = useMemo(() => {
@@ -340,28 +327,9 @@ export default function NovoAgendamentoModal({
       .slice(0, 6);
   }, [buscaCliente, clientes]);
 
-  const modoRetorno = Boolean(initialPayload?.clienteId);
-  const deveMostrarBusca = tipoCliente === "existente" && !clienteBloqueado;
-  const deveMostrarResultados =
-    deveMostrarBusca &&
-    (normalizarTexto(buscaCliente).length >= 2 || onlyDigits(buscaCliente).length >= 2);
-
   const horariosDisponiveis = horarios.filter((item) => item.disponivel);
   const horariosOcupados = horarios.filter((item) => !item.disponivel).slice(0, 5);
-
-  const cardInfoStyle = temaEscuro
-    ? {
-        backgroundColor: "#171827",
-        borderColor: "#334155",
-        color: "#ffffff",
-      }
-    : {
-        backgroundColor: "#faf5ff",
-        borderColor: "#e9d5ff",
-        color: "#0f172a",
-      };
-
-  const cardInfoSecondaryStyle = temaEscuro ? { color: "#cbd5e1" } : { color: "#64748b" };
+  const total = parseCurrency(valor);
 
   function selecionarServico(value: string) {
     setServicoSelecionadoId(value);
@@ -381,7 +349,30 @@ export default function NovoAgendamentoModal({
 
     setProcedimento(servico.nome);
     setDuracao(String(servico.duracaoPadrao));
-    setValor(servico.valorPadrao > 0 ? String(servico.valorPadrao).replace(".", ",") : "");
+    setValor(
+      servico.valorPadrao > 0
+        ? servico.valorPadrao.toFixed(2).replace(".", ",")
+        : "",
+    );
+  }
+
+  function iniciarNovoCliente() {
+    setTipoCliente("novo");
+
+    if (buscaCliente && !onlyDigits(buscaCliente)) {
+      setNovoClienteNome(buscaCliente.trim());
+    }
+
+    setClienteId("");
+    setErro("");
+  }
+
+  function voltarParaBuscaCliente() {
+    setTipoCliente("existente");
+    setNovoClienteNome("");
+    setNovoClienteWhatsapp("");
+    setNovoClienteOrigem("");
+    setErro("");
   }
 
   if (!open) return null;
@@ -400,7 +391,7 @@ export default function NovoAgendamentoModal({
     }
 
     if (tipoCliente === "existente" && !clienteId) {
-      setErro("Selecione um cliente cadastrado.");
+      setErro("Selecione um cliente cadastrado ou adicione um novo cliente.");
       return;
     }
 
@@ -414,7 +405,7 @@ export default function NovoAgendamentoModal({
     const dataCompleta = `${data}T${hora}:00`;
 
     try {
-      await criarAgendamento({
+      const payload = {
         clienteId: tipoCliente === "existente" ? Number(clienteId) : undefined,
         novoCliente:
           tipoCliente === "novo"
@@ -433,7 +424,16 @@ export default function NovoAgendamentoModal({
         valor: parseCurrency(valor),
         status,
         observacoes,
-      });
+      };
+
+      if (modoEdicao && initialPayload?.agendamentoId) {
+        await atualizarAgendamento({
+          id: initialPayload.agendamentoId,
+          ...payload,
+        });
+      } else {
+        await criarAgendamento(payload);
+      }
 
       setSalvando(false);
       onClose();
@@ -441,7 +441,9 @@ export default function NovoAgendamentoModal({
     } catch (error) {
       setSalvando(false);
       setErro(
-        error instanceof Error ? error.message : "Não foi possível salvar o agendamento.",
+        error instanceof Error
+          ? error.message
+          : "Não foi possível salvar o agendamento.",
       );
     }
   }
@@ -450,275 +452,42 @@ export default function NovoAgendamentoModal({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-[9999] h-[100dvh] w-full max-w-full overflow-x-hidden overflow-y-auto overscroll-y-contain bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-white"
-      style={{
-        touchAction: "pan-y",
-        overscrollBehaviorX: "none",
-        maxWidth: "100%",
-      }}
+      className="fixed inset-0 z-[9999] flex h-[100dvh] w-full items-center justify-center overflow-hidden bg-slate-950/45 p-2 backdrop-blur-[2px] sm:p-4"
     >
-      <div className="mx-auto flex min-h-[100dvh] w-full max-w-5xl flex-col overflow-x-hidden">
-        <div className="bg-white px-4 pb-3 pt-4 shadow-sm dark:bg-slate-900 sm:rounded-b-[2rem] sm:px-6 sm:pb-5 sm:pt-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-start gap-3">
-              <div className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300 sm:flex">
-                <CalendarPlus size={20} />
-              </div>
-
-              <div className="min-w-0">
-                <h2 className="truncate text-xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-2xl">
-                  {modoRetorno ? "Agendar retorno" : "Criar agendamento"}
-                </h2>
-
-                <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-300">
-                  {modoRetorno
-                    ? "Cliente já selecionada. Escolha data, horário e procedimento."
-                    : agendamentoDiretoAgenda
-                      ? "Horário e profissional definidos diretamente pela agenda."
-                      : "Busque a cliente, escolha um horário livre e salve o atendimento."}
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="shrink-0 rounded-2xl border border-slate-200 bg-slate-50 p-2 text-slate-500 shadow-sm hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
-              aria-label="Fechar modal"
-            >
-              <X size={18} />
-            </button>
+      <div className="flex max-h-[calc(100dvh-1rem)] w-full max-w-[620px] flex-col overflow-hidden rounded-md border border-slate-200 bg-white shadow-2xl shadow-slate-950/30 dark:border-slate-700 dark:bg-slate-900 sm:max-h-[calc(100dvh-2rem)]">
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-700 sm:px-5">
+          <div className="min-w-0">
+            <h2 className="truncate text-base font-bold text-slate-800 dark:text-white">
+              {modoEdicao
+                ? "Editando Atendimento"
+                : modoRetorno
+                  ? "Criando Retorno"
+                  : "Criando Atendimento"}
+            </h2>
           </div>
 
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex size-9 shrink-0 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white"
+            aria-label="Fechar"
+          >
+            <X size={18} />
+          </button>
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
           {erro ? (
-            <div className="mt-3 flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs leading-5 text-rose-700 dark:border-rose-500/40 dark:bg-rose-950/40 dark:text-rose-200">
-              <AlertCircle className="mt-0.5 shrink-0" size={15} />
+            <div className="mb-4 flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-950/30 dark:text-rose-200">
+              <AlertCircle size={16} className="mt-0.5 shrink-0" />
               <span>{erro}</span>
             </div>
           ) : null}
-        </div>
 
-        <div className="flex-1 space-y-3 px-4 py-3 pb-[calc(0.85rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-6">
-          <section className="rounded-[1.35rem] bg-white p-3 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-700 sm:p-5">
-            {clienteBloqueado && clienteSelecionado ? (
-              <div className="rounded-2xl border p-3" style={cardInfoStyle}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className={labelClassName()}>Cliente selecionada</p>
-                    <p className="mt-1 truncate text-base font-bold" style={{ color: cardInfoStyle.color }}>
-                      {clienteSelecionado.nome}
-                    </p>
-                    <p className="mt-1 truncate text-xs" style={cardInfoSecondaryStyle}>
-                      {telefoneCliente(clienteSelecionado)}
-                    </p>
-                  </div>
-                  <CheckCircle2
-                    className="shrink-0"
-                    style={{ color: temaEscuro ? "#c4b5fd" : "#6d28d9" }}
-                    size={20}
-                  />
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTipoCliente("existente");
-                      setErro("");
-                    }}
-                    className={`flex min-w-0 items-center justify-center gap-2 rounded-2xl border px-3 py-2.5 text-center text-xs font-bold transition sm:justify-start sm:text-sm ${
-                      tipoCliente === "existente"
-                        ? "border-purple-300 bg-purple-50 text-purple-800 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                        : "border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-                    }`}
-                  >
-                    <UsersRound size={16} className="shrink-0" />
-                    <span className="truncate">Cliente cadastrado</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTipoCliente("novo");
-                      setErro("");
-                    }}
-                    className={`flex min-w-0 items-center justify-center gap-2 rounded-2xl border px-3 py-2.5 text-center text-xs font-bold transition sm:justify-start sm:text-sm ${
-                      tipoCliente === "novo"
-                        ? "border-purple-300 bg-purple-50 text-purple-800 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                        : "border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-                    }`}
-                  >
-                    <UserPlus size={16} className="shrink-0" />
-                    <span className="truncate">Novo cliente</span>
-                  </button>
-                </div>
-
-                {tipoCliente === "existente" ? (
-                  <div className="mt-3 space-y-3">
-                    <label className="block space-y-2">
-                      <span className={labelClassName()}>Buscar cliente</span>
-                      <div className="relative min-w-0">
-                        <Search
-                          className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                          size={16}
-                        />
-                        <input
-                          value={buscaCliente}
-                          onChange={(event) => {
-                            setBuscaCliente(event.target.value);
-                            setErro("");
-                          }}
-                          placeholder="Digite pelo menos 2 letras ou números"
-                          className={`${inputClassName()} pl-11`}
-                        />
-                      </div>
-                    </label>
-
-                    {clienteSelecionado ? (
-                      <div className="rounded-2xl border p-3" style={cardInfoStyle}>
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className={labelClassName()}>Selecionado</p>
-                            <p className="mt-1 truncate text-sm font-bold" style={{ color: cardInfoStyle.color }}>
-                              {clienteSelecionado.nome}
-                            </p>
-                            <p className="mt-1 truncate text-xs" style={cardInfoSecondaryStyle}>
-                              {telefoneCliente(clienteSelecionado)}
-                            </p>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setClienteId("");
-                              setBuscaCliente("");
-                            }}
-                            className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                          >
-                            Trocar
-                          </button>
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {deveMostrarResultados ? (
-                      <div className="space-y-2">
-                        {clientesFiltrados.length > 0 ? (
-                          clientesFiltrados.map((cliente) => {
-                            const active = clienteId === String(cliente.id);
-
-                            return (
-                              <button
-                                key={cliente.id}
-                                type="button"
-                                onClick={() => {
-                                  setClienteId(String(cliente.id));
-                                  setErro("");
-                                }}
-                                className={`w-full rounded-2xl border px-3 py-2.5 text-left transition ${
-                                  active
-                                    ? "border-purple-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-900"
-                                    : "border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
-                                }`}
-                              >
-                                <p className="truncate text-sm font-bold text-slate-900 dark:text-white">
-                                  {cliente.nome}
-                                </p>
-                                <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
-                                  {telefoneCliente(cliente)}
-                                </p>
-                              </button>
-                            );
-                          })
-                        ) : (
-                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center text-xs leading-5 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                            Nenhuma cliente encontrada para essa busca.
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-xs leading-5 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                        A lista completa não aparece automaticamente. Pesquise pelo nome ou WhatsApp.
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="mt-3 grid gap-3">
-                    <label className="block space-y-2">
-                      <span className={labelClassName()}>Nome do cliente</span>
-                      <input
-                        value={novoClienteNome}
-                        onChange={(event) => {
-                          setNovoClienteNome(event.target.value);
-                          setErro("");
-                        }}
-                        placeholder="Ex.: Jully Oliveira"
-                        className={inputClassName()}
-                      />
-                    </label>
-
-                    <label className="block space-y-2">
-                      <span className={labelClassName()}>WhatsApp</span>
-                      <input
-                        value={novoClienteWhatsapp}
-                        onChange={(event) => setNovoClienteWhatsapp(maskPhone(event.target.value))}
-                        placeholder="(11) 99999-9999"
-                        className={inputClassName()}
-                      />
-                    </label>
-
-                    <label className="block space-y-2">
-                      <span className={labelClassName()}>Origem</span>
-                      <select
-                        value={novoClienteOrigem}
-                        onChange={(event) => setNovoClienteOrigem(event.target.value)}
-                        className={inputClassName()}
-                      >
-                        <option value="">Selecione</option>
-                        {origensCliente.map((origem) => (
-                          <option key={origem.id} value={origem.nome}>
-                            {origem.nome}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                )}
-              </>
-            )}
-          </section>
-
-          <section className="rounded-[1.35rem] bg-white p-3 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-700 sm:p-5">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block space-y-2 sm:col-span-2">
-                <span className={labelClassName()}>Profissional</span>
-                <select
-                  value={profissionalId}
-                  disabled={agendamentoDiretoAgenda}
-                  onChange={(event) => {
-                    setProfissionalId(event.target.value);
-                    setErro("");
-                  }}
-                  className={
-                    agendamentoDiretoAgenda
-                      ? "h-11 w-full cursor-not-allowed rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                      : inputClassName()
-                  }
-                >
-                  <option value="">Selecione</option>
-                  {profissionais.map((profissional) => (
-                    <option key={profissional.id} value={profissional.id}>
-                      {profissional.nome}
-                      {profissional.area ? ` · ${profissional.area}` : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block space-y-2">
-                <span className={labelClassName()}>Data</span>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+            <label className="min-w-0">
+              <span className={labelClassName()}>Data</span>
+              <div className="relative">
                 <input
                   type="date"
                   value={data}
@@ -727,21 +496,23 @@ export default function NovoAgendamentoModal({
                     setData(event.target.value);
                     setErro("");
                   }}
-                  className={
-                    agendamentoDiretoAgenda
-                      ? "h-11 w-full cursor-not-allowed rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                      : inputClassName()
-                  }
+                  className={`${fieldClassName()} pr-7 disabled:cursor-not-allowed disabled:opacity-70`}
                 />
-              </label>
+                <CalendarDays
+                  size={17}
+                  className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-500"
+                />
+              </div>
+            </label>
 
-              <label className="block space-y-2">
-                <span className={labelClassName()}>Horário</span>
+            <label className="min-w-0">
+              <span className={labelClassName()}>Hora início</span>
+              <div className="relative">
                 {agendamentoDiretoAgenda ? (
                   <input
                     value={hora}
                     readOnly
-                    className="h-11 w-full cursor-not-allowed rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                    className={`${fieldClassName()} cursor-not-allowed pr-7 opacity-80`}
                   />
                 ) : (
                   <select
@@ -750,9 +521,9 @@ export default function NovoAgendamentoModal({
                       setHora(event.target.value);
                       setErro("");
                     }}
-                    className={inputClassName()}
+                    className={`${fieldClassName()} appearance-none pr-7`}
                   >
-                    <option value="">Selecione um horário</option>
+                    <option value="">Selecione</option>
                     {horariosDisponiveis.map((item) => (
                       <option key={item.hora} value={item.hora}>
                         {item.hora}
@@ -760,189 +531,419 @@ export default function NovoAgendamentoModal({
                     ))}
                   </select>
                 )}
-              </label>
-            </div>
-
-            {!agendamentoDiretoAgenda ? (
-              <div className="mt-3">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <span className={labelClassName()}>Horários disponíveis</span>
-                  {isLoadingHorarios ? <span className="text-xs text-slate-400">Carregando...</span> : null}
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                  {horariosDisponiveis.map((item) => (
-                    <button
-                      key={item.hora}
-                      type="button"
-                      onClick={() => {
-                        setHora(item.hora);
-                        setErro("");
-                      }}
-                      className={`h-10 rounded-2xl border px-2 text-center text-sm font-bold transition ${
-                        hora === item.hora
-                          ? "border-purple-300 bg-purple-50 text-purple-800 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                      }`}
-                    >
-                      {item.hora}
-                    </button>
-                  ))}
-
-                  {!isLoadingHorarios && horariosDisponiveis.length === 0 ? (
-                    <div className="col-span-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 sm:col-span-4">
-                      Selecione profissional e data para ver horários livres.
-                    </div>
-                  ) : null}
-                </div>
-
-                {horariosOcupados.length > 0 ? (
-                  <details className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
-                    <summary className="cursor-pointer text-xs font-bold text-slate-500 dark:text-slate-300">
-                      Ver horários ocupados
-                    </summary>
-
-                    <div className="mt-3 space-y-2">
-                      {horariosOcupados.map((item) => (
-                        <div
-                          key={item.hora}
-                          className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-xs text-slate-500 dark:bg-slate-900 dark:text-slate-300"
-                        >
-                          <span className="inline-flex items-center gap-1.5">
-                            <Clock3 size={12} />
-                            {item.hora}
-                          </span>
-                          <span className="truncate">{item.motivo}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                ) : null}
+                <Clock3
+                  size={18}
+                  className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-500"
+                />
               </div>
-            ) : null}
-          </section>
+            </label>
 
-          <section className="rounded-[1.35rem] bg-white p-3 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-700 sm:p-5">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block space-y-2 sm:col-span-2">
-                <span className={labelClassName()}>Procedimento / serviço</span>
+            <label className="col-span-2 min-w-0">
+              <span className={labelClassName()}>Profissional</span>
+              <div className="relative">
                 <select
-                  value={servicoSelecionadoId}
-                  onChange={(event) => selecionarServico(event.target.value)}
-                  className={inputClassName()}
-                >
-                  <option value="">Selecione um serviço cadastrado</option>
-                  {servicos.map((servico) => (
-                    <option key={servico.id} value={servico.id}>
-                      {servico.nome} · {servico.duracaoPadrao} min
-                      {servico.valorPadrao > 0
-                        ? ` · ${servico.valorPadrao.toLocaleString("pt-BR", {
-                            style: "currency",
-                            currency: "BRL",
-                          })}`
-                        : ""}
-                    </option>
-                  ))}
-                  <option value="outro">Outro procedimento</option>
-                </select>
-              </label>
-
-              <label className="block space-y-2 sm:col-span-2">
-                <span className={labelClassName()}>Duração</span>
-                <select
-                  value={duracao}
+                  value={profissionalId}
+                  disabled={agendamentoDiretoAgenda}
                   onChange={(event) => {
-                    setDuracao(event.target.value);
+                    setProfissionalId(event.target.value);
                     setErro("");
                   }}
-                  className={inputClassName()}
+                  className={`${fieldClassName()} appearance-none pr-7 disabled:cursor-not-allowed disabled:opacity-70`}
                 >
-                  <option value="30">30 min</option>
-                  <option value="45">45 min</option>
-                  <option value="60">1 hora</option>
-                  <option value="90">1h30</option>
-                  <option value="120">2 horas</option>
-                  <option value="150">2h30</option>
-                  <option value="180">3 horas</option>
+                  <option value="">Selecione</option>
+                  {profissionais.map((profissional) => (
+                    <option key={profissional.id} value={profissional.id}>
+                      {profissional.nome}
+                    </option>
+                  ))}
                 </select>
+                <ChevronDown
+                  size={16}
+                  className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-500"
+                />
+              </div>
+            </label>
+          </div>
+
+          <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-700">
+            <div className="flex items-center justify-between gap-3">
+              <span className={labelClassName()}>Cliente</span>
+
+              {!clienteBloqueado && tipoCliente === "existente" && !clienteSelecionado ? (
+                <button
+                  type="button"
+                  onClick={iniciarNovoCliente}
+                  className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-emerald-600 hover:text-emerald-700"
+                >
+                  <UserPlus size={14} />
+                  Adicionar cliente
+                </button>
+              ) : null}
+            </div>
+
+            {tipoCliente === "novo" ? (
+              <div className="rounded-md border border-emerald-200 bg-emerald-50/60 p-3 dark:border-emerald-500/30 dark:bg-emerald-950/20">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-sm font-bold text-emerald-800 dark:text-emerald-200">
+                    <UserPlus size={16} />
+                    Novo cliente
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={voltarParaBuscaCliente}
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                  >
+                    Voltar à busca
+                  </button>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="sm:col-span-2">
+                    <span className={labelClassName()}>Nome</span>
+                    <input
+                      value={novoClienteNome}
+                      onChange={(event) => {
+                        setNovoClienteNome(event.target.value);
+                        setErro("");
+                      }}
+                      placeholder="Nome completo"
+                      className={fieldClassName()}
+                    />
+                  </label>
+
+                  <label>
+                    <span className={labelClassName()}>WhatsApp</span>
+                    <input
+                      value={novoClienteWhatsapp}
+                      onChange={(event) =>
+                        setNovoClienteWhatsapp(maskPhone(event.target.value))
+                      }
+                      placeholder="(11) 99999-9999"
+                      className={fieldClassName()}
+                    />
+                  </label>
+
+                  <label>
+                    <span className={labelClassName()}>Origem</span>
+                    <div className="relative">
+                      <select
+                        value={novoClienteOrigem}
+                        onChange={(event) =>
+                          setNovoClienteOrigem(event.target.value)
+                        }
+                        className={`${fieldClassName()} appearance-none pr-7`}
+                      >
+                        <option value="">Selecione</option>
+                        {origensCliente.map((origem) => (
+                          <option key={origem.id} value={origem.nome}>
+                            {origem.nome}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown
+                        size={15}
+                        className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-500"
+                      />
+                    </div>
+                  </label>
+                </div>
+
+                <p className="mt-3 text-[11px] leading-4 text-slate-500">
+                  O cliente será criado automaticamente ao salvar este atendimento.
+                </p>
+              </div>
+            ) : clienteSelecionado ? (
+              <div className="flex items-center justify-between gap-3 border-b border-violet-300 pb-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
+                    <UserRound size={15} />
+                  </span>
+
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-slate-800 dark:text-white">
+                      {clienteSelecionado.nome}
+                    </p>
+                    <p className="truncate text-xs text-slate-500">
+                      {telefoneCliente(clienteSelecionado)}
+                    </p>
+                  </div>
+                </div>
+
+                {!clienteBloqueado ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setClienteId("");
+                      setBuscaCliente("");
+                    }}
+                    className="text-xs font-semibold text-violet-700 hover:text-violet-900 dark:text-violet-300"
+                  >
+                    Trocar
+                  </button>
+                ) : (
+                  <CheckCircle2 size={17} className="shrink-0 text-emerald-600" />
+                )}
+              </div>
+            ) : (
+              <div className="relative">
+                <Search
+                  size={16}
+                  className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 text-violet-600"
+                />
+                <input
+                  value={buscaCliente}
+                  onChange={(event) => {
+                    setBuscaCliente(event.target.value);
+                    setErro("");
+                  }}
+                  placeholder="Digite para buscar..."
+                  className={`${fieldClassName()} pl-6`}
+                />
+
+                {(normalizarTexto(buscaCliente).length >= 2 ||
+                  onlyDigits(buscaCliente).length >= 2) ? (
+                  <div className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-md border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                    {clientesFiltrados.length > 0 ? (
+                      <>
+                        {clientesFiltrados.map((cliente) => (
+                          <button
+                            key={cliente.id}
+                            type="button"
+                            onClick={() => {
+                              setClienteId(String(cliente.id));
+                              setTipoCliente("existente");
+                              setBuscaCliente("");
+                              setErro("");
+                            }}
+                            className="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-2.5 text-left transition last:border-b-0 hover:bg-violet-50 dark:border-slate-800 dark:hover:bg-violet-500/10"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-slate-800 dark:text-white">
+                                {cliente.nome}
+                              </p>
+                              <p className="truncate text-xs text-slate-500">
+                                {telefoneCliente(cliente)}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
+
+                        <button
+                          type="button"
+                          onClick={iniciarNovoCliente}
+                          className="flex w-full items-center justify-center gap-2 bg-emerald-600 px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-white transition hover:bg-emerald-700"
+                        >
+                          <UserPlus size={14} />
+                          Adicionar novo cliente
+                        </button>
+                      </>
+                    ) : (
+                      <div className="p-3">
+                        <p className="mb-2 text-center text-xs text-slate-500">
+                          Nenhum cliente encontrado.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={iniciarNovoCliente}
+                          className="flex w-full items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-white hover:bg-emerald-700"
+                        >
+                          <UserPlus size={14} />
+                          Adicionar cliente
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-700">
+            <div className="grid grid-cols-[1fr_auto] items-end gap-4">
+              <label className="min-w-0">
+                <span className={labelClassName()}>Serviço</span>
+                <div className="relative">
+                  <select
+                    value={servicoSelecionadoId}
+                    onChange={(event) => selecionarServico(event.target.value)}
+                    className={`${fieldClassName()} appearance-none pr-7`}
+                  >
+                    <option value="">Digite para buscar ou selecione um serviço...</option>
+                    {servicos.map((servico) => (
+                      <option key={servico.id} value={servico.id}>
+                        {servico.nome}
+                      </option>
+                    ))}
+                    <option value="outro">Outro procedimento</option>
+                  </select>
+                  <ChevronDown
+                    size={16}
+                    className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-500"
+                  />
+                </div>
               </label>
 
-              <label className="block space-y-2 sm:col-span-2">
+              <div className="pb-2 text-right">
+                <span className="block text-[11px] text-slate-500">Total</span>
+                <strong className="whitespace-nowrap text-base text-slate-800 dark:text-white">
+                  {formatCurrency(total)}
+                </strong>
+              </div>
+            </div>
+
+            {servicoSelecionadoId === "outro" ? (
+              <label className="mt-3 block">
                 <span className={labelClassName()}>Nome do procedimento</span>
                 <input
                   value={procedimento}
                   onChange={(event) => {
                     setProcedimento(event.target.value);
-                    setServicoSelecionadoId("outro");
                     setErro("");
                   }}
-                  placeholder="Ex.: Retorno - Limpeza de pele"
-                  className={inputClassName()}
+                  placeholder="Informe o procedimento"
+                  className={fieldClassName()}
                 />
               </label>
+            ) : null}
 
-              <label className="block space-y-2">
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <label>
+                <span className={labelClassName()}>
+                  Duração baseada no serviço
+                </span>
+                <div className="relative">
+                  <select
+                    value={duracao}
+                    onChange={(event) => {
+                      setDuracao(event.target.value);
+                      setErro("");
+                    }}
+                    className={`${fieldClassName()} appearance-none pr-7`}
+                  >
+                    <option value="30">30 min</option>
+                    <option value="45">45 min</option>
+                    <option value="60">1 hora</option>
+                    <option value="90">1h30</option>
+                    <option value="120">2 horas</option>
+                    <option value="150">2h30</option>
+                    <option value="180">3 horas</option>
+                  </select>
+                  <ChevronDown
+                    size={16}
+                    className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-500"
+                  />
+                </div>
+              </label>
+
+              <label>
                 <span className={labelClassName()}>Valor previsto</span>
                 <input
                   value={valor}
-                  onChange={(event) => setValor(formatCurrencyInput(event.target.value))}
+                  onChange={(event) =>
+                    setValor(formatCurrencyInput(event.target.value))
+                  }
                   placeholder="0,00"
-                  className={inputClassName()}
-                />
-              </label>
-
-              <label className="block space-y-2">
-                <span className={labelClassName()}>Status</span>
-                <select
-                  value={status}
-                  onChange={(event) => setStatus(event.target.value)}
-                  className={inputClassName()}
-                >
-                  <option>Agendado</option>
-                  <option>Confirmado</option>
-                  <option>Em atendimento</option>
-                  <option>Atendido</option>
-                  <option>Faltou</option>
-                  <option>Cancelado</option>
-                </select>
-              </label>
-
-              <label className="block space-y-2 sm:col-span-2">
-                <span className={labelClassName()}>Observações</span>
-                <textarea
-                  value={observacoes}
-                  onChange={(event) => setObservacoes(event.target.value)}
-                  placeholder="Preferências, restrições, sinal, comanda ou observações do atendimento."
-                  className="min-h-20 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:bg-white focus:ring-4 focus:ring-purple-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-purple-400 dark:focus:bg-slate-900 dark:focus:ring-purple-900/40"
+                  className={fieldClassName()}
                 />
               </label>
             </div>
-          </section>
 
-          <div className="grid gap-2 pb-4 sm:grid-cols-2 sm:pb-0">
+            {!agendamentoDiretoAgenda && horariosOcupados.length > 0 ? (
+              <details className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/50">
+                <summary className="cursor-pointer text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  Ver horários ocupados
+                  {isLoadingHorarios ? " · atualizando..." : ""}
+                </summary>
+
+                <div className="mt-2 space-y-1">
+                  {horariosOcupados.map((item) => (
+                    <div
+                      key={item.hora}
+                      className="flex items-center justify-between gap-3 text-xs text-slate-500"
+                    >
+                      <span>{item.hora}</span>
+                      <span className="truncate">{item.motivo}</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            ) : null}
+
             <button
               type="button"
-              onClick={salvar}
-              disabled={salvando}
-              className="h-12 rounded-2xl bg-gradient-to-r from-purple-700 to-fuchsia-600 px-5 text-sm font-bold text-white shadow-lg shadow-purple-900/20 transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 sm:order-2"
+              onClick={() => setMostrarMaisCampos((value) => !value)}
+              className="mt-5 flex w-full items-center justify-center gap-2 border border-violet-300 px-3 py-2.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-50 dark:border-violet-500/50 dark:text-violet-300 dark:hover:bg-violet-500/10"
             >
-              {salvando
-                ? "Salvando..."
-                : modoRetorno
-                  ? "Salvar retorno"
-                  : "Salvar atendimento"}
+              Mais campos
+              <ChevronDown
+                size={16}
+                className={`transition ${mostrarMaisCampos ? "rotate-180" : ""}`}
+              />
             </button>
 
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={salvando}
-              className="h-12 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:order-1"
-            >
-              Cancelar
-            </button>
+            {mostrarMaisCampos ? (
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <label>
+                  <span className={labelClassName()}>Status</span>
+                  <div className="relative">
+                    <select
+                      value={status}
+                      onChange={(event) => setStatus(event.target.value)}
+                      className={`${fieldClassName()} appearance-none pr-7`}
+                    >
+                      <option>Agendado</option>
+                      <option>Confirmado</option>
+                      <option>Em atendimento</option>
+                      <option>Atendido</option>
+                      <option>Faltou</option>
+                      <option>Cancelado</option>
+                    </select>
+                    <ChevronDown
+                      size={16}
+                      className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-500"
+                    />
+                  </div>
+                </label>
+
+                <label className="sm:col-span-2">
+                  <span className={labelClassName()}>Observações</span>
+                  <textarea
+                    value={observacoes}
+                    onChange={(event) => setObservacoes(event.target.value)}
+                    placeholder="Sinal, preferências, restrições ou outras observações..."
+                    rows={3}
+                    className="w-full resize-y border-0 border-b border-slate-300 bg-transparent px-0 py-2 text-[15px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-violet-600 focus:ring-0 dark:border-slate-600 dark:text-white dark:focus:border-violet-400"
+                  />
+                </label>
+              </div>
+            ) : null}
           </div>
         </div>
+
+        <footer className="grid shrink-0 grid-cols-2 gap-3 border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900 sm:px-5">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={salvando}
+            className="h-10 rounded-md border border-violet-400 bg-white text-sm font-bold uppercase text-violet-700 transition hover:bg-violet-50 disabled:opacity-50 dark:bg-transparent dark:text-violet-300"
+          >
+            Fechar
+          </button>
+
+          <button
+            type="button"
+            onClick={salvar}
+            disabled={salvando}
+            className="h-10 rounded-md bg-violet-700 text-sm font-bold uppercase text-white shadow-sm transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {salvando
+              ? "Salvando..."
+              : modoEdicao
+                ? "Salvar alterações"
+                : "Salvar"}
+          </button>
+        </footer>
       </div>
     </div>
   );
