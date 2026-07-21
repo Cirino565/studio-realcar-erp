@@ -590,17 +590,84 @@ function montarHorario(data: string, hora: string) {
   return parseLocalDateTime(`${data}T${hora}`);
 }
 
-const CLINICA_HORA_ABERTURA = 9;
-const CLINICA_HORA_FECHAMENTO = 19;
-const CLINICA_INTERVALO_MINUTOS = 30;
+type HorarioFuncionamento = {
+  abertura: string;
+  fechamento: string;
+} | null;
 
-function gerarSlotsDisponibilidade() {
+type ConfiguracaoHorarioAgenda = {
+  semana: HorarioFuncionamento;
+  sabado: HorarioFuncionamento;
+  domingo: HorarioFuncionamento;
+  intervalo: number;
+};
+
+function parseHorarioFuncionamento(
+  value: string | null | undefined,
+  intervaloAgenda: number,
+): ConfiguracaoHorarioAgenda {
+  const padrao: ConfiguracaoHorarioAgenda = {
+    semana: { abertura: "09:00", fechamento: "19:00" },
+    sabado: { abertura: "09:00", fechamento: "17:00" },
+    domingo: null,
+    intervalo: Math.max(5, intervaloAgenda || 30),
+  };
+
+  if (!value) {
+    return padrao;
+  }
+
+  const semana = value.match(/SEG-SEX=(\d{2}:\d{2})-(\d{2}:\d{2})/i);
+  const sabado = value.match(/SAB=(FECHADO|(\d{2}:\d{2})-(\d{2}:\d{2}))/i);
+  const domingo = value.match(/DOM=(FECHADO|(\d{2}:\d{2})-(\d{2}:\d{2}))/i);
+
+  return {
+    semana: semana
+      ? { abertura: semana[1], fechamento: semana[2] }
+      : padrao.semana,
+    sabado:
+      sabado?.[1]?.toUpperCase() === "FECHADO"
+        ? null
+        : sabado?.[2] && sabado?.[3]
+          ? { abertura: sabado[2], fechamento: sabado[3] }
+          : padrao.sabado,
+    domingo:
+      domingo?.[1]?.toUpperCase() === "FECHADO"
+        ? null
+        : domingo?.[2] && domingo?.[3]
+          ? { abertura: domingo[2], fechamento: domingo[3] }
+          : null,
+    intervalo: padrao.intervalo,
+  };
+}
+
+function getDiaSemana(data: string) {
+  const [year, month, day] = data.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+}
+
+function minutosDoHorario(value: string) {
+  const [hour, minute] = value.split(":").map(Number);
+  return hour * 60 + minute;
+}
+
+function gerarSlotsDisponibilidade(
+  funcionamento: HorarioFuncionamento,
+  intervalo: number,
+  duracao: number,
+) {
+  if (!funcionamento) {
+    return [];
+  }
+
   const slots: string[] = [];
+  const abertura = minutosDoHorario(funcionamento.abertura);
+  const fechamento = minutosDoHorario(funcionamento.fechamento);
 
   for (
-    let minutos = CLINICA_HORA_ABERTURA * 60;
-    minutos < CLINICA_HORA_FECHAMENTO * 60;
-    minutos += CLINICA_INTERVALO_MINUTOS
+    let minutos = abertura;
+    minutos + duracao <= fechamento;
+    minutos += intervalo
   ) {
     const hour = Math.floor(minutos / 60);
     const minute = minutos % 60;
@@ -627,6 +694,36 @@ export async function buscarDisponibilidadeAgenda({
   await requirePermission("agenda.visualizar");
 
   if (!profissionalId || !data) {
+    return [];
+  }
+
+  const configuracaoClinica = await prisma.configuracaoClinica.findFirst({
+    select: {
+      horarioAtendimento: true,
+      intervaloAgenda: true,
+    },
+  });
+
+  const configuracaoHorario = parseHorarioFuncionamento(
+    configuracaoClinica?.horarioAtendimento,
+    configuracaoClinica?.intervaloAgenda || 30,
+  );
+
+  const diaSemana = getDiaSemana(data);
+  const funcionamento =
+    diaSemana === 0
+      ? configuracaoHorario.domingo
+      : diaSemana === 6
+        ? configuracaoHorario.sabado
+        : configuracaoHorario.semana;
+
+  const slots = gerarSlotsDisponibilidade(
+    funcionamento,
+    configuracaoHorario.intervalo,
+    duracao,
+  );
+
+  if (slots.length === 0) {
     return [];
   }
 
@@ -660,7 +757,7 @@ export async function buscarDisponibilidadeAgenda({
     },
   });
 
-  return gerarSlotsDisponibilidade().map((hora) => {
+  return slots.map((hora) => {
     const inicioNovo = montarHorario(data, hora);
     const fimNovo = addMinutes(inicioNovo, duracao);
 

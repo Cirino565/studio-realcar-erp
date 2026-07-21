@@ -103,6 +103,51 @@ function toNumber(value: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+type HorariosAgendaForm = {
+  semanaAbertura: string;
+  semanaFechamento: string;
+  sabadoAtivo: boolean;
+  sabadoAbertura: string;
+  sabadoFechamento: string;
+};
+
+const HORARIOS_AGENDA_PADRAO: HorariosAgendaForm = {
+  semanaAbertura: "09:00",
+  semanaFechamento: "19:00",
+  sabadoAtivo: true,
+  sabadoAbertura: "09:00",
+  sabadoFechamento: "17:00",
+};
+
+function parseHorariosAgenda(value?: string | null): HorariosAgendaForm {
+  if (!value) {
+    return { ...HORARIOS_AGENDA_PADRAO };
+  }
+
+  const semana = value.match(/SEG-SEX=(\d{2}:\d{2})-(\d{2}:\d{2})/i);
+  const sabado = value.match(/SAB=(FECHADO|(\d{2}:\d{2})-(\d{2}:\d{2}))/i);
+
+  if (semana || sabado) {
+    return {
+      semanaAbertura: semana?.[1] || HORARIOS_AGENDA_PADRAO.semanaAbertura,
+      semanaFechamento: semana?.[2] || HORARIOS_AGENDA_PADRAO.semanaFechamento,
+      sabadoAtivo: sabado ? sabado[1].toUpperCase() !== "FECHADO" : true,
+      sabadoAbertura: sabado?.[2] || HORARIOS_AGENDA_PADRAO.sabadoAbertura,
+      sabadoFechamento: sabado?.[3] || HORARIOS_AGENDA_PADRAO.sabadoFechamento,
+    };
+  }
+
+  return { ...HORARIOS_AGENDA_PADRAO };
+}
+
+function serializarHorariosAgenda(value: HorariosAgendaForm) {
+  const sabado = value.sabadoAtivo
+    ? `${value.sabadoAbertura}-${value.sabadoFechamento}`
+    : "FECHADO";
+
+  return `SEG-SEX=${value.semanaAbertura}-${value.semanaFechamento};SAB=${sabado};DOM=FECHADO`;
+}
+
 function getInitials(name: string) {
   return (
     name
@@ -134,7 +179,7 @@ function buildInitialForm(
     responsavelTecnico: toText(configuracao.responsavelTecnico),
     registroProfissional: toText(configuracao.registroProfissional),
     especialidadePrincipal: toText(configuracao.especialidadePrincipal),
-    horarioAtendimento: toText(configuracao.horarioAtendimento),
+    horarioAtendimento: configuracao.horarioAtendimento || serializarHorariosAgenda(HORARIOS_AGENDA_PADRAO),
     intervaloAgenda: configuracao.intervaloAgenda,
     antecedenciaLembrete: configuracao.antecedenciaLembrete,
     toleranciaAtraso: configuracao.toleranciaAtraso,
@@ -572,6 +617,9 @@ export default function ConfiguracoesClient({
   const [form, setForm] = useState<SalvarConfiguracaoInput>(() =>
     buildInitialForm(configuracao),
   );
+  const [horariosAgenda, setHorariosAgenda] = useState<HorariosAgendaForm>(() =>
+    parseHorariosAgenda(configuracao.horarioAtendimento),
+  );
   const [isPending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
 
@@ -603,6 +651,27 @@ export default function ConfiguracoesClient({
         ? toNumber(value)
         : value,
     }));
+  }
+
+  function handleHorarioAgendaChange(
+    campo: keyof HorariosAgendaForm,
+    value: string | boolean,
+  ) {
+    setSaved(false);
+
+    setHorariosAgenda((current) => {
+      const next = {
+        ...current,
+        [campo]: value,
+      } as HorariosAgendaForm;
+
+      setForm((formAtual) => ({
+        ...formAtual,
+        horarioAtendimento: serializarHorariosAgenda(next),
+      }));
+
+      return next;
+    });
   }
 
   function handleSubmit(
@@ -842,13 +911,119 @@ export default function ConfiguracoesClient({
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <Field
-                  label="Horário de atendimento"
-                  name="horarioAtendimento"
-                  value={form.horarioAtendimento || ""}
-                  placeholder="Segunda a sexta, 09h às 19h"
-                  onChange={handleChange}
-                />
+                <div className="grid gap-3 rounded-3xl border border-white/[0.10] bg-[#111827]/45 p-4 md:col-span-2">
+                  <div>
+                    <p className="text-sm font-semibold text-white">
+                      Horários de atendimento
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-slate-400">
+                      Estes horários controlam os períodos disponíveis na agenda.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.04] p-4 sm:grid-cols-[1fr_160px_160px] sm:items-end">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-200">
+                        Segunda a sexta
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Atendimento regular
+                      </p>
+                    </div>
+
+                    <label className="grid gap-2 text-sm text-slate-300">
+                      <span className="font-medium">Abertura</span>
+                      <input
+                        type="time"
+                        value={horariosAgenda.semanaAbertura}
+                        onChange={(event) =>
+                          handleHorarioAgendaChange(
+                            "semanaAbertura",
+                            event.target.value,
+                          )
+                        }
+                        className="h-11 rounded-2xl border border-white/[0.10] bg-white/[0.06] px-4 text-sm text-white outline-none transition focus:border-violet-300/40 focus:ring-4 focus:ring-violet-500/10"
+                      />
+                    </label>
+
+                    <label className="grid gap-2 text-sm text-slate-300">
+                      <span className="font-medium">Fechamento</span>
+                      <input
+                        type="time"
+                        value={horariosAgenda.semanaFechamento}
+                        onChange={(event) =>
+                          handleHorarioAgendaChange(
+                            "semanaFechamento",
+                            event.target.value,
+                          )
+                        }
+                        className="h-11 rounded-2xl border border-white/[0.10] bg-white/[0.06] px-4 text-sm text-white outline-none transition focus:border-violet-300/40 focus:ring-4 focus:ring-violet-500/10"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="grid gap-3 rounded-2xl border border-violet-400/15 bg-violet-400/[0.05] p-4 sm:grid-cols-[1fr_160px_160px] sm:items-end">
+                    <div>
+                      <label className="inline-flex cursor-pointer items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={horariosAgenda.sabadoAtivo}
+                          onChange={(event) =>
+                            handleHorarioAgendaChange(
+                              "sabadoAtivo",
+                              event.target.checked,
+                            )
+                          }
+                          className="h-4 w-4 rounded border-white/20 accent-violet-500"
+                        />
+                        <span>
+                          <span className="block text-sm font-semibold text-white">
+                            Sábado
+                          </span>
+                          <span className="mt-1 block text-xs text-slate-400">
+                            Marque para permitir agendamentos aos sábados
+                          </span>
+                        </span>
+                      </label>
+                    </div>
+
+                    <label className="grid gap-2 text-sm text-slate-300">
+                      <span className="font-medium">Abertura</span>
+                      <input
+                        type="time"
+                        value={horariosAgenda.sabadoAbertura}
+                        disabled={!horariosAgenda.sabadoAtivo}
+                        onChange={(event) =>
+                          handleHorarioAgendaChange(
+                            "sabadoAbertura",
+                            event.target.value,
+                          )
+                        }
+                        className="h-11 rounded-2xl border border-white/[0.10] bg-white/[0.06] px-4 text-sm text-white outline-none transition disabled:cursor-not-allowed disabled:opacity-40 focus:border-violet-300/40 focus:ring-4 focus:ring-violet-500/10"
+                      />
+                    </label>
+
+                    <label className="grid gap-2 text-sm text-slate-300">
+                      <span className="font-medium">Fechamento</span>
+                      <input
+                        type="time"
+                        value={horariosAgenda.sabadoFechamento}
+                        disabled={!horariosAgenda.sabadoAtivo}
+                        onChange={(event) =>
+                          handleHorarioAgendaChange(
+                            "sabadoFechamento",
+                            event.target.value,
+                          )
+                        }
+                        className="h-11 rounded-2xl border border-white/[0.10] bg-white/[0.06] px-4 text-sm text-white outline-none transition disabled:cursor-not-allowed disabled:opacity-40 focus:border-violet-300/40 focus:ring-4 focus:ring-violet-500/10"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-xs text-slate-400">
+                    Domingo permanece fechado. Padrão atual: segunda a sexta, 09h às 19h; sábado, 09h às 17h.
+                  </div>
+                </div>
                 <Field
                   label="Intervalo padrão da agenda"
                   name="intervaloAgenda"
