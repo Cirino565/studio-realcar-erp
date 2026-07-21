@@ -81,9 +81,16 @@ model Agendamento {
   duracao        Int           @default(60)
   valor          Float         @default(0)
   observacoes    String?
-  status         String        @default("Agendado")
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  status               String        @default("Agendado")
+  serieId              String?
+  recorrenciaTipo      String?
+  recorrenciaIntervalo Int?
+  recorrenciaIndice    Int?
+  recorrenciaTotal     Int?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  @@index([serieId])
 }
 
 model Profissional {
@@ -111,11 +118,17 @@ model BloqueioAgenda {
   duracao        Int           @default(60)
   motivo         String
   observacoes    String?
-  status         String        @default("Ativo")
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  status               String        @default("Ativo")
+  serieId              String?
+  recorrenciaTipo      String?
+  recorrenciaIntervalo Int?
+  recorrenciaIndice    Int?
+  recorrenciaTotal     Int?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
 
   @@index([profissionalId, data])
+  @@index([serieId])
 }
 
 model Lancamento {

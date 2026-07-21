@@ -49,6 +49,11 @@ type AgendamentoAgenda = {
   valor: number;
   observacoes: string | null;
   status: string;
+  serieId?: string | null;
+  recorrenciaTipo?: string | null;
+  recorrenciaIntervalo?: number | null;
+  recorrenciaIndice?: number | null;
+  recorrenciaTotal?: number | null;
   createdAt?: string;
   updatedAt?: string;
   cliente: {
@@ -67,6 +72,11 @@ type BloqueioAgenda = {
   motivo: string;
   observacoes: string | null;
   status: string;
+  serieId?: string | null;
+  recorrenciaTipo?: string | null;
+  recorrenciaIntervalo?: number | null;
+  recorrenciaIndice?: number | null;
+  recorrenciaTotal?: number | null;
   createdAt?: string;
   updatedAt?: string;
   profissional: ProfissionalAgenda;
@@ -78,6 +88,10 @@ type NovoAgendamentoPayload = NovoHorarioPayload & {
   modo?: "novo" | "retorno" | "edicao" | "edicao_bloqueio";
   tipoAtendimento?: "agendamento" | "bloqueio";
   motivoBloqueio?: string;
+  serieId?: string | null;
+  recorrenciaTipo?: string | null;
+  recorrenciaIndice?: number | null;
+  recorrenciaTotal?: number | null;
   clienteId?: number;
   procedimento?: string;
   duracao?: number;
@@ -96,6 +110,7 @@ type Props = {
   initialDate: string;
   initialProfissionalFiltro: string;
   initialClienteId?: string | null;
+  initialView: "day" | "week";
   horarioAtendimento?: string | null;
 };
 
@@ -167,6 +182,7 @@ export default function AgendaClient({
   initialDate,
   initialProfissionalFiltro,
   initialClienteId,
+  initialView,
   horarioAtendimento,
 }: Props) {
   const [selectedDate, setSelectedDate] = useState(() =>
@@ -217,11 +233,12 @@ export default function AgendaClient({
 
     const dataAtual = toDateInput(selectedDate);
     const profissional = value !== "todas" ? `&profissional=${value}` : "";
+    const view = initialView === "week" ? "&view=week" : "";
 
     window.history.replaceState(
       null,
       "",
-      `/agenda?data=${dataAtual}${profissional}`,
+      `/agenda?data=${dataAtual}${profissional}${view}`,
     );
   }
 
@@ -244,6 +261,10 @@ export default function AgendaClient({
       profissionalId: bloqueio.profissionalId,
       duracao: bloqueio.duracao || 60,
       motivoBloqueio: bloqueio.motivo,
+      serieId: bloqueio.serieId,
+      recorrenciaTipo: bloqueio.recorrenciaTipo,
+      recorrenciaIndice: bloqueio.recorrenciaIndice,
+      recorrenciaTotal: bloqueio.recorrenciaTotal,
       observacoes: bloqueio.observacoes || "",
     });
   }
@@ -267,6 +288,10 @@ export default function AgendaClient({
       duracao: appointment.duracao || 60,
       valor: appointment.valor || 0,
       status: appointment.status,
+      serieId: appointment.serieId,
+      recorrenciaTipo: appointment.recorrenciaTipo,
+      recorrenciaIndice: appointment.recorrenciaIndice,
+      recorrenciaTotal: appointment.recorrenciaTotal,
       observacoes: appointment.observacoes || "",
     });
   }
@@ -346,6 +371,7 @@ export default function AgendaClient({
             onSelectBlock={abrirEdicaoBloqueio}
             onMessage={abrirWhatsApp}
             horarioAtendimento={horarioAtendimento}
+            viewMode={initialView}
           />
         )}
       </div>

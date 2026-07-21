@@ -11,6 +11,7 @@ import {
   ChevronRight,
   MessageCircle,
   Plus,
+  Repeat2,
   UserRound,
   UsersRound,
   X,
@@ -34,6 +35,11 @@ type AgendamentoAgenda = {
   valor: number;
   observacoes: string | null;
   status: string;
+  serieId?: string | null;
+  recorrenciaTipo?: string | null;
+  recorrenciaIntervalo?: number | null;
+  recorrenciaIndice?: number | null;
+  recorrenciaTotal?: number | null;
   createdAt?: string;
   updatedAt?: string;
   cliente: {
@@ -52,6 +58,11 @@ type BloqueioAgenda = {
   motivo: string;
   observacoes: string | null;
   status: string;
+  serieId?: string | null;
+  recorrenciaTipo?: string | null;
+  recorrenciaIntervalo?: number | null;
+  recorrenciaIndice?: number | null;
+  recorrenciaTotal?: number | null;
   createdAt?: string;
   updatedAt?: string;
   profissional: ProfissionalAgenda;
@@ -77,6 +88,7 @@ type Props = {
   onSelectBlock: (bloqueio: BloqueioAgenda) => void;
   onMessage: (appointment: AgendamentoAgenda) => void;
   horarioAtendimento?: string | null;
+  viewMode: "day" | "week";
 };
 
 const START_HOUR = 9;
@@ -274,12 +286,88 @@ function getPalette(color: string, index: number) {
   };
 }
 
-function agendaHref(date: Date, profissionalFiltro: string) {
+function getStatusPalette(status: string) {
+  const normalized = (status || "Agendado").toLowerCase();
+
+  if (normalized === "confirmado") {
+    return {
+      solid: "#059669",
+      gradientEnd: "#10b981",
+      soft: "rgba(5, 150, 105, 0.10)",
+      border: "rgba(16, 185, 129, 0.38)",
+    };
+  }
+
+  if (normalized === "em atendimento") {
+    return {
+      solid: "#0891b2",
+      gradientEnd: "#06b6d4",
+      soft: "rgba(8, 145, 178, 0.10)",
+      border: "rgba(6, 182, 212, 0.40)",
+    };
+  }
+
+  if (normalized === "atendido") {
+    return {
+      solid: "#2563eb",
+      gradientEnd: "#3b82f6",
+      soft: "rgba(37, 99, 235, 0.10)",
+      border: "rgba(59, 130, 246, 0.40)",
+    };
+  }
+
+  if (normalized === "faltou") {
+    return {
+      solid: "#d97706",
+      gradientEnd: "#f59e0b",
+      soft: "rgba(217, 119, 6, 0.10)",
+      border: "rgba(245, 158, 11, 0.42)",
+    };
+  }
+
+  if (normalized === "cancelado") {
+    return {
+      solid: "#64748b",
+      gradientEnd: "#94a3b8",
+      soft: "rgba(100, 116, 139, 0.10)",
+      border: "rgba(148, 163, 184, 0.45)",
+    };
+  }
+
+  return {
+    solid: "#7c3aed",
+    gradientEnd: "#a21caf",
+    soft: "rgba(124, 58, 237, 0.10)",
+    border: "rgba(139, 92, 246, 0.42)",
+  };
+}
+
+function agendaHref(
+  date: Date,
+  profissionalFiltro: string,
+  viewMode: "day" | "week" = "day",
+) {
   const data = formatDateInput(date);
   const profissional =
     profissionalFiltro !== "todas" ? `&profissional=${profissionalFiltro}` : "";
+  const view = viewMode === "week" ? "&view=week" : "";
 
-  return `/agenda?data=${data}${profissional}`;
+  return `/agenda?data=${data}${profissional}${view}`;
+}
+
+function formatSaoPauloDateKey(value: Date | string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: SAO_PAULO_TIMEZONE,
+  }).formatToParts(new Date(value));
+
+  const year = parts.find((part) => part.type === "year")?.value || "";
+  const month = parts.find((part) => part.type === "month")?.value || "";
+  const day = parts.find((part) => part.type === "day")?.value || "";
+
+  return `${year}-${month}-${day}`;
 }
 
 function getAppointmentNote(appointment: AgendamentoAgenda) {
@@ -310,6 +398,7 @@ export default function AgendaCalendar({
   onSelectBlock,
   onMessage,
   horarioAtendimento,
+  viewMode,
 }: Props) {
   const today = new Date();
   const selectedDateInput = formatDateInput(selectedDate);
@@ -422,7 +511,7 @@ export default function AgendaCalendar({
 
   function goToDate(date: Date) {
     onDateChange(date);
-    window.location.href = agendaHref(date, profissionalFiltro);
+    window.location.href = agendaHref(date, profissionalFiltro, viewMode);
   }
 
   function openCalendar() {
@@ -480,6 +569,69 @@ export default function AgendaCalendar({
     });
   }
 
+  const weeklyOverview = useMemo(() => {
+    const visibleIds = new Set(visibleProfessionals.map((item) => item.id));
+
+    return weekDays.map((day) => {
+      const dateKey = formatDateInput(day);
+      const items: Array<
+        | { kind: "appointment"; minute: number; appointment: AgendamentoAgenda }
+        | { kind: "block"; minute: number; bloqueio: BloqueioAgenda }
+        | { kind: "lunch"; minute: number }
+      > = [];
+
+      agendamentos.forEach((appointment) => {
+        if (
+          appointment.profissionalId &&
+          visibleIds.has(appointment.profissionalId) &&
+          formatSaoPauloDateKey(appointment.data) === dateKey
+        ) {
+          const time = getSaoPauloTimeParts(appointment.data);
+          items.push({
+            kind: "appointment",
+            minute: time.hour * 60 + time.minute,
+            appointment,
+          });
+        }
+      });
+
+      bloqueios.forEach((bloqueio) => {
+        if (
+          visibleIds.has(bloqueio.profissionalId) &&
+          formatSaoPauloDateKey(bloqueio.data) === dateKey
+        ) {
+          const time = getSaoPauloTimeParts(bloqueio.data);
+          items.push({
+            kind: "block",
+            minute: time.hour * 60 + time.minute,
+            bloqueio,
+          });
+        }
+      });
+
+      if (
+        day.getDay() !== 0 &&
+        almocoVisual.ativo &&
+        almocoVisual.dias.includes(day.getDay())
+      ) {
+        items.push({
+          kind: "lunch",
+          minute: minutosHorario(almocoVisual.inicio),
+        });
+      }
+
+      items.sort((a, b) => a.minute - b.minute);
+
+      return { day, dateKey, items };
+    });
+  }, [
+    agendamentos,
+    almocoVisual,
+    bloqueios,
+    visibleProfessionals,
+    weekDays,
+  ]);
+
   const currentTimeLine = useMemo(() => {
     if (!isSameDay(selectedDate, today) || isSunday) return null;
 
@@ -496,14 +648,33 @@ export default function AgendaCalendar({
       <div className="border-b border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-900">
         <div className="flex min-h-14 flex-col gap-2 px-2 py-2 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center lg:gap-4 lg:px-3">
           <div className="flex min-w-0 items-center gap-1.5">
-            <span className="hidden h-9 items-center rounded-md bg-violet-700 px-3 text-xs font-extrabold uppercase tracking-wide text-white sm:inline-flex">
-              Dia
-            </span>
+            <div className="hidden overflow-hidden rounded-md border border-violet-300 bg-white sm:flex dark:border-violet-500/50 dark:bg-slate-950">
+              <a
+                href={agendaHref(selectedDate, profissionalFiltro, "day")}
+                className={`flex h-9 items-center px-3 text-xs font-extrabold uppercase tracking-wide transition ${
+                  viewMode === "day"
+                    ? "bg-violet-700 text-white"
+                    : "text-violet-700 hover:bg-violet-50 dark:text-violet-200 dark:hover:bg-violet-500/10"
+                }`}
+              >
+                Dia
+              </a>
+              <a
+                href={agendaHref(selectedDate, profissionalFiltro, "week")}
+                className={`flex h-9 items-center border-l border-violet-200 px-3 text-xs font-extrabold uppercase tracking-wide transition dark:border-violet-500/40 ${
+                  viewMode === "week"
+                    ? "bg-violet-700 text-white"
+                    : "text-violet-700 hover:bg-violet-50 dark:text-violet-200 dark:hover:bg-violet-500/10"
+                }`}
+              >
+                Semana
+              </a>
+            </div>
 
             <div className="flex overflow-hidden rounded-md border border-violet-300 bg-white dark:border-violet-500/50 dark:bg-slate-950">
               <button
                 type="button"
-                onClick={() => goToDate(addDays(selectedDate, -1))}
+                onClick={() => goToDate(addDays(selectedDate, viewMode === "week" ? -7 : -1))}
                 className="flex h-9 w-9 items-center justify-center border-r border-violet-200 text-violet-700 transition hover:bg-violet-50 dark:border-violet-500/40 dark:text-violet-200 dark:hover:bg-violet-500/10"
                 aria-label="Dia anterior"
               >
@@ -520,7 +691,7 @@ export default function AgendaCalendar({
 
               <button
                 type="button"
-                onClick={() => goToDate(addDays(selectedDate, 1))}
+                onClick={() => goToDate(addDays(selectedDate, viewMode === "week" ? 7 : 1))}
                 className="flex h-9 w-9 items-center justify-center text-violet-700 transition hover:bg-violet-50 dark:text-violet-200 dark:hover:bg-violet-500/10"
                 aria-label="Próximo dia"
               >
@@ -548,7 +719,7 @@ export default function AgendaCalendar({
                 return (
                   <a
                     key={formatDateInput(day)}
-                    href={agendaHref(day, profissionalFiltro)}
+                    href={agendaHref(day, profissionalFiltro, viewMode)}
                     className={`flex h-9 w-[82px] flex-none items-center justify-center gap-1 rounded-md border px-2 text-center text-xs font-semibold transition ${
                       active
                         ? "border-violet-700 bg-violet-700 text-white shadow-sm"
@@ -652,7 +823,192 @@ export default function AgendaCalendar({
         </div>
       </div>
 
-      {isSunday ? (
+      {viewMode === "week" ? (
+        <div className="w-full overflow-x-auto border-t border-slate-300 dark:border-slate-700">
+          <div className="grid min-w-[1180px] grid-cols-7 bg-slate-200 dark:bg-slate-800">
+            {weeklyOverview.map(({ day, dateKey, items }) => {
+              const sunday = day.getDay() === 0;
+              const active = isSameDay(day, selectedDate);
+              const appointmentCount = items.filter(
+                (item) => item.kind === "appointment",
+              ).length;
+
+              return (
+                <section
+                  key={dateKey}
+                  className="min-h-[560px] border-r border-slate-300 bg-white last:border-r-0 dark:border-slate-700 dark:bg-slate-950"
+                >
+                  <a
+                    href={agendaHref(day, profissionalFiltro, "day")}
+                    className={`flex h-16 items-center justify-between border-b px-3 transition ${
+                      active
+                        ? "border-violet-300 bg-violet-50 dark:border-violet-500/40 dark:bg-violet-500/10"
+                        : "border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-900"
+                    }`}
+                  >
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                        {formatWeekday(day)}
+                      </p>
+                      <p className="mt-0.5 text-lg font-extrabold text-slate-900 dark:text-white">
+                        {String(day.getDate()).padStart(2, "0")}
+                      </p>
+                    </div>
+                    {!sunday ? (
+                      <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                        {appointmentCount}
+                      </span>
+                    ) : null}
+                  </a>
+
+                  <div className="space-y-2 p-2">
+                    {sunday ? (
+                      <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-6 text-center text-xs font-semibold text-slate-400 dark:border-slate-700 dark:bg-slate-900">
+                        Fechado
+                      </div>
+                    ) : (
+                      <>
+                        {items.map((item, itemIndex) => {
+                          if (item.kind === "lunch") {
+                            return (
+                              <div
+                                key={`lunch-${dateKey}-${itemIndex}`}
+                                className="rounded-md border border-dashed border-amber-300 bg-amber-50 px-2 py-1.5 text-[10px] font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
+                              >
+                                {almocoVisual.inicio}–{almocoVisual.fim} · Almoço
+                              </div>
+                            );
+                          }
+
+                          if (item.kind === "block") {
+                            const bloqueio = item.bloqueio;
+                            return (
+                              <button
+                                key={`block-${bloqueio.id}`}
+                                type="button"
+                                onClick={() => onSelectBlock(bloqueio)}
+                                className="w-full rounded-md border border-slate-300 bg-slate-100 p-2 text-left transition hover:border-slate-400 hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
+                              >
+                                <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
+                                  <Ban size={11} />
+                                  {formatTime(bloqueio.data)}–{formatTime(blockEnd(bloqueio))}
+                                </div>
+                                <p className="mt-1 truncate text-xs font-extrabold uppercase text-slate-700 dark:text-slate-200">
+                                  {bloqueio.motivo}
+                                </p>
+                                <div className="mt-1 flex min-w-0 items-center justify-between gap-2 text-[10px] text-slate-500">
+                                  <span className="truncate">{bloqueio.profissional.nome}</span>
+                                  {bloqueio.serieId ? (
+                                    <span className="inline-flex shrink-0 items-center gap-1" title="Bloqueio recorrente">
+                                      <Repeat2 size={10} />
+                                      {bloqueio.recorrenciaIndice && bloqueio.recorrenciaTotal
+                                        ? `${bloqueio.recorrenciaIndice}/${bloqueio.recorrenciaTotal}`
+                                        : ""}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </button>
+                            );
+                          }
+
+                          const appointment = item.appointment;
+                          const palette = getStatusPalette(appointment.status);
+                          const professionalIndex = Math.max(
+                            0,
+                            visibleProfessionals.findIndex(
+                              (professional) => professional.id === appointment.profissionalId,
+                            ),
+                          );
+                          const professionalPalette = getPalette(
+                            appointment.profissional?.cor || "violet",
+                            professionalIndex,
+                          );
+
+                          return (
+                            <button
+                              key={`appointment-${appointment.id}`}
+                              type="button"
+                              onClick={() => onSelectAppointment(appointment)}
+                              className="w-full overflow-hidden rounded-md border p-2 text-left shadow-sm transition hover:-translate-y-px hover:shadow-md"
+                              style={{
+                                borderColor: palette.border,
+                                background: palette.soft,
+                                borderLeftWidth: 4,
+                                borderLeftColor: palette.solid,
+                              }}
+                            >
+                              <p
+                                className="text-[10px] font-extrabold"
+                                style={{ color: palette.solid }}
+                              >
+                                {formatTime(appointment.data)}–{formatTime(appointmentEnd(appointment))}
+                              </p>
+                              <p className="mt-1 truncate text-xs font-extrabold uppercase text-slate-900 dark:text-white">
+                                {appointment.cliente.nome}
+                              </p>
+                              <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-slate-600 dark:text-slate-300">
+                                {appointment.procedimento}
+                              </p>
+                              <span
+                                className="mt-1 inline-flex rounded px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-white"
+                                style={{ backgroundColor: palette.solid }}
+                              >
+                                {appointment.status}
+                              </span>
+                              <div className="mt-1 flex min-w-0 items-center justify-between gap-2 text-[10px] font-semibold text-slate-400">
+                                <span className="inline-flex min-w-0 items-center gap-1.5 truncate">
+                                  <span
+                                    className="size-1.5 shrink-0 rounded-full"
+                                    style={{ backgroundColor: professionalPalette.solid }}
+                                  />
+                                  <span className="truncate">
+                                    {appointment.profissional?.nome || "Sem profissional"}
+                                  </span>
+                                </span>
+                                {appointment.serieId ? (
+                                  <span className="inline-flex shrink-0 items-center gap-1" title="Agendamento recorrente">
+                                    <Repeat2 size={10} />
+                                    {appointment.recorrenciaIndice && appointment.recorrenciaTotal
+                                      ? `${appointment.recorrenciaIndice}/${appointment.recorrenciaTotal}`
+                                      : ""}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </button>
+                          );
+                        })}
+
+                        {items.length === 0 ? (
+                          <div className="rounded-md border border-dashed border-slate-200 px-2 py-5 text-center text-[11px] text-slate-400 dark:border-slate-800">
+                            Nenhum atendimento
+                          </div>
+                        ) : null}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const profissional = visibleProfessionals[0] || profissionais[0];
+                            if (!profissional) return;
+                            onNovoHorario({
+                              data: dateKey,
+                              hora: "09:00",
+                              profissionalId: profissional.id,
+                            });
+                          }}
+                          className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-violet-300 px-2 py-2 text-[11px] font-bold text-violet-700 transition hover:bg-violet-50 dark:border-violet-500/40 dark:text-violet-300 dark:hover:bg-violet-500/10"
+                        >
+                          <Plus size={13} />
+                          Novo
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        </div>
+      ) : isSunday ? (
         <div className="flex min-h-[360px] items-center justify-center p-6">
           <div className="max-w-md text-center">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
@@ -826,7 +1182,7 @@ export default function AgendaCalendar({
                               <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-slate-700 text-white dark:bg-slate-200 dark:text-slate-800">
                                 <Ban size={11} />
                               </span>
-                              <div className="min-w-0">
+                              <div className="min-w-0 flex-1">
                                 <p className="text-[0.64rem] font-extrabold leading-tight text-slate-700 dark:text-slate-100 sm:text-[0.7rem]">
                                   {formatTime(bloqueio.data)} - {formatTime(blockEnd(bloqueio))}
                                 </p>
@@ -834,6 +1190,14 @@ export default function AgendaCalendar({
                                   {bloqueio.motivo}
                                 </p>
                               </div>
+                              {bloqueio.serieId ? (
+                                <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-400/60 bg-white/50 px-1.5 py-1 text-[9px] font-bold text-slate-600 dark:bg-slate-800/70 dark:text-slate-200">
+                                  <Repeat2 size={10} />
+                                  {bloqueio.recorrenciaIndice && bloqueio.recorrenciaTotal
+                                    ? `${bloqueio.recorrenciaIndice}/${bloqueio.recorrenciaTotal}`
+                                    : ""}
+                                </span>
+                              ) : null}
                             </div>
 
                             {height >= 62 ? (
@@ -860,6 +1224,7 @@ export default function AgendaCalendar({
                         (visibleEnd - visibleStart) * MINUTE_HEIGHT - 4,
                       );
                       const note = getAppointmentNote(appointment);
+                      const statusPalette = getStatusPalette(appointment.status);
 
                       return (
                         <article
@@ -876,7 +1241,8 @@ export default function AgendaCalendar({
                           style={{
                             top,
                             height,
-                            background: `linear-gradient(135deg, ${palette.solid}, ${palette.gradientEnd})`,
+                            background: `linear-gradient(135deg, ${statusPalette.solid}, ${statusPalette.gradientEnd})`,
+                            boxShadow: `inset 3px 0 0 ${palette.solid}`,
                           }}
                         >
                           <div className="flex h-full min-w-0 flex-col px-2.5 py-1.5">
@@ -891,6 +1257,18 @@ export default function AgendaCalendar({
                                   {appointment.cliente.nome}
                                 </p>
                               </div>
+
+                              {appointment.serieId ? (
+                                <span
+                                  className="hidden shrink-0 items-center gap-1 rounded-md border border-white/30 bg-white/15 px-1.5 py-1 text-[10px] font-bold text-white sm:inline-flex"
+                                  title="Agendamento recorrente"
+                                >
+                                  <Repeat2 size={11} />
+                                  {appointment.recorrenciaIndice && appointment.recorrenciaTotal
+                                    ? `${appointment.recorrenciaIndice}/${appointment.recorrenciaTotal}`
+                                    : ""}
+                                </span>
+                              ) : null}
 
                               <button
                                 type="button"
@@ -912,8 +1290,9 @@ export default function AgendaCalendar({
                             ) : null}
 
                             {height >= 82 ? (
-                              <p className="mt-1 line-clamp-1 text-[0.62rem] text-white/80">
-                                {note}
+                              <p className="mt-1 line-clamp-1 text-[0.62rem] font-medium text-white/85">
+                                {appointment.status}
+                                {note !== appointment.status ? ` · ${note}` : ""}
                               </p>
                             ) : null}
                           </div>

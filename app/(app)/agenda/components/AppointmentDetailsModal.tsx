@@ -12,6 +12,7 @@ import {
   Pencil,
   Phone,
   PlayCircle,
+  Repeat2,
   Sparkles,
   Trash2,
   UserRound,
@@ -19,6 +20,7 @@ import {
 } from "lucide-react";
 
 import {
+  cancelarSerieAgendamento,
   excluirAgendamento,
   iniciarAtendimento,
 } from "@/actions/agendamento.actions";
@@ -34,6 +36,11 @@ type AppointmentDetails = {
   valor: number;
   observacoes: string | null;
   status: string;
+  serieId?: string | null;
+  recorrenciaTipo?: string | null;
+  recorrenciaIntervalo?: number | null;
+  recorrenciaIndice?: number | null;
+  recorrenciaTotal?: number | null;
   createdAt?: string;
   updatedAt?: string;
   cliente: {
@@ -163,12 +170,14 @@ export default function AppointmentDetailsModal({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isManagingSeries, setIsManagingSeries] = useState(false);
 
   useLockBodyScroll(open);
 
   useEffect(() => {
     setError(null);
     setIsDeleting(false);
+    setIsManagingSeries(false);
   }, [open, appointment?.id]);
 
   if (!open || !appointment) return null;
@@ -253,6 +262,37 @@ export default function AppointmentDetailsModal({
     }
   }
 
+  async function handleCancelarSerie(escopo: "seguintes" | "toda") {
+    setError(null);
+
+    if (!currentAppointment.serieId) return;
+
+    const mensagem =
+      escopo === "toda"
+        ? "Cancelar todos os agendamentos pendentes desta série? Atendimentos já finalizados serão preservados."
+        : "Cancelar este agendamento e todas as próximas ocorrências pendentes da série?";
+
+    if (!window.confirm(mensagem)) return;
+
+    setIsManagingSeries(true);
+
+    try {
+      await cancelarSerieAgendamento({
+        id: currentAppointment.id,
+        escopo,
+      });
+      onClose();
+      window.location.reload();
+    } catch (error) {
+      setIsManagingSeries(false);
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível atualizar a série recorrente.",
+      );
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-[100] h-[100dvh] overflow-hidden">
       <button
@@ -287,6 +327,16 @@ export default function AppointmentDetailsModal({
                   >
                     {currentAppointment.status}
                   </span>
+
+                  {currentAppointment.serieId ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700">
+                      <Repeat2 size={12} />
+                      Recorrente
+                      {currentAppointment.recorrenciaIndice && currentAppointment.recorrenciaTotal
+                        ? ` ${currentAppointment.recorrenciaIndice}/${currentAppointment.recorrenciaTotal}`
+                        : ""}
+                    </span>
+                  ) : null}
 
                   {atendimentoEmAndamento ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-cyan-50 px-2.5 py-1 text-xs font-semibold text-cyan-700">
@@ -560,6 +610,43 @@ export default function AppointmentDetailsModal({
                   {isDeleting ? "Excluindo..." : "Excluir agendamento"}
                 </Button>
               </div>
+
+              {currentAppointment.serieId && podeGerenciarAgendamento ? (
+                <div className="mt-4 rounded-2xl border border-violet-200 bg-violet-50/70 p-3">
+                  <div className="flex items-start gap-2">
+                    <Repeat2 size={16} className="mt-0.5 shrink-0 text-violet-700" />
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wide text-violet-800">
+                        Série recorrente
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-violet-700">
+                        Editar altera somente esta ocorrência. Para interromper a repetição, cancele as próximas ocorrências ou toda a série pendente.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleCancelarSerie("seguintes")}
+                      disabled={isManagingSeries}
+                      className="h-10 border-violet-200 bg-white text-xs text-violet-700 hover:bg-violet-100"
+                    >
+                      Cancelar este e próximos
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleCancelarSerie("toda")}
+                      disabled={isManagingSeries}
+                      className="h-10 border-rose-200 bg-white text-xs text-rose-700 hover:bg-rose-50"
+                    >
+                      Cancelar série pendente
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
 
               {!podeGerenciarAgendamento ? (
                 <p className="mt-3 text-xs leading-5 text-slate-500">

@@ -18,6 +18,12 @@ function getParam(
   return Array.isArray(value) ? value[0] : value;
 }
 
+type AgendaViewMode = "day" | "week";
+
+function getViewMode(value?: string): AgendaViewMode {
+  return value === "week" ? "week" : "day";
+}
+
 function getDataSelecionada(value?: string) {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return new Date();
@@ -42,6 +48,18 @@ function inicioDoDia(date: Date) {
 
 function fimDoDia(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+}
+
+function inicioDaSemana(date: Date) {
+  const result = inicioDoDia(date);
+  result.setDate(result.getDate() - result.getDay());
+  return result;
+}
+
+function fimDaSemana(date: Date) {
+  const result = inicioDaSemana(date);
+  result.setDate(result.getDate() + 7);
+  return result;
 }
 
 function normalizarTexto(value?: string | null) {
@@ -98,6 +116,12 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
   const dataSelecionada = getDataSelecionada(
     getParam(resolvedSearchParams, "data"),
   );
+
+  const viewMode = getViewMode(getParam(resolvedSearchParams, "view"));
+  const inicioBusca =
+    viewMode === "week" ? inicioDaSemana(dataSelecionada) : inicioDoDia(dataSelecionada);
+  const fimBusca =
+    viewMode === "week" ? fimDaSemana(dataSelecionada) : fimDoDia(dataSelecionada);
 
   const profissionalFiltroParam = getParam(
     resolvedSearchParams,
@@ -177,8 +201,8 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
     prisma.agendamento.findMany({
       where: {
         data: {
-          gte: inicioDoDia(dataSelecionada),
-          lt: fimDoDia(dataSelecionada),
+          gte: inicioBusca,
+          lt: fimBusca,
         },
       },
       include: {
@@ -204,8 +228,8 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
     prisma.bloqueioAgenda.findMany({
       where: {
         data: {
-          gte: inicioDoDia(dataSelecionada),
-          lt: fimDoDia(dataSelecionada),
+          gte: inicioBusca,
+          lt: fimBusca,
         },
         status: "Ativo",
       },
@@ -246,6 +270,7 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
         initialDate={toDateInput(dataSelecionada)}
         initialProfissionalFiltro={profissionalFiltro}
         initialClienteId={clienteIdParam}
+        initialView={viewMode}
         horarioAtendimento={configuracaoClinica?.horarioAtendimento || null}
       />
     </div>

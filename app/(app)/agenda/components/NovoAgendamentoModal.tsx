@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock3,
+  Repeat2,
   Search,
   Trash2,
   UserPlus,
@@ -23,6 +24,7 @@ import {
   criarAgendamento,
   criarBloqueioAgenda,
   excluirBloqueioAgenda,
+  excluirSerieBloqueioAgenda,
   type HorarioDisponivelAgenda,
 } from "@/actions/agendamento.actions";
 
@@ -62,6 +64,10 @@ type NovoAgendamentoPayload = NovoHorarioPayload & {
   modo?: "novo" | "retorno" | "edicao" | "edicao_bloqueio";
   tipoAtendimento?: "agendamento" | "bloqueio";
   motivoBloqueio?: string;
+  serieId?: string | null;
+  recorrenciaTipo?: string | null;
+  recorrenciaIndice?: number | null;
+  recorrenciaTotal?: number | null;
   clienteId?: number;
   procedimento?: string;
   duracao?: number;
@@ -211,6 +217,14 @@ export default function NovoAgendamentoModal({
   const [status, setStatus] = useState("Agendado");
   const [observacoes, setObservacoes] = useState("");
   const [motivoBloqueio, setMotivoBloqueio] = useState("Almoço");
+  const [recorrenciaTipo, setRecorrenciaTipo] = useState<
+    "nenhuma" | "semanal" | "quinzenal" | "mensal" | "personalizada"
+  >("nenhuma");
+  const [recorrenciaIntervalo, setRecorrenciaIntervalo] = useState("1");
+  const [recorrenciaUnidade, setRecorrenciaUnidade] = useState<
+    "dias" | "semanas" | "meses"
+  >("semanas");
+  const [recorrenciaOcorrencias, setRecorrenciaOcorrencias] = useState("4");
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [mostrarMaisCampos, setMostrarMaisCampos] = useState(false);
@@ -271,6 +285,10 @@ export default function NovoAgendamentoModal({
     setStatus(initialPayload?.status || "Agendado");
     setObservacoes(initialPayload?.observacoes || "");
     setMotivoBloqueio(initialPayload?.motivoBloqueio || "Almoço");
+    setRecorrenciaTipo("nenhuma");
+    setRecorrenciaIntervalo("1");
+    setRecorrenciaUnidade("semanas");
+    setRecorrenciaOcorrencias("4");
     setMostrarMaisCampos(Boolean(initialPayload?.observacoes || modoEdicao));
 
     if (initialPayload?.procedimento) {
@@ -412,6 +430,12 @@ export default function NovoAgendamentoModal({
 
     const dataCompleta = `${data}T${hora}:00`;
     const duracaoNumerica = Number(duracao) || 60;
+    const recorrencia = {
+      tipo: recorrenciaTipo,
+      intervalo: Math.max(1, Number(recorrenciaIntervalo) || 1),
+      unidade: recorrenciaUnidade,
+      ocorrencias: Math.min(52, Math.max(2, Number(recorrenciaOcorrencias) || 4)),
+    } as const;
 
     if (tipoAtendimento === "bloqueio") {
       if (!motivoBloqueio.trim()) {
@@ -428,6 +452,7 @@ export default function NovoAgendamentoModal({
           duracao: duracaoNumerica,
           motivo: motivoBloqueio,
           observacoes,
+          recorrencia: modoEdicaoBloqueio ? { tipo: "nenhuma" as const } : recorrencia,
         };
 
         if (modoEdicaoBloqueio && initialPayload?.bloqueioId) {
@@ -491,6 +516,7 @@ export default function NovoAgendamentoModal({
         valor: parseCurrency(valor),
         status,
         observacoes,
+        recorrencia: modoEdicao ? { tipo: "nenhuma" as const } : recorrencia,
       };
 
       if (modoEdicao && initialPayload?.agendamentoId) {
@@ -538,6 +564,39 @@ export default function NovoAgendamentoModal({
         error instanceof Error
           ? error.message
           : "Não foi possível excluir o bloqueio.",
+      );
+    }
+  }
+
+
+  async function excluirSerieBloqueioAtual(escopo: "seguintes" | "toda") {
+    if (!modoEdicaoBloqueio || !initialPayload?.bloqueioId || !initialPayload?.serieId) {
+      return;
+    }
+
+    const mensagem =
+      escopo === "toda"
+        ? "Excluir toda a série de bloqueios recorrentes?"
+        : "Excluir este bloqueio e todas as próximas ocorrências da série?";
+
+    if (!window.confirm(mensagem)) return;
+
+    setSalvando(true);
+    setErro("");
+
+    try {
+      await excluirSerieBloqueioAgenda({
+        id: initialPayload.bloqueioId,
+        escopo,
+      });
+      onClose();
+      window.location.reload();
+    } catch (error) {
+      setSalvando(false);
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível excluir a série de bloqueios.",
       );
     }
   }
@@ -986,6 +1045,107 @@ export default function NovoAgendamentoModal({
               </label>
             </div>
 
+            {!modoEdicao ? (
+              <div className="mt-4 rounded-md border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-800/40">
+                <div className="flex items-center gap-2">
+                  <Repeat2 size={16} className="text-violet-600 dark:text-violet-300" />
+                  <span className="text-xs font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200">
+                    Repetição
+                  </span>
+                </div>
+
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label>
+                    <span className={labelClassName()}>Repetir</span>
+                    <div className="relative">
+                      <select
+                        value={recorrenciaTipo}
+                        onChange={(event) =>
+                          setRecorrenciaTipo(
+                            event.target.value as typeof recorrenciaTipo,
+                          )
+                        }
+                        className={`${fieldClassName()} appearance-none pr-7`}
+                      >
+                        <option value="nenhuma">Não repetir</option>
+                        <option value="semanal">Semanal</option>
+                        <option value="quinzenal">Quinzenal</option>
+                        <option value="mensal">Mensal</option>
+                        <option value="personalizada">Personalizado</option>
+                      </select>
+                      <ChevronDown
+                        size={15}
+                        className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-500"
+                      />
+                    </div>
+                  </label>
+
+                  {recorrenciaTipo !== "nenhuma" ? (
+                    <label>
+                      <span className={labelClassName()}>Quantidade de ocorrências</span>
+                      <input
+                        type="number"
+                        min={2}
+                        max={52}
+                        value={recorrenciaOcorrencias}
+                        onChange={(event) =>
+                          setRecorrenciaOcorrencias(event.target.value)
+                        }
+                        className={fieldClassName()}
+                      />
+                    </label>
+                  ) : null}
+
+                  {recorrenciaTipo === "personalizada" ? (
+                    <>
+                      <label>
+                        <span className={labelClassName()}>A cada</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={90}
+                          value={recorrenciaIntervalo}
+                          onChange={(event) =>
+                            setRecorrenciaIntervalo(event.target.value)
+                          }
+                          className={fieldClassName()}
+                        />
+                      </label>
+
+                      <label>
+                        <span className={labelClassName()}>Unidade</span>
+                        <div className="relative">
+                          <select
+                            value={recorrenciaUnidade}
+                            onChange={(event) =>
+                              setRecorrenciaUnidade(
+                                event.target.value as typeof recorrenciaUnidade,
+                              )
+                            }
+                            className={`${fieldClassName()} appearance-none pr-7`}
+                          >
+                            <option value="dias">dia(s)</option>
+                            <option value="semanas">semana(s)</option>
+                            <option value="meses">mês(es)</option>
+                          </select>
+                          <ChevronDown
+                            size={15}
+                            className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-500"
+                          />
+                        </div>
+                      </label>
+                    </>
+                  ) : null}
+                </div>
+
+                {recorrenciaTipo !== "nenhuma" ? (
+                  <p className="mt-3 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+                    O sistema valida todos os horários antes de criar a série. Se qualquer ocorrência conflitar com outro atendimento ou bloqueio, nada será criado.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
             {!agendamentoDiretoAgenda && horariosOcupados.length > 0 ? (
               <details className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/50">
                 <summary className="cursor-pointer text-xs font-semibold text-slate-600 dark:text-slate-300">
@@ -1122,6 +1282,107 @@ export default function NovoAgendamentoModal({
                 </div>
               </label>
 
+            {!modoEdicaoBloqueio ? (
+              <div className="mt-4 rounded-md border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-800/40">
+                <div className="flex items-center gap-2">
+                  <Repeat2 size={16} className="text-violet-600 dark:text-violet-300" />
+                  <span className="text-xs font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200">
+                    Repetição
+                  </span>
+                </div>
+
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label>
+                    <span className={labelClassName()}>Repetir</span>
+                    <div className="relative">
+                      <select
+                        value={recorrenciaTipo}
+                        onChange={(event) =>
+                          setRecorrenciaTipo(
+                            event.target.value as typeof recorrenciaTipo,
+                          )
+                        }
+                        className={`${fieldClassName()} appearance-none pr-7`}
+                      >
+                        <option value="nenhuma">Não repetir</option>
+                        <option value="semanal">Semanal</option>
+                        <option value="quinzenal">Quinzenal</option>
+                        <option value="mensal">Mensal</option>
+                        <option value="personalizada">Personalizado</option>
+                      </select>
+                      <ChevronDown
+                        size={15}
+                        className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-500"
+                      />
+                    </div>
+                  </label>
+
+                  {recorrenciaTipo !== "nenhuma" ? (
+                    <label>
+                      <span className={labelClassName()}>Quantidade de ocorrências</span>
+                      <input
+                        type="number"
+                        min={2}
+                        max={52}
+                        value={recorrenciaOcorrencias}
+                        onChange={(event) =>
+                          setRecorrenciaOcorrencias(event.target.value)
+                        }
+                        className={fieldClassName()}
+                      />
+                    </label>
+                  ) : null}
+
+                  {recorrenciaTipo === "personalizada" ? (
+                    <>
+                      <label>
+                        <span className={labelClassName()}>A cada</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={90}
+                          value={recorrenciaIntervalo}
+                          onChange={(event) =>
+                            setRecorrenciaIntervalo(event.target.value)
+                          }
+                          className={fieldClassName()}
+                        />
+                      </label>
+
+                      <label>
+                        <span className={labelClassName()}>Unidade</span>
+                        <div className="relative">
+                          <select
+                            value={recorrenciaUnidade}
+                            onChange={(event) =>
+                              setRecorrenciaUnidade(
+                                event.target.value as typeof recorrenciaUnidade,
+                              )
+                            }
+                            className={`${fieldClassName()} appearance-none pr-7`}
+                          >
+                            <option value="dias">dia(s)</option>
+                            <option value="semanas">semana(s)</option>
+                            <option value="meses">mês(es)</option>
+                          </select>
+                          <ChevronDown
+                            size={15}
+                            className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-500"
+                          />
+                        </div>
+                      </label>
+                    </>
+                  ) : null}
+                </div>
+
+                {recorrenciaTipo !== "nenhuma" ? (
+                  <p className="mt-3 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+                    O sistema valida todos os horários antes de criar a série. Se qualquer ocorrência conflitar com outro atendimento ou bloqueio, nada será criado.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
               <label className="mt-4 block">
                 <span className={labelClassName()}>Observação</span>
                 <textarea
@@ -1132,6 +1393,40 @@ export default function NovoAgendamentoModal({
                   className="w-full resize-y border-0 border-b border-slate-300 bg-transparent px-0 py-2 text-[15px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-violet-600 focus:ring-0 dark:border-slate-600 dark:text-white dark:focus:border-violet-400"
                 />
               </label>
+
+              {modoEdicaoBloqueio && initialPayload?.serieId ? (
+                <div className="mt-5 rounded-md border border-violet-200 bg-violet-50/70 p-3 dark:border-violet-500/30 dark:bg-violet-950/20">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-violet-800 dark:text-violet-200">
+                    <Repeat2 size={14} />
+                    Bloqueio recorrente
+                    {initialPayload.recorrenciaIndice && initialPayload.recorrenciaTotal
+                      ? ` ${initialPayload.recorrenciaIndice}/${initialPayload.recorrenciaTotal}`
+                      : ""}
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-violet-700 dark:text-violet-300">
+                    A edição altera somente esta ocorrência. Você também pode remover as próximas ocorrências ou toda a série.
+                  </p>
+
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => excluirSerieBloqueioAtual("seguintes")}
+                      disabled={salvando}
+                      className="h-9 rounded-md border border-violet-200 bg-white px-2 text-xs font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-50 dark:bg-slate-900"
+                    >
+                      Excluir este e próximos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => excluirSerieBloqueioAtual("toda")}
+                      disabled={salvando}
+                      className="h-9 rounded-md border border-rose-200 bg-white px-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50 dark:bg-slate-900"
+                    >
+                      Excluir série inteira
+                    </button>
+                  </div>
+                </div>
+              ) : null}
 
               {modoEdicaoBloqueio ? (
                 <button

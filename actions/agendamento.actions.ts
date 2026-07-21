@@ -1,5 +1,7 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+
 import { requirePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
@@ -13,6 +15,13 @@ type ClienteNovoAgendamento = {
   observacoes?: string;
 };
 
+export type RecorrenciaAgendaInput = {
+  tipo?: "nenhuma" | "semanal" | "quinzenal" | "mensal" | "personalizada";
+  intervalo?: number;
+  unidade?: "dias" | "semanas" | "meses";
+  ocorrencias?: number;
+};
+
 type NovoAgendamento = {
   clienteId?: number;
   novoCliente?: ClienteNovoAgendamento;
@@ -23,6 +32,7 @@ type NovoAgendamento = {
   valor?: number;
   status?: string;
   observacoes?: string;
+  recorrencia?: RecorrenciaAgendaInput;
 };
 
 export type NovoBloqueioAgenda = {
@@ -31,6 +41,7 @@ export type NovoBloqueioAgenda = {
   duracao?: number;
   motivo: string;
   observacoes?: string;
+  recorrencia?: RecorrenciaAgendaInput;
 };
 
 const profissionaisPadrao = [
@@ -190,6 +201,88 @@ function addMinutes(date: Date, minutes: number) {
   return next;
 }
 
+type RecorrenciaNormalizada = {
+  tipo: "nenhuma" | "semanal" | "quinzenal" | "mensal" | "personalizada";
+  intervalo: number;
+  unidade: "dias" | "semanas" | "meses";
+  ocorrencias: number;
+};
+
+function normalizarRecorrencia(
+  recorrencia?: RecorrenciaAgendaInput,
+): RecorrenciaNormalizada {
+  const tipo = recorrencia?.tipo || "nenhuma";
+
+  if (tipo === "nenhuma") {
+    return {
+      tipo,
+      intervalo: 1,
+      unidade: "semanas",
+      ocorrencias: 1,
+    };
+  }
+
+  const ocorrencias = Math.min(52, Math.max(2, recorrencia?.ocorrencias || 4));
+
+  if (tipo === "semanal") {
+    return { tipo, intervalo: 1, unidade: "semanas", ocorrencias };
+  }
+
+  if (tipo === "quinzenal") {
+    return { tipo, intervalo: 2, unidade: "semanas", ocorrencias };
+  }
+
+  if (tipo === "mensal") {
+    return { tipo, intervalo: 1, unidade: "meses", ocorrencias };
+  }
+
+  return {
+    tipo,
+    intervalo: Math.min(90, Math.max(1, recorrencia?.intervalo || 1)),
+    unidade: recorrencia?.unidade || "semanas",
+    ocorrencias,
+  };
+}
+
+function addDaysFixed(date: Date, days: number) {
+  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+function addMonthsSaoPaulo(date: Date, monthsToAdd: number) {
+  const [year, month, day] = formatDateSaoPaulo(date).split("-").map(Number);
+  const totalMonths = year * 12 + (month - 1) + monthsToAdd;
+  const targetYear = Math.floor(totalMonths / 12);
+  const targetMonthIndex = ((totalMonths % 12) + 12) % 12;
+  const lastDay = new Date(
+    Date.UTC(targetYear, targetMonthIndex + 1, 0),
+  ).getUTCDate();
+  const targetDay = Math.min(day, lastDay);
+  const targetDate = `${targetYear}-${String(targetMonthIndex + 1).padStart(2, "0")}-${String(targetDay).padStart(2, "0")}`;
+
+  return parseLocalDateTime(`${targetDate}T${formatHourMinute(date)}`);
+}
+
+function gerarDatasRecorrencia(
+  dataBase: Date,
+  recorrencia?: RecorrenciaAgendaInput,
+) {
+  const regra = normalizarRecorrencia(recorrencia);
+
+  return {
+    regra,
+    datas: Array.from({ length: regra.ocorrencias }, (_, index) => {
+      if (index === 0) return new Date(dataBase);
+
+      if (regra.unidade === "meses") {
+        return addMonthsSaoPaulo(dataBase, regra.intervalo * index);
+      }
+
+      const diasPorUnidade = regra.unidade === "semanas" ? 7 : 1;
+      return addDaysFixed(dataBase, regra.intervalo * diasPorUnidade * index);
+    }),
+  };
+}
+
 function parseLocalDateTime(value: string) {
   const [datePart, rawTimePart = "00:00"] = value.split("T");
   const timePart = rawTimePart
@@ -325,31 +418,114 @@ async function validarConflitoAgenda({
   }
 }
 
+async function validarDatasNoHorarioFuncionamento(
+  datas: Date[],
+  duracao: number,
+) {
+  const configuracaoClinica = await prisma.configuracaoClinica.findFirst({
+    select: {
+      horarioAtendimento: true,
+      intervaloAgenda: true,
+    },
+  });
+
+  const configuracaoHorario = parseHorarioFuncionamento(
+    configuracaoClinica?.horarioAtendimento,
+    configuracaoClinica?.intervaloAgenda || 30,
+  );
+
+  for (const data of datas) {
+    const dataTexto = formatDateSaoPaulo(data);
+    const diaSemana = getDiaSemana(dataTexto);
+    const funcionamento =
+      diaSemana === 0
+        ? configuracaoHorario.domingo
+        : diaSemana === 6
+          ? configuracaoHorario.sabado
+          : configuracaoHorario.semana;
+
+    if (!funcionamento) {
+      throw new Error(
+        `A recorrência inclui ${dataTexto}, dia em que a clínica está fechada. Ajuste a repetição antes de salvar.`,
+      );
+    }
+
+    const inicio = minutosDoHorario(formatHourMinute(data));
+    const abertura = minutosDoHorario(funcionamento.abertura);
+    const fechamento = minutosDoHorario(funcionamento.fechamento);
+
+    if (inicio < abertura || inicio + duracao > fechamento) {
+      throw new Error(
+        `O horário de ${dataTexto} fica fora do expediente (${funcionamento.abertura} às ${funcionamento.fechamento}). Ajuste a série antes de salvar.`,
+      );
+    }
+  }
+}
+
 export async function criarAgendamento(dados: NovoAgendamento) {
   await requirePermission("agenda.gerenciar");
 
-  const data = parseLocalDateTime(dados.data);
+  const dataBase = parseLocalDateTime(dados.data);
   const duracao = dados.duracao || 60;
+  const { regra, datas } = gerarDatasRecorrencia(dataBase, dados.recorrencia);
 
-  await validarConflitoAgenda({
-    profissionalId: dados.profissionalId,
-    data,
-    duracao,
-  });
+  await validarDatasNoHorarioFuncionamento(datas, duracao);
 
-  const clienteId = await resolverCliente(dados);
-
-  await prisma.agendamento.create({
-    data: {
-      clienteId,
-      profissionalId: dados.profissionalId || null,
-      procedimento: dados.procedimento,
+  for (const data of datas) {
+    await validarConflitoAgenda({
+      profissionalId: dados.profissionalId,
       data,
       duracao,
-      valor: dados.valor || 0,
-      status: dados.status || "Agendado",
-      observacoes: dados.observacoes || null,
-    },
+    });
+  }
+
+  const serieId = datas.length > 1 ? randomUUID() : null;
+
+  await prisma.$transaction(async (tx) => {
+    let clienteId = dados.clienteId;
+
+    if (!clienteId) {
+      if (!dados.novoCliente?.nome?.trim()) {
+        throw new Error(
+          "Informe um cliente cadastrado ou cadastre um novo cliente.",
+        );
+      }
+
+      const cliente = await tx.cliente.create({
+        data: {
+          nome: dados.novoCliente.nome.trim(),
+          telefone:
+            dados.novoCliente.telefone?.trim() ||
+            dados.novoCliente.whatsapp?.trim() ||
+            "Não informado",
+          whatsapp: dados.novoCliente.whatsapp?.trim() || null,
+          origem: dados.novoCliente.origem || null,
+          procedimentoInteresse:
+            dados.novoCliente.procedimentoInteresse || dados.procedimento,
+          observacoes: dados.novoCliente.observacoes || null,
+        },
+      });
+
+      clienteId = cliente.id;
+    }
+
+    await tx.agendamento.createMany({
+      data: datas.map((data, index) => ({
+        clienteId: clienteId!,
+        profissionalId: dados.profissionalId || null,
+        procedimento: dados.procedimento,
+        data,
+        duracao,
+        valor: dados.valor || 0,
+        status: dados.status || "Agendado",
+        observacoes: dados.observacoes || null,
+        serieId,
+        recorrenciaTipo: serieId ? regra.tipo : null,
+        recorrenciaIntervalo: serieId ? regra.intervalo : null,
+        recorrenciaIndice: serieId ? index + 1 : null,
+        recorrenciaTotal: serieId ? datas.length : null,
+      })),
+    });
   });
 
   revalidatePath("/agenda");
@@ -407,6 +583,48 @@ export async function excluirAgendamento(id: number) {
   revalidatePath("/");
 }
 
+export async function cancelarSerieAgendamento({
+  id,
+  escopo = "seguintes",
+}: {
+  id: number;
+  escopo?: "seguintes" | "toda";
+}) {
+  await requirePermission("agenda.gerenciar");
+
+  const atual = await prisma.agendamento.findUnique({
+    where: { id },
+    select: { serieId: true, data: true },
+  });
+
+  if (!atual?.serieId) {
+    throw new Error("Este agendamento não pertence a uma série recorrente.");
+  }
+
+  const resultado = await prisma.agendamento.updateMany({
+    where: {
+      serieId: atual.serieId,
+      ...(escopo === "seguintes" ? { data: { gte: atual.data } } : {}),
+      status: { notIn: ["Atendido", "Em atendimento", "Cancelado"] },
+    },
+    data: { status: "Cancelado" },
+  });
+
+  await prisma.auditoria.create({
+    data: {
+      modulo: "Agenda",
+      acao: escopo === "toda" ? "Cancelou série recorrente" : "Cancelou recorrências futuras",
+      entidade: "Agendamento",
+      entidadeId: String(id),
+      usuario: "Equipe Studio Realçar",
+      detalhes: `${resultado.count} agendamento(s) recorrente(s) cancelado(s).`,
+    },
+  });
+
+  revalidatePath("/agenda");
+  revalidatePath("/");
+}
+
 export async function criarBloqueioAgenda(dados: NovoBloqueioAgenda) {
   await requirePermission("agenda.gerenciar");
 
@@ -418,35 +636,49 @@ export async function criarBloqueioAgenda(dados: NovoBloqueioAgenda) {
     throw new Error("Informe o motivo do bloqueio.");
   }
 
-  const data = parseLocalDateTime(dados.data);
+  const dataBase = parseLocalDateTime(dados.data);
   const duracao = Math.max(5, dados.duracao || 60);
+  const { regra, datas } = gerarDatasRecorrencia(dataBase, dados.recorrencia);
 
-  await validarConflitoAgenda({
-    profissionalId: dados.profissionalId,
-    data,
-    duracao,
-  });
+  await validarDatasNoHorarioFuncionamento(datas, duracao);
+
+  for (const data of datas) {
+    await validarConflitoAgenda({
+      profissionalId: dados.profissionalId,
+      data,
+      duracao,
+    });
+  }
+
+  const serieId = datas.length > 1 ? randomUUID() : null;
 
   await prisma.$transaction(async (tx) => {
-    const bloqueio = await tx.bloqueioAgenda.create({
-      data: {
+    await tx.bloqueioAgenda.createMany({
+      data: datas.map((data, index) => ({
         profissionalId: dados.profissionalId,
         data,
         duracao,
         motivo: dados.motivo.trim(),
         observacoes: dados.observacoes?.trim() || null,
         status: "Ativo",
-      },
+        serieId,
+        recorrenciaTipo: serieId ? regra.tipo : null,
+        recorrenciaIntervalo: serieId ? regra.intervalo : null,
+        recorrenciaIndice: serieId ? index + 1 : null,
+        recorrenciaTotal: serieId ? datas.length : null,
+      })),
     });
 
     await tx.auditoria.create({
       data: {
         modulo: "Agenda",
-        acao: "Criou bloqueio de agenda",
+        acao: serieId ? "Criou série de bloqueios" : "Criou bloqueio de agenda",
         entidade: "BloqueioAgenda",
-        entidadeId: String(bloqueio.id),
+        entidadeId: serieId || "novo",
         usuario: "Equipe Studio Realçar",
-        detalhes: `${dados.motivo.trim()} em ${formatDateSaoPaulo(data)} das ${formatHourMinute(data)} às ${formatHourMinute(addMinutes(data, duracao))}.`,
+        detalhes: serieId
+          ? `${datas.length} bloqueios recorrentes criados para ${dados.motivo.trim()}.`
+          : `${dados.motivo.trim()} em ${formatDateSaoPaulo(dataBase)} das ${formatHourMinute(dataBase)} às ${formatHourMinute(addMinutes(dataBase, duracao))}.`,
       },
     });
   });
@@ -526,6 +758,46 @@ export async function excluirBloqueioAgenda(id: number) {
         detalhes: bloqueio?.motivo || "Bloqueio removido da agenda.",
       },
     });
+  });
+
+  revalidatePath("/agenda");
+  revalidatePath("/");
+}
+
+export async function excluirSerieBloqueioAgenda({
+  id,
+  escopo = "seguintes",
+}: {
+  id: number;
+  escopo?: "seguintes" | "toda";
+}) {
+  await requirePermission("agenda.gerenciar");
+
+  const atual = await prisma.bloqueioAgenda.findUnique({
+    where: { id },
+    select: { serieId: true, data: true, motivo: true },
+  });
+
+  if (!atual?.serieId) {
+    throw new Error("Este bloqueio não pertence a uma série recorrente.");
+  }
+
+  const resultado = await prisma.bloqueioAgenda.deleteMany({
+    where: {
+      serieId: atual.serieId,
+      ...(escopo === "seguintes" ? { data: { gte: atual.data } } : {}),
+    },
+  });
+
+  await prisma.auditoria.create({
+    data: {
+      modulo: "Agenda",
+      acao: escopo === "toda" ? "Excluiu série de bloqueios" : "Excluiu bloqueios futuros da série",
+      entidade: "BloqueioAgenda",
+      entidadeId: String(id),
+      usuario: "Equipe Studio Realçar",
+      detalhes: `${resultado.count} bloqueio(s) removido(s) da série ${atual.motivo}.`,
+    },
   });
 
   revalidatePath("/agenda");
