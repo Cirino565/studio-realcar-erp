@@ -167,33 +167,56 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
         ? String(profissionalDoUsuario.id)
         : "todas";
 
-  const agendamentos = await prisma.agendamento.findMany({
-    where: {
-      data: {
-        gte: inicioDoDia(dataSelecionada),
-        lt: fimDoDia(dataSelecionada),
-      },
-    },
-    include: {
-      cliente: {
-        select: {
-          nome: true,
-          telefone: true,
-          whatsapp: true,
+  const [agendamentos, bloqueios] = await Promise.all([
+    prisma.agendamento.findMany({
+      where: {
+        data: {
+          gte: inicioDoDia(dataSelecionada),
+          lt: fimDoDia(dataSelecionada),
         },
       },
-      profissional: {
-        select: {
-          id: true,
-          nome: true,
-          area: true,
-          cor: true,
-          status: true,
+      include: {
+        cliente: {
+          select: {
+            nome: true,
+            telefone: true,
+            whatsapp: true,
+          },
+        },
+        profissional: {
+          select: {
+            id: true,
+            nome: true,
+            area: true,
+            cor: true,
+            status: true,
+          },
         },
       },
-    },
-    orderBy: { data: "asc" },
-  });
+      orderBy: { data: "asc" },
+    }),
+    prisma.bloqueioAgenda.findMany({
+      where: {
+        data: {
+          gte: inicioDoDia(dataSelecionada),
+          lt: fimDoDia(dataSelecionada),
+        },
+        status: "Ativo",
+      },
+      include: {
+        profissional: {
+          select: {
+            id: true,
+            nome: true,
+            area: true,
+            cor: true,
+            status: true,
+          },
+        },
+      },
+      orderBy: { data: "asc" },
+    }),
+  ]);
 
   return (
     <div className="w-full max-w-full overflow-x-hidden pb-0">
@@ -204,6 +227,12 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
           data: agendamento.data.toISOString(),
           createdAt: agendamento.createdAt.toISOString(),
           updatedAt: agendamento.updatedAt.toISOString(),
+        }))}
+        bloqueios={bloqueios.map((bloqueio) => ({
+          ...bloqueio,
+          data: bloqueio.data.toISOString(),
+          createdAt: bloqueio.createdAt.toISOString(),
+          updatedAt: bloqueio.updatedAt.toISOString(),
         }))}
         profissionais={profissionais}
         origensCliente={origensCliente}

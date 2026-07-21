@@ -100,6 +100,22 @@ model Profissional {
   updatedAt     DateTime @updatedAt
 
   agendamentos  Agendamento[]
+  bloqueiosAgenda BloqueioAgenda[]
+}
+
+model BloqueioAgenda {
+  id             Int           @id @default(autoincrement())
+  profissionalId Int
+  profissional   Profissional  @relation(fields: [profissionalId], references: [id], onDelete: Cascade)
+  data           DateTime
+  duracao        Int           @default(60)
+  motivo         String
+  observacoes    String?
+  status         String        @default("Ativo")
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([profissionalId, data])
 }
 
 model Lancamento {

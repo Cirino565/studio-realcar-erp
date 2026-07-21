@@ -59,9 +59,25 @@ type AgendamentoAgenda = {
   profissional: ProfissionalAgenda | null;
 };
 
+type BloqueioAgenda = {
+  id: number;
+  profissionalId: number;
+  data: string;
+  duracao: number;
+  motivo: string;
+  observacoes: string | null;
+  status: string;
+  createdAt?: string;
+  updatedAt?: string;
+  profissional: ProfissionalAgenda;
+};
+
 type NovoAgendamentoPayload = NovoHorarioPayload & {
   agendamentoId?: number;
-  modo?: "novo" | "retorno" | "edicao";
+  bloqueioId?: number;
+  modo?: "novo" | "retorno" | "edicao" | "edicao_bloqueio";
+  tipoAtendimento?: "agendamento" | "bloqueio";
+  motivoBloqueio?: string;
   clienteId?: number;
   procedimento?: string;
   duracao?: number;
@@ -73,6 +89,7 @@ type NovoAgendamentoPayload = NovoHorarioPayload & {
 type Props = {
   clientes: ClienteAgenda[];
   agendamentos: AgendamentoAgenda[];
+  bloqueios: BloqueioAgenda[];
   profissionais: ProfissionalAgenda[];
   origensCliente: OrigemClienteAgenda[];
   servicos: ServicoAgenda[];
@@ -142,6 +159,7 @@ function formatarDataCurta(value: Date | string) {
 export default function AgendaClient({
   clientes,
   agendamentos,
+  bloqueios,
   profissionais,
   origensCliente,
   servicos,
@@ -209,6 +227,22 @@ export default function AgendaClient({
     setNovoHorario({
       ...payload,
       modo: "novo",
+      tipoAtendimento: "agendamento",
+    });
+  }
+
+
+  function abrirEdicaoBloqueio(bloqueio: BloqueioAgenda) {
+    setNovoHorario({
+      bloqueioId: bloqueio.id,
+      modo: "edicao_bloqueio",
+      tipoAtendimento: "bloqueio",
+      data: toSaoPauloDateInput(bloqueio.data),
+      hora: toTimeInput(bloqueio.data),
+      profissionalId: bloqueio.profissionalId,
+      duracao: bloqueio.duracao || 60,
+      motivoBloqueio: bloqueio.motivo,
+      observacoes: bloqueio.observacoes || "",
     });
   }
 
@@ -304,8 +338,10 @@ export default function AgendaClient({
             profissionais={profissionaisVisiveis}
             todosProfissionais={profissionais}
             agendamentos={agendamentos}
+            bloqueios={bloqueios}
             onNovoHorario={abrirNovoHorario}
             onSelectAppointment={setSelectedAppointment}
+            onSelectBlock={abrirEdicaoBloqueio}
             onMessage={abrirWhatsApp}
           />
         )}

@@ -25,6 +25,14 @@ type NovoAgendamento = {
   observacoes?: string;
 };
 
+export type NovoBloqueioAgenda = {
+  profissionalId: number;
+  data: string;
+  duracao?: number;
+  motivo: string;
+  observacoes?: string;
+};
+
 const profissionaisPadrao = [
   {
     nome: "Vivian",
@@ -223,11 +231,13 @@ async function validarConflitoAgenda({
   data,
   duracao,
   ignoreId,
+  ignoreBloqueioId,
 }: {
   profissionalId?: number;
   data: Date;
   duracao: number;
   ignoreId?: number;
+  ignoreBloqueioId?: number;
 }) {
   if (!profissionalId) return;
 
@@ -237,44 +247,82 @@ async function validarConflitoAgenda({
   const inicioDia = parseLocalDateTime(`${dataSaoPaulo}T00:00`);
   const fimDia = addMinutes(inicioDia, 24 * 60);
 
-  const agendamentosDoDia = await prisma.agendamento.findMany({
-    where: {
-      profissionalId,
-      data: {
-        gte: inicioDia,
-        lt: fimDia,
+  const [agendamentosDoDia, bloqueiosDoDia] = await Promise.all([
+    prisma.agendamento.findMany({
+      where: {
+        profissionalId,
+        data: {
+          gte: inicioDia,
+          lt: fimDia,
+        },
+        status: {
+          notIn: ["Cancelado"],
+        },
+        ...(ignoreId ? { id: { not: ignoreId } } : {}),
       },
-      status: {
-        notIn: ["Cancelado"],
-      },
-      ...(ignoreId ? { id: { not: ignoreId } } : {}),
-    },
-    select: {
-      id: true,
-      data: true,
-      duracao: true,
-      cliente: {
-        select: {
-          nome: true,
+      select: {
+        id: true,
+        data: true,
+        duracao: true,
+        cliente: {
+          select: {
+            nome: true,
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.bloqueioAgenda.findMany({
+      where: {
+        profissionalId,
+        data: {
+          gte: inicioDia,
+          lt: fimDia,
+        },
+        status: "Ativo",
+        ...(ignoreBloqueioId ? { id: { not: ignoreBloqueioId } } : {}),
+      },
+      select: {
+        id: true,
+        data: true,
+        duracao: true,
+        motivo: true,
+      },
+    }),
+  ]);
 
-  const conflito = agendamentosDoDia.find((agendamento) => {
+  const conflitoAgendamento = agendamentosDoDia.find((agendamento) => {
     const inicioExistente = new Date(agendamento.data);
     const fimExistente = addMinutes(inicioExistente, agendamento.duracao);
     return inicioExistente < fimNovo && fimExistente > inicioNovo;
   });
 
-  if (!conflito) return;
+  if (conflitoAgendamento) {
+    const inicio = formatHourMinute(conflitoAgendamento.data);
+    const fim = formatHourMinute(
+      addMinutes(conflitoAgendamento.data, conflitoAgendamento.duracao),
+    );
 
-  const inicio = formatHourMinute(conflito.data);
-  const fim = formatHourMinute(addMinutes(conflito.data, conflito.duracao));
+    throw new Error(
+      `Este horário conflita com ${conflitoAgendamento.cliente.nome}, agendado das ${inicio} às ${fim}. Escolha outro horário ou ajuste a duração.`,
+    );
+  }
 
-  throw new Error(
-    `Este horário conflita com ${conflito.cliente.nome}, agendado das ${inicio} às ${fim}. Escolha outro horário ou ajuste a duração.`,
-  );
+  const conflitoBloqueio = bloqueiosDoDia.find((bloqueio) => {
+    const inicioExistente = new Date(bloqueio.data);
+    const fimExistente = addMinutes(inicioExistente, bloqueio.duracao);
+    return inicioExistente < fimNovo && fimExistente > inicioNovo;
+  });
+
+  if (conflitoBloqueio) {
+    const inicio = formatHourMinute(conflitoBloqueio.data);
+    const fim = formatHourMinute(
+      addMinutes(conflitoBloqueio.data, conflitoBloqueio.duracao),
+    );
+
+    throw new Error(
+      `Este horário está bloqueado por "${conflitoBloqueio.motivo}" das ${inicio} às ${fim}. Escolha outro horário ou edite o bloqueio existente.`,
+    );
+  }
 }
 
 export async function criarAgendamento(dados: NovoAgendamento) {
@@ -353,6 +401,131 @@ export async function excluirAgendamento(id: number) {
     where: {
       id,
     },
+  });
+
+  revalidatePath("/agenda");
+  revalidatePath("/");
+}
+
+export async function criarBloqueioAgenda(dados: NovoBloqueioAgenda) {
+  await requirePermission("agenda.gerenciar");
+
+  if (!dados.profissionalId) {
+    throw new Error("Selecione a profissional para o bloqueio.");
+  }
+
+  if (!dados.motivo?.trim()) {
+    throw new Error("Informe o motivo do bloqueio.");
+  }
+
+  const data = parseLocalDateTime(dados.data);
+  const duracao = Math.max(5, dados.duracao || 60);
+
+  await validarConflitoAgenda({
+    profissionalId: dados.profissionalId,
+    data,
+    duracao,
+  });
+
+  await prisma.$transaction(async (tx) => {
+    const bloqueio = await tx.bloqueioAgenda.create({
+      data: {
+        profissionalId: dados.profissionalId,
+        data,
+        duracao,
+        motivo: dados.motivo.trim(),
+        observacoes: dados.observacoes?.trim() || null,
+        status: "Ativo",
+      },
+    });
+
+    await tx.auditoria.create({
+      data: {
+        modulo: "Agenda",
+        acao: "Criou bloqueio de agenda",
+        entidade: "BloqueioAgenda",
+        entidadeId: String(bloqueio.id),
+        usuario: "Equipe Studio Realçar",
+        detalhes: `${dados.motivo.trim()} em ${formatDateSaoPaulo(data)} das ${formatHourMinute(data)} às ${formatHourMinute(addMinutes(data, duracao))}.`,
+      },
+    });
+  });
+
+  revalidatePath("/agenda");
+  revalidatePath("/");
+}
+
+export async function atualizarBloqueioAgenda({
+  id,
+  ...dados
+}: NovoBloqueioAgenda & { id: number }) {
+  await requirePermission("agenda.gerenciar");
+
+  if (!id) {
+    throw new Error("Bloqueio inválido.");
+  }
+
+  if (!dados.profissionalId) {
+    throw new Error("Selecione a profissional para o bloqueio.");
+  }
+
+  if (!dados.motivo?.trim()) {
+    throw new Error("Informe o motivo do bloqueio.");
+  }
+
+  const data = parseLocalDateTime(dados.data);
+  const duracao = Math.max(5, dados.duracao || 60);
+
+  await validarConflitoAgenda({
+    profissionalId: dados.profissionalId,
+    data,
+    duracao,
+    ignoreBloqueioId: id,
+  });
+
+  await prisma.bloqueioAgenda.update({
+    where: { id },
+    data: {
+      profissionalId: dados.profissionalId,
+      data,
+      duracao,
+      motivo: dados.motivo.trim(),
+      observacoes: dados.observacoes?.trim() || null,
+      status: "Ativo",
+    },
+  });
+
+  revalidatePath("/agenda");
+  revalidatePath("/");
+}
+
+export async function excluirBloqueioAgenda(id: number) {
+  await requirePermission("agenda.gerenciar");
+
+  if (!id) {
+    throw new Error("Bloqueio inválido.");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const bloqueio = await tx.bloqueioAgenda.findUnique({
+      where: { id },
+      select: { motivo: true },
+    });
+
+    await tx.bloqueioAgenda.delete({
+      where: { id },
+    });
+
+    await tx.auditoria.create({
+      data: {
+        modulo: "Agenda",
+        acao: "Excluiu bloqueio de agenda",
+        entidade: "BloqueioAgenda",
+        entidadeId: String(id),
+        usuario: "Equipe Studio Realçar",
+        detalhes: bloqueio?.motivo || "Bloqueio removido da agenda.",
+      },
+    });
   });
 
   revalidatePath("/agenda");
@@ -685,11 +858,13 @@ export async function buscarDisponibilidadeAgenda({
   data,
   duracao = 60,
   ignoreId,
+  ignoreBloqueioId,
 }: {
   profissionalId?: number;
   data: string;
   duracao?: number;
   ignoreId?: number;
+  ignoreBloqueioId?: number;
 }): Promise<HorarioDisponivelAgenda[]> {
   await requirePermission("agenda.visualizar");
 
@@ -730,60 +905,102 @@ export async function buscarDisponibilidadeAgenda({
   const inicioDia = parseLocalDateTime(`${data}T00:00`);
   const fimDia = addMinutes(inicioDia, 24 * 60);
 
-  const agendamentosDoDia = await prisma.agendamento.findMany({
-    where: {
-      profissionalId,
-      data: {
-        gte: inicioDia,
-        lt: fimDia,
+  const [agendamentosDoDia, bloqueiosDoDia] = await Promise.all([
+    prisma.agendamento.findMany({
+      where: {
+        profissionalId,
+        data: {
+          gte: inicioDia,
+          lt: fimDia,
+        },
+        status: {
+          notIn: ["Cancelado"],
+        },
+        ...(ignoreId ? { id: { not: ignoreId } } : {}),
       },
-      status: {
-        notIn: ["Cancelado"],
-      },
-      ...(ignoreId ? { id: { not: ignoreId } } : {}),
-    },
-    select: {
-      id: true,
-      data: true,
-      duracao: true,
-      cliente: {
-        select: {
-          nome: true,
+      select: {
+        id: true,
+        data: true,
+        duracao: true,
+        cliente: {
+          select: {
+            nome: true,
+          },
         },
       },
-    },
-    orderBy: {
-      data: "asc",
-    },
-  });
+      orderBy: {
+        data: "asc",
+      },
+    }),
+    prisma.bloqueioAgenda.findMany({
+      where: {
+        profissionalId,
+        data: {
+          gte: inicioDia,
+          lt: fimDia,
+        },
+        status: "Ativo",
+        ...(ignoreBloqueioId ? { id: { not: ignoreBloqueioId } } : {}),
+      },
+      select: {
+        id: true,
+        data: true,
+        duracao: true,
+        motivo: true,
+      },
+      orderBy: {
+        data: "asc",
+      },
+    }),
+  ]);
 
   return slots.map((hora) => {
     const inicioNovo = montarHorario(data, hora);
     const fimNovo = addMinutes(inicioNovo, duracao);
 
-    const conflito = agendamentosDoDia.find((agendamento) => {
+    const conflitoAgendamento = agendamentosDoDia.find((agendamento) => {
       const inicioExistente = new Date(agendamento.data);
       const fimExistente = addMinutes(inicioExistente, agendamento.duracao);
 
       return inicioExistente < fimNovo && fimExistente > inicioNovo;
     });
 
-    if (!conflito) {
+    if (conflitoAgendamento) {
+      const inicio = formatHourMinute(conflitoAgendamento.data);
+      const fim = formatHourMinute(
+        addMinutes(conflitoAgendamento.data, conflitoAgendamento.duracao),
+      );
+
       return {
         hora,
-        disponivel: true,
+        disponivel: false,
+        motivo: `${conflitoAgendamento.cliente.nome} · ${inicio} às ${fim}`,
       };
     }
 
-    const inicio = formatHourMinute(conflito.data);
-    const fim = formatHourMinute(
-      addMinutes(conflito.data, conflito.duracao),
-    );
+    const conflitoBloqueio = bloqueiosDoDia.find((bloqueio) => {
+      const inicioExistente = new Date(bloqueio.data);
+      const fimExistente = addMinutes(inicioExistente, bloqueio.duracao);
+
+      return inicioExistente < fimNovo && fimExistente > inicioNovo;
+    });
+
+    if (conflitoBloqueio) {
+      const inicio = formatHourMinute(conflitoBloqueio.data);
+      const fim = formatHourMinute(
+        addMinutes(conflitoBloqueio.data, conflitoBloqueio.duracao),
+      );
+
+      return {
+        hora,
+        disponivel: false,
+        motivo: `${conflitoBloqueio.motivo} · ${inicio} às ${fim}`,
+      };
+    }
 
     return {
       hora,
-      disponivel: false,
-      motivo: `${conflito.cliente.nome} · ${inicio} às ${fim}`,
+      disponivel: true,
     };
   });
 }

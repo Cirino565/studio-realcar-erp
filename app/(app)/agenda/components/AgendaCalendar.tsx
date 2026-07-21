@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
+  Ban,
   CalendarDays,
   Check,
   ChevronDown,
@@ -43,6 +44,19 @@ type AgendamentoAgenda = {
   profissional: ProfissionalAgenda | null;
 };
 
+type BloqueioAgenda = {
+  id: number;
+  profissionalId: number;
+  data: string;
+  duracao: number;
+  motivo: string;
+  observacoes: string | null;
+  status: string;
+  createdAt?: string;
+  updatedAt?: string;
+  profissional: ProfissionalAgenda;
+};
+
 export type NovoHorarioPayload = {
   data: string;
   hora: string;
@@ -57,8 +71,10 @@ type Props = {
   profissionais: ProfissionalAgenda[];
   todosProfissionais: ProfissionalAgenda[];
   agendamentos: AgendamentoAgenda[];
+  bloqueios: BloqueioAgenda[];
   onNovoHorario: (payload: NovoHorarioPayload) => void;
   onSelectAppointment: (appointment: AgendamentoAgenda) => void;
+  onSelectBlock: (bloqueio: BloqueioAgenda) => void;
   onMessage: (appointment: AgendamentoAgenda) => void;
 };
 
@@ -169,6 +185,10 @@ function appointmentEnd(appointment: AgendamentoAgenda) {
   return addMinutes(new Date(appointment.data), appointment.duracao);
 }
 
+function blockEnd(bloqueio: BloqueioAgenda) {
+  return addMinutes(new Date(bloqueio.data), bloqueio.duracao);
+}
+
 function getEndHour(date: Date) {
   if (date.getDay() === 6) return 17;
   return 19;
@@ -248,8 +268,10 @@ export default function AgendaCalendar({
   profissionais,
   todosProfissionais,
   agendamentos,
+  bloqueios,
   onNovoHorario,
   onSelectAppointment,
+  onSelectBlock,
   onMessage,
 }: Props) {
   const today = new Date();
@@ -314,8 +336,13 @@ export default function AgendaCalendar({
         .sort(
           (a, b) => new Date(a.data).getTime() - new Date(b.data).getTime(),
         ),
+      blocks: bloqueios
+        .filter((bloqueio) => bloqueio.profissionalId === profissional.id)
+        .sort(
+          (a, b) => new Date(a.data).getTime() - new Date(b.data).getTime(),
+        ),
     }));
-  }, [agendamentos, visibleProfessionals]);
+  }, [agendamentos, bloqueios, visibleProfessionals]);
 
   const shouldEnableHorizontalScroll = visibleProfessionals.length > 2;
   const gridMinWidth =
@@ -643,7 +670,7 @@ export default function AgendaCalendar({
             </div>
 
             {appointmentsByProfessional.map(
-              ({ profissional, appointments, index }) => {
+              ({ profissional, appointments, blocks, index }) => {
                 const palette = getPalette(profissional.cor, index);
 
                 return (
@@ -677,6 +704,64 @@ export default function AgendaCalendar({
                         <span className="h-px flex-1 bg-rose-500" />
                       </div>
                     ) : null}
+
+                    {blocks.map((bloqueio) => {
+                      const startMinutes = minutesFromStart(bloqueio.data);
+                      const endMinutes = minutesFromStart(blockEnd(bloqueio));
+
+                      if (endMinutes <= 0 || startMinutes >= totalMinutes) return null;
+
+                      const top = Math.max(0, startMinutes * MINUTE_HEIGHT + 2);
+                      const visibleEnd = Math.min(totalMinutes, endMinutes);
+                      const visibleStart = Math.max(0, startMinutes);
+                      const height = Math.max(
+                        40,
+                        (visibleEnd - visibleStart) * MINUTE_HEIGHT - 4,
+                      );
+
+                      return (
+                        <article
+                          key={`block-${bloqueio.id}`}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => onSelectBlock(bloqueio)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              onSelectBlock(bloqueio);
+                            }
+                          }}
+                          className="absolute left-0.5 right-0.5 z-10 cursor-pointer overflow-hidden rounded-sm border border-slate-400/80 bg-slate-200 text-left shadow-sm transition hover:bg-slate-300 dark:border-slate-500 dark:bg-slate-700 dark:hover:bg-slate-600"
+                          style={{
+                            top,
+                            height,
+                            backgroundImage:
+                              "repeating-linear-gradient(135deg, rgba(100,116,139,.12) 0, rgba(100,116,139,.12) 6px, rgba(255,255,255,.18) 6px, rgba(255,255,255,.18) 12px)",
+                          }}
+                        >
+                          <div className="flex h-full min-w-0 flex-col px-2.5 py-1.5">
+                            <div className="flex items-start gap-2">
+                              <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-slate-700 text-white dark:bg-slate-200 dark:text-slate-800">
+                                <Ban size={11} />
+                              </span>
+                              <div className="min-w-0">
+                                <p className="text-[0.64rem] font-extrabold leading-tight text-slate-700 dark:text-slate-100 sm:text-[0.7rem]">
+                                  {formatTime(bloqueio.data)} - {formatTime(blockEnd(bloqueio))}
+                                </p>
+                                <p className="mt-0.5 truncate text-[0.72rem] font-extrabold uppercase leading-tight text-slate-900 dark:text-white sm:text-xs">
+                                  {bloqueio.motivo}
+                                </p>
+                              </div>
+                            </div>
+
+                            {height >= 62 ? (
+                              <p className="mt-1 line-clamp-1 text-[0.66rem] font-semibold text-slate-600 dark:text-slate-300">
+                                {bloqueio.observacoes || "Horário indisponível"}
+                              </p>
+                            ) : null}
+                          </div>
+                        </article>
+                      );
+                    })}
 
                     {appointments.map((appointment) => {
                       const startMinutes = minutesFromStart(appointment.data);

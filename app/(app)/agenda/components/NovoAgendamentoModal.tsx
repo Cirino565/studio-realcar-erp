@@ -4,11 +4,13 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   AlertCircle,
+  Ban,
   CalendarDays,
   CheckCircle2,
   ChevronDown,
   Clock3,
   Search,
+  Trash2,
   UserPlus,
   UserRound,
   X,
@@ -16,8 +18,11 @@ import {
 
 import {
   atualizarAgendamento,
+  atualizarBloqueioAgenda,
   buscarDisponibilidadeAgenda,
   criarAgendamento,
+  criarBloqueioAgenda,
+  excluirBloqueioAgenda,
   type HorarioDisponivelAgenda,
 } from "@/actions/agendamento.actions";
 
@@ -53,7 +58,10 @@ type ServicoAgenda = {
 
 type NovoAgendamentoPayload = NovoHorarioPayload & {
   agendamentoId?: number;
-  modo?: "novo" | "retorno" | "edicao";
+  bloqueioId?: number;
+  modo?: "novo" | "retorno" | "edicao" | "edicao_bloqueio";
+  tipoAtendimento?: "agendamento" | "bloqueio";
+  motivoBloqueio?: string;
   clienteId?: number;
   procedimento?: string;
   duracao?: number;
@@ -185,6 +193,7 @@ export default function NovoAgendamentoModal({
   servicos,
   initialPayload,
 }: Props) {
+  const [tipoAtendimento, setTipoAtendimento] = useState<"agendamento" | "bloqueio">("agendamento");
   const [tipoCliente, setTipoCliente] = useState<"existente" | "novo">("existente");
   const [clienteId, setClienteId] = useState("");
   const [clienteBloqueado, setClienteBloqueado] = useState(false);
@@ -201,6 +210,7 @@ export default function NovoAgendamentoModal({
   const [valor, setValor] = useState("");
   const [status, setStatus] = useState("Agendado");
   const [observacoes, setObservacoes] = useState("");
+  const [motivoBloqueio, setMotivoBloqueio] = useState("Almoço");
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [mostrarMaisCampos, setMostrarMaisCampos] = useState(false);
@@ -213,6 +223,10 @@ export default function NovoAgendamentoModal({
     initialPayload?.modo === "edicao" && initialPayload?.agendamentoId,
   );
 
+  const modoEdicaoBloqueio = Boolean(
+    initialPayload?.modo === "edicao_bloqueio" && initialPayload?.bloqueioId,
+  );
+
   const modoRetorno = Boolean(
     !modoEdicao &&
       (initialPayload?.modo === "retorno" || initialPayload?.clienteId),
@@ -220,6 +234,7 @@ export default function NovoAgendamentoModal({
 
   const agendamentoDiretoAgenda = Boolean(
     !modoEdicao &&
+      !modoEdicaoBloqueio &&
       initialPayload?.profissionalId &&
       initialPayload?.data &&
       initialPayload?.hora,
@@ -232,6 +247,7 @@ export default function NovoAgendamentoModal({
     const deveBloquearCliente = Boolean(temClientePreSelecionado && !modoEdicao);
 
     setErro("");
+    setTipoAtendimento(initialPayload?.tipoAtendimento || (modoEdicaoBloqueio ? "bloqueio" : "agendamento"));
     setTipoCliente("existente");
     setClienteBloqueado(deveBloquearCliente);
     setClienteId(initialPayload?.clienteId ? String(initialPayload.clienteId) : "");
@@ -254,6 +270,7 @@ export default function NovoAgendamentoModal({
     setValor(valorParaInput(initialPayload?.valor));
     setStatus(initialPayload?.status || "Agendado");
     setObservacoes(initialPayload?.observacoes || "");
+    setMotivoBloqueio(initialPayload?.motivoBloqueio || "Almoço");
     setMostrarMaisCampos(Boolean(initialPayload?.observacoes || modoEdicao));
 
     if (initialPayload?.procedimento) {
@@ -272,7 +289,7 @@ export default function NovoAgendamentoModal({
       setServicoSelecionadoId("");
       setProcedimento("");
     }
-  }, [open, initialPayload, profissionais, servicos, modoEdicao]);
+  }, [open, initialPayload, profissionais, servicos, modoEdicao, modoEdicaoBloqueio]);
 
   useEffect(() => {
     if (!open || !profissionalId || !data) {
@@ -287,6 +304,7 @@ export default function NovoAgendamentoModal({
           data,
           duracao: Number(duracao) || 60,
           ignoreId: modoEdicao ? initialPayload?.agendamentoId : undefined,
+          ignoreBloqueioId: modoEdicaoBloqueio ? initialPayload?.bloqueioId : undefined,
         });
 
         setHorarios(resultado);
@@ -300,7 +318,9 @@ export default function NovoAgendamentoModal({
     data,
     duracao,
     modoEdicao,
+    modoEdicaoBloqueio,
     initialPayload?.agendamentoId,
+    initialPayload?.bloqueioId,
   ]);
 
   const clienteSelecionado = useMemo(() => {
@@ -385,8 +405,57 @@ export default function NovoAgendamentoModal({
       return;
     }
 
-    if (!procedimento || !data || !hora) {
-      setErro("Preencha procedimento, data e horário.");
+    if (!data || !hora) {
+      setErro("Preencha data e horário.");
+      return;
+    }
+
+    const dataCompleta = `${data}T${hora}:00`;
+    const duracaoNumerica = Number(duracao) || 60;
+
+    if (tipoAtendimento === "bloqueio") {
+      if (!motivoBloqueio.trim()) {
+        setErro("Informe o motivo do bloqueio.");
+        return;
+      }
+
+      setSalvando(true);
+
+      try {
+        const payloadBloqueio = {
+          profissionalId: Number(profissionalId),
+          data: dataCompleta,
+          duracao: duracaoNumerica,
+          motivo: motivoBloqueio,
+          observacoes,
+        };
+
+        if (modoEdicaoBloqueio && initialPayload?.bloqueioId) {
+          await atualizarBloqueioAgenda({
+            id: initialPayload.bloqueioId,
+            ...payloadBloqueio,
+          });
+        } else {
+          await criarBloqueioAgenda(payloadBloqueio);
+        }
+
+        setSalvando(false);
+        onClose();
+        window.location.reload();
+      } catch (error) {
+        setSalvando(false);
+        setErro(
+          error instanceof Error
+            ? error.message
+            : "Não foi possível salvar o bloqueio.",
+        );
+      }
+
+      return;
+    }
+
+    if (!procedimento) {
+      setErro("Selecione ou informe o procedimento.");
       return;
     }
 
@@ -401,8 +470,6 @@ export default function NovoAgendamentoModal({
     }
 
     setSalvando(true);
-
-    const dataCompleta = `${data}T${hora}:00`;
 
     try {
       const payload = {
@@ -420,7 +487,7 @@ export default function NovoAgendamentoModal({
         profissionalId: profissionalId ? Number(profissionalId) : undefined,
         procedimento,
         data: dataCompleta,
-        duracao: Number(duracao) || 60,
+        duracao: duracaoNumerica,
         valor: parseCurrency(valor),
         status,
         observacoes,
@@ -448,6 +515,34 @@ export default function NovoAgendamentoModal({
     }
   }
 
+  async function excluirBloqueioAtual() {
+    if (!modoEdicaoBloqueio || !initialPayload?.bloqueioId) return;
+
+    const confirmou = window.confirm(
+      `Excluir o bloqueio "${motivoBloqueio}"? Esta ação remove o horário bloqueado da agenda.`,
+    );
+
+    if (!confirmou) return;
+
+    setSalvando(true);
+    setErro("");
+
+    try {
+      await excluirBloqueioAgenda(initialPayload.bloqueioId);
+      setSalvando(false);
+      onClose();
+      window.location.reload();
+    } catch (error) {
+      setSalvando(false);
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível excluir o bloqueio.",
+      );
+    }
+  }
+
+
   return (
     <div
       role="dialog"
@@ -458,11 +553,15 @@ export default function NovoAgendamentoModal({
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-700 sm:px-5">
           <div className="min-w-0">
             <h2 className="truncate text-base font-bold text-slate-800 dark:text-white">
-              {modoEdicao
-                ? "Editando Atendimento"
-                : modoRetorno
-                  ? "Criando Retorno"
-                  : "Criando Atendimento"}
+              {modoEdicaoBloqueio
+                ? "Editando Bloqueio"
+                : tipoAtendimento === "bloqueio"
+                  ? "Criando Bloqueio"
+                  : modoEdicao
+                    ? "Editando Atendimento"
+                    : modoRetorno
+                      ? "Criando Retorno"
+                      : "Criando Atendimento"}
             </h2>
           </div>
 
@@ -475,6 +574,42 @@ export default function NovoAgendamentoModal({
             <X size={18} />
           </button>
         </header>
+
+        <div className="flex shrink-0 items-center justify-center gap-6 border-b border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-slate-700 dark:bg-slate-900/80">
+          {(["agendamento", "bloqueio"] as const).map((tipo) => {
+            const active = tipoAtendimento === tipo;
+            const locked = modoEdicao || modoEdicaoBloqueio;
+
+            return (
+              <button
+                key={tipo}
+                type="button"
+                disabled={locked && !active}
+                onClick={() => {
+                  if (locked) return;
+                  setTipoAtendimento(tipo);
+                  setErro("");
+                }}
+                className={`inline-flex items-center gap-2 text-sm font-medium transition ${
+                  active
+                    ? "text-violet-700 dark:text-violet-300"
+                    : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"
+                } disabled:cursor-not-allowed disabled:opacity-40`}
+              >
+                <span
+                  className={`flex size-5 items-center justify-center rounded-full border-2 ${
+                    active
+                      ? "border-violet-600"
+                      : "border-slate-400 dark:border-slate-500"
+                  }`}
+                >
+                  {active ? <span className="size-2.5 rounded-full bg-violet-600" /> : null}
+                </span>
+                {tipo === "agendamento" ? "Agendamento" : "Bloqueio"}
+              </button>
+            );
+          })}
+        </div>
 
         <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
           {erro ? (
@@ -565,6 +700,8 @@ export default function NovoAgendamentoModal({
             </label>
           </div>
 
+          {tipoAtendimento === "agendamento" ? (
+            <>
           <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-700">
             <div className="flex items-center justify-between gap-3">
               <span className={labelClassName()}>Cliente</span>
@@ -919,6 +1056,97 @@ export default function NovoAgendamentoModal({
               </div>
             ) : null}
           </div>
+            </>
+          ) : (
+            <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-700">
+              <div className="mb-4 flex items-start gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-700 dark:bg-slate-800/50">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-700 text-white dark:bg-slate-200 dark:text-slate-800">
+                  <Ban size={17} />
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-slate-800 dark:text-white">
+                    Horário indisponível
+                  </p>
+                  <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                    O período ficará bloqueado para novos agendamentos desta profissional.
+                  </p>
+                </div>
+              </div>
+
+              <label className="block">
+                <span className={labelClassName()}>Motivo do bloqueio</span>
+                <div className="relative">
+                  <select
+                    value={motivoBloqueio}
+                    onChange={(event) => setMotivoBloqueio(event.target.value)}
+                    className={`${fieldClassName()} appearance-none pr-7`}
+                  >
+                    <option>Almoço</option>
+                    <option>Folga</option>
+                    <option>Reunião</option>
+                    <option>Treinamento</option>
+                    <option>Compromisso pessoal</option>
+                    <option>Ausência</option>
+                    <option>Manutenção</option>
+                    <option>Outro</option>
+                  </select>
+                  <ChevronDown
+                    size={16}
+                    className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-500"
+                  />
+                </div>
+              </label>
+
+              <label className="mt-4 block">
+                <span className={labelClassName()}>Duração</span>
+                <div className="relative">
+                  <select
+                    value={duracao}
+                    onChange={(event) => setDuracao(event.target.value)}
+                    className={`${fieldClassName()} appearance-none pr-7`}
+                  >
+                    <option value="30">30 min</option>
+                    <option value="45">45 min</option>
+                    <option value="60">1 hora</option>
+                    <option value="90">1h30</option>
+                    <option value="120">2 horas</option>
+                    <option value="150">2h30</option>
+                    <option value="180">3 horas</option>
+                    <option value="240">4 horas</option>
+                    <option value="480">Dia inteiro</option>
+                  </select>
+                  <ChevronDown
+                    size={16}
+                    className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-500"
+                  />
+                </div>
+              </label>
+
+              <label className="mt-4 block">
+                <span className={labelClassName()}>Observação</span>
+                <textarea
+                  value={observacoes}
+                  onChange={(event) => setObservacoes(event.target.value)}
+                  placeholder="Opcional. Ex.: retorno às 14h, compromisso externo..."
+                  rows={3}
+                  className="w-full resize-y border-0 border-b border-slate-300 bg-transparent px-0 py-2 text-[15px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-violet-600 focus:ring-0 dark:border-slate-600 dark:text-white dark:focus:border-violet-400"
+                />
+              </label>
+
+              {modoEdicaoBloqueio ? (
+                <button
+                  type="button"
+                  onClick={excluirBloqueioAtual}
+                  disabled={salvando}
+                  className="mt-6 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-rose-300 bg-rose-50 text-sm font-bold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50 dark:border-rose-500/40 dark:bg-rose-950/30 dark:text-rose-300"
+                >
+                  <Trash2 size={16} />
+                  Excluir bloqueio
+                </button>
+              ) : null}
+            </div>
+          )}
+
         </div>
 
         <footer className="grid shrink-0 grid-cols-2 gap-3 border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900 sm:px-5">
@@ -939,9 +1167,11 @@ export default function NovoAgendamentoModal({
           >
             {salvando
               ? "Salvando..."
-              : modoEdicao
-                ? "Salvar alterações"
-                : "Salvar"}
+              : modoEdicaoBloqueio || tipoAtendimento === "bloqueio"
+                ? "Salvar bloqueio"
+                : modoEdicao
+                  ? "Salvar alterações"
+                  : "Salvar"}
           </button>
         </footer>
       </div>
