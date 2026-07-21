@@ -18,7 +18,12 @@ export async function GET() {
 
   const [
     clientes,
+    origensCliente,
+    procedimentosInteresse,
+    procedimentosServico,
+    profissionais,
     agendamentos,
+    bloqueiosAgenda,
     lancamentos,
     fornecedores,
     produtos,
@@ -26,6 +31,7 @@ export async function GET() {
     compras,
     compraItens,
     leads,
+    leadInteracoes,
     campanhas,
     usuarios,
     perfis,
@@ -36,13 +42,21 @@ export async function GET() {
     auditoria,
     backupRegistros,
     anamneses,
+    anamneseModelos,
+    anamnesePerguntas,
+    anamneseRespostas,
     fotos,
     documentos,
     procedimentos,
     evolucoes,
   ] = await Promise.all([
     prisma.cliente.findMany(),
+    prisma.origemCliente.findMany(),
+    prisma.procedimentoInteresse.findMany(),
+    prisma.procedimentoServico.findMany(),
+    prisma.profissional.findMany(),
     prisma.agendamento.findMany(),
+    prisma.bloqueioAgenda.findMany(),
     prisma.lancamento.findMany(),
     prisma.fornecedor.findMany(),
     prisma.produto.findMany(),
@@ -50,6 +64,7 @@ export async function GET() {
     prisma.compra.findMany(),
     prisma.compraItem.findMany(),
     prisma.lead.findMany(),
+    prisma.leadInteracao.findMany(),
     prisma.campanhaMarketing.findMany(),
     prisma.usuario.findMany({
       select: {
@@ -77,6 +92,9 @@ export async function GET() {
     prisma.auditoria.findMany(),
     prisma.backupRegistro.findMany(),
     prisma.clienteAnamnese.findMany(),
+    prisma.anamneseModelo.findMany(),
+    prisma.anamnesePergunta.findMany(),
+    prisma.clienteAnamneseResposta.findMany(),
     prisma.clienteFoto.findMany(),
     prisma.clienteDocumento.findMany(),
     prisma.clienteProcedimento.findMany(),
@@ -85,7 +103,12 @@ export async function GET() {
 
   const data = {
     clientes,
+    origensCliente,
+    procedimentosInteresse,
+    procedimentosServico,
+    profissionais,
     agendamentos,
+    bloqueiosAgenda,
     lancamentos,
     fornecedores,
     produtos,
@@ -93,6 +116,7 @@ export async function GET() {
     compras,
     compraItens,
     leads,
+    leadInteracoes,
     campanhas,
     usuarios,
     perfis,
@@ -103,13 +127,19 @@ export async function GET() {
     auditoria,
     backupRegistros,
     anamneses,
+    anamneseModelos,
+    anamnesePerguntas,
+    anamneseRespostas,
     fotos,
     documentos,
     procedimentos,
     evolucoes,
   };
 
-  const totalRegistros = Object.values(data).reduce((total, registros) => total + registros.length, 0);
+  const totalRegistros = Object.values(data).reduce(
+    (total, registros) => total + registros.length,
+    0,
+  );
 
   await prisma.auditoria.create({
     data: {
@@ -124,7 +154,7 @@ export async function GET() {
   return NextResponse.json(
     {
       generatedAt,
-      version: "studio-realcar-erp-deploy-ready-1.1",
+      version: "studio-realcar-erp-deploy-ready-1.2",
       type: "logical-snapshot",
       totalRegistros,
       data,

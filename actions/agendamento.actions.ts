@@ -1005,6 +1005,26 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
       },
     });
 
+    const leadVinculado = await tx.lead.findUnique({
+      where: { agendamentoId: agendamento.id },
+      select: { id: true, etapa: true },
+    });
+
+    if (leadVinculado?.etapa === "Avaliação") {
+      await tx.lead.update({
+        where: { id: leadVinculado.id },
+        data: { etapa: "Negociação" },
+      });
+
+      await tx.leadInteracao.create({
+        data: {
+          leadId: leadVinculado.id,
+          tipo: "Atendimento",
+          descricao: `Atendimento concluído: ${procedimentoRealizado}. Lead movido automaticamente para Negociação.`,
+        },
+      });
+    }
+
     await tx.auditoria.create({
       data: {
         modulo: "Agenda",
@@ -1022,6 +1042,7 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
   revalidatePath("/clientes");
   revalidatePath(`/clientes/${agendamento.clienteId}`);
   revalidatePath("/relatorios");
+  revalidatePath("/marketing");
   revalidatePath("/");
 }
 

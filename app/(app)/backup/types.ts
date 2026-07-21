@@ -9,19 +9,31 @@ export type BackupRegistroItem = {
 
 export type BackupMetricas = {
   clientes: number;
+  origensCliente: number;
+  procedimentosInteresse: number;
+  procedimentosServico: number;
+  profissionais: number;
   agendamentos: number;
+  bloqueiosAgenda: number;
   lancamentos: number;
   fornecedores: number;
   produtos: number;
   movimentacoes: number;
+  compras: number;
+  compraItens: number;
   leads: number;
+  interacoesLeads: number;
   campanhas: number;
   usuarios: number;
   perfis: number;
   permissoes: number;
+  perfilPermissoes: number;
   automacoes: number;
   auditoria: number;
   anamneses: number;
+  anamneseModelos: number;
+  anamnesePerguntas: number;
+  anamneseRespostas: number;
   fotos: number;
   documentos: number;
   procedimentos: number;

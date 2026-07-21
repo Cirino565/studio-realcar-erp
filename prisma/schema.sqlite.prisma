@@ -32,6 +32,7 @@ model Cliente {
   procedimentos ClienteProcedimento[]
   evolucoes    ClienteEvolucao[]
   anamneseRespostas ClienteAnamneseResposta[]
+  leads          Lead[]
 }
 
 model OrigemCliente {
@@ -89,6 +90,8 @@ model Agendamento {
   recorrenciaTotal     Int?
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
+
+  lead                 Lead?
 
   @@index([serieId])
 }
@@ -220,29 +223,57 @@ model CompraItem {
 }
 
 model Lead {
-  id          Int      @id @default(autoincrement())
-  nome        String
-  telefone    String?
-  origem      String?
-  interesse   String?
-  etapa       String   @default("Novo")
-  valorPrevisto Float  @default(0)
-  observacoes String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               Int       @id @default(autoincrement())
+  nome             String
+  telefone         String?
+  origem           String?
+  interesse        String?
+  etapa            String    @default("Novo")
+  valorPrevisto    Float     @default(0)
+  observacoes      String?
+  motivoPerda      String?
+  ultimoContatoEm  DateTime?
+  proximoContatoEm DateTime?
+  convertidoEm     DateTime?
+  clienteId        Int?
+  cliente          Cliente?  @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  agendamentoId    Int?      @unique
+  agendamento      Agendamento? @relation(fields: [agendamentoId], references: [id], onDelete: SetNull)
+  campanhaId       Int?
+  campanha         CampanhaMarketing? @relation(fields: [campanhaId], references: [id], onDelete: SetNull)
+  interacoes       LeadInteracao[]
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([clienteId])
+  @@index([campanhaId])
+  @@index([etapa])
+  @@index([proximoContatoEm])
+}
+
+model LeadInteracao {
+  id        Int      @id @default(autoincrement())
+  leadId    Int
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  tipo      String
+  descricao String?
+  createdAt DateTime @default(now())
+
+  @@index([leadId, createdAt])
 }
 
 model CampanhaMarketing {
-  id          Int      @id @default(autoincrement())
-  nome        String
-  canal       String
-  investimento Float  @default(0)
-  leads       Int      @default(0)
-  status      String   @default("Ativa")
-  inicio      DateTime?
-  fim         DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                Int      @id @default(autoincrement())
+  nome              String
+  canal             String
+  investimento      Float    @default(0)
+  leads             Int      @default(0)
+  status            String   @default("Ativa")
+  inicio            DateTime?
+  fim               DateTime?
+  leadsRelacionados Lead[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model Usuario {
