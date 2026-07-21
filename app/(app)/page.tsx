@@ -24,6 +24,7 @@ import {
 import Link from "next/link";
 
 import CentralDoDiaClient from "@/components/dashboard/CentralDoDiaClient";
+import FilaComercialClient from "@/components/dashboard/FilaComercialClient";
 import { WhatsAppLink } from "@/components/ui/whatsapp-link";
 
 const TIMEZONE = "America/Sao_Paulo";
@@ -147,6 +148,7 @@ function CardIndicador({
 export default async function Home() {
   const usuario = await requirePagePermission("dashboard.visualizar");
   const podeGerenciarAgenda = canAccess(usuario, "agenda.gerenciar");
+  const podeGerenciarMarketing = canAccess(usuario, "marketing.gerenciar");
 
   const agora = new Date();
   const hojeISO = dataISOEmSaoPaulo(agora);
@@ -167,6 +169,10 @@ export default async function Home() {
   proximoMesBase.setUTCMonth(proximoMesBase.getUTCMonth() + 1);
   const inicioProximoMes = inicioDiaSaoPaulo(proximoMesBase.toISOString().slice(0, 10));
 
+  const UM_DIA_MS = 24 * 60 * 60 * 1000;
+  const limiteNegociacaoParada = new Date(inicioHoje.getTime() - 3 * UM_DIA_MS);
+  const limiteAvaliacoesProximas = new Date(inicioHoje.getTime() + 8 * UM_DIA_MS);
+
   const [
     agendaHoje,
     confirmacoesAmanha,
@@ -176,6 +182,7 @@ export default async function Home() {
     produtosAtivos,
     financeiroPendente,
     leadsAbertos,
+    totalLeadsAbertos,
     lancamentosMes,
     totalClientes,
   ] = await Promise.all([
@@ -278,8 +285,33 @@ export default async function Home() {
       where: {
         etapa: { notIn: ["Convertido", "Perdido"] },
       },
+      select: {
+        id: true,
+        nome: true,
+        telefone: true,
+        origem: true,
+        interesse: true,
+        etapa: true,
+        valorPrevisto: true,
+        ultimoContatoEm: true,
+        proximoContatoEm: true,
+        clienteId: true,
+        createdAt: true,
+        updatedAt: true,
+        agendamento: {
+          select: {
+            id: true,
+            data: true,
+            status: true,
+            procedimento: true,
+          },
+        },
+      },
       orderBy: [{ updatedAt: "asc" }, { createdAt: "asc" }],
-      take: 10,
+    }),
+
+    prisma.lead.count({
+      where: { etapa: { notIn: ["Convertido", "Perdido"] } },
     }),
 
     prisma.lancamento.findMany({
@@ -319,6 +351,167 @@ export default async function Home() {
     .reduce((total, item) => total + item.valor, 0);
 
   const saldoMes = entradasMes - saidasMes;
+
+  const followUpsVencidos = leadsAbertos
+    .filter((lead) => lead.proximoContatoEm && lead.proximoContatoEm < inicioHoje)
+    .sort((a, b) =>
+      (a.proximoContatoEm?.getTime() || 0) - (b.proximoContatoEm?.getTime() || 0),
+    );
+
+  const followUpsHoje = leadsAbertos
+    .filter(
+      (lead) =>
+        lead.proximoContatoEm &&
+        lead.proximoContatoEm >= inicioHoje &&
+        lead.proximoContatoEm < inicioAmanha,
+    )
+    .sort((a, b) =>
+      (a.proximoContatoEm?.getTime() || 0) - (b.proximoContatoEm?.getTime() || 0),
+    );
+
+  const avaliacoesSemConfirmacao = leadsAbertos
+    .filter(
+      (lead) =>
+        lead.etapa === "Avaliação" &&
+        lead.agendamento &&
+        lead.agendamento.status === "Agendado" &&
+        lead.agendamento.data >= inicioHoje &&
+        lead.agendamento.data < limiteAvaliacoesProximas,
+    )
+    .sort(
+      (a, b) =>
+        (a.agendamento?.data.getTime() || Number.MAX_SAFE_INTEGER) -
+        (b.agendamento?.data.getTime() || Number.MAX_SAFE_INTEGER),
+    );
+
+  const negociacoesParadas = leadsAbertos
+    .filter((lead) => {
+      if (lead.etapa !== "Negociação") return false;
+      const referencia = lead.ultimoContatoEm || lead.updatedAt;
+      return referencia < limiteNegociacaoParada;
+    })
+    .sort((a, b) => {
+      const referenciaA = (a.ultimoContatoEm || a.updatedAt).getTime();
+      const referenciaB = (b.ultimoContatoEm || b.updatedAt).getTime();
+      return referenciaA - referenciaB;
+    });
+
+  const oportunidadesPrioritarias = leadsAbertos
+    .filter((lead) => {
+      const avaliacaoProxima =
+        lead.agendamento &&
+        lead.agendamento.status !== "Cancelado" &&
+        lead.agendamento.status !== "Atendido" &&
+        lead.agendamento.data >= inicioHoje &&
+        lead.agendamento.data < limiteAvaliacoesProximas;
+
+      return lead.etapa === "Negociação" || Boolean(avaliacaoProxima);
+    })
+    .sort((a, b) => {
+      const dataA = a.agendamento?.data.getTime() || Number.MAX_SAFE_INTEGER;
+      const dataB = b.agendamento?.data.getTime() || Number.MAX_SAFE_INTEGER;
+      if (dataA !== dataB) return dataA - dataB;
+      return b.valorPrevisto - a.valorPrevisto;
+    });
+
+  type CategoriaFilaComercial =
+    | "Follow-up vencido"
+    | "Contato de hoje"
+    | "Avaliação sem confirmação"
+    | "Negociação parada"
+    | "Prioridade comercial";
+
+  type LeadFilaBase = (typeof leadsAbertos)[number];
+
+  const filaComercial: Array<{
+    id: number;
+    nome: string;
+    etapa: string;
+    interesse: string | null;
+    valorPrevisto: number;
+    categoria: CategoriaFilaComercial;
+    detalhe: string;
+    whatsappUrl: string;
+    agendamentoId: number | null;
+    agendaUrl: string | null;
+    podeConfirmarAgendamento: boolean;
+  }> = [];
+
+  const idsNaFila = new Set<number>();
+
+  function adicionarNaFila(
+    lead: LeadFilaBase,
+    categoria: CategoriaFilaComercial,
+    detalhe: string,
+    opcoes?: { podeConfirmarAgendamento?: boolean },
+  ) {
+    if (idsNaFila.has(lead.id)) return;
+    idsNaFila.add(lead.id);
+
+    const primeiroNome = lead.nome.split(" ")[0];
+    const mensagem =
+      categoria === "Negociação parada"
+        ? `Olá, ${primeiroNome}! Tudo bem? Aqui é do Studio Realçar. Passando para retomar nossa conversa${lead.interesse ? ` sobre ${lead.interesse}` : ""}. Ficou alguma dúvida em que possamos ajudar?`
+        : `Olá, ${primeiroNome}! Tudo bem? Aqui é do Studio Realçar. Passando para dar continuidade ao nosso contato${lead.interesse ? ` sobre ${lead.interesse}` : ""}. Posso te ajudar por aqui?`;
+
+    filaComercial.push({
+      id: lead.id,
+      nome: lead.nome,
+      etapa: lead.etapa,
+      interesse: lead.interesse,
+      valorPrevisto: lead.valorPrevisto,
+      categoria,
+      detalhe,
+      whatsappUrl: buildWhatsAppUrl(lead.telefone, mensagem),
+      agendamentoId: lead.agendamento?.id || null,
+      agendaUrl: lead.agendamento
+        ? `/agenda?data=${dataISOEmSaoPaulo(lead.agendamento.data)}`
+        : null,
+      podeConfirmarAgendamento: Boolean(opcoes?.podeConfirmarAgendamento),
+    });
+  }
+
+  followUpsVencidos.slice(0, 8).forEach((lead) => {
+    const dias = Math.max(1, Math.floor((inicioHoje.getTime() - lead.proximoContatoEm!.getTime()) / UM_DIA_MS));
+    adicionarNaFila(
+      lead,
+      "Follow-up vencido",
+      `Contato atrasado há ${dias} dia${dias === 1 ? "" : "s"}.`,
+    );
+  });
+
+  followUpsHoje.slice(0, 8).forEach((lead) => {
+    adicionarNaFila(lead, "Contato de hoje", "Follow-up programado para hoje.");
+  });
+
+  avaliacoesSemConfirmacao.slice(0, 8).forEach((lead) => {
+    if (!lead.agendamento) return;
+    adicionarNaFila(
+      lead,
+      "Avaliação sem confirmação",
+      `Avaliação em ${formatarDataCurta(lead.agendamento.data)} às ${formatarHorario(lead.agendamento.data)} ainda está como Agendado.`,
+      { podeConfirmarAgendamento: true },
+    );
+  });
+
+  negociacoesParadas.slice(0, 8).forEach((lead) => {
+    const referencia = lead.ultimoContatoEm || lead.updatedAt;
+    const dias = Math.max(3, Math.floor((inicioHoje.getTime() - referencia.getTime()) / UM_DIA_MS));
+    adicionarNaFila(
+      lead,
+      "Negociação parada",
+      `Sem contato comercial registrado há ${dias} dias.`,
+    );
+  });
+
+  oportunidadesPrioritarias.slice(0, 8).forEach((lead) => {
+    const detalhe = lead.agendamento
+      ? `Próximo atendimento em ${formatarDataCurta(lead.agendamento.data)} às ${formatarHorario(lead.agendamento.data)}.`
+      : "Oportunidade em negociação que merece acompanhamento.";
+    adicionarNaFila(lead, "Prioridade comercial", detalhe);
+  });
+
+  const filaComercialLimitada = filaComercial.slice(0, 14);
 
   const confirmacoes = confirmacoesAmanha.map((agendamento) => ({
     id: agendamento.id,
@@ -436,10 +629,10 @@ export default async function Home() {
           tone="amber"
         />
         <CardIndicador
-          titulo="Leads em aberto"
-          valor={leadsAbertos.length}
-          descricao="Oportunidades ainda não encerradas."
-          href="#alertas"
+          titulo="Follow-ups vencidos"
+          valor={followUpsVencidos.length}
+          descricao={`${followUpsHoje.length} contato(s) programado(s) para hoje.`}
+          href="#fila-comercial"
           icon={ClipboardList}
           tone="blue"
         />
@@ -556,6 +749,42 @@ export default async function Home() {
               podeGerenciarAgenda={podeGerenciarAgenda}
             />
           </div>
+        </div>
+      </section>
+
+      <section id="fila-comercial" className="premium-card p-4 sm:p-5">
+        <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <ClipboardList className="size-5 text-blue-600" />
+              <h2 className="text-lg font-bold text-slate-950">Fila comercial inteligente</h2>
+            </div>
+            <p className="mt-1 text-sm text-slate-500">
+              Prioriza o que exige ação hoje usando follow-ups, avaliações, negociações e agenda real do CRM.
+            </p>
+          </div>
+          <Link
+            href="/marketing"
+            className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:border-violet-200 hover:text-violet-700"
+          >
+            Abrir CRM completo
+          </Link>
+        </div>
+
+        <div className="mt-4">
+          <FilaComercialClient
+            itens={filaComercialLimitada}
+            resumo={{
+              atrasados: followUpsVencidos.length,
+              hoje: followUpsHoje.length,
+              avaliacoes: avaliacoesSemConfirmacao.length,
+              negociacoes: negociacoesParadas.length,
+              prioridades: oportunidadesPrioritarias.length,
+              totalAbertos: totalLeadsAbertos,
+            }}
+            podeGerenciarMarketing={podeGerenciarMarketing}
+            podeGerenciarAgenda={podeGerenciarAgenda}
+          />
         </div>
       </section>
 
@@ -750,37 +979,32 @@ export default async function Home() {
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <ClipboardList className="size-4 text-blue-600" />
-                <p className="font-bold text-slate-900">Leads em aberto</p>
+                <p className="font-bold text-slate-900">Resumo do CRM</p>
               </div>
-              <Link href="/marketing" className="text-xs font-bold text-blue-700">Abrir Marketing</Link>
+              <Link href="#fila-comercial" className="text-xs font-bold text-blue-700">Ver fila do dia</Link>
             </div>
 
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {leadsAbertos.length > 0 ? leadsAbertos.slice(0, 6).map((lead) => (
-                <div key={lead.id} className="rounded-xl border border-blue-100 bg-white/80 p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold text-slate-900">{lead.nome}</p>
-                      <p className="mt-0.5 truncate text-xs text-slate-500">{lead.interesse || "Interesse não informado"}</p>
-                    </div>
-                    <span className="shrink-0 rounded-lg bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700">{lead.etapa}</span>
-                  </div>
-                  {lead.telefone ? (
-                    <WhatsAppLink
-                      href={buildWhatsAppUrl(
-                        lead.telefone,
-                        `Olá, ${lead.nome.split(" ")[0]}! Tudo bem? Aqui é do Studio Realçar. Passando para retomar nosso contato${lead.interesse ? ` sobre ${lead.interesse}` : ""}. Posso te ajudar por aqui?`,
-                      )}
-                      className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700"
-                    >
-                      <MessageCircle className="size-3.5" />
-                      WhatsApp
-                    </WhatsAppLink>
-                  ) : null}
-                </div>
-              )) : (
-                <p className="text-sm text-slate-500">Nenhum lead em aberto.</p>
-              )}
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+              <div className="rounded-xl border border-blue-100 bg-white/80 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Em aberto</p>
+                <p className="mt-1 text-xl font-bold text-slate-950">{totalLeadsAbertos}</p>
+              </div>
+              <div className="rounded-xl border border-rose-100 bg-white/80 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-rose-500">Atrasados</p>
+                <p className="mt-1 text-xl font-bold text-rose-700">{followUpsVencidos.length}</p>
+              </div>
+              <div className="rounded-xl border border-amber-100 bg-white/80 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-amber-500">Hoje</p>
+                <p className="mt-1 text-xl font-bold text-amber-700">{followUpsHoje.length}</p>
+              </div>
+              <div className="rounded-xl border border-violet-100 bg-white/80 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-violet-500">Avaliações</p>
+                <p className="mt-1 text-xl font-bold text-violet-700">{avaliacoesSemConfirmacao.length}</p>
+              </div>
+              <div className="rounded-xl border border-cyan-100 bg-white/80 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-cyan-600">Paradas</p>
+                <p className="mt-1 text-xl font-bold text-cyan-700">{negociacoesParadas.length}</p>
+              </div>
             </div>
           </div>
         </div>
@@ -818,7 +1042,7 @@ export default async function Home() {
               <p><strong className="text-slate-900">{agendaHoje.length}</strong> atendimento(s) ativo(s) hoje.</p>
               <p><strong className="text-slate-900">{confirmacoesAmanha.length}</strong> confirmação(ões) pendente(s) para amanhã.</p>
               <p><strong className="text-slate-900">{clientesReativacao.length}</strong> cliente(s) priorizado(s) para reativação.</p>
-              <p><strong className="text-slate-900">{leadsAbertos.length}</strong> lead(s) em aberto entre os mais antigos.</p>
+              <p><strong className="text-slate-900">{followUpsVencidos.length}</strong> follow-up(s) vencido(s) e <strong className="text-slate-900">{negociacoesParadas.length}</strong> negociação(ões) sem contato há 3+ dias.</p>
             </div>
           </div>
 
