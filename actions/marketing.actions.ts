@@ -15,6 +15,8 @@ export type CriarLeadInput = {
   valorPrevisto: number;
   observacoes?: string;
   campanhaId?: number | null;
+  resolucaoTelefone?: "vincular" | "pessoa_diferente";
+  clienteIdVinculo?: number | null;
 };
 
 export type AtualizarLeadInput = CriarLeadInput & {
@@ -117,6 +119,34 @@ async function registrarInteracao(leadId: number, tipo: string, descricao?: stri
   });
 }
 
+export async function verificarTelefoneLead(telefone?: string | null) {
+  await requirePermission("marketing.gerenciar");
+
+  const [clienteExistente, leadAtivo] = await Promise.all([
+    localizarClientePorTelefone(telefone),
+    localizarLeadAtivoDuplicado(telefone),
+  ]);
+
+  return {
+    clienteExistente: clienteExistente
+      ? {
+          id: clienteExistente.id,
+          nome: clienteExistente.nome,
+          telefone: clienteExistente.telefone,
+          whatsapp: clienteExistente.whatsapp,
+        }
+      : null,
+    leadAtivo: leadAtivo
+      ? {
+          id: leadAtivo.id,
+          nome: leadAtivo.nome,
+          telefone: leadAtivo.telefone,
+          etapa: leadAtivo.etapa,
+        }
+      : null,
+  };
+}
+
 async function converterLeadInterno(id: number) {
   const lead = await prisma.lead.findUnique({ where: { id } });
 
@@ -126,7 +156,7 @@ async function converterLeadInterno(id: number) {
 
   let clienteId = lead.clienteId;
 
-  if (!clienteId) {
+  if (!clienteId && !lead.ignorarVinculoTelefone) {
     const existente = await localizarClientePorTelefone(lead.telefone);
     clienteId = existente?.id || null;
   }
@@ -195,14 +225,39 @@ export async function criarLead(dados: CriarLeadInput) {
     throw new Error("Nome do lead é obrigatório.");
   }
 
-  const duplicado = await localizarLeadAtivoDuplicado(dados.telefone);
-  if (duplicado) {
+  const [duplicado, clienteExistente] = await Promise.all([
+    localizarLeadAtivoDuplicado(dados.telefone),
+    localizarClientePorTelefone(dados.telefone),
+  ]);
+
+  const pessoaDiferente = dados.resolucaoTelefone === "pessoa_diferente";
+
+  if (duplicado && !pessoaDiferente) {
     throw new Error(
-      `Já existe um lead ativo com este telefone: ${duplicado.nome} (${duplicado.etapa}). Abra o cadastro existente em vez de duplicar.`,
+      `Já existe um lead ativo com este telefone: ${duplicado.nome} (${duplicado.etapa}). Confirme explicitamente se o novo cadastro representa outra pessoa que compartilha o mesmo número.`,
     );
   }
 
-  const clienteExistente = await localizarClientePorTelefone(dados.telefone);
+  let clienteId: number | null = null;
+  let ignorarVinculoTelefone = false;
+
+  if (clienteExistente) {
+    if (dados.resolucaoTelefone === "vincular") {
+      if (!dados.clienteIdVinculo || dados.clienteIdVinculo !== clienteExistente.id) {
+        throw new Error("O cliente selecionado não corresponde ao telefone informado. Revise os dados antes de continuar.");
+      }
+      clienteId = clienteExistente.id;
+    } else if (pessoaDiferente) {
+      ignorarVinculoTelefone = true;
+    } else {
+      throw new Error(
+        `Este telefone já pertence ao cliente ${clienteExistente.nome}. Confirme se deseja vincular a oportunidade ao cadastro existente ou cadastrar uma pessoa diferente.`,
+      );
+    }
+  } else if (pessoaDiferente) {
+    // Pode haver outro lead ativo com o mesmo telefone, por exemplo em número compartilhado por familiares.
+    ignorarVinculoTelefone = Boolean(duplicado);
+  }
 
   const lead = await prisma.$transaction(async (tx) => {
     const criado = await tx.lead.create({
@@ -215,17 +270,22 @@ export async function criarLead(dados: CriarLeadInput) {
         valorPrevisto: limparNumero(dados.valorPrevisto),
         observacoes: limparTexto(dados.observacoes),
         campanhaId: dados.campanhaId || null,
-        clienteId: clienteExistente?.id || null,
+        clienteId,
+        ignorarVinculoTelefone,
       },
     });
+
+    const descricaoCriacao = clienteId
+      ? `Lead criado e vinculado ao cliente existente ${clienteExistente?.nome || `#${clienteId}`}, após confirmação manual.`
+      : ignorarVinculoTelefone
+        ? "Lead criado como pessoa diferente apesar de o telefone também existir em outro cadastro. O vínculo automático por telefone foi desativado para esta oportunidade."
+        : "Lead criado no CRM comercial.";
 
     await tx.leadInteracao.create({
       data: {
         leadId: criado.id,
         tipo: "Criação",
-        descricao: clienteExistente
-          ? `Lead criado e vinculado ao cliente existente ${clienteExistente.nome}.`
-          : "Lead criado no CRM comercial.",
+        descricao: descricaoCriacao,
       },
     });
 
@@ -236,7 +296,9 @@ export async function criarLead(dados: CriarLeadInput) {
         entidade: "Lead",
         entidadeId: String(criado.id),
         usuario: "Equipe Studio Realçar",
-        detalhes: criado.nome,
+        detalhes: ignorarVinculoTelefone
+          ? `${criado.nome} · telefone compartilhado confirmado manualmente`
+          : criado.nome,
       },
     });
 
@@ -507,7 +569,7 @@ export async function agendarAvaliacaoLead(dados: AgendarAvaliacaoLeadInput) {
   }
 
   let clienteId = lead.clienteId;
-  if (!clienteId) {
+  if (!clienteId && !lead.ignorarVinculoTelefone) {
     const existente = await localizarClientePorTelefone(lead.telefone);
     clienteId = existente?.id || null;
   }

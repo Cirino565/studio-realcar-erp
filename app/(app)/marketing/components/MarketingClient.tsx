@@ -45,6 +45,7 @@ import {
   marcarLeadPerdido,
   registrarContatoLead,
   registrarObservacaoLead,
+  verificarTelefoneLead,
 } from "@/actions/marketing.actions";
 import { Button } from "@/components/ui/button";
 import { WhatsAppLink } from "@/components/ui/whatsapp-link";
@@ -77,6 +78,22 @@ type Props = {
 };
 
 type TabKey = "pipeline" | "campanhas" | "mensagens";
+
+type ConflitoTelefoneLead = {
+  dados: LeadFormData;
+  clienteExistente: {
+    id: number;
+    nome: string;
+    telefone: string;
+    whatsapp: string | null;
+  } | null;
+  leadAtivo: {
+    id: number;
+    nome: string;
+    telefone: string | null;
+    etapa: string;
+  } | null;
+};
 
 const tabs: { key: TabKey; label: string }[] = [
   { key: "pipeline", label: "Pipeline" },
@@ -216,6 +233,7 @@ export default function MarketingClient({
   const [tab, setTab] = useState<TabKey>("pipeline");
   const [leadModal, setLeadModal] = useState(false);
   const [leadEditando, setLeadEditando] = useState<MarketingLead | null>(null);
+  const [conflitoTelefone, setConflitoTelefone] = useState<ConflitoTelefoneLead | null>(null);
   const [campanhaModal, setCampanhaModal] = useState(false);
   const [mensagemModal, setMensagemModal] = useState<MarketingLead | null>(null);
   const [detalhesModal, setDetalhesModal] = useState<MarketingLead | null>(null);
@@ -284,9 +302,38 @@ export default function MarketingClient({
     executar(async () => {
       if (leadEditando) {
         await atualizarLead({ ...dados, id: leadEditando.id });
-      } else {
-        await criarLead(dados);
+        setLeadModal(false);
+        setLeadEditando(null);
+        return;
       }
+
+      const verificacao = await verificarTelefoneLead(dados.telefone);
+      if (verificacao.clienteExistente || verificacao.leadAtivo) {
+        setConflitoTelefone({
+          dados,
+          clienteExistente: verificacao.clienteExistente,
+          leadAtivo: verificacao.leadAtivo,
+        });
+        return;
+      }
+
+      await criarLead(dados);
+      setLeadModal(false);
+      setLeadEditando(null);
+    });
+  }
+
+  function resolverConflitoTelefone(resolucao: "vincular" | "pessoa_diferente") {
+    const conflito = conflitoTelefone;
+    if (!conflito) return;
+
+    executar(async () => {
+      await criarLead({
+        ...conflito.dados,
+        resolucaoTelefone: resolucao,
+        clienteIdVinculo: resolucao === "vincular" ? conflito.clienteExistente?.id || null : null,
+      });
+      setConflitoTelefone(null);
       setLeadModal(false);
       setLeadEditando(null);
     });
@@ -481,6 +528,13 @@ export default function MarketingClient({
         onClose={() => { setLeadModal(false); setLeadEditando(null); }}
         onSubmit={salvarLead}
         disabled={isPending}
+      />
+      <TelefoneDuplicadoModal
+        conflito={conflitoTelefone}
+        disabled={isPending}
+        onCorrigir={() => setConflitoTelefone(null)}
+        onVincular={() => resolverConflitoTelefone("vincular")}
+        onPessoaDiferente={() => resolverConflitoTelefone("pessoa_diferente")}
       />
       <CampanhaModal open={campanhaModal} onClose={() => setCampanhaModal(false)} onSubmit={salvarCampanha} disabled={isPending} />
       <MarketingMessageModal lead={mensagemModal} onClose={() => setMensagemModal(null)} onUpdated={() => router.refresh()} podeGerenciar={podeGerenciarMarketing} />
@@ -824,6 +878,89 @@ function LeadModal({
   );
 }
 
+function TelefoneDuplicadoModal({
+  conflito,
+  disabled,
+  onCorrigir,
+  onVincular,
+  onPessoaDiferente,
+}: {
+  conflito: ConflitoTelefoneLead | null;
+  disabled: boolean;
+  onCorrigir: () => void;
+  onVincular: () => void;
+  onPessoaDiferente: () => void;
+}) {
+  if (!conflito) return null;
+
+  const { dados, clienteExistente, leadAtivo } = conflito;
+  const telefoneEncontrado = clienteExistente?.whatsapp || clienteExistente?.telefone || leadAtivo?.telefone || dados.telefone;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/80 p-0 backdrop-blur-md sm:items-center sm:p-4">
+      <div className="w-full max-w-2xl rounded-t-[2rem] border border-amber-300/20 bg-[#171d2a] p-5 shadow-2xl shadow-black/50 sm:rounded-[2rem] sm:p-6">
+        <div className="flex items-start gap-4">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-amber-300/20 bg-amber-400/10 text-amber-200">
+            <AlertTriangle className="size-5" />
+          </div>
+          <div>
+            <h3 className="text-xl font-semibold text-white">Telefone já cadastrado</h3>
+            <p className="mt-1 text-sm leading-6 text-slate-400">
+              O CRM encontrou este número em outro cadastro. Confirme a identidade antes de criar o lead para evitar misturar clientes, prontuários, agenda ou financeiro.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-white/[0.10] bg-white/[0.05] p-4">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Novo lead informado</span>
+            <strong className="mt-2 block text-base text-white">{dados.nome}</strong>
+            <span className="mt-1 block text-sm text-slate-400">{dados.telefone || "Telefone não informado"}</span>
+          </div>
+
+          <div className="rounded-2xl border border-amber-300/15 bg-amber-400/8 p-4">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-200/60">Cadastro encontrado</span>
+            {clienteExistente ? (
+              <>
+                <strong className="mt-2 block text-base text-white">Cliente: {clienteExistente.nome}</strong>
+                <span className="mt-1 block text-sm text-amber-100/70">{telefoneEncontrado}</span>
+              </>
+            ) : leadAtivo ? (
+              <>
+                <strong className="mt-2 block text-base text-white">Lead ativo: {leadAtivo.nome}</strong>
+                <span className="mt-1 block text-sm text-amber-100/70">Etapa: {leadAtivo.etapa}</span>
+              </>
+            ) : null}
+            {clienteExistente && leadAtivo ? <span className="mt-2 block text-xs text-amber-100/60">Também existe um lead ativo com este telefone: {leadAtivo.nome} ({leadAtivo.etapa}).</span> : null}
+          </div>
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-cyan-300/10 bg-cyan-400/7 p-4 text-sm leading-6 text-cyan-100/80">
+          {leadAtivo
+            ? `Já existe uma oportunidade ativa com este telefone: ${leadAtivo.nome} (${leadAtivo.etapa}). Corrija os dados ou escolha pessoa diferente somente quando o número for realmente compartilhado.`
+            : clienteExistente
+              ? "Vincule somente se for realmente a mesma pessoa. Se o número for compartilhado por familiares, casal ou equipe, escolha cadastrar como pessoa diferente."
+              : "Confirme os dados antes de continuar."}
+        </div>
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          {clienteExistente && !leadAtivo ? (
+            <Button type="button" onClick={onVincular} disabled={disabled} className="sm:col-span-2">
+              <Link2 className="size-4" /> Vincular ao cliente {clienteExistente.nome}
+            </Button>
+          ) : null}
+          <Button type="button" variant="outline" onClick={onCorrigir} disabled={disabled}>
+            <Pencil className="size-4" /> Corrigir os dados
+          </Button>
+          <Button type="button" variant="outline" onClick={onPessoaDiferente} disabled={disabled} className="border-amber-300/20 text-amber-100 hover:bg-amber-400/10">
+            <UsersRound className="size-4" /> Cadastrar como pessoa diferente
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CampanhaModal({ open, onClose, onSubmit, disabled }: { open: boolean; onClose: () => void; onSubmit: (dados: CampanhaFormData) => void; disabled: boolean }) {
   const [form, setForm] = useState<CampanhaFormData>({ nome: "", canal: "Instagram", investimento: 0, leads: 0, status: "Ativa", inicio: "", fim: "" });
   useEffect(() => { if (open) setForm({ nome: "", canal: "Instagram", investimento: 0, leads: 0, status: "Ativa", inicio: "", fim: "" }); }, [open]);
@@ -990,6 +1127,7 @@ function LeadDetailsModal({
             </div>
             {lead.observacoes ? <div className="mt-4 rounded-2xl bg-black/10 p-3 text-sm leading-6 text-slate-300">{lead.observacoes}</div> : null}
             {lead.motivoPerda ? <div className="mt-4 rounded-2xl border border-rose-300/15 bg-rose-400/8 p-3 text-sm text-rose-100"><strong>Motivo da perda:</strong> {lead.motivoPerda}</div> : null}
+            {lead.ignorarVinculoTelefone ? <div className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-400/10 p-3 text-sm leading-6 text-amber-100"><strong>Telefone compartilhado:</strong> este lead foi confirmado como uma pessoa diferente. O CRM não reutilizará automaticamente outro cliente apenas por este número.</div> : null}
           </section>
 
           <section className="rounded-3xl border border-white/[0.10] bg-white/[0.055] p-4">

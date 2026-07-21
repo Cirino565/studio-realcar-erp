@@ -237,6 +237,7 @@ model Lead {
   convertidoEm     DateTime?
   clienteId        Int?
   cliente          Cliente?  @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  ignorarVinculoTelefone Boolean @default(false)
   agendamentoId    Int?      @unique
   agendamento      Agendamento? @relation(fields: [agendamentoId], references: [id], onDelete: SetNull)
   campanhaId       Int?
