@@ -76,12 +76,48 @@ type Props = {
   onSelectAppointment: (appointment: AgendamentoAgenda) => void;
   onSelectBlock: (bloqueio: BloqueioAgenda) => void;
   onMessage: (appointment: AgendamentoAgenda) => void;
+  horarioAtendimento?: string | null;
 };
 
 const START_HOUR = 9;
 const SLOT_MINUTES = 30;
 const MINUTE_HEIGHT = 1.5;
 const SAO_PAULO_TIMEZONE = "America/Sao_Paulo";
+
+
+type AlmocoVisualConfig = {
+  ativo: boolean;
+  inicio: string;
+  fim: string;
+  dias: number[];
+};
+
+const ALMOCO_VISUAL_PADRAO: AlmocoVisualConfig = {
+  ativo: true,
+  inicio: "12:00",
+  fim: "13:00",
+  dias: [1, 2, 3, 4, 5, 6],
+};
+
+function parseAlmocoVisual(value?: string | null): AlmocoVisualConfig {
+  if (!value) return { ...ALMOCO_VISUAL_PADRAO, dias: [...ALMOCO_VISUAL_PADRAO.dias] };
+
+  const horario = value.match(/ALMOCO=(\d{2}:\d{2})-(\d{2}:\d{2})/i);
+  const ativo = value.match(/ALMOCO_ATIVO=(0|1)/i);
+  const dias = value.match(/ALMOCO_DIAS=([0-6](?:,[0-6])*)/i);
+
+  return {
+    ativo: ativo ? ativo[1] === "1" : ALMOCO_VISUAL_PADRAO.ativo,
+    inicio: horario?.[1] || ALMOCO_VISUAL_PADRAO.inicio,
+    fim: horario?.[2] || ALMOCO_VISUAL_PADRAO.fim,
+    dias: dias ? dias[1].split(",").map(Number) : [...ALMOCO_VISUAL_PADRAO.dias],
+  };
+}
+
+function minutosHorario(value: string) {
+  const [hour, minute] = value.split(":").map(Number);
+  return hour * 60 + minute;
+}
 
 function formatDateInput(date: Date) {
   const year = date.getFullYear();
@@ -273,6 +309,7 @@ export default function AgendaCalendar({
   onSelectAppointment,
   onSelectBlock,
   onMessage,
+  horarioAtendimento,
 }: Props) {
   const today = new Date();
   const selectedDateInput = formatDateInput(selectedDate);
@@ -280,6 +317,34 @@ export default function AgendaCalendar({
   const totalMinutes = Math.max(0, (endHour - START_HOUR) * 60);
   const gridHeight = totalMinutes * MINUTE_HEIGHT;
   const isSunday = selectedDate.getDay() === 0;
+  const almocoVisual = useMemo(
+    () => parseAlmocoVisual(horarioAtendimento),
+    [horarioAtendimento],
+  );
+  const almocoRange = useMemo(() => {
+    const diaSemana = selectedDate.getDay();
+
+    if (
+      isSunday ||
+      !almocoVisual.ativo ||
+      !almocoVisual.dias.includes(diaSemana)
+    ) {
+      return null;
+    }
+
+    const inicio = minutosHorario(almocoVisual.inicio) - START_HOUR * 60;
+    const fim = minutosHorario(almocoVisual.fim) - START_HOUR * 60;
+    const visibleStart = Math.max(0, inicio);
+    const visibleEnd = Math.min(totalMinutes, fim);
+
+    if (visibleEnd <= visibleStart) return null;
+
+    return {
+      top: visibleStart * MINUTE_HEIGHT,
+      height: (visibleEnd - visibleStart) * MINUTE_HEIGHT,
+      label: `${almocoVisual.inicio} às ${almocoVisual.fim}`,
+    };
+  }, [almocoVisual, isSunday, selectedDate, totalMinutes]);
 
   const [hiddenProfessionalIds, setHiddenProfessionalIds] = useState<number[]>([]);
   const [showVisibilityPanel, setShowVisibilityPanel] = useState(false);
@@ -694,6 +759,24 @@ export default function AgendaCalendar({
                         <span className="sr-only">Criar agendamento às {slot.label}</span>
                       </button>
                     ))}
+
+                    {almocoRange ? (
+                      <div
+                        className="pointer-events-none absolute left-0 right-0 z-[1] border-y border-amber-200/80 bg-amber-50/75 dark:border-amber-500/20 dark:bg-amber-400/[0.06]"
+                        style={{
+                          top: almocoRange.top,
+                          height: almocoRange.height,
+                        }}
+                      >
+                        {index === 0 && almocoRange.height >= 44 ? (
+                          <div className="flex h-full items-start justify-center pt-2">
+                            <span className="rounded-full border border-amber-300/70 bg-white/85 px-2.5 py-1 text-[0.62rem] font-bold uppercase tracking-[0.12em] text-amber-700 shadow-sm dark:border-amber-500/30 dark:bg-slate-900/80 dark:text-amber-200">
+                              Almoço · {almocoRange.label}
+                            </span>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
 
                     {currentTimeLine !== null ? (
                       <div

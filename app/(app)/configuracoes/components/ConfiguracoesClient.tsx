@@ -109,6 +109,10 @@ type HorariosAgendaForm = {
   sabadoAtivo: boolean;
   sabadoAbertura: string;
   sabadoFechamento: string;
+  almocoAtivo: boolean;
+  almocoInicio: string;
+  almocoFim: string;
+  almocoDias: number[];
 };
 
 const HORARIOS_AGENDA_PADRAO: HorariosAgendaForm = {
@@ -117,6 +121,10 @@ const HORARIOS_AGENDA_PADRAO: HorariosAgendaForm = {
   sabadoAtivo: true,
   sabadoAbertura: "09:00",
   sabadoFechamento: "17:00",
+  almocoAtivo: true,
+  almocoInicio: "12:00",
+  almocoFim: "13:00",
+  almocoDias: [1, 2, 3, 4, 5, 6],
 };
 
 function parseHorariosAgenda(value?: string | null): HorariosAgendaForm {
@@ -126,14 +134,23 @@ function parseHorariosAgenda(value?: string | null): HorariosAgendaForm {
 
   const semana = value.match(/SEG-SEX=(\d{2}:\d{2})-(\d{2}:\d{2})/i);
   const sabado = value.match(/SAB=(FECHADO|(\d{2}:\d{2})-(\d{2}:\d{2}))/i);
+  const almoco = value.match(/ALMOCO=(\d{2}:\d{2})-(\d{2}:\d{2})/i);
+  const almocoAtivo = value.match(/ALMOCO_ATIVO=(0|1)/i);
+  const almocoDias = value.match(/ALMOCO_DIAS=([0-6](?:,[0-6])*)/i);
 
-  if (semana || sabado) {
+  if (semana || sabado || almoco || almocoAtivo || almocoDias) {
     return {
       semanaAbertura: semana?.[1] || HORARIOS_AGENDA_PADRAO.semanaAbertura,
       semanaFechamento: semana?.[2] || HORARIOS_AGENDA_PADRAO.semanaFechamento,
       sabadoAtivo: sabado ? sabado[1].toUpperCase() !== "FECHADO" : true,
       sabadoAbertura: sabado?.[2] || HORARIOS_AGENDA_PADRAO.sabadoAbertura,
       sabadoFechamento: sabado?.[3] || HORARIOS_AGENDA_PADRAO.sabadoFechamento,
+      almocoAtivo: almocoAtivo ? almocoAtivo[1] === "1" : HORARIOS_AGENDA_PADRAO.almocoAtivo,
+      almocoInicio: almoco?.[1] || HORARIOS_AGENDA_PADRAO.almocoInicio,
+      almocoFim: almoco?.[2] || HORARIOS_AGENDA_PADRAO.almocoFim,
+      almocoDias: almocoDias
+        ? almocoDias[1].split(",").map(Number)
+        : [...HORARIOS_AGENDA_PADRAO.almocoDias],
     };
   }
 
@@ -144,8 +161,9 @@ function serializarHorariosAgenda(value: HorariosAgendaForm) {
   const sabado = value.sabadoAtivo
     ? `${value.sabadoAbertura}-${value.sabadoFechamento}`
     : "FECHADO";
+  const almocoDias = [...value.almocoDias].sort((a, b) => a - b).join(",");
 
-  return `SEG-SEX=${value.semanaAbertura}-${value.semanaFechamento};SAB=${sabado};DOM=FECHADO`;
+  return `SEG-SEX=${value.semanaAbertura}-${value.semanaFechamento};SAB=${sabado};DOM=FECHADO;ALMOCO_ATIVO=${value.almocoAtivo ? "1" : "0"};ALMOCO=${value.almocoInicio}-${value.almocoFim};ALMOCO_DIAS=${almocoDias}`;
 }
 
 function getInitials(name: string) {
@@ -179,7 +197,7 @@ function buildInitialForm(
     responsavelTecnico: toText(configuracao.responsavelTecnico),
     registroProfissional: toText(configuracao.registroProfissional),
     especialidadePrincipal: toText(configuracao.especialidadePrincipal),
-    horarioAtendimento: configuracao.horarioAtendimento || serializarHorariosAgenda(HORARIOS_AGENDA_PADRAO),
+    horarioAtendimento: serializarHorariosAgenda(parseHorariosAgenda(configuracao.horarioAtendimento)),
     intervaloAgenda: configuracao.intervaloAgenda,
     antecedenciaLembrete: configuracao.antecedenciaLembrete,
     toleranciaAtraso: configuracao.toleranciaAtraso,
@@ -655,7 +673,7 @@ export default function ConfiguracoesClient({
 
   function handleHorarioAgendaChange(
     campo: keyof HorariosAgendaForm,
-    value: string | boolean,
+    value: string | boolean | number[],
   ) {
     setSaved(false);
 
@@ -672,6 +690,15 @@ export default function ConfiguracoesClient({
 
       return next;
     });
+  }
+
+
+  function toggleDiaAlmoco(dia: number) {
+    const dias = horariosAgenda.almocoDias.includes(dia)
+      ? horariosAgenda.almocoDias.filter((item) => item !== dia)
+      : [...horariosAgenda.almocoDias, dia];
+
+    handleHorarioAgendaChange("almocoDias", dias);
   }
 
   function handleSubmit(
@@ -1018,6 +1045,100 @@ export default function ConfiguracoesClient({
                         className="h-11 rounded-2xl border border-white/[0.10] bg-white/[0.06] px-4 text-sm text-white outline-none transition disabled:cursor-not-allowed disabled:opacity-40 focus:border-violet-300/40 focus:ring-4 focus:ring-violet-500/10"
                       />
                     </label>
+                  </div>
+
+                  <div className="grid gap-4 rounded-2xl border border-amber-300/15 bg-amber-300/[0.04] p-4 md:grid-cols-[1fr_160px_160px] md:items-end">
+                    <div>
+                      <label className="inline-flex cursor-pointer items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={horariosAgenda.almocoAtivo}
+                          onChange={(event) =>
+                            handleHorarioAgendaChange(
+                              "almocoAtivo",
+                              event.target.checked,
+                            )
+                          }
+                          className="mt-0.5 h-4 w-4 rounded border-white/20 accent-amber-400"
+                        />
+                        <span>
+                          <span className="block text-sm font-semibold text-white">
+                            Faixa visual de almoço
+                          </span>
+                          <span className="mt-1 block text-xs leading-5 text-slate-400">
+                            Apenas destaca a agenda. Não bloqueia nem impede agendamentos.
+                          </span>
+                        </span>
+                      </label>
+                    </div>
+
+                    <label className="grid gap-2 text-sm text-slate-300">
+                      <span className="font-medium">Início</span>
+                      <input
+                        type="time"
+                        value={horariosAgenda.almocoInicio}
+                        disabled={!horariosAgenda.almocoAtivo}
+                        onChange={(event) =>
+                          handleHorarioAgendaChange(
+                            "almocoInicio",
+                            event.target.value,
+                          )
+                        }
+                        className="h-11 rounded-2xl border border-white/[0.10] bg-white/[0.06] px-4 text-sm text-white outline-none transition disabled:cursor-not-allowed disabled:opacity-40 focus:border-amber-300/40 focus:ring-4 focus:ring-amber-500/10"
+                      />
+                    </label>
+
+                    <label className="grid gap-2 text-sm text-slate-300">
+                      <span className="font-medium">Fim</span>
+                      <input
+                        type="time"
+                        value={horariosAgenda.almocoFim}
+                        disabled={!horariosAgenda.almocoAtivo}
+                        onChange={(event) =>
+                          handleHorarioAgendaChange(
+                            "almocoFim",
+                            event.target.value,
+                          )
+                        }
+                        className="h-11 rounded-2xl border border-white/[0.10] bg-white/[0.06] px-4 text-sm text-white outline-none transition disabled:cursor-not-allowed disabled:opacity-40 focus:border-amber-300/40 focus:ring-4 focus:ring-amber-500/10"
+                      />
+                    </label>
+
+                    <div className="md:col-span-3">
+                      <p className="mb-2 text-xs font-medium text-slate-400">
+                        Dias em que a faixa deve aparecer
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          [1, "Seg"],
+                          [2, "Ter"],
+                          [3, "Qua"],
+                          [4, "Qui"],
+                          [5, "Sex"],
+                          [6, "Sáb"],
+                        ].map(([dia, label]) => {
+                          const ativo = horariosAgenda.almocoDias.includes(
+                            Number(dia),
+                          );
+
+                          return (
+                            <button
+                              key={String(dia)}
+                              type="button"
+                              disabled={!horariosAgenda.almocoAtivo}
+                              onClick={() => toggleDiaAlmoco(Number(dia))}
+                              className={`h-9 min-w-12 rounded-xl border px-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                                ativo
+                                  ? "border-amber-300/40 bg-amber-300/15 text-amber-100"
+                                  : "border-white/[0.10] bg-white/[0.04] text-slate-400 hover:bg-white/[0.07]"
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
 
                   <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-xs text-slate-400">

@@ -109,7 +109,7 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
     "clienteId",
   );
 
-  const [clientes, profissionais, origensCliente, servicos] = await Promise.all([
+  const [clientes, profissionais, origensCliente, servicos, configuracaoClinica] = await Promise.all([
     prisma.cliente.findMany({
       orderBy: { nome: "asc" },
       select: {
@@ -152,6 +152,12 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
         categoria: true,
         duracaoPadrao: true,
         valorPadrao: true,
+      },
+    }),
+
+    prisma.configuracaoClinica.findFirst({
+      select: {
+        horarioAtendimento: true,
       },
     }),
   ]);
@@ -240,6 +246,7 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
         initialDate={toDateInput(dataSelecionada)}
         initialProfissionalFiltro={profissionalFiltro}
         initialClienteId={clienteIdParam}
+        horarioAtendimento={configuracaoClinica?.horarioAtendimento || null}
       />
     </div>
   );

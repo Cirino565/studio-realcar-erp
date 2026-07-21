@@ -96,6 +96,7 @@ type Props = {
   initialDate: string;
   initialProfissionalFiltro: string;
   initialClienteId?: string | null;
+  horarioAtendimento?: string | null;
 };
 
 function parseLocalDate(value: string) {
@@ -166,6 +167,7 @@ export default function AgendaClient({
   initialDate,
   initialProfissionalFiltro,
   initialClienteId,
+  horarioAtendimento,
 }: Props) {
   const [selectedDate, setSelectedDate] = useState(() =>
     parseLocalDate(initialDate),
@@ -343,6 +345,7 @@ export default function AgendaClient({
             onSelectAppointment={setSelectedAppointment}
             onSelectBlock={abrirEdicaoBloqueio}
             onMessage={abrirWhatsApp}
+            horarioAtendimento={horarioAtendimento}
           />
         )}
       </div>
