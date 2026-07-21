@@ -6,7 +6,6 @@ import { CalendarDays, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 import AgendaCalendar, { type NovoHorarioPayload } from "./AgendaCalendar";
-import AgendaHeader from "./AgendaHeader";
 import AppointmentDetailsModal from "./AppointmentDetailsModal";
 import AppointmentMessageModal from "./AppointmentMessageModal";
 import FinalizarAtendimentoModal from "./FinalizarAtendimentoModal";
@@ -267,11 +266,7 @@ export default function AgendaClient({
   }
 
   return (
-    <div className="w-full max-w-full overflow-x-hidden pb-6 lg:space-y-8 lg:overflow-visible lg:pb-0">
-      <div className="hidden lg:block">
-        <AgendaHeader />
-      </div>
-
+    <div className="w-full max-w-full overflow-x-hidden pb-6 lg:overflow-visible lg:pb-0">
       <div className="w-full max-w-full min-w-0">
         {profissionais.length === 0 ? (
           <section className="premium-card mx-0 p-4 sm:p-7">

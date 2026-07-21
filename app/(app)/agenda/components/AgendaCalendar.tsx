@@ -7,7 +7,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Clock3,
   MessageCircle,
   Plus,
   UserRound,
@@ -103,14 +102,6 @@ function formatWeekday(date: Date) {
     .slice(0, 3);
 }
 
-function formatDateHeading(date: Date) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  }).format(date);
-}
 
 function formatDateCompact(date: Date) {
   return new Intl.DateTimeFormat("pt-BR", {
@@ -168,6 +159,7 @@ function getPalette(color: string, index: number) {
   ) {
     return {
       solid: "#be123c",
+      gradientEnd: "#e11d48",
       soft: "rgba(190, 18, 60, 0.10)",
       border: "rgba(244, 63, 94, 0.42)",
     };
@@ -176,6 +168,7 @@ function getPalette(color: string, index: number) {
   if (normalized.includes("blue") || normalized.includes("azul")) {
     return {
       solid: "#2563eb",
+      gradientEnd: "#4f46e5",
       soft: "rgba(37, 99, 235, 0.10)",
       border: "rgba(59, 130, 246, 0.42)",
     };
@@ -184,6 +177,7 @@ function getPalette(color: string, index: number) {
   if (normalized.includes("teal") || normalized.includes("green")) {
     return {
       solid: "#0f766e",
+      gradientEnd: "#0d9488",
       soft: "rgba(15, 118, 110, 0.10)",
       border: "rgba(20, 184, 166, 0.42)",
     };
@@ -191,6 +185,7 @@ function getPalette(color: string, index: number) {
 
   return {
     solid: "#7c3aed",
+    gradientEnd: "#a21caf",
     soft: "rgba(124, 58, 237, 0.10)",
     border: "rgba(139, 92, 246, 0.42)",
   };
@@ -348,23 +343,19 @@ export default function AgendaCalendar({
   }, [isSunday, selectedDate, today, totalMinutes]);
 
   return (
-    <section className="relative w-full max-w-full overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">
-      <div className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-900/80">
-        <div className="flex flex-col gap-3 p-3 lg:flex-row lg:items-center lg:justify-between lg:px-4">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => goToDate(today)}
-              className="h-9 rounded-lg border border-violet-200 bg-violet-600 px-3 text-sm font-semibold text-white transition hover:bg-violet-700 dark:border-violet-500/40"
-            >
-              Hoje
-            </button>
+    <section className="relative w-full max-w-full overflow-hidden border border-slate-300 bg-white text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:rounded-xl">
+      <div className="border-b border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex min-h-14 flex-col gap-2 px-2 py-2 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center lg:gap-4 lg:px-3">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="hidden h-9 items-center rounded-md bg-violet-700 px-3 text-xs font-extrabold uppercase tracking-wide text-white sm:inline-flex">
+              Dia
+            </span>
 
-            <div className="flex overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950">
+            <div className="flex overflow-hidden rounded-md border border-violet-300 bg-white dark:border-violet-500/50 dark:bg-slate-950">
               <button
                 type="button"
                 onClick={() => goToDate(addDays(selectedDate, -1))}
-                className="flex h-9 w-9 items-center justify-center border-r border-slate-200 text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                className="flex h-9 w-9 items-center justify-center border-r border-violet-200 text-violet-700 transition hover:bg-violet-50 dark:border-violet-500/40 dark:text-violet-200 dark:hover:bg-violet-500/10"
                 aria-label="Dia anterior"
               >
                 <ChevronLeft size={17} />
@@ -372,17 +363,24 @@ export default function AgendaCalendar({
 
               <button
                 type="button"
+                onClick={() => goToDate(today)}
+                className="h-9 border-r border-violet-200 px-3 text-xs font-extrabold uppercase tracking-wide text-violet-700 transition hover:bg-violet-50 dark:border-violet-500/40 dark:text-violet-200 dark:hover:bg-violet-500/10"
+              >
+                Hoje
+              </button>
+
+              <button
+                type="button"
                 onClick={() => goToDate(addDays(selectedDate, 1))}
-                className="flex h-9 w-9 items-center justify-center text-slate-600 transition hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                className="flex h-9 w-9 items-center justify-center text-violet-700 transition hover:bg-violet-50 dark:text-violet-200 dark:hover:bg-violet-500/10"
                 aria-label="Próximo dia"
               >
                 <ChevronRight size={17} />
               </button>
             </div>
 
-            <label className="relative flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800">
-              <CalendarDays size={16} className="text-violet-600 dark:text-violet-300" />
-              <span className="hidden sm:inline">{formatDateCompact(selectedDate)}</span>
+            <label className="relative flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-violet-700 transition hover:bg-violet-50 dark:text-violet-200 dark:hover:bg-violet-500/10" title={formatDateCompact(selectedDate)}>
+              <CalendarDays size={19} />
               <input
                 type="date"
                 value={selectedDateInput}
@@ -393,16 +391,43 @@ export default function AgendaCalendar({
             </label>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="order-3 min-w-0 overflow-x-auto lg:order-none lg:overflow-visible">
+            <div className="mx-auto flex min-w-max items-stretch justify-center overflow-hidden rounded-md border border-violet-300 bg-white dark:border-violet-500/50 dark:bg-slate-950">
+              {weekDays.map((day) => {
+                const active = isSameDay(day, selectedDate);
+                const todayItem = isSameDay(day, today);
+
+                return (
+                  <a
+                    key={formatDateInput(day)}
+                    href={agendaHref(day, profissionalFiltro)}
+                    className={`flex min-w-[84px] items-center justify-center gap-1.5 border-r border-violet-200 px-2.5 py-2 text-center text-xs font-semibold transition last:border-r-0 dark:border-violet-500/40 ${
+                      active
+                        ? "bg-violet-700 text-white"
+                        : todayItem
+                          ? "bg-violet-50 text-violet-800 hover:bg-violet-100 dark:bg-violet-500/10 dark:text-violet-100"
+                          : "text-violet-700 hover:bg-violet-50 dark:text-violet-200 dark:hover:bg-violet-500/10"
+                    }`}
+                  >
+                    <span className="capitalize">{formatWeekday(day)}</span>
+                    <span className="font-extrabold">{String(day.getDate()).padStart(2, "0")}</span>
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-1.5">
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setShowVisibilityPanel((current) => !current)}
-                className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="flex h-9 items-center gap-2 rounded-md px-2.5 text-violet-700 transition hover:bg-violet-50 dark:text-violet-200 dark:hover:bg-violet-500/10"
+                title="Selecionar agendas"
               >
-                <UsersRound size={16} />
-                <span className="hidden sm:inline">Agendas</span>
-                <ChevronDown size={14} />
+                <UsersRound size={18} />
+                <span className="hidden text-xs font-bold sm:inline">Agendas</span>
+                <ChevronDown size={13} />
               </button>
 
               {showVisibilityPanel ? (
@@ -469,55 +494,13 @@ export default function AgendaCalendar({
               type="button"
               onClick={abrirNovoPadrao}
               disabled={!visibleProfessionals[0] && !profissionais[0]}
-              className="flex h-9 items-center gap-2 rounded-lg bg-violet-600 px-3 text-sm font-bold text-white shadow-sm transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-700 text-white shadow-md shadow-violet-700/25 transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50 sm:h-11 sm:w-11"
+              title="Novo agendamento"
             >
-              <Plus size={16} />
-              <span className="hidden sm:inline">Novo agendamento</span>
+              <Plus size={21} />
+              <span className="sr-only">Novo agendamento</span>
             </button>
           </div>
-        </div>
-
-        <div className="border-t border-slate-200 px-2 py-2 dark:border-slate-800 sm:px-3">
-          <div className="grid grid-cols-7 gap-1">
-            {weekDays.map((day) => {
-              const active = isSameDay(day, selectedDate);
-              const todayItem = isSameDay(day, today);
-
-              return (
-                <a
-                  key={formatDateInput(day)}
-                  href={agendaHref(day, profissionalFiltro)}
-                  className={`min-w-0 rounded-lg border px-1 py-2 text-center transition sm:px-2 ${
-                    active
-                      ? "border-violet-600 bg-violet-600 text-white shadow-sm"
-                      : todayItem
-                        ? "border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-500/40 dark:bg-violet-500/10 dark:text-violet-200"
-                        : "border-transparent text-slate-600 hover:border-slate-200 hover:bg-white dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-950"
-                  }`}
-                >
-                  <span className="block truncate text-[0.62rem] font-bold uppercase tracking-wide sm:text-[0.68rem]">
-                    {formatWeekday(day)}
-                  </span>
-                  <span className="mt-1 block text-sm font-bold sm:text-base">
-                    {String(day.getDate()).padStart(2, "0")}
-                  </span>
-                </a>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="border-t border-slate-200 px-3 py-2 dark:border-slate-800 sm:px-4">
-          <p className="text-sm font-semibold capitalize text-slate-700 dark:text-slate-200">
-            {formatDateHeading(selectedDate)}
-          </p>
-          <p className="mt-0.5 text-xs text-slate-400">
-            {isSunday
-              ? "Clínica fechada aos domingos"
-              : selectedDate.getDay() === 6
-                ? "Atendimento das 09:00 às 17:00"
-                : "Atendimento das 09:00 às 19:00"}
-          </p>
         </div>
       </div>
 
@@ -554,8 +537,8 @@ export default function AgendaCalendar({
               )}, minmax(0, 1fr))`,
             }}
           >
-            <div className="sticky left-0 z-30 flex h-12 items-center justify-center border-b border-r border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-800 dark:bg-slate-900">
-              <Clock3 size={16} />
+            <div className="sticky left-0 z-30 flex h-11 items-center justify-center border-b border-r border-slate-300 bg-white text-violet-700 dark:border-slate-700 dark:bg-slate-900 dark:text-violet-200">
+              <UsersRound size={17} />
             </div>
 
             {appointmentsByProfessional.map(({ profissional, index }) => {
@@ -564,17 +547,17 @@ export default function AgendaCalendar({
               return (
                 <div
                   key={profissional.id}
-                  className="h-12 border-b border-r border-slate-200 bg-slate-50 px-2 dark:border-slate-800 dark:bg-slate-900"
+                  className="h-11 border-b border-r border-slate-300 bg-white px-2 dark:border-slate-700 dark:bg-slate-900"
                 >
                   <div className="flex h-full min-w-0 items-center justify-center gap-2">
                     <span
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white shadow-sm"
                       style={{ backgroundColor: palette.solid }}
                     >
                       <UserRound size={14} />
                     </span>
                     <div className="min-w-0">
-                      <p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100 sm:text-sm">
+                      <p className="truncate text-xs font-extrabold text-slate-800 dark:text-slate-100 sm:text-sm">
                         {profissional.nome}
                       </p>
                       {profissional.area ? (
@@ -589,13 +572,13 @@ export default function AgendaCalendar({
             })}
 
             <div
-              className="sticky left-0 z-20 border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+              className="sticky left-0 z-20 border-r border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950"
               style={{ height: gridHeight }}
             >
               {slots.map((slot) => (
                 <div
                   key={slot.label}
-                  className="absolute left-0 right-0 border-t border-slate-200 pr-2 pt-1 text-right text-[0.65rem] font-medium text-slate-500 dark:border-slate-800 dark:text-slate-400"
+                  className="absolute left-0 right-0 border-t border-slate-300 pr-2 pt-1 text-right text-[0.66rem] font-semibold text-slate-500 dark:border-slate-700 dark:text-slate-400"
                   style={{ top: slot.offset }}
                 >
                   {slot.label}
@@ -610,7 +593,7 @@ export default function AgendaCalendar({
                 return (
                   <div
                     key={`grid-${profissional.id}`}
-                    className="relative border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+                    className="relative border-r border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950"
                     style={{ height: gridHeight }}
                   >
                     {slots.slice(0, -1).map((slot) => (
@@ -665,29 +648,22 @@ export default function AgendaCalendar({
                               onSelectAppointment(appointment);
                             }
                           }}
-                          className="absolute left-1 right-1 z-10 cursor-pointer overflow-hidden rounded-md border text-left shadow-sm transition hover:-translate-y-px hover:shadow-md sm:left-1.5 sm:right-1.5"
+                          className="absolute left-0.5 right-0.5 z-10 cursor-pointer overflow-hidden rounded-sm border border-white/20 text-left shadow-sm transition hover:brightness-105 hover:shadow-md sm:left-0.5 sm:right-0.5"
                           style={{
                             top,
                             height,
-                            backgroundColor: palette.soft,
-                            borderColor: palette.border,
+                            background: `linear-gradient(135deg, ${palette.solid}, ${palette.gradientEnd})`,
                           }}
                         >
-                          <div
-                            className="absolute bottom-0 left-0 top-0 w-1"
-                            style={{ backgroundColor: palette.solid }}
-                          />
-
-                          <div className="flex h-full min-w-0 flex-col px-2 py-1.5 pl-3">
+                          <div className="flex h-full min-w-0 flex-col px-2.5 py-1.5">
                             <div className="flex min-w-0 items-start justify-between gap-2">
                               <div className="min-w-0">
                                 <p
-                                  className="text-[0.64rem] font-extrabold leading-tight sm:text-[0.7rem]"
-                                  style={{ color: palette.solid }}
+                                  className="text-[0.64rem] font-extrabold leading-tight text-white/95 sm:text-[0.7rem]"
                                 >
                                   {formatTime(appointment.data)} - {formatTime(appointmentEnd(appointment))}
                                 </p>
-                                <p className="mt-0.5 truncate text-[0.72rem] font-extrabold uppercase leading-tight text-slate-900 dark:text-white sm:text-xs">
+                                <p className="mt-0.5 truncate text-[0.72rem] font-extrabold uppercase leading-tight text-white sm:text-xs">
                                   {appointment.cliente.nome}
                                 </p>
                               </div>
@@ -698,7 +674,7 @@ export default function AgendaCalendar({
                                   event.stopPropagation();
                                   onMessage(appointment);
                                 }}
-                                className="hidden shrink-0 rounded-md border border-slate-200 bg-white/80 p-1 text-slate-500 transition hover:text-violet-600 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-300 sm:block"
+                                className="hidden shrink-0 rounded-md border border-white/30 bg-white/15 p-1 text-white transition hover:bg-white/25 sm:block"
                                 aria-label="Criar mensagem"
                               >
                                 <MessageCircle size={12} />
@@ -706,13 +682,13 @@ export default function AgendaCalendar({
                             </div>
 
                             {height >= 52 ? (
-                              <p className="mt-1 line-clamp-1 text-[0.66rem] font-semibold text-slate-600 dark:text-slate-300 sm:text-[0.72rem]">
+                              <p className="mt-1 line-clamp-1 text-[0.66rem] font-semibold text-white/95 sm:text-[0.72rem]">
                                 {appointment.procedimento}
                               </p>
                             ) : null}
 
                             {height >= 82 ? (
-                              <p className="mt-1 line-clamp-1 text-[0.62rem] text-slate-500 dark:text-slate-400">
+                              <p className="mt-1 line-clamp-1 text-[0.62rem] text-white/80">
                                 {note}
                               </p>
                             ) : null}
