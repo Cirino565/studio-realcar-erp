@@ -12,6 +12,7 @@ export const PAGE_PERMISSION_PRIORITY = [
   { href: "/estoque", permissao: "estoque.visualizar" },
   { href: "/relatorios", permissao: "relatorios.visualizar" },
   { href: "/marketing", permissao: "marketing.visualizar" },
+  { href: "/comunicacoes", permissao: "marketing.visualizar" },
   { href: "/usuarios", permissao: "usuarios.gerenciar" },
   { href: "/permissoes", permissao: "permissoes.gerenciar" },
   { href: "/auditoria", permissao: "auditoria.visualizar" },

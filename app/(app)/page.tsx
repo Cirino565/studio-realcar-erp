@@ -561,6 +561,13 @@ export default async function Home() {
               Abrir agenda
             </Link>
             <Link
+              href="/comunicacoes"
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 shadow-sm transition hover:bg-emerald-100"
+            >
+              <MessageCircle className="size-4" />
+              Comunicações
+            </Link>
+            <Link
               href="/clientes"
               className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-violet-600 px-3 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-violet-700"
             >

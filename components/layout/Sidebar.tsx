@@ -13,6 +13,7 @@ import {
   KeyRound,
   LayoutDashboard,
   Megaphone,
+  MessagesSquare,
   Menu,
   Package,
   Settings,
@@ -64,6 +65,12 @@ const mainMenus = [
     nome: "Marketing",
     icon: Megaphone,
     href: "/marketing",
+    permissao: "marketing.visualizar",
+  },
+  {
+    nome: "Comunicação",
+    icon: MessagesSquare,
+    href: "/comunicacoes",
     permissao: "marketing.visualizar",
   },
 ];

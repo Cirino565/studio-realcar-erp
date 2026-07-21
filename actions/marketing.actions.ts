@@ -439,7 +439,7 @@ export async function marcarLeadPerdido(id: number, motivo: string) {
 }
 
 export async function registrarContatoLead(id: number, proximoContato?: string | null) {
-  await requirePermission("marketing.gerenciar");
+  const usuario = await requirePermission("marketing.gerenciar");
 
   const lead = await prisma.lead.findUnique({ where: { id } });
   if (!lead) throw new Error("Lead não encontrado.");
@@ -465,6 +465,22 @@ export async function registrarContatoLead(id: number, proximoContato?: string |
         descricao: proximo
           ? `Contato iniciado pelo WhatsApp. Próximo acompanhamento programado para ${proximoContato}.`
           : "Contato iniciado pelo WhatsApp.",
+      },
+    });
+
+    await tx.comunicacaoRegistro.create({
+      data: {
+        clienteId: lead.clienteId,
+        leadId: id,
+        agendamentoId: lead.agendamentoId,
+        destinatarioNome: lead.nome,
+        telefone: lead.telefone,
+        categoria: "Follow-up comercial",
+        canal: "WhatsApp",
+        mensagem: "Contato iniciado pelo WhatsApp a partir do CRM.",
+        status: "Aberta",
+        usuario: usuario.email,
+        abertoEm: agora,
       },
     });
   });

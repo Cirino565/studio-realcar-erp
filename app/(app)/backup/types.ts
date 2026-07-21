@@ -29,6 +29,8 @@ export type BackupMetricas = {
   permissoes: number;
   perfilPermissoes: number;
   automacoes: number;
+  mensagemModelos: number;
+  comunicacoes: number;
   auditoria: number;
   anamneses: number;
   anamneseModelos: number;

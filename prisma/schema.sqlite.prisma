@@ -33,6 +33,7 @@ model Cliente {
   evolucoes    ClienteEvolucao[]
   anamneseRespostas ClienteAnamneseResposta[]
   leads          Lead[]
+  comunicacoes   ComunicacaoRegistro[]
 }
 
 model OrigemCliente {
@@ -92,6 +93,7 @@ model Agendamento {
   updatedAt            DateTime      @updatedAt
 
   lead                 Lead?
+  comunicacoes          ComunicacaoRegistro[]
 
   @@index([serieId])
 }
@@ -243,6 +245,7 @@ model Lead {
   campanhaId       Int?
   campanha         CampanhaMarketing? @relation(fields: [campanhaId], references: [id], onDelete: SetNull)
   interacoes       LeadInteracao[]
+  comunicacoes      ComunicacaoRegistro[]
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -402,6 +405,49 @@ model Automacao {
   observacoes     String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+}
+
+model MensagemModelo {
+  id          Int      @id @default(autoincrement())
+  chave       String   @unique
+  nome        String
+  categoria   String
+  corpo       String
+  ativo       Boolean  @default(true)
+  ordem       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  comunicacoes ComunicacaoRegistro[]
+}
+
+model ComunicacaoRegistro {
+  id               Int             @id @default(autoincrement())
+  modeloId         Int?
+  modelo           MensagemModelo? @relation(fields: [modeloId], references: [id], onDelete: SetNull)
+  clienteId        Int?
+  cliente          Cliente?        @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  leadId           Int?
+  lead             Lead?           @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  agendamentoId    Int?
+  agendamento      Agendamento?    @relation(fields: [agendamentoId], references: [id], onDelete: SetNull)
+  destinatarioNome String
+  telefone         String?
+  categoria        String
+  canal            String          @default("WhatsApp")
+  mensagem         String
+  status           String          @default("Aberta")
+  usuario          String?
+  abertoEm         DateTime?
+  enviadoEm        DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([clienteId, createdAt])
+  @@index([leadId, createdAt])
+  @@index([agendamentoId, createdAt])
+  @@index([categoria, createdAt])
+  @@index([status, createdAt])
 }
 
 
