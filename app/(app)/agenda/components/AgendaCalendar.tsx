@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
+  CalendarDays,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   MessageCircle,
   Plus,
@@ -60,99 +63,21 @@ type Props = {
 };
 
 const START_HOUR = 9;
-const END_HOUR = 19;
 const SLOT_MINUTES = 30;
-const MINUTE_HEIGHT = 1.72;
-const TOTAL_MINUTES = (END_HOUR - START_HOUR) * 60;
-
-const slots = Array.from(
-  { length: TOTAL_MINUTES / SLOT_MINUTES + 1 },
-  (_, index) => {
-    const totalMinutes = START_HOUR * 60 + index * SLOT_MINUTES;
-    const hour = Math.floor(totalMinutes / 60);
-    const minute = totalMinutes % 60;
-
-    return {
-      hour,
-      minute,
-      label: `${String(hour).padStart(2, "0")}:${String(minute).padStart(
-        2,
-        "0",
-      )}`,
-      offset: index * SLOT_MINUTES * MINUTE_HEIGHT,
-    };
-  },
-);
-
-const gridHeight = TOTAL_MINUTES * MINUTE_HEIGHT;
+const MINUTE_HEIGHT = 1.5;
+const SAO_PAULO_TIMEZONE = "America/Sao_Paulo";
 
 function formatDateInput(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
-
   return `${year}-${month}-${day}`;
-}
-
-function formatTime(value: Date | string) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
-
-function formatMonthName(value: Date) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    month: "long",
-  }).format(value);
-}
-
-function formatDateTitle(value: Date, today: Date) {
-  const dateText = new Intl.DateTimeFormat("pt-BR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(value);
-
-  if (isSameDay(value, today)) {
-    return `Hoje, ${dateText}`;
-  }
-
-  return new Intl.DateTimeFormat("pt-BR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(value);
-}
-
-function formatShortWeekDay(value: Date) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    weekday: "short",
-  })
-    .format(value)
-    .replace(".", "");
 }
 
 function addDays(date: Date, amount: number) {
   const next = new Date(date);
   next.setDate(next.getDate() + amount);
-
   return next;
-}
-
-function addMinutes(date: Date, minutes: number) {
-  const next = new Date(date);
-  next.setMinutes(next.getMinutes() + minutes);
-
-  return next;
-}
-
-function getDateStripDays(date: Date) {
-  return Array.from(
-    { length: 35 },
-    (_, index) => addDays(date, index - 10),
-  );
 }
 
 function isSameDay(first: Date, second: Date) {
@@ -163,79 +88,125 @@ function isSameDay(first: Date, second: Date) {
   );
 }
 
-function minutesFromStart(value: Date | string) {
-  const date = new Date(value);
+function startOfWeek(date: Date) {
+  const result = new Date(date);
+  result.setDate(result.getDate() - result.getDay());
+  return result;
+}
 
-  return (
-    date.getHours() * 60 +
-    date.getMinutes() -
-    START_HOUR * 60
-  );
+function formatWeekday(date: Date) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    weekday: "short",
+  })
+    .format(date)
+    .replace(".", "")
+    .slice(0, 3);
+}
+
+function formatDateHeading(date: Date) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
+
+function formatDateCompact(date: Date) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
+}
+
+function getSaoPauloTimeParts(value: Date | string) {
+  const parts = new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: SAO_PAULO_TIMEZONE,
+  }).formatToParts(new Date(value));
+
+  const hour = Number(parts.find((part) => part.type === "hour")?.value || 0);
+  const minute = Number(parts.find((part) => part.type === "minute")?.value || 0);
+
+  return { hour, minute };
+}
+
+function formatTime(value: Date | string) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: SAO_PAULO_TIMEZONE,
+  }).format(new Date(value));
+}
+
+function addMinutes(date: Date, minutes: number) {
+  return new Date(date.getTime() + minutes * 60_000);
 }
 
 function appointmentEnd(appointment: AgendamentoAgenda) {
-  return addMinutes(
-    new Date(appointment.data),
-    appointment.duracao,
-  );
+  return addMinutes(new Date(appointment.data), appointment.duracao);
 }
 
-function agendaHref(
-  date: Date,
-  profissionalFiltro: string,
-) {
-  const data = formatDateInput(date);
-
-  const profissional =
-    profissionalFiltro !== "todas"
-      ? `&profissional=${profissionalFiltro}`
-      : "";
-
-  return `/agenda?data=${data}${profissional}`;
+function getEndHour(date: Date) {
+  if (date.getDay() === 6) return 17;
+  return 19;
 }
 
-function getColorClasses(
-  color: string,
-  index: number,
-) {
-  const normalizedColor = (color || "").toLowerCase();
+function getPalette(color: string, index: number) {
+  const normalized = (color || "").toLowerCase();
 
   if (
-    index % 2 === 1 ||
-    normalizedColor.includes("rose") ||
-    normalizedColor.includes("pink") ||
-    normalizedColor.includes("red") ||
-    normalizedColor.includes("vermelho")
+    normalized.includes("rose") ||
+    normalized.includes("red") ||
+    normalized.includes("pink") ||
+    normalized.includes("vermelho") ||
+    index % 2 === 1
   ) {
     return {
-      avatar: "bg-red-600 text-white",
-      event:
-        "border-red-400 bg-gradient-to-br from-red-500 via-rose-500 to-red-600 text-white shadow-red-500/25",
-      line: "bg-red-300",
-      badge: "bg-white/20 text-white",
+      solid: "#be123c",
+      soft: "rgba(190, 18, 60, 0.10)",
+      border: "rgba(244, 63, 94, 0.42)",
+    };
+  }
+
+  if (normalized.includes("blue") || normalized.includes("azul")) {
+    return {
+      solid: "#2563eb",
+      soft: "rgba(37, 99, 235, 0.10)",
+      border: "rgba(59, 130, 246, 0.42)",
+    };
+  }
+
+  if (normalized.includes("teal") || normalized.includes("green")) {
+    return {
+      solid: "#0f766e",
+      soft: "rgba(15, 118, 110, 0.10)",
+      border: "rgba(20, 184, 166, 0.42)",
     };
   }
 
   return {
-    avatar: "bg-violet-600 text-white",
-    event:
-      "border-fuchsia-400 bg-gradient-to-br from-violet-500 via-fuchsia-500 to-purple-600 text-white shadow-purple-500/25",
-    line: "bg-fuchsia-300",
-    badge: "bg-white/20 text-white",
+    solid: "#7c3aed",
+    soft: "rgba(124, 58, 237, 0.10)",
+    border: "rgba(139, 92, 246, 0.42)",
   };
 }
 
-function getAppointmentNote(
-  appointment: AgendamentoAgenda,
-) {
-  const note = appointment.observacoes
-    ?.split("\n")
-    .find(Boolean)
-    ?.trim();
+function agendaHref(date: Date, profissionalFiltro: string) {
+  const data = formatDateInput(date);
+  const profissional =
+    profissionalFiltro !== "todas" ? `&profissional=${profissionalFiltro}` : "";
 
-  if (note) {
-    return note;
-  }
+  return `/agenda?data=${data}${profissional}`;
+}
+
+function getAppointmentNote(appointment: AgendamentoAgenda) {
+  const note = appointment.observacoes?.split("\n").find(Boolean)?.trim();
+  if (note) return note;
 
   if (appointment.valor > 0) {
     return appointment.valor.toLocaleString("pt-BR", {
@@ -260,102 +231,81 @@ export default function AgendaCalendar({
   onMessage,
 }: Props) {
   const today = new Date();
-  const stripDays = getDateStripDays(selectedDate);
   const selectedDateInput = formatDateInput(selectedDate);
+  const endHour = getEndHour(selectedDate);
+  const totalMinutes = Math.max(0, (endHour - START_HOUR) * 60);
+  const gridHeight = totalMinutes * MINUTE_HEIGHT;
+  const isSunday = selectedDate.getDay() === 0;
 
-  const activeDayRef =
-    useRef<HTMLAnchorElement | null>(null);
+  const [hiddenProfessionalIds, setHiddenProfessionalIds] = useState<number[]>([]);
+  const [showVisibilityPanel, setShowVisibilityPanel] = useState(false);
 
-  const [
-    hiddenProfessionalIds,
-    setHiddenProfessionalIds,
-  ] = useState<number[]>([]);
+  const weekDays = useMemo(() => {
+    const weekStart = startOfWeek(selectedDate);
+    return Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
+  }, [selectedDate]);
 
-  const [
-    showVisibilityPanel,
-    setShowVisibilityPanel,
-  ] = useState(false);
+  const slots = useMemo(() => {
+    if (isSunday) return [];
 
-  useEffect(() => {
-    activeDayRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-      inline: "center",
-    });
-  }, [selectedDateInput]);
-
-  const visibleProfessionals = useMemo(() => {
-    const result = profissionais.filter(
-      (profissional) =>
-        !hiddenProfessionalIds.includes(
-          profissional.id,
-        ),
-    );
-
-    return result.length > 0
-      ? result
-      : profissionais;
-  }, [hiddenProfessionalIds, profissionais]);
-
-  const appointmentsByProfessional = useMemo(() => {
-    return visibleProfessionals.map(
-      (profissional, index) => {
-        const appointments = agendamentos
-          .filter(
-            (appointment) =>
-              appointment.profissionalId ===
-              profissional.id,
-          )
-          .sort(
-            (a, b) =>
-              new Date(a.data).getTime() -
-              new Date(b.data).getTime(),
-          );
+    return Array.from(
+      { length: totalMinutes / SLOT_MINUTES + 1 },
+      (_, index) => {
+        const total = START_HOUR * 60 + index * SLOT_MINUTES;
+        const hour = Math.floor(total / 60);
+        const minute = total % 60;
 
         return {
-          profissional,
-          appointments,
-          index,
+          label: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
+          offset: index * SLOT_MINUTES * MINUTE_HEIGHT,
         };
       },
     );
+  }, [isSunday, totalMinutes]);
+
+  const visibleProfessionals = useMemo(() => {
+    const result = profissionais.filter(
+      (profissional) => !hiddenProfessionalIds.includes(profissional.id),
+    );
+
+    return result.length > 0 ? result : profissionais;
+  }, [hiddenProfessionalIds, profissionais]);
+
+  const appointmentsByProfessional = useMemo(() => {
+    return visibleProfessionals.map((profissional, index) => ({
+      profissional,
+      index,
+      appointments: agendamentos
+        .filter((appointment) => appointment.profissionalId === profissional.id)
+        .sort(
+          (a, b) => new Date(a.data).getTime() - new Date(b.data).getTime(),
+        ),
+    }));
   }, [agendamentos, visibleProfessionals]);
 
-  const shouldEnableHorizontalScroll =
-    visibleProfessionals.length > 2;
-
+  const shouldEnableHorizontalScroll = visibleProfessionals.length > 2;
   const gridMinWidth =
     visibleProfessionals.length <= 2
       ? "100%"
-      : `${36 + visibleProfessionals.length * 160}px`;
+      : `${58 + visibleProfessionals.length * 220}px`;
+
+  function minutesFromStart(value: Date | string) {
+    const { hour, minute } = getSaoPauloTimeParts(value);
+    return hour * 60 + minute - START_HOUR * 60;
+  }
 
   function goToDate(date: Date) {
     onDateChange(date);
-
-    window.location.href = agendaHref(
-      date,
-      profissionalFiltro,
-    );
+    window.location.href = agendaHref(date, profissionalFiltro);
   }
 
   function handleDateInputChange(value: string) {
-    const [year, month, day] = value
-      .split("-")
-      .map(Number);
-
-    if (!year || !month || !day) {
-      return;
-    }
-
-    goToDate(
-      new Date(year, month - 1, day),
-    );
+    const [year, month, day] = value.split("-").map(Number);
+    if (!year || !month || !day) return;
+    goToDate(new Date(year, month - 1, day));
   }
 
-  function abrirNovo(
-    profissionalId: number,
-    hora = "09:00",
-  ) {
+  function abrirNovo(profissionalId: number, hora = "09:00") {
     onNovoHorario({
       data: selectedDateInput,
       hora,
@@ -363,592 +313,420 @@ export default function AgendaCalendar({
     });
   }
 
-  function toggleProfessional(
-    profissionalId: number,
-  ) {
-    setHiddenProfessionalIds((current) => {
-      const isHidden =
-        current.includes(profissionalId);
-
-      if (isHidden) {
-        return current.filter(
-          (id) => id !== profissionalId,
-        );
-      }
-
-      if (
-        profissionais.length -
-          current.length <=
-        1
-      ) {
-        return current;
-      }
-
-      return [...current, profissionalId];
-    });
-  }
-
   function abrirNovoPadrao() {
-    const profissional =
-      visibleProfessionals[0] ||
-      profissionais[0];
-
-    if (profissional) {
-      abrirNovo(profissional.id);
-    }
+    const profissional = visibleProfessionals[0] || profissionais[0];
+    if (profissional) abrirNovo(profissional.id);
   }
 
-  function selecionarFiltroProfissional(
-    value: string,
-  ) {
+  function selecionarFiltroProfissional(value: string) {
     setHiddenProfessionalIds([]);
     onProfissionalFiltroChange(value);
     setShowVisibilityPanel(false);
   }
 
+  function toggleProfessional(profissionalId: number) {
+    setHiddenProfessionalIds((current) => {
+      const isHidden = current.includes(profissionalId);
+
+      if (isHidden) {
+        return current.filter((id) => id !== profissionalId);
+      }
+
+      if (profissionais.length - current.length <= 1) return current;
+      return [...current, profissionalId];
+    });
+  }
+
+  const currentTimeLine = useMemo(() => {
+    if (!isSameDay(selectedDate, today) || isSunday) return null;
+
+    const current = new Date();
+    const minutes = current.getHours() * 60 + current.getMinutes() - START_HOUR * 60;
+
+    if (minutes < 0 || minutes > totalMinutes) return null;
+    return minutes * MINUTE_HEIGHT;
+  }, [isSunday, selectedDate, today, totalMinutes]);
+
   return (
-    <section className="relative w-full max-w-full overflow-visible bg-white text-slate-900 shadow-xl shadow-slate-950/10 dark:bg-slate-950 dark:text-slate-100 dark:shadow-black/30 sm:overflow-hidden sm:rounded-[1.5rem]">
-      <div className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-        <div className="px-2 pt-1 text-center text-[0.68rem] font-medium capitalize leading-none text-slate-400 dark:text-slate-500 sm:px-4">
-          {formatMonthName(selectedDate)}
-        </div>
-
-        <div className="flex max-w-full gap-1 overflow-x-auto px-1 pb-1 scrollbar-premium sm:px-3">
-          {stripDays.map((day) => {
-            const active = isSameDay(
-              day,
-              selectedDate,
-            );
-
-            const isToday = isSameDay(
-              day,
-              today,
-            );
-
-            return (
-              <a
-                key={day.toISOString()}
-                ref={
-                  active
-                    ? activeDayRef
-                    : null
-                }
-                href={agendaHref(
-                  day,
-                  profissionalFiltro,
-                )}
-                className="min-w-[48px] shrink-0 rounded-xl px-1 py-1 text-center transition"
-              >
-                <span className="block truncate text-[0.68rem] font-medium text-slate-500 dark:text-slate-400 sm:text-xs">
-                  {formatShortWeekDay(day).slice(
-                    0,
-                    3,
-                  )}
-                </span>
-
-                <span
-                  className={`mx-auto mt-1 flex h-9 w-9 items-center justify-center rounded-lg text-lg font-semibold leading-none sm:h-10 sm:w-10 ${
-                    active
-                      ? "bg-red-600 text-white shadow-lg shadow-red-500/20"
-                      : isToday
-                        ? "bg-teal-50 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300"
-                        : "text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-                  }`}
-                >
-                  {String(
-                    day.getDate(),
-                  ).padStart(2, "0")}
-                </span>
-              </a>
-            );
-          })}
-        </div>
-
-        <label className="relative block cursor-pointer border-t border-slate-100 py-2 text-center text-sm font-semibold capitalize text-teal-700 dark:border-slate-800 dark:text-teal-300 sm:text-base">
-          <span className="pointer-events-none">
-            {formatDateTitle(
-              selectedDate,
-              today,
-            )}
-          </span>
-
-          <input
-            type="date"
-            value={selectedDateInput}
-            onChange={(event) =>
-              handleDateInputChange(
-                event.target.value,
-              )
-            }
-            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-            aria-label="Selecionar data"
-          />
-        </label>
-      </div>
-
-      <div
-        className={
-          shouldEnableHorizontalScroll
-            ? "w-full max-w-full overflow-x-auto overflow-y-hidden"
-            : "w-full max-w-full overflow-visible"
-        }
-      >
-        <div
-          className="relative w-full min-w-0"
-          style={{
-            display: "grid",
-            minWidth: gridMinWidth,
-            gridTemplateColumns: `36px repeat(${Math.max(
-              visibleProfessionals.length,
-              1,
-            )}, minmax(0, 1fr))`,
-          }}
-        >
-          <div className="relative z-30 border-b border-r border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900">
+    <section className="relative w-full max-w-full overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">
+      <div className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-900/80">
+        <div className="flex flex-col gap-3 p-3 lg:flex-row lg:items-center lg:justify-between lg:px-4">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() =>
-                setShowVisibilityPanel(
-                  (current) => !current,
-                )
-              }
-              className="flex h-full min-h-[38px] w-full items-center justify-center text-teal-700 dark:text-teal-300"
-              aria-label="Mostrar ou ocultar agendas"
+              onClick={() => goToDate(today)}
+              className="h-9 rounded-lg border border-violet-200 bg-violet-600 px-3 text-sm font-semibold text-white transition hover:bg-violet-700 dark:border-violet-500/40"
             >
-              <UsersRound size={18} />
+              Hoje
             </button>
 
-            {showVisibilityPanel ? (
-              <div className="absolute left-1 top-10 z-50 w-60 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-950/20 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40">
-                <div className="flex items-center justify-between px-2 pb-2">
-                  <span className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
-                    Agendas
-                  </span>
+            <div className="flex overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950">
+              <button
+                type="button"
+                onClick={() => goToDate(addDays(selectedDate, -1))}
+                className="flex h-9 w-9 items-center justify-center border-r border-slate-200 text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                aria-label="Dia anterior"
+              >
+                <ChevronLeft size={17} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => goToDate(addDays(selectedDate, 1))}
+                className="flex h-9 w-9 items-center justify-center text-slate-600 transition hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                aria-label="Próximo dia"
+              >
+                <ChevronRight size={17} />
+              </button>
+            </div>
+
+            <label className="relative flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800">
+              <CalendarDays size={16} className="text-violet-600 dark:text-violet-300" />
+              <span className="hidden sm:inline">{formatDateCompact(selectedDate)}</span>
+              <input
+                type="date"
+                value={selectedDateInput}
+                onChange={(event) => handleDateInputChange(event.target.value)}
+                className="absolute inset-0 cursor-pointer opacity-0"
+                aria-label="Selecionar data"
+              />
+            </label>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowVisibilityPanel((current) => !current)}
+                className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                <UsersRound size={16} />
+                <span className="hidden sm:inline">Agendas</span>
+                <ChevronDown size={14} />
+              </button>
+
+              {showVisibilityPanel ? (
+                <div className="absolute right-0 top-11 z-50 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                  <div className="flex items-center justify-between px-2 py-1.5">
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
+                      Profissionais
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowVisibilityPanel(false)}
+                      className="rounded-md p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
 
                   <button
                     type="button"
-                    onClick={() =>
-                      setShowVisibilityPanel(
-                        false,
-                      )
-                    }
-                    className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                    aria-label="Fechar seletor"
+                    onClick={() => selecionarFiltroProfissional("todas")}
+                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
                   >
-                    <X size={14} />
-                  </button>
-                </div>
-
-                <div className="space-y-1">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      selecionarFiltroProfissional(
-                        "todas",
-                      )
-                    }
-                    className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800 ${
-                      profissionalFiltro ===
-                      "todas"
-                        ? "text-teal-700 dark:text-teal-300"
-                        : "text-slate-700 dark:text-slate-300"
-                    }`}
-                  >
-                    <span>
-                      Todas as agendas
-                    </span>
-
-                    {profissionalFiltro ===
-                    "todas" ? (
-                      <Check
-                        size={15}
-                        className="text-teal-700 dark:text-teal-300"
-                      />
+                    <span>Todas as agendas</span>
+                    {profissionalFiltro === "todas" ? (
+                      <Check size={15} className="text-violet-600" />
                     ) : null}
                   </button>
 
-                  {todosProfissionais.map(
-                    (profissional) => {
-                      const active =
-                        profissionalFiltro ===
-                        String(
-                          profissional.id,
-                        );
+                  {todosProfissionais.map((profissional) => {
+                    const active = profissionalFiltro === String(profissional.id);
+                    const hidden = hiddenProfessionalIds.includes(profissional.id);
 
-                      const hidden =
-                        hiddenProfessionalIds.includes(
-                          profissional.id,
-                        );
-
-                      return (
-                        <div
-                          key={
-                            profissional.id
-                          }
-                          className="flex items-center gap-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800"
+                    return (
+                      <div
+                        key={profissional.id}
+                        className="flex items-center rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => selecionarFiltroProfissional(String(profissional.id))}
+                          className="min-w-0 flex-1 px-3 py-2 text-left text-sm"
                         >
-                          <button
-                            type="button"
-                            onClick={() =>
-                              selecionarFiltroProfissional(
-                                String(
-                                  profissional.id,
-                                ),
-                              )
-                            }
-                            className={`min-w-0 flex-1 px-3 py-2 text-left text-sm font-medium ${
-                              active
-                                ? "text-teal-700 dark:text-teal-300"
-                                : "text-slate-700 dark:text-slate-300"
-                            }`}
-                          >
-                            <span className="block truncate">
-                              {
-                                profissional.nome
-                              }
-                            </span>
-                          </button>
+                          <span className="block truncate">{profissional.nome}</span>
+                        </button>
 
-                          <button
-                            type="button"
-                            onClick={() =>
-                              toggleProfessional(
-                                profissional.id,
-                              )
-                            }
-                            className="shrink-0 rounded-lg px-2 py-2 text-slate-400 hover:text-teal-700 dark:text-slate-500 dark:hover:text-teal-300"
-                            title={
-                              hidden
-                                ? "Mostrar agenda"
-                                : "Ocultar agenda"
-                            }
-                          >
-                            {hidden ? (
-                              <X size={14} />
-                            ) : (
-                              <Check
-                                size={14}
-                              />
-                            )}
-                          </button>
-                        </div>
-                      );
-                    },
-                  )}
+                        <button
+                          type="button"
+                          onClick={() => toggleProfessional(profissional.id)}
+                          className="p-2 text-slate-400 hover:text-violet-600"
+                          title={hidden ? "Mostrar agenda" : "Ocultar agenda"}
+                        >
+                          {hidden ? <X size={14} /> : <Check size={14} />}
+                        </button>
+
+                        {active ? <Check size={14} className="mr-2 text-violet-600" /> : null}
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
-            ) : null}
-          </div>
+              ) : null}
+            </div>
 
-          {appointmentsByProfessional.map(
-            ({ profissional, index }) => {
-              const color =
-                getColorClasses(
-                  profissional.cor,
-                  index,
-                );
+            <button
+              type="button"
+              onClick={abrirNovoPadrao}
+              disabled={!visibleProfessionals[0] && !profissionais[0]}
+              className="flex h-9 items-center gap-2 rounded-lg bg-violet-600 px-3 text-sm font-bold text-white shadow-sm transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Plus size={16} />
+              <span className="hidden sm:inline">Novo agendamento</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="border-t border-slate-200 px-2 py-2 dark:border-slate-800 sm:px-3">
+          <div className="grid grid-cols-7 gap-1">
+            {weekDays.map((day) => {
+              const active = isSameDay(day, selectedDate);
+              const todayItem = isSameDay(day, today);
+
+              return (
+                <a
+                  key={formatDateInput(day)}
+                  href={agendaHref(day, profissionalFiltro)}
+                  className={`min-w-0 rounded-lg border px-1 py-2 text-center transition sm:px-2 ${
+                    active
+                      ? "border-violet-600 bg-violet-600 text-white shadow-sm"
+                      : todayItem
+                        ? "border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-500/40 dark:bg-violet-500/10 dark:text-violet-200"
+                        : "border-transparent text-slate-600 hover:border-slate-200 hover:bg-white dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-950"
+                  }`}
+                >
+                  <span className="block truncate text-[0.62rem] font-bold uppercase tracking-wide sm:text-[0.68rem]">
+                    {formatWeekday(day)}
+                  </span>
+                  <span className="mt-1 block text-sm font-bold sm:text-base">
+                    {String(day.getDate()).padStart(2, "0")}
+                  </span>
+                </a>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="border-t border-slate-200 px-3 py-2 dark:border-slate-800 sm:px-4">
+          <p className="text-sm font-semibold capitalize text-slate-700 dark:text-slate-200">
+            {formatDateHeading(selectedDate)}
+          </p>
+          <p className="mt-0.5 text-xs text-slate-400">
+            {isSunday
+              ? "Clínica fechada aos domingos"
+              : selectedDate.getDay() === 6
+                ? "Atendimento das 09:00 às 17:00"
+                : "Atendimento das 09:00 às 19:00"}
+          </p>
+        </div>
+      </div>
+
+      {isSunday ? (
+        <div className="flex min-h-[360px] items-center justify-center p-6">
+          <div className="max-w-md text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+              <CalendarDays size={22} />
+            </div>
+            <h3 className="mt-4 text-base font-bold text-slate-900 dark:text-white">
+              Domingo sem atendimento
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+              Selecione outro dia no calendário para visualizar ou criar agendamentos.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div
+          className={
+            shouldEnableHorizontalScroll
+              ? "w-full max-w-full overflow-x-auto overflow-y-hidden"
+              : "w-full max-w-full overflow-hidden"
+          }
+        >
+          <div
+            className="relative w-full min-w-0"
+            style={{
+              display: "grid",
+              minWidth: gridMinWidth,
+              gridTemplateColumns: `58px repeat(${Math.max(
+                visibleProfessionals.length,
+                1,
+              )}, minmax(0, 1fr))`,
+            }}
+          >
+            <div className="sticky left-0 z-30 flex h-12 items-center justify-center border-b border-r border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-800 dark:bg-slate-900">
+              <Clock3 size={16} />
+            </div>
+
+            {appointmentsByProfessional.map(({ profissional, index }) => {
+              const palette = getPalette(profissional.cor, index);
 
               return (
                 <div
                   key={profissional.id}
-                  className="min-w-0 border-b border-r border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900"
+                  className="h-12 border-b border-r border-slate-200 bg-slate-50 px-2 dark:border-slate-800 dark:bg-slate-900"
                 >
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setShowVisibilityPanel(
-                        (current) =>
-                          !current,
-                      )
-                    }
-                    className="flex h-[38px] w-full min-w-0 items-center justify-center gap-1 px-1 text-xs font-medium text-slate-700 dark:text-slate-300"
-                  >
+                  <div className="flex h-full min-w-0 items-center justify-center gap-2">
                     <span
-                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${color.avatar}`}
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white"
+                      style={{ backgroundColor: palette.solid }}
                     >
-                      <UserRound
-                        size={14}
-                      />
+                      <UserRound size={14} />
                     </span>
-
-                    <span className="min-w-0 truncate">
-                      {profissional.nome}
-                    </span>
-
-                    <ChevronDown
-                      size={13}
-                      className="shrink-0 text-slate-500 dark:text-slate-400"
-                    />
-                  </button>
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100 sm:text-sm">
+                        {profissional.nome}
+                      </p>
+                      {profissional.area ? (
+                        <p className="hidden truncate text-[0.64rem] text-slate-400 sm:block">
+                          {profissional.area}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
                 </div>
               );
-            },
-          )}
+            })}
 
-          <div
-            className="relative border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
-            style={{
-              height: gridHeight,
-            }}
-          >
-            {slots.map((slot) => (
-              <div
-                key={slot.label}
-                className="absolute left-0 right-0 border-t border-slate-200 pr-1 pt-1 text-right text-[0.68rem] font-medium text-slate-500 dark:border-slate-800 dark:text-slate-400 sm:text-xs"
-                style={{
-                  top: slot.offset,
-                }}
-              >
-                {slot.label}
-              </div>
-            ))}
-          </div>
-
-          {appointmentsByProfessional.map(
-            ({
-              profissional,
-              appointments,
-              index,
-            }) => {
-              const color =
-                getColorClasses(
-                  profissional.cor,
-                  index,
-                );
-
-              return (
+            <div
+              className="sticky left-0 z-20 border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+              style={{ height: gridHeight }}
+            >
+              {slots.map((slot) => (
                 <div
-                  key={`grid-${profissional.id}`}
-                  className="relative border-r border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-950"
-                  style={{
-                    height: gridHeight,
-                  }}
+                  key={slot.label}
+                  className="absolute left-0 right-0 border-t border-slate-200 pr-2 pt-1 text-right text-[0.65rem] font-medium text-slate-500 dark:border-slate-800 dark:text-slate-400"
+                  style={{ top: slot.offset }}
                 >
-                  {slots
-                    .slice(0, -1)
-                    .map((slot) => (
+                  {slot.label}
+                </div>
+              ))}
+            </div>
+
+            {appointmentsByProfessional.map(
+              ({ profissional, appointments, index }) => {
+                const palette = getPalette(profissional.cor, index);
+
+                return (
+                  <div
+                    key={`grid-${profissional.id}`}
+                    className="relative border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+                    style={{ height: gridHeight }}
+                  >
+                    {slots.slice(0, -1).map((slot) => (
                       <button
                         key={`${profissional.id}-${slot.label}`}
                         type="button"
-                        onClick={() =>
-                          abrirNovo(
-                            profissional.id,
-                            slot.label,
-                          )
-                        }
-                        className="absolute left-0 right-0 z-0 border-t border-slate-200 text-transparent transition hover:bg-teal-50 dark:border-slate-800 dark:hover:bg-teal-500/10"
+                        onClick={() => abrirNovo(profissional.id, slot.label)}
+                        className="absolute left-0 right-0 z-0 border-t border-slate-200 transition hover:bg-violet-50/80 dark:border-slate-800 dark:hover:bg-violet-500/10"
                         style={{
                           top: slot.offset,
-                          height:
-                            SLOT_MINUTES *
-                            MINUTE_HEIGHT,
+                          height: SLOT_MINUTES * MINUTE_HEIGHT,
                         }}
-                        title={`Agendar ${slot.label}`}
+                        title={`Criar agendamento às ${slot.label}`}
                       >
-                        <span className="sr-only">
-                          Agendar{" "}
-                          {slot.label}
-                        </span>
+                        <span className="sr-only">Criar agendamento às {slot.label}</span>
                       </button>
                     ))}
 
-                  {appointments.map(
-                    (appointment) => {
-                      const startMinutes =
-                        minutesFromStart(
-                          appointment.data,
-                        );
+                    {currentTimeLine !== null ? (
+                      <div
+                        className="pointer-events-none absolute left-0 right-0 z-20 flex items-center"
+                        style={{ top: currentTimeLine }}
+                      >
+                        <span className="h-2 w-2 -translate-x-1 rounded-full bg-rose-500" />
+                        <span className="h-px flex-1 bg-rose-500" />
+                      </div>
+                    ) : null}
 
-                      const endMinutes =
-                        minutesFromStart(
-                          appointmentEnd(
-                            appointment,
-                          ),
-                        );
+                    {appointments.map((appointment) => {
+                      const startMinutes = minutesFromStart(appointment.data);
+                      const endMinutes = minutesFromStart(appointmentEnd(appointment));
 
-                      if (
-                        endMinutes <= 0 ||
-                        startMinutes >=
-                          TOTAL_MINUTES
-                      ) {
-                        return null;
-                      }
+                      if (endMinutes <= 0 || startMinutes >= totalMinutes) return null;
 
-                      const top = Math.max(
-                        0,
-                        startMinutes *
-                          MINUTE_HEIGHT +
-                          3,
+                      const top = Math.max(0, startMinutes * MINUTE_HEIGHT + 2);
+                      const visibleEnd = Math.min(totalMinutes, endMinutes);
+                      const visibleStart = Math.max(0, startMinutes);
+                      const height = Math.max(
+                        40,
+                        (visibleEnd - visibleStart) * MINUTE_HEIGHT - 4,
                       );
-
-                      const height =
-                        Math.max(
-                          52,
-                          Math.min(
-                            TOTAL_MINUTES,
-                            endMinutes,
-                          ) *
-                            MINUTE_HEIGHT -
-                            Math.max(
-                              0,
-                              startMinutes,
-                            ) *
-                              MINUTE_HEIGHT -
-                            6,
-                        );
-
-                      const note =
-                        getAppointmentNote(
-                          appointment,
-                        );
+                      const note = getAppointmentNote(appointment);
 
                       return (
                         <article
-                          key={
-                            appointment.id
-                          }
+                          key={appointment.id}
                           role="button"
                           tabIndex={0}
-                          onClick={() =>
-                            onSelectAppointment(
-                              appointment,
-                            )
-                          }
-                          onKeyDown={(
-                            event,
-                          ) => {
-                            if (
-                              event.key ===
-                                "Enter" ||
-                              event.key ===
-                                " "
-                            ) {
-                              onSelectAppointment(
-                                appointment,
-                              );
+                          onClick={() => onSelectAppointment(appointment)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              onSelectAppointment(appointment);
                             }
                           }}
-                          className={`absolute left-1 right-1 z-10 cursor-pointer overflow-hidden rounded-lg border p-1.5 text-left shadow-lg transition hover:brightness-105 sm:left-1.5 sm:right-1.5 sm:rounded-xl sm:p-2 ${color.event}`}
+                          className="absolute left-1 right-1 z-10 cursor-pointer overflow-hidden rounded-md border text-left shadow-sm transition hover:-translate-y-px hover:shadow-md sm:left-1.5 sm:right-1.5"
                           style={{
                             top,
                             height,
+                            backgroundColor: palette.soft,
+                            borderColor: palette.border,
                           }}
                         >
                           <div
-                            className={`absolute left-0 top-0 h-full w-1 ${color.line}`}
+                            className="absolute bottom-0 left-0 top-0 w-1"
+                            style={{ backgroundColor: palette.solid }}
                           />
 
-                          <div className="relative flex h-full min-w-0 flex-col">
-                            <div className="flex min-w-0 items-start justify-between gap-1">
+                          <div className="flex h-full min-w-0 flex-col px-2 py-1.5 pl-3">
+                            <div className="flex min-w-0 items-start justify-between gap-2">
                               <div className="min-w-0">
-                                <p className="flex items-center gap-1 text-[0.64rem] font-bold leading-tight text-white sm:text-xs">
-                                  <Clock3
-                                    size={11}
-                                    className="shrink-0"
-                                  />
-
-                                  {formatTime(
-                                    appointment.data,
-                                  )}{" "}
-                                  -{" "}
-                                  {formatTime(
-                                    appointmentEnd(
-                                      appointment,
-                                    ),
-                                  )}
+                                <p
+                                  className="text-[0.64rem] font-extrabold leading-tight sm:text-[0.7rem]"
+                                  style={{ color: palette.solid }}
+                                >
+                                  {formatTime(appointment.data)} - {formatTime(appointmentEnd(appointment))}
                                 </p>
-
-                                <p className="mt-1 line-clamp-2 text-[0.72rem] font-semibold uppercase leading-tight text-white sm:text-sm">
-                                  {
-                                    appointment
-                                      .cliente
-                                      .nome
-                                  }
+                                <p className="mt-0.5 truncate text-[0.72rem] font-extrabold uppercase leading-tight text-slate-900 dark:text-white sm:text-xs">
+                                  {appointment.cliente.nome}
                                 </p>
                               </div>
 
                               <button
                                 type="button"
-                                onClick={(
-                                  event,
-                                ) => {
+                                onClick={(event) => {
                                   event.stopPropagation();
-
-                                  onMessage(
-                                    appointment,
-                                  );
+                                  onMessage(appointment);
                                 }}
-                                className="hidden shrink-0 rounded-lg bg-white/15 p-1.5 text-white transition hover:bg-white/25 sm:block"
-                                aria-label="Gerar mensagem de WhatsApp"
+                                className="hidden shrink-0 rounded-md border border-slate-200 bg-white/80 p-1 text-slate-500 transition hover:text-violet-600 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-300 sm:block"
+                                aria-label="Criar mensagem"
                               >
-                                <MessageCircle
-                                  size={13}
-                                />
+                                <MessageCircle size={12} />
                               </button>
                             </div>
 
-                            <p className="mt-1 line-clamp-2 text-[0.68rem] font-medium leading-snug text-white/95 sm:text-xs">
-                              {
-                                appointment.procedimento
-                              }
-                            </p>
-
-                            {height > 76 ? (
-                              <p className="mt-1 line-clamp-2 text-[0.64rem] leading-snug text-white/85 sm:text-[0.72rem]">
-                                {note}
+                            {height >= 52 ? (
+                              <p className="mt-1 line-clamp-1 text-[0.66rem] font-semibold text-slate-600 dark:text-slate-300 sm:text-[0.72rem]">
+                                {appointment.procedimento}
                               </p>
                             ) : null}
 
-                            {height > 112 ? (
-                              <div className="mt-auto flex items-center justify-between gap-2 pt-2">
-                                <span
-                                  className={`rounded-full px-2 py-0.5 text-[0.58rem] font-bold uppercase tracking-[0.08em] ${color.badge}`}
-                                >
-                                  {
-                                    appointment.status
-                                  }
-                                </span>
-
-                                <span className="text-[0.62rem] font-semibold text-white/80">
-                                  {
-                                    appointment.duracao
-                                  }{" "}
-                                  min
-                                </span>
-                              </div>
+                            {height >= 82 ? (
+                              <p className="mt-1 line-clamp-1 text-[0.62rem] text-slate-500 dark:text-slate-400">
+                                {note}
+                              </p>
                             ) : null}
                           </div>
                         </article>
                       );
-                    },
-                  )}
-                </div>
-              );
-            },
-          )}
+                    })}
+                  </div>
+                );
+              },
+            )}
+          </div>
         </div>
-      </div>
-
-      <button
-        type="button"
-        onClick={() => goToDate(today)}
-        className="fixed bottom-[calc(env(safe-area-inset-bottom)+96px)] left-1/2 z-[60] -translate-x-1/2 rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-bold text-white shadow-xl shadow-teal-900/20 transition hover:bg-teal-800 active:scale-[0.98] dark:bg-teal-500 dark:shadow-black/35 dark:hover:bg-teal-400 sm:absolute sm:bottom-5"
-      >
-        Hoje
-      </button>
-
-      <button
-        type="button"
-        onClick={abrirNovoPadrao}
-        className="fixed bottom-[calc(env(safe-area-inset-bottom)+92px)] right-5 z-[60] flex h-14 w-14 items-center justify-center rounded-full bg-teal-700 text-white shadow-2xl shadow-teal-900/25 transition hover:bg-teal-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-teal-500 dark:shadow-black/40 dark:hover:bg-teal-400 sm:absolute sm:bottom-5 sm:right-5"
-        disabled={
-          !visibleProfessionals[0] &&
-          !profissionais[0]
-        }
-        aria-label="Novo agendamento"
-      >
-        <Plus size={26} />
-      </button>
+      )}
     </section>
   );
 }
