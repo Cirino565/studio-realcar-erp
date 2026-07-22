@@ -17,8 +17,8 @@ export type LoginState = {
   erro?: string;
 };
 
-function normalizarEmail(valor: FormDataEntryValue | null) {
-  return typeof valor === "string" ? valor.trim().toLowerCase() : "";
+function normalizarIdentificador(valor: FormDataEntryValue | null) {
+  return typeof valor === "string" ? valor.trim() : "";
 }
 
 function normalizarSenha(valor: FormDataEntryValue | null) {
@@ -26,17 +26,25 @@ function normalizarSenha(valor: FormDataEntryValue | null) {
 }
 
 export async function login(_state: LoginState, formData: FormData) {
-  const email = normalizarEmail(formData.get("email"));
+  const identificador = normalizarIdentificador(formData.get("usuario"));
   const senha = normalizarSenha(formData.get("senha"));
 
-  if (!email || !senha) {
+  if (!identificador || !senha) {
     return {
-      erro: "Informe e-mail e senha para acessar.",
+      erro: "Informe usuário e senha para acessar.",
     };
   }
 
-  const user = await prisma.usuario.findUnique({
-    where: { email },
+  // O login principal passa a ser pelo nome do usuário, sem diferenciar
+  // maiúsculas e minúsculas. O e-mail continua aceito como fallback de
+  // segurança, preservando os acessos existentes sem alterar o banco.
+  const usuariosEncontrados = await prisma.usuario.findMany({
+    where: {
+      OR: [
+        { nome: { equals: identificador, mode: "insensitive" } },
+        { email: identificador.toLowerCase() },
+      ],
+    },
     include: {
       perfil: {
         include: {
@@ -48,7 +56,16 @@ export async function login(_state: LoginState, formData: FormData) {
         },
       },
     },
+    take: 2,
   });
+
+  if (usuariosEncontrados.length > 1) {
+    return {
+      erro: "Existe mais de um usuário com esse nome. Procure o administrador para ajustar os cadastros.",
+    };
+  }
+
+  const user = usuariosEncontrados[0];
 
   if (!user || user.status !== "Ativo") {
     return {
@@ -60,7 +77,7 @@ export async function login(_state: LoginState, formData: FormData) {
 
   if (!senhaValida) {
     return {
-      erro: "E-mail ou senha inválidos.",
+      erro: "Usuário ou senha inválidos.",
     };
   }
 

@@ -7,7 +7,7 @@ import {
   EyeOff,
   Loader2,
   LockKeyhole,
-  Mail,
+  UserRound,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
@@ -93,7 +93,7 @@ export default function LoginPage() {
               </h2>
 
               <p className="mt-2 text-sm leading-6 text-slate-500">
-                Digite seu e-mail e sua senha para acessar o sistema.
+                Digite seu nome de usuário e sua senha para acessar o sistema.
               </p>
             </div>
 
@@ -103,19 +103,19 @@ export default function LoginPage() {
             >
               <label className="block">
                 <span className="mb-2 block text-sm font-semibold text-slate-700">
-                  E-mail
+                  Usuário
                 </span>
 
                 <span className="relative block">
-                  <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <UserRound className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
 
                   <input
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    autoCapitalize="none"
+                    name="usuario"
+                    type="text"
+                    autoComplete="username"
+                    autoCapitalize="words"
                     spellCheck={false}
-                    placeholder="seuemail@empresa.com"
+                    placeholder="Ex.: Gabriely"
                     required
                     disabled={isPending}
                     aria-invalid={Boolean(state.erro)}
