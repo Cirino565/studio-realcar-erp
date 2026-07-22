@@ -31,8 +31,8 @@ const filtros: Array<{
   { value: "hoje", label: "Hoje" },
   { value: "7d", label: "7 dias" },
   { value: "30d", label: "30 dias" },
-  { value: "mes", label: "Este mÃªs" },
-  { value: "anterior", label: "MÃªs anterior" },
+  { value: "mes", label: "Este mês" },
+  { value: "anterior", label: "Mês anterior" },
 ];
 
 export default async function GestaoPage({ searchParams }: GestaoPageProps) {
@@ -55,15 +55,15 @@ export default async function GestaoPage({ searchParams }: GestaoPageProps) {
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-violet-100 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700">
               <Gauge className="size-3.5" />
-              InteligÃªncia de GestÃ£o, NÃ­vel 3A
+              Inteligência de Gestão, Nível 3A
             </div>
             <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
-              GestÃ£o baseada no que realmente aconteceu.
+              Gestão baseada no que realmente aconteceu.
             </h1>
             <p className="mt-1.5 text-sm leading-6 text-slate-500">
-              Financeiro realizado, agenda, clientes, CRM e comunicaÃ§Ã£o em uma
-              leitura executiva. O painel nÃ£o transforma agendamentos futuros em
-              receita e nÃ£o atribui resultados sem vÃ­nculo rastreÃ¡vel.
+              Financeiro realizado, agenda, clientes, CRM e comunicação em uma
+              leitura executiva. O painel não transforma agendamentos futuros em
+              receita e não atribui resultados sem vínculo rastreável.
             </p>
           </div>
 
@@ -71,7 +71,7 @@ export default async function GestaoPage({ searchParams }: GestaoPageProps) {
             <div className="flex items-center gap-2">
               <CalendarRange className="size-4 text-violet-600" />
               <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-                PerÃ­odo analisado
+                Período analisado
               </p>
             </div>
             <p className="mt-1 text-sm font-bold text-slate-900">

@@ -13,24 +13,24 @@ type Props = {
 };
 
 const ORIGENS_FALLBACK = [
-  "IndicaÃ§Ã£o",
+  "Indicação",
   "Google Ads",
   "Facebook Ads",
   "Instagram",
   "WhatsApp",
-  "Busca orgÃ¢nica",
+  "Busca orgânica",
   "Cliente antigo",
   "Passou na frente",
   "Outro",
 ];
 
 const PROCEDIMENTOS_FALLBACK = [
-  "AvaliaÃ§Ã£o",
+  "Avaliação",
   "Limpeza de pele",
   "Botox",
   "Preenchimento",
   "Bioestimulador",
-  "DepilaÃ§Ã£o",
+  "Depilação",
   "Massagem",
   "Drenagem",
   "Peeling",
@@ -91,13 +91,13 @@ export default function ClienteServerForm({
       : PROCEDIMENTOS_FALLBACK;
 
   const origemPadrao =
-    cliente?.origem || origensDisponiveis[0] || "IndicaÃ§Ã£o";
+    cliente?.origem || origensDisponiveis[0] || "Indicação";
 
   const procedimentoPadrao =
     cliente?.procedimentoInteresse ||
     cliente?.procedimento ||
     procedimentosDisponiveis[0] ||
-    "AvaliaÃ§Ã£o";
+    "Avaliação";
 
   return (
     <div
@@ -217,14 +217,14 @@ export default function ClienteServerForm({
 
             <label className="min-w-0 space-y-2 sm:col-span-2">
               <span className="block break-words text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                ObservaÃ§Ãµes
+                Observações
               </span>
 
               <textarea
                 name="observacoes"
                 defaultValue={cliente?.observacoes ?? ""}
                 rows={5}
-                placeholder="PreferÃªncias, restriÃ§Ãµes, observaÃ§Ãµes comerciais ou informaÃ§Ãµes Ãºteis para o atendimento."
+                placeholder="Preferências, restrições, observações comerciais ou informações úteis para o atendimento."
                 className="premium-input min-h-32 w-full min-w-0 max-w-full resize-y py-3"
               />
             </label>
