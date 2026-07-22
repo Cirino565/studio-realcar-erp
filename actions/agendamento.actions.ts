@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import { requirePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { criarVendaNoTx, type VendaProdutoInput } from "@/lib/vendas";
 import { revalidatePath } from "next/cache";
 
 type ClienteNovoAgendamento = {
@@ -872,7 +873,10 @@ export type FinalizarAtendimentoInput = {
   agendamentoId: number;
   procedimentoRealizado: string;
   profissional?: string;
+  procedimentoServicoId?: number | null;
   valorCobrado: number;
+  custoServico?: number;
+  produtos?: VendaProdutoInput[];
   formaPagamento: string;
   statusPagamento: string;
   evolucao: string;
@@ -896,7 +900,7 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
   }
 
   const valorCobrado = Number.isFinite(Number(dados.valorCobrado))
-    ? Number(dados.valorCobrado)
+    ? Math.max(0, Number(dados.valorCobrado))
     : 0;
 
   const dataAtendimento = dados.dataAtendimento
@@ -922,6 +926,10 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
     throw new Error("Não é possível finalizar um agendamento cancelado.");
   }
 
+  if (agendamento.status === "Atendido") {
+    throw new Error("Este atendimento já foi finalizado.");
+  }
+
   const profissional =
     dados.profissional?.trim() ||
     agendamento.profissional?.nome ||
@@ -929,6 +937,24 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
 
   const procedimentoRealizado = dados.procedimentoRealizado.trim();
   const observacoes = dados.observacoes?.trim() || null;
+
+  const servicoBase = dados.procedimentoServicoId
+    ? await prisma.procedimentoServico.findUnique({
+        where: { id: dados.procedimentoServicoId },
+        select: { id: true, custoPadrao: true },
+      })
+    : await prisma.procedimentoServico.findUnique({
+        where: { nome: procedimentoRealizado },
+        select: { id: true, custoPadrao: true },
+      });
+
+  const custoServico = Number.isFinite(Number(dados.custoServico))
+    ? Math.max(0, Number(dados.custoServico))
+    : Math.max(0, servicoBase?.custoPadrao || 0);
+
+  const produtos = (dados.produtos || []).filter(
+    (item) => item.produtoId > 0 && item.quantidade > 0,
+  );
 
   await prisma.$transaction(async (tx) => {
     await tx.clienteProcedimento.create({
@@ -953,33 +979,22 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
       },
     });
 
-    if (valorCobrado > 0) {
-      await tx.lancamento.create({
-        data: {
-          descricao: `Atendimento ${procedimentoRealizado} - ${agendamento.cliente.nome}`,
-          valor: valorCobrado,
-          tipo: "ENTRADA",
-          categoria: statusPagamento === "Pago" ? "Procedimentos" : "A receber",
-          observacoes: [
-            `Gerado automaticamente pela Agenda.`,
-            `Agendamento #${agendamento.id}.`,
-            `Cliente: ${agendamento.cliente.nome}.`,
-            `Profissional: ${profissional}.`,
-            `Forma de pagamento: ${formaPagamento}.`,
-            `Status do pagamento: ${statusPagamento}.`,
-            observacoes ? `Observações: ${observacoes}` : null,
-          ]
-            .filter(Boolean)
-            .join("\n"),
-          data: dataAtendimento,
-          formaPagamento,
-          statusPagamento,
-          origem: "Agenda",
-          agendamentoId: agendamento.id,
-          clienteId: agendamento.clienteId,
-        },
-      });
-    }
+    const venda = await criarVendaNoTx(tx, {
+      clienteId: agendamento.clienteId,
+      agendamentoId: agendamento.id,
+      data: dataAtendimento,
+      formaPagamento,
+      statusPagamento,
+      origem: "Agenda",
+      observacoes,
+      servico: {
+        procedimentoServicoId: servicoBase?.id || null,
+        descricao: procedimentoRealizado,
+        valorUnitario: valorCobrado,
+        custoUnitario: custoServico,
+      },
+      produtos,
+    });
 
     await tx.agendamento.update({
       where: { id: agendamento.id },
@@ -998,9 +1013,6 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
       data: {
         ultimaVisita: dataAtendimento,
         procedimento: procedimentoRealizado,
-        valorGasto: {
-          increment: valorCobrado,
-        },
         status: "Ativa",
       },
     });
@@ -1028,17 +1040,20 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
     await tx.auditoria.create({
       data: {
         modulo: "Agenda",
-        acao: "Finalizou atendimento",
-        entidade: "Agendamento",
-        entidadeId: String(agendamento.id),
+        acao: "Finalizou atendimento e registrou venda",
+        entidade: "Venda",
+        entidadeId: String(venda.vendaId),
         usuario: profissional,
-        detalhes: `Atendimento finalizado para ${agendamento.cliente.nome}. Procedimento: ${procedimentoRealizado}. Valor: ${valorCobrado}. Pagamento: ${statusPagamento}.`,
+        detalhes: `Atendimento finalizado para ${agendamento.cliente.nome}. Serviço: R$ ${venda.totalServicos.toFixed(2)}. Produtos: R$ ${venda.totalProdutos.toFixed(2)}. Total: R$ ${venda.valorTotal.toFixed(2)}. Custo direto: R$ ${venda.custoTotal.toFixed(2)}. Pagamento: ${statusPagamento}.`,
       },
     });
   });
 
   revalidatePath("/agenda");
+  revalidatePath("/vendas");
+  revalidatePath("/estoque");
   revalidatePath("/financeiro");
+  revalidatePath("/gestao");
   revalidatePath("/clientes");
   revalidatePath(`/clientes/${agendamento.clienteId}`);
   revalidatePath("/relatorios");

@@ -36,6 +36,18 @@ export type GestaoData = {
     receitaRecebida: number;
     despesasPagas: number;
     saldoRealizado: number;
+    comprasEstoqueInsumosPagas: number;
+    despesasOperacionaisPagas: number;
+    receitaServicos: number;
+    receitaProdutos: number;
+    receitaSemClassificacao: number;
+    custoDiretoServicos: number;
+    custoProdutosVendidos: number;
+    custoDiretoTotal: number;
+    margemDireta: number;
+    margemDiretaPercentual: number;
+    resultadoGerencial: number;
+    resultadoGerencialPercentual: number;
     aReceber: number;
     quantidadeAReceber: number;
     ticketMedioAtendimento: number;
@@ -81,6 +93,9 @@ export type GestaoData = {
   rankings: {
     receitaPorProfissional: GestaoRankingItem[];
     receitaPorProcedimento: GestaoRankingItem[];
+    margemPorProcedimento: GestaoRankingItem[];
+    receitaPorProduto: GestaoRankingItem[];
+    margemPorProduto: GestaoRankingItem[];
     leadsPorOrigem: GestaoRankingItem[];
     receitaPorCampanha: GestaoRankingItem[];
   };
@@ -419,6 +434,7 @@ export async function obterDadosGestao(
     configuracaoClinica,
     comunicacoesAbertas,
     comunicacoesEnviadas,
+    vendas,
     clientesReativacao,
     followUpsVencidos,
   ] = await Promise.all([
@@ -544,6 +560,37 @@ export async function obterDadosGestao(
         enviadoEm: true,
       },
     }),
+    prisma.venda.findMany({
+      where: {
+        statusPagamento: "Pago",
+        lancamento: {
+          is: {
+            statusPagamento: "Pago",
+            data: { gte: periodo.inicio, lt: periodo.fim },
+          },
+        },
+      },
+      select: {
+        id: true,
+        lancamentoId: true,
+        agendamentoId: true,
+        totalServicos: true,
+        totalProdutos: true,
+        custoServicos: true,
+        custoProdutos: true,
+        valorTotal: true,
+        custoTotal: true,
+        statusPagamento: true,
+        itens: {
+          select: {
+            tipo: true,
+            descricao: true,
+            valorTotal: true,
+            custoTotal: true,
+          },
+        },
+      },
+    }),
     prisma.cliente.count({
       where: {
         ultimaVisita: { lt: sessentaDiasAtras },
@@ -579,6 +626,55 @@ export async function obterDadosGestao(
     (item) => item.tipo === "ENTRADA" && !isPago(item.statusPagamento),
   );
   const aReceber = somarValores(aReceberLancamentos, (item) => item.valor);
+
+  const vendasPagas = vendas.filter((venda) => isPago(venda.statusPagamento));
+  const receitaServicos = somarValores(
+    vendasPagas,
+    (venda) => venda.totalServicos,
+  );
+  const receitaProdutos = somarValores(
+    vendasPagas,
+    (venda) => venda.totalProdutos,
+  );
+  const custoDiretoServicos = somarValores(
+    vendasPagas,
+    (venda) => venda.custoServicos,
+  );
+  const custoProdutosVendidos = somarValores(
+    vendasPagas,
+    (venda) => venda.custoProdutos,
+  );
+  const custoDiretoTotal = custoDiretoServicos + custoProdutosVendidos;
+  const receitaVendasClassificada = somarValores(
+    vendasPagas,
+    (venda) => venda.valorTotal,
+  );
+  const receitaSemClassificacao = Math.max(
+    0,
+    receitaRecebida - receitaVendasClassificada,
+  );
+
+  const saidasPagas = lancamentosPagos.filter((item) => item.tipo === "SAIDA");
+  const comprasEstoqueInsumosPagas = somarValores(
+    saidasPagas.filter(
+      (item) => normalizarTexto(item.categoria) === "produtos e insumos",
+    ),
+    (item) => item.valor,
+  );
+  const despesasOperacionaisPagas = somarValores(
+    saidasPagas.filter(
+      (item) => normalizarTexto(item.categoria) !== "produtos e insumos",
+    ),
+    (item) => item.valor,
+  );
+
+  const margemDireta = receitaRecebida - custoDiretoTotal;
+  const margemDiretaPercentual =
+    receitaRecebida > 0 ? (margemDireta / receitaRecebida) * 100 : 0;
+  const resultadoGerencial =
+    receitaRecebida - custoDiretoTotal - despesasOperacionaisPagas;
+  const resultadoGerencialPercentual =
+    receitaRecebida > 0 ? (resultadoGerencial / receitaRecebida) * 100 : 0;
 
   const receitaAnterior = somarValores(
     lancamentosAnteriores.filter(
@@ -677,8 +773,25 @@ export async function obterDadosGestao(
     }),
   );
 
-  const receitaPorProcedimento = agruparRanking(
-    lancamentosAgendaPagos.map((lancamento) => {
+  const lancamentoIdsVendasPagas = new Set(
+    vendasPagas
+      .map((venda) => venda.lancamentoId)
+      .filter((id): id is number => typeof id === "number"),
+  );
+
+  const lancamentosAgendaLegados = lancamentosAgendaPagos.filter(
+    (lancamento) => !lancamentoIdsVendasPagas.has(lancamento.id),
+  );
+
+  const itensServicoVendas = vendasPagas.flatMap((venda) =>
+    venda.itens.filter((item) => item.tipo === "SERVICO"),
+  );
+  const itensProdutoVendas = vendasPagas.flatMap((venda) =>
+    venda.itens.filter((item) => item.tipo === "PRODUTO"),
+  );
+
+  const receitaPorProcedimento = agruparRanking([
+    ...lancamentosAgendaLegados.map((lancamento) => {
       const agendamento = agendamentoFinanceiroPorId.get(
         lancamento.agendamentoId as number,
       );
@@ -688,6 +801,31 @@ export async function obterDadosGestao(
         valor: lancamento.valor,
       };
     }),
+    ...itensServicoVendas.map((item) => ({
+      label: item.descricao || "Sem procedimento",
+      valor: item.valorTotal,
+    })),
+  ]);
+
+  const margemPorProcedimento = agruparRanking(
+    itensServicoVendas.map((item) => ({
+      label: item.descricao || "Sem procedimento",
+      valor: item.valorTotal - item.custoTotal,
+    })),
+  );
+
+  const receitaPorProduto = agruparRanking(
+    itensProdutoVendas.map((item) => ({
+      label: item.descricao || "Sem produto",
+      valor: item.valorTotal,
+    })),
+  );
+
+  const margemPorProduto = agruparRanking(
+    itensProdutoVendas.map((item) => ({
+      label: item.descricao || "Sem produto",
+      valor: item.valorTotal - item.custoTotal,
+    })),
   );
 
   const leadsPorAgendamento =
@@ -894,6 +1032,18 @@ export async function obterDadosGestao(
       receitaRecebida,
       despesasPagas,
       saldoRealizado: receitaRecebida - despesasPagas,
+      comprasEstoqueInsumosPagas,
+      despesasOperacionaisPagas,
+      receitaServicos,
+      receitaProdutos,
+      receitaSemClassificacao,
+      custoDiretoServicos,
+      custoProdutosVendidos,
+      custoDiretoTotal,
+      margemDireta,
+      margemDiretaPercentual,
+      resultadoGerencial,
+      resultadoGerencialPercentual,
       aReceber,
       quantidadeAReceber: aReceberLancamentos.length,
       ticketMedioAtendimento,
@@ -952,6 +1102,9 @@ export async function obterDadosGestao(
     rankings: {
       receitaPorProfissional,
       receitaPorProcedimento,
+      margemPorProcedimento,
+      receitaPorProduto,
+      margemPorProduto,
       leadsPorOrigem,
       receitaPorCampanha,
     },

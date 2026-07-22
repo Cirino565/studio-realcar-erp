@@ -33,6 +33,7 @@ import {
   criarOrigemCliente,
   criarProcedimentoInteresse,
   criarProcedimentoServico,
+  atualizarProcedimentoServico,
   excluirOrigemCliente,
   excluirProcedimentoInteresse,
   excluirProcedimentoServico,
@@ -460,10 +461,159 @@ function parseCurrency(value: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function currencyFromNumber(value: number) {
+  return Number(value || 0).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function ServicoCardEditor({
+  item,
+  onExcluir,
+}: {
+  item: ProcedimentoServicoView;
+  onExcluir: (id: number) => void;
+}) {
+  const [duracao, setDuracao] = useState(String(item.duracaoPadrao || 60));
+  const [valor, setValor] = useState(currencyFromNumber(item.valorPadrao));
+  const [custo, setCusto] = useState(currencyFromNumber(item.custoPadrao));
+  const [salvo, setSalvo] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  const valorNumero = parseCurrency(valor);
+  const custoNumero = parseCurrency(custo);
+  const margem = valorNumero - custoNumero;
+  const margemPercentual =
+    valorNumero > 0 ? (margem / valorNumero) * 100 : 0;
+
+  function salvar() {
+    setSalvo(false);
+    startTransition(async () => {
+      await atualizarProcedimentoServico({
+        id: item.id,
+        nome: item.nome,
+        categoria: item.categoria || undefined,
+        descricao: item.descricao || undefined,
+        duracaoPadrao: Number(duracao) || 60,
+        valorPadrao: valorNumero,
+        custoPadrao: custoNumero,
+        status: item.status,
+        ordem: item.ordem,
+      });
+      setSalvo(true);
+      window.setTimeout(() => setSalvo(false), 1600);
+    });
+  }
+
+  return (
+    <div className="rounded-3xl border border-white/[0.08] bg-[#111827]/70 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-white">{item.nome}</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Configure preço, custo direto padrão e duração.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => onExcluir(item.id)}
+          disabled={isPending}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-200 transition hover:bg-rose-400/15 disabled:opacity-60"
+        >
+          <Trash2 className="h-4 w-4" />
+          Excluir
+        </button>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <label className="space-y-1.5">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Duração
+          </span>
+          <select
+            value={duracao}
+            onChange={(event) => setDuracao(event.target.value)}
+            className="premium-input w-full"
+          >
+            <option value="30">30 min</option>
+            <option value="45">45 min</option>
+            <option value="60">1h</option>
+            <option value="90">1h30</option>
+            <option value="120">2h</option>
+            <option value="150">2h30</option>
+            <option value="180">3h</option>
+            <option value="240">4h</option>
+          </select>
+        </label>
+
+        <label className="space-y-1.5">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Preço padrão
+          </span>
+          <div className="flex h-11 items-center overflow-hidden rounded-2xl border border-white/[0.10] bg-white/[0.06]">
+            <span className="border-r border-white/[0.10] px-3 text-sm font-semibold text-slate-300">
+              R$
+            </span>
+            <input
+              value={valor}
+              onChange={(event) =>
+                setValor(formatCurrencyInput(event.target.value))
+              }
+              className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm text-white outline-none"
+            />
+          </div>
+        </label>
+
+        <label className="space-y-1.5">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Custo direto padrão
+          </span>
+          <div className="flex h-11 items-center overflow-hidden rounded-2xl border border-white/[0.10] bg-white/[0.06]">
+            <span className="border-r border-white/[0.10] px-3 text-sm font-semibold text-slate-300">
+              R$
+            </span>
+            <input
+              value={custo}
+              onChange={(event) =>
+                setCusto(formatCurrencyInput(event.target.value))
+              }
+              className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm text-white outline-none"
+            />
+          </div>
+        </label>
+      </div>
+
+      <div className="mt-3 flex flex-col gap-2 rounded-2xl border border-emerald-400/10 bg-emerald-400/5 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs text-slate-400">
+          Margem padrão estimada:{" "}
+          <strong className="text-emerald-300">
+            {margem.toLocaleString("pt-BR", {
+              style: "currency",
+              currency: "BRL",
+            })}
+            {" "}({margemPercentual.toFixed(1).replace(".", ",")}%)
+          </strong>
+        </p>
+        <Button
+          type="button"
+          onClick={salvar}
+          disabled={isPending}
+          className="sm:w-auto"
+        >
+          <Save className="h-4 w-4" />
+          {isPending ? "Salvando..." : salvo ? "Salvo" : "Salvar custos"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function ServicosList({ items, procedimentosInteresse }: ServicosListProps) {
   const [procedimentoSelecionado, setProcedimentoSelecionado] = useState("");
   const [duracao, setDuracao] = useState("60");
   const [valor, setValor] = useState("");
+  const [custo, setCusto] = useState("");
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -483,18 +633,20 @@ function ServicosList({ items, procedimentosInteresse }: ServicosListProps) {
         nome,
         duracaoPadrao: Number(duracao) || 60,
         valorPadrao: parseCurrency(valor),
+        custoPadrao: parseCurrency(custo),
         status: "Ativo",
       });
       setProcedimentoSelecionado("");
       setDuracao("60");
       setValor("");
+      setCusto("");
     });
   }
 
   function excluir(id: number) {
     if (
       !confirm(
-        "Deseja excluir este serviço? Agendamentos antigos continuarão com o texto já salvo.",
+        "Deseja excluir este serviço? Agendamentos antigos e vendas históricas manterão os dados já registrados.",
       )
     ) {
       return;
@@ -515,9 +667,9 @@ function ServicosList({ items, procedimentosInteresse }: ServicosListProps) {
             Serviços da agenda
           </h3>
           <p className="mt-1 text-sm leading-6 text-slate-400">
-            Selecione um procedimento já cadastrado e defina duração e valor
-            padrão. A agenda usa esse tempo para bloquear automaticamente os
-            horários seguintes.
+            Defina duração, preço de venda e custo direto padrão. O custo será
+            copiado para o histórico no momento da venda, preservando a margem
+            real mesmo que o cadastro seja alterado no futuro.
           </p>
         </div>
         <span className="w-fit rounded-full border border-white/[0.10] bg-white/[0.06] px-3 py-1 text-xs font-semibold text-slate-300">
@@ -525,7 +677,7 @@ function ServicosList({ items, procedimentosInteresse }: ServicosListProps) {
         </span>
       </div>
 
-      <div className="mt-5 grid gap-3 md:grid-cols-[1.2fr_150px_180px_auto]">
+      <div className="mt-5 grid gap-3 xl:grid-cols-[1.2fr_130px_160px_160px_auto]">
         <select
           value={procedimentoSelecionado}
           onChange={(event) => setProcedimentoSelecionado(event.target.value)}
@@ -538,6 +690,7 @@ function ServicosList({ items, procedimentosInteresse }: ServicosListProps) {
             </option>
           ))}
         </select>
+
         <select
           value={duracao}
           onChange={(event) => setDuracao(event.target.value)}
@@ -552,9 +705,10 @@ function ServicosList({ items, procedimentosInteresse }: ServicosListProps) {
           <option value="180">3h</option>
           <option value="240">4h</option>
         </select>
-        <div className="flex h-11 items-center overflow-hidden rounded-2xl border border-white/[0.10] bg-white/[0.06] focus-within:border-violet-300/40 focus-within:bg-white/[0.09] focus-within:ring-4 focus-within:ring-violet-500/10">
-          <span className="border-r border-white/[0.10] px-4 text-sm font-semibold text-slate-300">
-            R$
+
+        <div className="flex h-11 items-center overflow-hidden rounded-2xl border border-white/[0.10] bg-white/[0.06]">
+          <span className="border-r border-white/[0.10] px-3 text-sm font-semibold text-slate-300">
+            Venda R$
           </span>
           <input
             value={valor}
@@ -562,14 +716,29 @@ function ServicosList({ items, procedimentosInteresse }: ServicosListProps) {
               setValor(formatCurrencyInput(event.target.value))
             }
             placeholder="0,00"
-            className="h-full min-w-0 flex-1 bg-transparent px-4 text-sm text-white outline-none placeholder:text-slate-500"
+            className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm text-white outline-none placeholder:text-slate-500"
           />
         </div>
+
+        <div className="flex h-11 items-center overflow-hidden rounded-2xl border border-white/[0.10] bg-white/[0.06]">
+          <span className="border-r border-white/[0.10] px-3 text-sm font-semibold text-slate-300">
+            Custo R$
+          </span>
+          <input
+            value={custo}
+            onChange={(event) =>
+              setCusto(formatCurrencyInput(event.target.value))
+            }
+            placeholder="0,00"
+            className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm text-white outline-none placeholder:text-slate-500"
+          />
+        </div>
+
         <Button
           type="button"
           onClick={adicionar}
           disabled={isPending || !procedimentoSelecionado || servicoJaExiste}
-          className="md:w-auto"
+          className="xl:w-auto"
         >
           <Plus className="h-4 w-4" />
           Adicionar
@@ -578,48 +747,27 @@ function ServicosList({ items, procedimentosInteresse }: ServicosListProps) {
 
       {servicoJaExiste ? (
         <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
-          Este procedimento já está configurado como serviço da agenda. Edite ou
-          exclua o serviço existente antes de cadastrar outro igual.
+          Este procedimento já está configurado como serviço da agenda. Atualize
+          preço e custo no cartão existente abaixo.
         </div>
       ) : null}
 
-      <div className="mt-5 grid gap-3 md:grid-cols-2">
+      <div className="mt-5 grid gap-3 xl:grid-cols-2">
         {items.length > 0 ? (
           items.map((item) => (
-            <div
-              key={item.id}
-              className="flex flex-col gap-3 rounded-3xl border border-white/[0.08] bg-[#111827]/70 p-4 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-white">
-                  {item.nome}
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  {item.duracaoPadrao} min ·{" "}
-                  {item.valorPadrao.toLocaleString("pt-BR", {
-                    style: "currency",
-                    currency: "BRL",
-                  })}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => excluir(item.id)}
-                disabled={isPending && pendingId === item.id}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-200 transition hover:bg-rose-400/15 disabled:opacity-60"
-              >
-                <Trash2 className="h-4 w-4" />
-                Excluir
-              </button>
-            </div>
+            <ServicoCardEditor key={item.id} item={item} onExcluir={excluir} />
           ))
         ) : (
-          <div className="rounded-3xl border border-dashed border-white/[0.10] p-6 text-center text-sm text-slate-400 md:col-span-2">
+          <div className="rounded-3xl border border-dashed border-white/[0.10] p-6 text-center text-sm text-slate-400 xl:col-span-2">
             Nenhum serviço cadastrado. Crie primeiro os procedimentos de
             interesse e depois vincule os serviços da agenda.
           </div>
         )}
       </div>
+
+      {pendingId ? (
+        <p className="mt-3 text-xs text-slate-500">Atualizando serviço...</p>
+      ) : null}
     </div>
   );
 }

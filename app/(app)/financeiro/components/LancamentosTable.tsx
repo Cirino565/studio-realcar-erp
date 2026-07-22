@@ -2,6 +2,7 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   CalendarDays,
+  CheckCircle2,
   SearchX,
   Trash,
 } from "lucide-react";
@@ -14,6 +15,7 @@ import type { LancamentoFinanceiro } from "../types";
 type Props = {
   lancamentos: LancamentoFinanceiro[];
   onExcluir: (id: number) => void;
+  onMarcarPago: (id: number) => void;
   isPending?: boolean;
 };
 
@@ -39,6 +41,7 @@ function getTipoConfig(tipo: string) {
 export default function LancamentosTable({
   lancamentos,
   onExcluir,
+  onMarcarPago,
   isPending = false,
 }: Props) {
   if (lancamentos.length === 0) {
@@ -108,12 +111,10 @@ export default function LancamentosTable({
                   </td>
                   <td className="px-5 py-4 text-slate-300">
                     <p>{lancamento.categoria || "Sem categoria"}</p>
-                    {lancamento.origem === "Agenda" ? (
-                      <p className="mt-1 text-xs text-slate-500">
-                        Agenda • {lancamento.statusPagamento || "Pago"}
-                        {lancamento.formaPagamento ? ` • ${lancamento.formaPagamento}` : ""}
-                      </p>
-                    ) : null}
+                    <p className="mt-1 text-xs text-slate-500">
+                      {lancamento.origem || "Manual"} • {lancamento.statusPagamento || "Pago"}
+                      {lancamento.formaPagamento ? ` • ${lancamento.formaPagamento}` : ""}
+                    </p>
                   </td>
                   <td className="px-5 py-4 text-slate-300">
                     <span className="inline-flex items-center gap-2">
@@ -128,16 +129,31 @@ export default function LancamentosTable({
                     {formatarMoeda(lancamento.valor)}
                   </td>
                   <td className="px-5 py-4 text-right">
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="icon-sm"
-                      disabled={isPending}
-                      onClick={() => onExcluir(lancamento.id)}
-                      aria-label={`Excluir lançamento ${lancamento.descricao}`}
-                    >
-                      <Trash className="size-4" />
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      {lancamento.tipo === "ENTRADA" &&
+                      (lancamento.statusPagamento || "Pago").toLowerCase() !== "pago" ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={isPending}
+                          onClick={() => onMarcarPago(lancamento.id)}
+                        >
+                          <CheckCircle2 className="size-4" />
+                          Marcar pago
+                        </Button>
+                      ) : null}
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon-sm"
+                        disabled={isPending}
+                        onClick={() => onExcluir(lancamento.id)}
+                        aria-label={`Excluir lançamento ${lancamento.descricao}`}
+                      >
+                        <Trash className="size-4" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -164,24 +180,37 @@ export default function LancamentosTable({
                   <p className="mt-1 text-xs text-slate-500">
                     {formatarData(lancamento.data)} • {lancamento.categoria || "Sem categoria"}
                   </p>
-                  {lancamento.origem === "Agenda" ? (
-                    <p className="mt-1 text-xs text-slate-500">
-                      Agenda • {lancamento.statusPagamento || "Pago"}
-                      {lancamento.formaPagamento ? ` • ${lancamento.formaPagamento}` : ""}
-                    </p>
-                  ) : null}
+                  <p className="mt-1 text-xs text-slate-500">
+                    {lancamento.origem || "Manual"} • {lancamento.statusPagamento || "Pago"}
+                    {lancamento.formaPagamento ? ` • ${lancamento.formaPagamento}` : ""}
+                  </p>
                 </div>
 
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="icon-xs"
-                  disabled={isPending}
-                  onClick={() => onExcluir(lancamento.id)}
-                  aria-label={`Excluir lançamento ${lancamento.descricao}`}
-                >
-                  <Trash className="size-3.5" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  {lancamento.tipo === "ENTRADA" &&
+                  (lancamento.statusPagamento || "Pago").toLowerCase() !== "pago" ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-xs"
+                      disabled={isPending}
+                      onClick={() => onMarcarPago(lancamento.id)}
+                      aria-label={`Marcar ${lancamento.descricao} como pago`}
+                    >
+                      <CheckCircle2 className="size-3.5" />
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon-xs"
+                    disabled={isPending}
+                    onClick={() => onExcluir(lancamento.id)}
+                    aria-label={`Excluir lançamento ${lancamento.descricao}`}
+                  >
+                    <Trash className="size-3.5" />
+                  </Button>
+                </div>
               </div>
 
               <div className="mt-4 flex items-center justify-between gap-3">

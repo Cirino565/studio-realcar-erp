@@ -34,6 +34,7 @@ model Cliente {
   anamneseRespostas ClienteAnamneseResposta[]
   leads          Lead[]
   comunicacoes   ComunicacaoRegistro[]
+  vendas          Venda[]
 }
 
 model OrigemCliente {
@@ -64,12 +65,14 @@ model ProcedimentoServico {
   descricao     String?
   duracaoPadrao Int      @default(60)
   valorPadrao   Float    @default(0)
+  custoPadrao   Float    @default(0)
   status        String   @default("Ativo")
   ordem         Int      @default(0)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   anamneseModelos AnamneseModelo[]
+  itensVenda      VendaItem[]
 }
 
 model Agendamento {
@@ -94,6 +97,7 @@ model Agendamento {
 
   lead                 Lead?
   comunicacoes          ComunicacaoRegistro[]
+  vendas                Venda[]
 
   @@index([serieId])
 }
@@ -151,6 +155,8 @@ model Lancamento {
   clienteId       Int?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  venda           Venda?
 }
 
 model Fornecedor {
@@ -187,17 +193,75 @@ model Produto {
 
   movimentacoes  MovimentacaoEstoque[]
   itensCompra    CompraItem[]
+  itensVenda     VendaItem[]
 }
 
 model MovimentacaoEstoque {
   id          Int      @id @default(autoincrement())
   produtoId   Int
   produto     Produto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  vendaItemId Int?     @unique
+  vendaItem   VendaItem? @relation(fields: [vendaItemId], references: [id], onDelete: SetNull)
   tipo        String
   quantidade  Int
   motivo      String
   observacoes String?
   createdAt   DateTime @default(now())
+}
+
+model Venda {
+  id                  Int       @id @default(autoincrement())
+  clienteId           Int?
+  cliente             Cliente?  @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  agendamentoId       Int?
+  agendamento         Agendamento? @relation(fields: [agendamentoId], references: [id], onDelete: SetNull)
+  lancamentoId        Int?      @unique
+  lancamento          Lancamento? @relation(fields: [lancamentoId], references: [id], onDelete: SetNull)
+  totalServicos       Float     @default(0)
+  totalProdutos       Float     @default(0)
+  custoServicos       Float     @default(0)
+  custoProdutos       Float     @default(0)
+  valorTotal          Float     @default(0)
+  custoTotal          Float     @default(0)
+  formaPagamento      String?
+  statusPagamento     String    @default("Pago")
+  origem              String    @default("Venda")
+  observacoes         String?
+  data                DateTime  @default(now())
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  itens               VendaItem[]
+
+  @@index([clienteId, data])
+  @@index([agendamentoId, data])
+  @@index([data])
+  @@index([statusPagamento, data])
+}
+
+model VendaItem {
+  id                    Int       @id @default(autoincrement())
+  vendaId               Int
+  venda                 Venda     @relation(fields: [vendaId], references: [id], onDelete: Cascade)
+  tipo                  String
+  produtoId             Int?
+  produto               Produto?  @relation(fields: [produtoId], references: [id], onDelete: SetNull)
+  procedimentoServicoId Int?
+  procedimentoServico   ProcedimentoServico? @relation(fields: [procedimentoServicoId], references: [id], onDelete: SetNull)
+  descricao             String
+  quantidade            Int       @default(1)
+  valorUnitario         Float     @default(0)
+  custoUnitario         Float     @default(0)
+  valorTotal            Float     @default(0)
+  custoTotal            Float     @default(0)
+  createdAt             DateTime  @default(now())
+
+  movimentacao          MovimentacaoEstoque?
+
+  @@index([vendaId])
+  @@index([produtoId])
+  @@index([procedimentoServicoId])
+  @@index([tipo])
 }
 
 model Compra {

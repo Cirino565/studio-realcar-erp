@@ -65,25 +65,25 @@ export default function FinanceiroResumo({ resumo }: Props) {
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <FinanceiroResumoCard
-        titulo="Entradas"
+        titulo="Entradas recebidas"
         valor={formatarMoeda(resumo.entradas)}
-        detalhe={`${resumo.quantidadeEntradas} lançamento(s) de receita`}
+        detalhe={`${resumo.quantidadeEntradas} lançamento(s) pago(s) de receita`}
         icon={ArrowUpRight}
         tone="green"
       />
 
       <FinanceiroResumoCard
-        titulo="Saídas"
+        titulo="Saídas pagas"
         valor={formatarMoeda(resumo.saidas)}
-        detalhe={`${resumo.quantidadeSaidas} lançamento(s) de despesa`}
+        detalhe={`${resumo.quantidadeSaidas} lançamento(s) pago(s) de despesa`}
         icon={ArrowDownLeft}
         tone="red"
       />
 
       <FinanceiroResumoCard
-        titulo="Saldo Operacional"
+        titulo="Saldo realizado"
         valor={formatarMoeda(resumo.saldo)}
-        detalhe="Entradas menos saídas no filtro atual"
+        detalhe="Somente valores efetivamente pagos no filtro"
         icon={Banknote}
         tone="cyan"
       />
@@ -91,7 +91,7 @@ export default function FinanceiroResumo({ resumo }: Props) {
       <FinanceiroResumoCard
         titulo="Ticket Médio"
         valor={formatarMoeda(resumo.ticketMedioEntrada)}
-        detalhe="Média das entradas registradas"
+        detalhe="Média das entradas efetivamente recebidas"
         icon={CircleDollarSign}
         tone="violet"
       />

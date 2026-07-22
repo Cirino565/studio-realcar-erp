@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { CalendarDays, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import type { ProdutoVendaOption } from "@/lib/vendas.types";
 
 import AgendaCalendar, { type NovoHorarioPayload } from "./AgendaCalendar";
 import AppointmentDetailsModal from "./AppointmentDetailsModal";
@@ -37,6 +38,7 @@ type ServicoAgenda = {
   categoria: string | null;
   duracaoPadrao: number;
   valorPadrao: number;
+  custoPadrao: number;
 };
 
 type AgendamentoAgenda = {
@@ -107,6 +109,7 @@ type Props = {
   profissionais: ProfissionalAgenda[];
   origensCliente: OrigemClienteAgenda[];
   servicos: ServicoAgenda[];
+  produtos: ProdutoVendaOption[];
   initialDate: string;
   initialProfissionalFiltro: string;
   initialClienteId?: string | null;
@@ -179,6 +182,7 @@ export default function AgendaClient({
   profissionais,
   origensCliente,
   servicos,
+  produtos,
   initialDate,
   initialProfissionalFiltro,
   initialClienteId,
@@ -405,6 +409,8 @@ export default function AgendaClient({
       <FinalizarAtendimentoModal
         open={Boolean(finishAppointment)}
         appointment={finishAppointment}
+        servicos={servicos}
+        produtos={produtos}
         onClose={() => setFinishAppointment(null)}
         onAgendarRetorno={abrirReagendamento}
       />

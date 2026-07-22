@@ -260,6 +260,30 @@ function RankingList({
   );
 }
 
+function LeituraFinanceiraCard({
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  label: string;
+  value: number;
+  detail: string;
+  tone: Tone;
+}) {
+  return (
+    <div className={`rounded-2xl border p-4 ${toneClasses[tone].soft}`}>
+      <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-600">
+        {label}
+      </p>
+      <p className="mt-2 text-xl font-bold text-slate-950">
+        {formatarMoeda(value)}
+      </p>
+      <p className="mt-1 text-[11px] leading-4 text-slate-500">{detail}</p>
+    </div>
+  );
+}
+
 function InsightCard({ insight }: { insight: GestaoInsight }) {
   return (
     <div
@@ -288,6 +312,7 @@ function InsightCard({ insight }: { insight: GestaoInsight }) {
 
 export default function GestaoDashboard({ data }: Props) {
   const saldoPositivo = data.financeiro.saldoRealizado >= 0;
+  const resultadoPositivo = data.financeiro.resultadoGerencial >= 0;
 
   return (
     <div className="min-w-0 space-y-5 pb-4">
@@ -301,78 +326,116 @@ export default function GestaoDashboard({ data }: Props) {
           variation={data.financeiro.variacaoReceita}
         />
         <MetricCard
-          title="Saldo realizado"
-          value={formatarMoeda(data.financeiro.saldoRealizado)}
-          detail={`${formatarMoeda(data.financeiro.despesasPagas)} em saídas pagas no período.`}
-          icon={WalletCards}
-          tone={saldoPositivo ? "violet" : "rose"}
+          title="Resultado gerencial"
+          value={formatarMoeda(data.financeiro.resultadoGerencial)}
+          detail={`Receita menos custos diretos e ${formatarMoeda(data.financeiro.despesasOperacionaisPagas)} em despesas operacionais pagas.`}
+          icon={TrendingUp}
+          tone={resultadoPositivo ? "violet" : "rose"}
         />
         <MetricCard
-          title="Atendimentos realizados"
-          value={String(data.agenda.atendidos)}
-          detail={`${data.agenda.faltas} falta(s) e ${data.agenda.cancelados} cancelamento(s).`}
-          icon={UserRoundCheck}
-          tone="blue"
-          variation={data.agenda.variacaoAtendidos}
-        />
-        <MetricCard
-          title="Leads recebidos"
-          value={String(data.crm.leadsRecebidos)}
-          detail={`${data.crm.conversoesNoPeriodo} conversão(ões) registrada(s) no período.`}
-          icon={Megaphone}
+          title="Margem após custos diretos"
+          value={formatarPercentual(data.financeiro.margemDiretaPercentual)}
+          detail={`${formatarMoeda(data.financeiro.custoDiretoTotal)} de custos históricos reconhecidos nas vendas pagas.`}
+          icon={Gauge}
           tone="cyan"
-          variation={data.crm.variacaoLeads}
+        />
+        <MetricCard
+          title="Saldo de caixa realizado"
+          value={formatarMoeda(data.financeiro.saldoRealizado)}
+          detail={`${formatarMoeda(data.financeiro.despesasPagas)} em todas as saídas pagas, inclusive compras de estoque e insumos.`}
+          icon={WalletCards}
+          tone={saldoPositivo ? "blue" : "rose"}
         />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <div className="premium-card p-4 sm:p-5">
           <SectionTitle
-            title="Leitura financeira"
-            description="Valores realizados são separados de agendamentos e previsões."
+            title="Rentabilidade e resultado"
+            description="Receita, custos diretos históricos e despesas são separados para não confundir faturamento com resultado."
             icon={WalletCards}
           />
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-700">
-                Receita de atendimentos
-              </p>
-              <p className="mt-2 text-2xl font-bold text-emerald-950">
-                {formatarMoeda(data.financeiro.receitaAgenda)}
-              </p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">
-                Entradas pagas vinculadas diretamente a agendamentos.
-              </p>
-            </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <LeituraFinanceiraCard
+              label="Receita de serviços"
+              value={data.financeiro.receitaServicos}
+              detail="Serviços de vendas pagas com composição registrada."
+              tone="emerald"
+            />
+            <LeituraFinanceiraCard
+              label="Receita de produtos"
+              value={data.financeiro.receitaProdutos}
+              detail="Produtos vendidos em atendimentos ou vendas avulsas."
+              tone="violet"
+            />
+            <LeituraFinanceiraCard
+              label="Receita sem composição 3A+"
+              value={data.financeiro.receitaSemClassificacao}
+              detail="Entradas pagas antigas ou manuais ainda sem separação serviço/produto."
+              tone="blue"
+            />
+            <LeituraFinanceiraCard
+              label="Custos diretos de serviços"
+              value={data.financeiro.custoDiretoServicos}
+              detail="Custo histórico congelado no momento de cada venda paga."
+              tone="amber"
+            />
+            <LeituraFinanceiraCard
+              label="Custo dos produtos vendidos"
+              value={data.financeiro.custoProdutosVendidos}
+              detail="Preço de compra congelado quando cada produto foi vendido."
+              tone="amber"
+            />
+            <LeituraFinanceiraCard
+              label="Despesas operacionais pagas"
+              value={data.financeiro.despesasOperacionaisPagas}
+              detail="Aluguel, marketing, salários, impostos e demais saídas, exceto compras de estoque/insumos."
+              tone="rose"
+            />
+          </div>
 
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <div className="rounded-2xl border border-violet-100 bg-violet-50/70 p-4">
               <p className="text-xs font-bold uppercase tracking-[0.12em] text-violet-700">
-                Ticket médio por atendimento pago
+                Resultado gerencial
               </p>
-              <p className="mt-2 text-2xl font-bold text-violet-950">
-                {formatarMoeda(data.financeiro.ticketMedioAtendimento)}
+              <p className={`mt-2 text-2xl font-bold ${data.financeiro.resultadoGerencial >= 0 ? "text-violet-950" : "text-rose-700"}`}>
+                {formatarMoeda(data.financeiro.resultadoGerencial)}
               </p>
               <p className="mt-1 text-xs leading-5 text-slate-500">
-                Receita de agenda dividida por atendimentos pagos únicos.
+                {formatarPercentual(data.financeiro.resultadoGerencialPercentual)} da receita recebida, após custos diretos e despesas operacionais.
               </p>
             </div>
 
-            <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4 sm:col-span-2">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-amber-700">
-                    A receber registrado
-                  </p>
-                  <p className="mt-2 text-2xl font-bold text-amber-950">
-                    {formatarMoeda(data.financeiro.aReceber)}
-                  </p>
-                </div>
-                <p className="text-xs text-slate-600">
-                  {data.financeiro.quantidadeAReceber} lançamento(s) de entrada
-                  não marcado(s) como pago.
-                </p>
-              </div>
+            <div className="rounded-2xl border border-cyan-100 bg-cyan-50/70 p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-cyan-700">
+                Compras de estoque e insumos pagas
+              </p>
+              <p className="mt-2 text-2xl font-bold text-cyan-950">
+                {formatarMoeda(data.financeiro.comprasEstoqueInsumosPagas)}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Afetam o caixa, mas não são descontadas novamente do resultado gerencial quando o custo já foi reconhecido na venda.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs font-bold text-slate-500">Receita vinculada a atendimentos</p>
+              <p className="mt-1 text-xl font-bold text-slate-950">{formatarMoeda(data.financeiro.receitaAgenda)}</p>
+              <p className="mt-1 text-[11px] text-slate-500">Pode incluir produtos vendidos junto ao atendimento.</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs font-bold text-slate-500">Ticket médio por atendimento pago</p>
+              <p className="mt-1 text-xl font-bold text-slate-950">{formatarMoeda(data.financeiro.ticketMedioAtendimento)}</p>
+              <p className="mt-1 text-[11px] text-slate-500">Total recebido vinculado ao atendimento dividido por atendimentos pagos únicos.</p>
+            </div>
+            <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4">
+              <p className="text-xs font-bold text-amber-700">A receber registrado</p>
+              <p className="mt-1 text-xl font-bold text-amber-950">{formatarMoeda(data.financeiro.aReceber)}</p>
+              <p className="mt-1 text-[11px] text-slate-600">{data.financeiro.quantidadeAReceber} lançamento(s) ainda não marcado(s) como pago.</p>
             </div>
           </div>
         </div>
@@ -565,24 +628,39 @@ export default function GestaoDashboard({ data }: Props) {
         <div className="grid gap-4 xl:grid-cols-2">
           <RankingList
             title="Receita por profissional"
-            description="Entradas pagas ligadas a agendamentos e à profissional registrada no atendimento."
+            description="Entradas pagas ligadas a agendamentos. Quando houver produto vendido junto, o total também permanece atribuído ao atendimento."
             items={data.rankings.receitaPorProfissional}
           />
           <RankingList
-            title="Receita por procedimento"
-            description="Somente receita paga rastreável até um agendamento."
+            title="Receita de serviços por procedimento"
+            description="No 3A+, apenas a parcela do serviço é atribuída ao procedimento. Dados legados permanecem pela receita antiga vinculada ao agendamento."
             items={data.rankings.receitaPorProcedimento}
+          />
+          <RankingList
+            title="Margem direta por procedimento"
+            description="Receita do serviço menos o custo direto histórico congelado em cada venda paga."
+            items={data.rankings.margemPorProcedimento}
+          />
+          <RankingList
+            title="Receita por produto"
+            description="Produtos efetivamente vendidos em vendas pagas, incluindo itens adicionados durante o atendimento."
+            items={data.rankings.receitaPorProduto}
+          />
+          <RankingList
+            title="Margem direta por produto"
+            description="Preço vendido menos o custo de compra histórico de cada produto no momento da venda."
+            items={data.rankings.margemPorProduto}
+          />
+          <RankingList
+            title="Receita rastreada por campanha"
+            description="Pagamentos de vendas vinculadas a agendamentos originados por leads com campanha."
+            items={data.rankings.receitaPorCampanha}
           />
           <RankingList
             title="Leads por origem"
             description="Origem informada nos leads criados no período."
             items={data.rankings.leadsPorOrigem}
             format="number"
-          />
-          <RankingList
-            title="Receita rastreada por campanha"
-            description="Somente pagamentos de agendamentos originados por leads vinculados a uma campanha."
-            items={data.rankings.receitaPorCampanha}
           />
         </div>
       </section>
@@ -668,11 +746,13 @@ export default function GestaoDashboard({ data }: Props) {
               Como interpretar este painel
             </p>
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              Receita significa entrada marcada como paga. Receita por
-              profissional, procedimento e campanha só aparece quando existe
-              vínculo rastreável com o agendamento. Ocupação é uma estimativa de
-              agenda reservada baseada no expediente configurado, profissionais
-              ativos e bloqueios reais. Nenhum agendamento futuro é tratado
+              Receita significa entrada marcada como paga. Saldo de caixa
+              considera todas as saídas pagas. Resultado gerencial desconta
+              custos diretos históricos das vendas e despesas operacionais,
+              sem descontar novamente compras classificadas como Produtos e
+              insumos. Isso evita dupla contagem de custo. Dados anteriores ao
+              Nível 3A+ podem aparecer como receita sem composição até que haja
+              histórico novo suficiente. Nenhum agendamento futuro é tratado
               como faturamento realizado.
             </p>
           </div>

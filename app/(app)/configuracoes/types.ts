@@ -53,6 +53,7 @@ export type ProcedimentoServicoView = {
   descricao: string | null;
   duracaoPadrao: number;
   valorPadrao: number;
+  custoPadrao: number;
   status: string;
   ordem: number;
   createdAt: Date;

@@ -19,6 +19,7 @@ import {
   Package,
   Settings,
   ShieldCheck,
+  ShoppingCart,
   Sparkles,
   Users,
   Wallet,
@@ -54,6 +55,12 @@ const mainMenus = [
     nome: "Financeiro",
     icon: Wallet,
     href: "/financeiro",
+    permissao: "financeiro.visualizar",
+  },
+  {
+    nome: "Vendas",
+    icon: ShoppingCart,
+    href: "/vendas",
     permissao: "financeiro.visualizar",
   },
   {

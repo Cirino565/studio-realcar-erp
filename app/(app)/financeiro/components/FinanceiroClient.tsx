@@ -12,7 +12,10 @@ import {
   WalletCards,
 } from "lucide-react";
 
-import { excluirLancamento } from "@/actions/lancamento.actions";
+import {
+  excluirLancamento,
+  marcarLancamentoPago,
+} from "@/actions/lancamento.actions";
 import { Button } from "@/components/ui/button";
 import { formatarMoeda } from "@/lib/format";
 
@@ -73,8 +76,11 @@ function isWithinPeriod(date: Date, periodo: PeriodoFinanceiro) {
 }
 
 function calcularResumo(lancamentos: LancamentoFinanceiro[]): FinanceiroResumoData {
-  const entradas = lancamentos.filter((item) => item.tipo === "ENTRADA");
-  const saidas = lancamentos.filter((item) => item.tipo === "SAIDA");
+  const realizados = lancamentos.filter(
+    (item) => (item.statusPagamento || "Pago").trim().toLowerCase() === "pago",
+  );
+  const entradas = realizados.filter((item) => item.tipo === "ENTRADA");
+  const saidas = realizados.filter((item) => item.tipo === "SAIDA");
 
   const totalEntradas = entradas.reduce((acc, item) => acc + item.valor, 0);
   const totalSaidas = saidas.reduce((acc, item) => acc + item.valor, 0);
@@ -144,6 +150,7 @@ export default function FinanceiroClient({ lancamentos }: Props) {
   const [tipo, setTipo] = useState("todos");
   const [periodo, setPeriodo] = useState<PeriodoFinanceiro>("mes");
   const [categoria, setCategoria] = useState("todas");
+  const [feedback, setFeedback] = useState<{ tipo: "ok" | "erro"; mensagem: string } | null>(null);
 
   const categorias = useMemo(() => {
     const valores = new Set(
@@ -292,13 +299,61 @@ export default function FinanceiroClient({ lancamentos }: Props) {
       <LancamentosTable
         lancamentos={lancamentosFiltrados}
         isPending={isPending}
-        onExcluir={(id) => {
+        onMarcarPago={(id) => {
+          setFeedback(null);
           startTransition(async () => {
-            await excluirLancamento(id);
-            router.refresh();
+            try {
+              const resultado = await marcarLancamentoPago(id);
+              setFeedback({
+                tipo: resultado.ok ? "ok" : "erro",
+                mensagem: resultado.mensagem,
+              });
+              if (resultado.ok) router.refresh();
+            } catch (error) {
+              setFeedback({
+                tipo: "erro",
+                mensagem:
+                  error instanceof Error
+                    ? error.message
+                    : "Não foi possível confirmar o pagamento.",
+              });
+            }
+          });
+        }}
+        onExcluir={(id) => {
+          setFeedback(null);
+          startTransition(async () => {
+            try {
+              const resultado = await excluirLancamento(id);
+              setFeedback({
+                tipo: resultado.ok ? "ok" : "erro",
+                mensagem: resultado.mensagem,
+              });
+              if (resultado.ok) router.refresh();
+            } catch (error) {
+              setFeedback({
+                tipo: "erro",
+                mensagem:
+                  error instanceof Error
+                    ? error.message
+                    : "Não foi possível excluir o lançamento.",
+              });
+            }
           });
         }}
       />
+
+      {feedback ? (
+        <div
+          className={`fixed bottom-20 right-5 z-50 max-w-md rounded-2xl border px-4 py-3 text-sm font-medium shadow-2xl backdrop-blur ${
+            feedback.tipo === "ok"
+              ? "border-emerald-300/20 bg-emerald-700/95 text-white"
+              : "border-rose-300/20 bg-rose-700/95 text-white"
+          }`}
+        >
+          {feedback.mensagem}
+        </div>
+      ) : null}
 
       {isPending ? (
         <div className="fixed bottom-5 right-5 z-50 rounded-2xl border border-violet-300/20 bg-violet-600/90 px-4 py-3 text-sm font-medium text-white shadow-2xl shadow-violet-950/40 backdrop-blur">

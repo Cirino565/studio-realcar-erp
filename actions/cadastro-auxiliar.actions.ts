@@ -206,6 +206,7 @@ export type ProcedimentoServicoInput = {
   descricao?: string;
   duracaoPadrao?: number;
   valorPadrao?: number;
+  custoPadrao?: number;
   status?: string;
   ordem?: number;
 };
@@ -222,6 +223,7 @@ export async function criarProcedimentoServico(dados: ProcedimentoServicoInput) 
       descricao: toNullableText(dados.descricao),
       duracaoPadrao: toSafeOrder(dados.duracaoPadrao) || 60,
       valorPadrao: Number.isFinite(dados.valorPadrao) ? Number(dados.valorPadrao) : 0,
+      custoPadrao: Number.isFinite(dados.custoPadrao) ? Math.max(0, Number(dados.custoPadrao)) : 0,
       status: dados.status || "Ativo",
       ordem: toSafeOrder(dados.ordem),
     },
@@ -246,6 +248,7 @@ export async function atualizarProcedimentoServico(dados: ProcedimentoServicoInp
       descricao: toNullableText(dados.descricao),
       duracaoPadrao: toSafeOrder(dados.duracaoPadrao) || 60,
       valorPadrao: Number.isFinite(dados.valorPadrao) ? Number(dados.valorPadrao) : 0,
+      custoPadrao: Number.isFinite(dados.custoPadrao) ? Math.max(0, Number(dados.custoPadrao)) : 0,
       status: dados.status || "Ativo",
       ordem: toSafeOrder(dados.ordem),
     },
