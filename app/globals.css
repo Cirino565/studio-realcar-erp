@@ -1034,32 +1034,100 @@ body {
   background-color: rgba(14, 165, 233, 0.13) !important;
 }
 
+/* Dark semantic surfaces
+   Tailwind opacity variants such as bg-emerald-50/70 generate a different
+   class from bg-emerald-50. Without explicit overrides they keep their
+   light pastel background in the black theme. Keep these surfaces dark and
+   use the semantic color only as a subtle tint. */
+.theme-dark .app-shell .bg-violet-50\/70 {
+  background-color: rgba(139, 92, 246, 0.10) !important;
+}
+
+.theme-dark .app-shell .bg-emerald-50\/70 {
+  background-color: rgba(16, 185, 129, 0.085) !important;
+}
+
+.theme-dark .app-shell .bg-rose-50\/60,
+.theme-dark .app-shell .bg-rose-50\/70 {
+  background-color: rgba(244, 63, 94, 0.085) !important;
+}
+
+.theme-dark .app-shell .bg-amber-50\/60,
+.theme-dark .app-shell .bg-amber-50\/70 {
+  background-color: rgba(245, 158, 11, 0.085) !important;
+}
+
+.theme-dark .app-shell .bg-blue-50\/60,
+.theme-dark .app-shell .bg-blue-50\/70 {
+  background-color: rgba(59, 130, 246, 0.085) !important;
+}
+
+.theme-dark .app-shell .bg-cyan-50\/70 {
+  background-color: rgba(6, 182, 212, 0.085) !important;
+}
+
+/* Semantic borders in dark mode. Light-theme 100/200 borders otherwise
+   become disproportionately bright against #0b1220/#111827 surfaces. */
+.theme-dark .app-shell .border-violet-100,
+.theme-dark .app-shell .border-violet-200 {
+  border-color: rgba(167, 139, 250, 0.22) !important;
+}
+
+.theme-dark .app-shell .border-emerald-100,
+.theme-dark .app-shell .border-emerald-200 {
+  border-color: rgba(52, 211, 153, 0.22) !important;
+}
+
+.theme-dark .app-shell .border-rose-100,
+.theme-dark .app-shell .border-rose-200 {
+  border-color: rgba(251, 113, 133, 0.22) !important;
+}
+
+.theme-dark .app-shell .border-amber-100,
+.theme-dark .app-shell .border-amber-200 {
+  border-color: rgba(251, 191, 36, 0.22) !important;
+}
+
+.theme-dark .app-shell .border-blue-100,
+.theme-dark .app-shell .border-blue-200 {
+  border-color: rgba(96, 165, 250, 0.22) !important;
+}
+
+.theme-dark .app-shell .border-cyan-100,
+.theme-dark .app-shell .border-cyan-200 {
+  border-color: rgba(34, 211, 238, 0.22) !important;
+}
+
 .theme-dark .app-shell .text-violet-500,
 .theme-dark .app-shell .text-violet-600,
 .theme-dark .app-shell .text-violet-700,
 .theme-dark .app-shell .text-violet-800,
-.theme-dark .app-shell .text-violet-900 {
+.theme-dark .app-shell .text-violet-900,
+.theme-dark .app-shell .text-violet-950 {
   color: #c4b5fd !important;
 }
 
 .theme-dark .app-shell .text-emerald-600,
 .theme-dark .app-shell .text-emerald-700,
 .theme-dark .app-shell .text-emerald-800,
-.theme-dark .app-shell .text-emerald-900 {
+.theme-dark .app-shell .text-emerald-900,
+.theme-dark .app-shell .text-emerald-950 {
   color: #6ee7b7 !important;
 }
 
 .theme-dark .app-shell .text-rose-600,
 .theme-dark .app-shell .text-rose-700,
 .theme-dark .app-shell .text-rose-800,
-.theme-dark .app-shell .text-rose-900 {
+.theme-dark .app-shell .text-rose-900,
+.theme-dark .app-shell .text-rose-950 {
   color: #fda4af !important;
 }
 
 .theme-dark .app-shell .text-amber-600,
 .theme-dark .app-shell .text-amber-700,
 .theme-dark .app-shell .text-amber-800,
-.theme-dark .app-shell .text-amber-900 {
+.theme-dark .app-shell .text-amber-900,
+.theme-dark .app-shell .text-amber-950 {
   color: #fcd34d !important;
 }
 
@@ -1067,10 +1135,12 @@ body {
 .theme-dark .app-shell .text-blue-700,
 .theme-dark .app-shell .text-blue-800,
 .theme-dark .app-shell .text-blue-900,
+.theme-dark .app-shell .text-blue-950,
 .theme-dark .app-shell .text-cyan-600,
 .theme-dark .app-shell .text-cyan-700,
 .theme-dark .app-shell .text-cyan-800,
-.theme-dark .app-shell .text-cyan-900 {
+.theme-dark .app-shell .text-cyan-900,
+.theme-dark .app-shell .text-cyan-950 {
   color: #7dd3fc !important;
 }
 
