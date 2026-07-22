@@ -10,6 +10,7 @@ import {
   Calendar,
   ChevronRight,
   FileBarChart2,
+  Gauge,
   KeyRound,
   LayoutDashboard,
   Megaphone,
@@ -30,6 +31,12 @@ const mainMenus = [
     icon: LayoutDashboard,
     href: "/",
     permissao: "dashboard.visualizar",
+  },
+  {
+    nome: "Gestão",
+    icon: Gauge,
+    href: "/gestao",
+    permissao: "relatorios.visualizar",
   },
   {
     nome: "Clientes",
