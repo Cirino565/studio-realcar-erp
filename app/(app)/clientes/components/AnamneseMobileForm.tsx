@@ -1,21 +1,24 @@
 "use client";
 
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
   useTransition,
+  type FormEvent as ReactFormEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
   Check,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
+  Download,
   FileSignature,
   Loader2,
+  MessageCircle,
   RotateCcw,
   Save,
+  Share2,
   ShieldCheck,
 } from "lucide-react";
 
@@ -25,6 +28,8 @@ import {
 } from "@/actions/anamnese-config.actions";
 import { Button } from "@/components/ui/button";
 import { formatarData } from "@/lib/format";
+import { baixarBlob, gerarArquivoPdfAnamnese } from "@/lib/anamnese-pdf";
+import { buildWhatsAppUrl } from "@/lib/whatsapp";
 import type {
   ClienteAnamneseData,
   ClienteAnamneseModeloData,
@@ -35,6 +40,7 @@ import type {
 type Props = {
   clienteId: number;
   clienteNome: string;
+  clienteTelefone: string;
   procedimento: string;
   modelo: ClienteAnamneseModeloData | null;
   fichaAtual: ClienteAnamneseData | null;
@@ -348,17 +354,19 @@ function RespostaMobile({
 export default function AnamneseMobileForm({
   clienteId,
   clienteNome,
+  clienteTelefone,
   procedimento,
   modelo,
   fichaAtual,
   historico,
   respostas,
 }: Props) {
-  const [etapaAtual, setEtapaAtual] = useState(0);
   const [erro, setErro] = useState("");
+  const [avisoPdf, setAvisoPdf] = useState("");
+  const [acaoPdf, setAcaoPdf] = useState<"baixar" | "compartilhar" | "whatsapp" | null>(null);
+  const [respondidasObrigatorias, setRespondidasObrigatorias] = useState(0);
   const [isPending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement | null>(null);
-  const conteudoEtapaRef = useRef<HTMLDivElement | null>(null);
 
   const respostasDaFicha = useMemo(() => {
     if (fichaAtual) {
@@ -386,46 +394,57 @@ export default function AnamneseMobileForm({
     return resultado;
   }, [modelo]);
 
-  const totalEtapas = etapas.length + 1;
-  const etapaAssinatura = etapaAtual === etapas.length;
-  const progresso = totalEtapas > 0 ? ((etapaAtual + 1) / totalEtapas) * 100 : 100;
-
   const indicePergunta = useMemo(() => {
     const mapa = new Map<number, number>();
     (modelo?.perguntas ?? []).forEach((pergunta, index) => mapa.set(pergunta.id, index));
     return mapa;
   }, [modelo]);
 
-  function irParaEtapa(proximaEtapa: number) {
-    setErro("");
-    setEtapaAtual(Math.max(0, Math.min(etapas.length, proximaEtapa)));
-    requestAnimationFrame(() => {
-      conteudoEtapaRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
+  const perguntasObrigatorias = useMemo(
+    () =>
+      (modelo?.perguntas ?? []).filter(
+        (pergunta) => pergunta.tipo !== "SECAO" && pergunta.obrigatoria,
+      ),
+    [modelo],
+  );
+
+  const respostasOrdenadas = useMemo(() => {
+    const ordem = new Map<number, number>();
+    (modelo?.perguntas ?? []).forEach((pergunta, index) => ordem.set(pergunta.id, index));
+
+    return [...respostasDaFicha].sort((a, b) => {
+      const ordemA = a.perguntaId ? ordem.get(a.perguntaId) ?? 9999 : 9999;
+      const ordemB = b.perguntaId ? ordem.get(b.perguntaId) ?? 9999 : 9999;
+      return ordemA - ordemB;
     });
-  }
+  }, [modelo, respostasDaFicha]);
 
-  function validarEtapa() {
+  function atualizarProgresso() {
     const form = formRef.current;
-    const etapa = etapas[etapaAtual];
-    if (!form || !etapa) return true;
+    if (!form) return;
     const dados = new FormData(form);
-
-    const faltante = etapa.perguntas.find((pergunta) => {
-      if (!pergunta.obrigatoria) return false;
+    const respondidas = perguntasObrigatorias.filter((pergunta) => {
       const index = indicePergunta.get(pergunta.id);
       if (index == null) return false;
-      return dados.getAll(`resposta_${index}`).filter((item) => String(item).trim()).length === 0;
-    });
+      return dados
+        .getAll(`resposta_${index}`)
+        .some((item) => String(item).trim().length > 0);
+    }).length;
+    setRespondidasObrigatorias(respondidas);
+  }
 
-    if (faltante) {
-      setErro(`Responda: ${faltante.pergunta}`);
-      return false;
-    }
-    setErro("");
-    return true;
+  useEffect(() => {
+    const id = window.requestAnimationFrame(atualizarProgresso);
+    return () => window.cancelAnimationFrame(id);
+  }, [modelo, respostasDaFicha]);
+
+  function rolarPara(id: string) {
+    window.requestAnimationFrame(() => {
+      document.getElementById(id)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
   }
 
   function validarFinalizacao() {
@@ -433,34 +452,129 @@ export default function AnamneseMobileForm({
     if (!form) return false;
     const dados = new FormData(form);
 
-    for (let etapaIndex = 0; etapaIndex < etapas.length; etapaIndex += 1) {
-      const faltante = etapas[etapaIndex].perguntas.find((pergunta) => {
-        if (!pergunta.obrigatoria) return false;
-        const index = indicePergunta.get(pergunta.id);
-        if (index == null) return false;
-        return dados.getAll(`resposta_${index}`).filter((item) => String(item).trim()).length === 0;
-      });
+    for (const pergunta of perguntasObrigatorias) {
+      const index = indicePergunta.get(pergunta.id);
+      if (index == null) continue;
+      const preenchida = dados
+        .getAll(`resposta_${index}`)
+        .some((item) => String(item).trim().length > 0);
 
-      if (faltante) {
-        irParaEtapa(etapaIndex);
-        setErro(`Responda: ${faltante.pergunta}`);
+      if (!preenchida) {
+        setErro(`Responda: ${pergunta.pergunta}`);
+        rolarPara(`pergunta-${pergunta.id}`);
         return false;
       }
     }
 
     if (dados.get("declaracaoFinal") !== "on") {
       setErro("Confirme a declaração final antes de assinar.");
+      rolarPara("assinatura-anamnese");
       return false;
     }
 
     const assinatura = String(dados.get("assinaturaCliente") || "");
     if (!assinatura.startsWith("data:image/")) {
       setErro("A assinatura da cliente é obrigatória para finalizar.");
+      rolarPara("assinatura-anamnese");
       return false;
     }
 
     setErro("");
     return true;
+  }
+
+  async function prepararPdf() {
+    if (!fichaAtual || fichaAtual.status !== "FINALIZADA") {
+      throw new Error("A anamnese precisa estar finalizada para gerar o PDF.");
+    }
+
+    return gerarArquivoPdfAnamnese({
+      clienteNome,
+      procedimento,
+      versao: fichaAtual.versao,
+      dataFicha: fichaAtual.dataFicha,
+      assinadaEm: fichaAtual.assinadaEm,
+      profissional: fichaAtual.profissional,
+      assinaturaNome: fichaAtual.assinaturaNome,
+      assinaturaCliente: fichaAtual.assinaturaCliente,
+      respostas: respostasOrdenadas.map((resposta) => ({
+        perguntaTexto: resposta.perguntaTexto,
+        resposta: resposta.resposta,
+        observacao: resposta.observacao,
+      })),
+    });
+  }
+
+  async function baixarPdf() {
+    setAcaoPdf("baixar");
+    setAvisoPdf("");
+    try {
+      const { blob, nomeArquivo } = await prepararPdf();
+      baixarBlob(blob, nomeArquivo);
+      setAvisoPdf("PDF baixado com sucesso.");
+    } catch (error) {
+      setAvisoPdf(error instanceof Error ? error.message : "Não foi possível gerar o PDF.");
+    } finally {
+      setAcaoPdf(null);
+    }
+  }
+
+  async function compartilharPdf() {
+    setAcaoPdf("compartilhar");
+    setAvisoPdf("");
+    try {
+      const { arquivo, blob, nomeArquivo } = await prepararPdf();
+      const podeCompartilhar =
+        typeof navigator.share === "function" &&
+        (!navigator.canShare || navigator.canShare({ files: [arquivo] }));
+
+      if (podeCompartilhar) {
+        await navigator.share({
+          title: `Anamnese de ${procedimento}`,
+          text: `Anamnese assinada de ${clienteNome}.`,
+          files: [arquivo],
+        });
+        setAvisoPdf("PDF encaminhado para o compartilhamento do celular.");
+      } else {
+        baixarBlob(blob, nomeArquivo);
+        setAvisoPdf("Este celular não permite compartilhar o arquivo diretamente. O PDF foi baixado.");
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        setAvisoPdf("");
+      } else {
+        setAvisoPdf(error instanceof Error ? error.message : "Não foi possível compartilhar o PDF.");
+      }
+    } finally {
+      setAcaoPdf(null);
+    }
+  }
+
+  async function abrirWhatsappComPdf() {
+    const janelaWhatsapp = window.open("about:blank", "_blank");
+    setAcaoPdf("whatsapp");
+    setAvisoPdf("");
+
+    try {
+      const { blob, nomeArquivo } = await prepararPdf();
+      baixarBlob(blob, nomeArquivo);
+      const primeiroNome = clienteNome.trim().split(" ")[0] || clienteNome;
+      const mensagem = `Olá, ${primeiroNome}! Segue sua anamnese assinada de ${procedimento}, realizada no Studio Realçar. O arquivo ${nomeArquivo} foi preparado para envio.`;
+      const url = buildWhatsAppUrl(clienteTelefone, mensagem);
+
+      if (janelaWhatsapp) {
+        janelaWhatsapp.location.href = url;
+      } else {
+        window.location.href = url;
+      }
+
+      setAvisoPdf("O PDF foi baixado e a conversa do cliente foi aberta. No WhatsApp, anexe o arquivo baixado antes de enviar.");
+    } catch (error) {
+      janelaWhatsapp?.close();
+      setAvisoPdf(error instanceof Error ? error.message : "Não foi possível preparar o envio.");
+    } finally {
+      setAcaoPdf(null);
+    }
   }
 
   if (!modelo) {
@@ -486,10 +600,59 @@ export default function AnamneseMobileForm({
               </p>
             </div>
           </div>
+
           {fichaAtual.assinaturaCliente ? (
             <div className="mt-4 rounded-2xl border border-emerald-200 bg-white p-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={fichaAtual.assinaturaCliente} alt={`Assinatura de ${fichaAtual.assinaturaNome || clienteNome}`} className="mx-auto max-h-36 max-w-full" />
+              <img
+                src={fichaAtual.assinaturaCliente}
+                alt={`Assinatura de ${fichaAtual.assinaturaNome || clienteNome}`}
+                className="mx-auto max-h-36 max-w-full"
+              />
+            </div>
+          ) : null}
+
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            <button
+              type="button"
+              onClick={abrirWhatsappComPdf}
+              disabled={acaoPdf !== null || !clienteTelefone}
+              className="inline-flex min-h-13 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 text-sm font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {acaoPdf === "whatsapp" ? <Loader2 className="animate-spin" size={18} /> : <MessageCircle size={18} />}
+              Baixar PDF e abrir WhatsApp
+            </button>
+
+            <button
+              type="button"
+              onClick={compartilharPdf}
+              disabled={acaoPdf !== null}
+              className="inline-flex min-h-13 items-center justify-center gap-2 rounded-2xl border border-emerald-300 bg-white px-4 text-sm font-bold text-emerald-800 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-400/30 dark:bg-white/[0.06] dark:text-emerald-100"
+            >
+              {acaoPdf === "compartilhar" ? <Loader2 className="animate-spin" size={18} /> : <Share2 size={18} />}
+              Compartilhar PDF
+            </button>
+
+            <button
+              type="button"
+              onClick={baixarPdf}
+              disabled={acaoPdf !== null}
+              className="inline-flex min-h-13 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200"
+            >
+              {acaoPdf === "baixar" ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} />}
+              Baixar PDF
+            </button>
+          </div>
+
+          {!clienteTelefone ? (
+            <p className="mt-3 text-xs font-semibold text-amber-800 dark:text-amber-200">
+              Cadastre o telefone ou WhatsApp do cliente para abrir a conversa diretamente.
+            </p>
+          ) : null}
+
+          {avisoPdf ? (
+            <div className="mt-3 rounded-2xl border border-emerald-200 bg-white p-3 text-xs font-semibold leading-5 text-emerald-900 dark:border-emerald-400/20 dark:bg-white/[0.05] dark:text-emerald-100">
+              {avisoPdf}
             </div>
           ) : null}
 
@@ -497,7 +660,7 @@ export default function AnamneseMobileForm({
             <details className="mt-4 rounded-2xl border border-emerald-200 bg-white p-4 text-slate-800 dark:border-emerald-400/20 dark:bg-white/[0.05] dark:text-slate-100">
               <summary className="cursor-pointer text-sm font-bold">Ver respostas desta versão</summary>
               <div className="mt-4 space-y-3">
-                {respostasDaFicha.map((resposta) => (
+                {respostasOrdenadas.map((resposta) => (
                   <div key={resposta.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.04]">
                     <p className="text-sm font-semibold">{resposta.perguntaTexto}</p>
                     <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{resposta.resposta || "Sem resposta"}</p>
@@ -540,11 +703,17 @@ export default function AnamneseMobileForm({
     );
   }
 
+  const totalObrigatorias = perguntasObrigatorias.length;
+  const percentual = totalObrigatorias > 0
+    ? Math.round((respondidasObrigatorias / totalObrigatorias) * 100)
+    : 100;
+
   return (
     <form
       ref={formRef}
       action={salvarRespostasAnamneseRapida}
-      onSubmit={(event) => {
+      onChange={atualizarProgresso}
+      onSubmit={(event: ReactFormEvent<HTMLFormElement>) => {
         const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
         if (submitter?.value === "finalizar" && !validarFinalizacao()) {
           event.preventDefault();
@@ -561,14 +730,16 @@ export default function AnamneseMobileForm({
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{procedimento}</p>
-            <p className="mt-0.5 text-xs text-slate-500">Etapa {etapaAtual + 1} de {totalEtapas}</p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              {respondidasObrigatorias} de {totalObrigatorias} obrigatórias respondidas
+            </p>
           </div>
           <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-bold text-violet-700 dark:bg-violet-500/15 dark:text-violet-200">
-            {Math.round(progresso)}%
+            {percentual}%
           </span>
         </div>
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
-          <div className="h-full rounded-full bg-violet-600 transition-all" style={{ width: `${progresso}%` }} />
+          <div className="h-full rounded-full bg-violet-600 transition-all" style={{ width: `${percentual}%` }} />
         </div>
       </div>
 
@@ -591,11 +762,10 @@ export default function AnamneseMobileForm({
         </div>
       ))}
 
-      <div ref={conteudoEtapaRef} className="scroll-mt-28">
+      <div className="space-y-4">
         {etapas.map((etapa, indiceEtapa) => (
           <section
             key={`${indiceEtapa}-${etapa.titulo}`}
-            hidden={indiceEtapa !== etapaAtual}
             className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:p-5"
           >
             <div className="mb-5">
@@ -617,8 +787,9 @@ export default function AnamneseMobileForm({
 
                 return (
                   <div
+                    id={`pergunta-${pergunta.id}`}
                     key={pergunta.id}
-                    className="rounded-3xl border border-slate-200 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.03]"
+                    className="scroll-mt-40 rounded-3xl border border-slate-200 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.03]"
                   >
                     <div className="mb-3 flex items-start justify-between gap-3">
                       <p className="text-base font-semibold leading-6 text-slate-900 dark:text-white">
@@ -642,67 +813,51 @@ export default function AnamneseMobileForm({
           </section>
         ))}
 
-        {etapaAssinatura ? (
-          <section className="rounded-3xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-400/20 dark:bg-violet-500/10 sm:p-5">
-            <div className="flex items-start gap-3">
-              <div className="rounded-2xl bg-white p-3 text-violet-700 shadow-sm dark:bg-white/10 dark:text-violet-200">
-                <FileSignature size={22} />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-slate-950 dark:text-white">
-                  Revisão e assinatura
-                </h3>
-                <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                  Entregue o celular ao cliente para confirmar e assinar.
-                </p>
-              </div>
+        <section id="assinatura-anamnese" className="scroll-mt-40 rounded-3xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-400/20 dark:bg-violet-500/10 sm:p-5">
+          <div className="flex items-start gap-3">
+            <div className="rounded-2xl bg-white p-3 text-violet-700 shadow-sm dark:bg-white/10 dark:text-violet-200">
+              <FileSignature size={22} />
             </div>
-            <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-800 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200">
-              <input
-                type="checkbox"
-                name="declaracaoFinal"
-                className="mt-1 size-5 accent-violet-600"
-              />
-              <span>
-                Declaro que as informações fornecidas nesta anamnese são verdadeiras e completas conforme meu conhecimento, e confirmo que revisei as respostas antes da assinatura.
-              </span>
-            </label>
-            <div className="mt-5">
-              <p className="mb-3 text-sm font-bold text-slate-900 dark:text-white">
-                Assinatura de {clienteNome}
+            <div>
+              <h3 className="text-lg font-bold text-slate-950 dark:text-white">
+                Revisão e assinatura
+              </h3>
+              <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                Entregue o celular ao cliente para confirmar e assinar.
               </p>
-              <AssinaturaCanvas />
             </div>
-            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100">
-              Depois de finalizada e assinada, esta versão fica bloqueada. Qualquer alteração futura deve ser feita em uma nova versão.
-            </div>
-          </section>
-        ) : null}
+          </div>
+          <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-800 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200">
+            <input
+              type="checkbox"
+              name="declaracaoFinal"
+              className="mt-1 size-5 accent-violet-600"
+            />
+            <span>
+              Declaro que as informações fornecidas nesta anamnese são verdadeiras e completas conforme meu conhecimento, e confirmo que revisei as respostas antes da assinatura.
+            </span>
+          </label>
+          <div className="mt-5">
+            <p className="mb-3 text-sm font-bold text-slate-900 dark:text-white">
+              Assinatura de {clienteNome}
+            </p>
+            <AssinaturaCanvas />
+          </div>
+          <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100">
+            Depois de finalizada e assinada, esta versão fica bloqueada. Qualquer alteração futura deve ser feita em uma nova versão.
+          </div>
+        </section>
       </div>
 
       {erro ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-100">{erro}</div> : null}
 
-      <div className="sticky bottom-2 z-20 grid gap-2 rounded-3xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur dark:border-white/10 dark:bg-slate-950/95 sm:flex sm:items-center sm:justify-between">
-        <div className="flex gap-2">
-          {etapaAtual > 0 ? (
-            <button type="button" onClick={() => irParaEtapa(etapaAtual - 1)} className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-700 dark:border-white/10 dark:text-slate-200 sm:flex-none">
-              <ChevronLeft size={18} /> Voltar
-            </button>
-          ) : null}
-          <button type="submit" name="intencao" value="rascunho" className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-700 dark:border-white/10 dark:text-slate-200 sm:flex-none">
-            <Save size={17} /> Salvar rascunho
-          </button>
-        </div>
-
-        {!etapaAssinatura ? (
-          <button type="button" onClick={() => { if (validarEtapa()) irParaEtapa(etapaAtual + 1); }} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 text-sm font-bold text-white shadow-sm">
-            Próximo <ChevronRight size={18} />
-          </button>
-        ) : (
-          <button type="submit" name="intencao" value="finalizar" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 text-sm font-bold text-white shadow-sm">
-            <ShieldCheck size={18} /> Finalizar e assinar
-          </button>
-        )}
+      <div className="sticky bottom-2 z-20 grid gap-2 rounded-3xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur dark:border-white/10 dark:bg-slate-950/95 sm:grid-cols-2">
+        <button type="submit" name="intencao" value="rascunho" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-700 dark:border-white/10 dark:text-slate-200">
+          <Save size={17} /> Salvar rascunho
+        </button>
+        <button type="submit" name="intencao" value="finalizar" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 text-sm font-bold text-white shadow-sm">
+          <ShieldCheck size={18} /> Finalizar e assinar
+        </button>
       </div>
     </form>
   );

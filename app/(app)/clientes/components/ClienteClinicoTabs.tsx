@@ -416,7 +416,7 @@ export function ClienteClinicoTabs({
             <SectionHeader
               icon={ClipboardList}
               title="Anamnese do procedimento"
-              description="Preenchimento otimizado para celular, com rascunho, etapas rápidas, assinatura e histórico por versão."
+              description="Preenchimento otimizado para celular, com perguntas em sequência, rascunho, assinatura, PDF e histórico por versão."
             />
 
             <div className="min-w-0 space-y-5 p-4 sm:p-6">
@@ -440,13 +440,14 @@ export function ClienteClinicoTabs({
                 </label>
 
                 <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-4 text-xs leading-5 text-cyan-800 dark:border-cyan-300/20 dark:bg-cyan-400/10 dark:text-cyan-100">
-                  Toque nas respostas para preencher. Campos de detalhe aparecem somente quando necessários. Salve como rascunho a qualquer momento e finalize apenas com a assinatura da cliente.
+                  Toque nas respostas e role a tela normalmente. Todas as perguntas ficam uma abaixo da outra, e os campos de detalhe aparecem somente quando necessários.
                 </div>
               </div>
 
               <AnamneseMobileForm
                 clienteId={data.id}
                 clienteNome={data.nome}
+                clienteTelefone={data.whatsapp || data.telefone}
                 procedimento={procedimentoAnamnese}
                 modelo={modeloAnamneseAtual}
                 fichaAtual={anamneseAtual}

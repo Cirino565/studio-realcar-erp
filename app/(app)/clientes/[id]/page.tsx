@@ -1,4 +1,4 @@
-﻿import { ClienteClinicoTabs } from "@/app/(app)/clientes/components/ClienteClinicoTabs";
+import { ClienteClinicoTabs } from "@/app/(app)/clientes/components/ClienteClinicoTabs";
 import type { ClienteClinicoData } from "@/app/(app)/clientes/types";
 import { requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -109,6 +109,8 @@ export default async function ClientePage({ params }: ClientePageProps) {
   const data: ClienteClinicoData = {
     id: cliente.id,
     nome: cliente.nome,
+    telefone: cliente.telefone,
+    whatsapp: cliente.whatsapp,
     anamnese: anamneses[0] ?? null,
     anamneses,
     fotos: cliente.fotos.map((foto) => ({
@@ -181,4 +183,3 @@ export default async function ClientePage({ params }: ClientePageProps) {
     </div>
   );
 }
-

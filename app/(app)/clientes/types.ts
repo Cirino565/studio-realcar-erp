@@ -1,4 +1,4 @@
-﻿export type ClienteAnamneseData = {
+export type ClienteAnamneseData = {
   id: number;
   procedimento: string | null;
   queixaPrincipal: string | null;
@@ -65,6 +65,8 @@ export type ClienteEvolucaoData = {
 export type ClienteClinicoData = {
   id: number;
   nome: string;
+  telefone: string;
+  whatsapp: string | null;
   anamnese: ClienteAnamneseData | null;
   anamneses: ClienteAnamneseData[];
   fotos: ClienteFotoData[];
@@ -106,4 +108,3 @@ export type ClienteAnamneseRespostaData = {
   profissional: string | null;
   dataResposta: string;
 };
-
