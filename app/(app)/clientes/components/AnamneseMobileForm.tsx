@@ -358,6 +358,7 @@ export default function AnamneseMobileForm({
   const [erro, setErro] = useState("");
   const [isPending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement | null>(null);
+  const conteudoEtapaRef = useRef<HTMLDivElement | null>(null);
 
   const respostasDaFicha = useMemo(() => {
     if (fichaAtual) {
@@ -395,6 +396,17 @@ export default function AnamneseMobileForm({
     return mapa;
   }, [modelo]);
 
+  function irParaEtapa(proximaEtapa: number) {
+    setErro("");
+    setEtapaAtual(Math.max(0, Math.min(etapas.length, proximaEtapa)));
+    requestAnimationFrame(() => {
+      conteudoEtapaRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }
+
   function validarEtapa() {
     const form = formRef.current;
     const etapa = etapas[etapaAtual];
@@ -430,7 +442,7 @@ export default function AnamneseMobileForm({
       });
 
       if (faltante) {
-        setEtapaAtual(etapaIndex);
+        irParaEtapa(etapaIndex);
         setErro(`Responda: ${faltante.pergunta}`);
         return false;
       }
@@ -579,57 +591,101 @@ export default function AnamneseMobileForm({
         </div>
       ))}
 
-      {!etapaAssinatura ? (
-        <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:p-5">
-          <div className="mb-5">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-violet-600 dark:text-violet-300">{etapas[etapaAtual]?.titulo}</p>
-            <h3 className="mt-2 text-lg font-bold text-slate-950 dark:text-white">Responda por toque sempre que possível</h3>
-          </div>
-          <div className="space-y-5">
-            {etapas[etapaAtual]?.perguntas.map((pergunta) => {
-              const index = indicePergunta.get(pergunta.id) ?? 0;
-              const anterior = respostasDaFicha.find((item) => item.perguntaId === pergunta.id || item.perguntaTexto === pergunta.pergunta);
-              return (
-                <div key={pergunta.id} className="rounded-3xl border border-slate-200 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.03]">
-                  <div className="mb-3 flex items-start justify-between gap-3">
-                    <p className="text-base font-semibold leading-6 text-slate-900 dark:text-white">{pergunta.pergunta}</p>
-                    {pergunta.obrigatoria ? <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-[0.65rem] font-bold text-amber-800 dark:bg-amber-400/15 dark:text-amber-200">Obrigatória</span> : null}
-                  </div>
-                  <RespostaMobile pergunta={pergunta} index={index} anterior={anterior} />
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      ) : (
-        <section className="rounded-3xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-400/20 dark:bg-violet-500/10 sm:p-5">
-          <div className="flex items-start gap-3">
-            <div className="rounded-2xl bg-white p-3 text-violet-700 shadow-sm dark:bg-white/10 dark:text-violet-200"><FileSignature size={22} /></div>
-            <div>
-              <h3 className="text-lg font-bold text-slate-950 dark:text-white">Revisão e assinatura</h3>
-              <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">Entregue o celular ao cliente para confirmar e assinar.</p>
+      <div ref={conteudoEtapaRef} className="scroll-mt-28">
+        {etapas.map((etapa, indiceEtapa) => (
+          <section
+            key={`${indiceEtapa}-${etapa.titulo}`}
+            hidden={indiceEtapa !== etapaAtual}
+            className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:p-5"
+          >
+            <div className="mb-5">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-violet-600 dark:text-violet-300">
+                {etapa.titulo}
+              </p>
+              <h3 className="mt-2 text-lg font-bold text-slate-950 dark:text-white">
+                Responda por toque sempre que possível
+              </h3>
             </div>
-          </div>
-          <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-800 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200">
-            <input type="checkbox" name="declaracaoFinal" className="mt-1 size-5 accent-violet-600" />
-            <span>Declaro que as informações fornecidas nesta anamnese são verdadeiras e completas conforme meu conhecimento, e confirmo que revisei as respostas antes da assinatura.</span>
-          </label>
-          <div className="mt-5">
-            <p className="mb-3 text-sm font-bold text-slate-900 dark:text-white">Assinatura de {clienteNome}</p>
-            <AssinaturaCanvas />
-          </div>
-          <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100">
-            Depois de finalizada e assinada, esta versão fica bloqueada. Qualquer alteração futura deve ser feita em uma nova versão.
-          </div>
-        </section>
-      )}
+            <div className="space-y-5">
+              {etapa.perguntas.map((pergunta) => {
+                const index = indicePergunta.get(pergunta.id) ?? 0;
+                const anterior = respostasDaFicha.find(
+                  (item) =>
+                    item.perguntaId === pergunta.id ||
+                    item.perguntaTexto === pergunta.pergunta,
+                );
+
+                return (
+                  <div
+                    key={pergunta.id}
+                    className="rounded-3xl border border-slate-200 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.03]"
+                  >
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <p className="text-base font-semibold leading-6 text-slate-900 dark:text-white">
+                        {pergunta.pergunta}
+                      </p>
+                      {pergunta.obrigatoria ? (
+                        <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-[0.65rem] font-bold text-amber-800 dark:bg-amber-400/15 dark:text-amber-200">
+                          Obrigatória
+                        </span>
+                      ) : null}
+                    </div>
+                    <RespostaMobile
+                      pergunta={pergunta}
+                      index={index}
+                      anterior={anterior}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+
+        {etapaAssinatura ? (
+          <section className="rounded-3xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-400/20 dark:bg-violet-500/10 sm:p-5">
+            <div className="flex items-start gap-3">
+              <div className="rounded-2xl bg-white p-3 text-violet-700 shadow-sm dark:bg-white/10 dark:text-violet-200">
+                <FileSignature size={22} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-950 dark:text-white">
+                  Revisão e assinatura
+                </h3>
+                <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  Entregue o celular ao cliente para confirmar e assinar.
+                </p>
+              </div>
+            </div>
+            <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-800 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200">
+              <input
+                type="checkbox"
+                name="declaracaoFinal"
+                className="mt-1 size-5 accent-violet-600"
+              />
+              <span>
+                Declaro que as informações fornecidas nesta anamnese são verdadeiras e completas conforme meu conhecimento, e confirmo que revisei as respostas antes da assinatura.
+              </span>
+            </label>
+            <div className="mt-5">
+              <p className="mb-3 text-sm font-bold text-slate-900 dark:text-white">
+                Assinatura de {clienteNome}
+              </p>
+              <AssinaturaCanvas />
+            </div>
+            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100">
+              Depois de finalizada e assinada, esta versão fica bloqueada. Qualquer alteração futura deve ser feita em uma nova versão.
+            </div>
+          </section>
+        ) : null}
+      </div>
 
       {erro ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-100">{erro}</div> : null}
 
       <div className="sticky bottom-2 z-20 grid gap-2 rounded-3xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur dark:border-white/10 dark:bg-slate-950/95 sm:flex sm:items-center sm:justify-between">
         <div className="flex gap-2">
           {etapaAtual > 0 ? (
-            <button type="button" onClick={() => { setErro(""); setEtapaAtual((valor) => Math.max(0, valor - 1)); }} className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-700 dark:border-white/10 dark:text-slate-200 sm:flex-none">
+            <button type="button" onClick={() => irParaEtapa(etapaAtual - 1)} className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-700 dark:border-white/10 dark:text-slate-200 sm:flex-none">
               <ChevronLeft size={18} /> Voltar
             </button>
           ) : null}
@@ -639,7 +695,7 @@ export default function AnamneseMobileForm({
         </div>
 
         {!etapaAssinatura ? (
-          <button type="button" onClick={() => { if (validarEtapa()) { setEtapaAtual((valor) => Math.min(etapas.length, valor + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); } }} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 text-sm font-bold text-white shadow-sm">
+          <button type="button" onClick={() => { if (validarEtapa()) irParaEtapa(etapaAtual + 1); }} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 text-sm font-bold text-white shadow-sm">
             Próximo <ChevronRight size={18} />
           </button>
         ) : (
