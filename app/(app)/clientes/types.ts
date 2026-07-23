@@ -17,6 +17,8 @@ export type ClienteAnamneseData = {
   assinaturaCliente: string | null;
   assinaturaNome: string | null;
   termoConsentimento: boolean;
+  declaracaoTexto: string | null;
+  declaracaoVersao: string | null;
   status: string;
   versao: number;
   finalizadaEm: string | null;

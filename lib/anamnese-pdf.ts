@@ -1,3 +1,8 @@
+import {
+  DECLARACAO_ANAMNESE_LEGADO,
+  STUDIO_REALCAR_IDENTIDADE,
+} from "@/lib/studio-realcar";
+
 export type AnamnesePdfResposta = {
   perguntaTexto: string;
   resposta: string | null;
@@ -13,6 +18,8 @@ export type AnamnesePdfDados = {
   profissional: string | null;
   assinaturaNome: string | null;
   assinaturaCliente: string | null;
+  declaracaoTexto: string | null;
+  declaracaoVersao: string | null;
   respostas: AnamnesePdfResposta[];
 };
 
@@ -124,6 +131,20 @@ function comandoTexto(
     escaparTextoPdf(texto),
     ascii(") Tj ET\n"),
   ]);
+}
+
+function comandoTextoCentralizado(
+  fonte: "F1" | "F2",
+  tamanho: number,
+  yTopo: number,
+  texto: string,
+) {
+  const larguraAproximada = Math.min(
+    LARGURA_CONTEUDO,
+    texto.length * tamanho * 0.52,
+  );
+  const x = Math.max(MARGEM_X, (LARGURA_PAGINA - larguraAproximada) / 2);
+  return comandoTexto(fonte, tamanho, x, yTopo, texto);
 }
 
 function comandoLinha(x1: number, y1Topo: number, x2: number, y2Topo: number) {
@@ -272,9 +293,58 @@ async function converterAssinaturaParaJpeg(
   });
 }
 
+async function converterLogoParaJpeg(): Promise<ImagemJpeg | null> {
+  if (typeof document === "undefined") return null;
+
+  return new Promise((resolve) => {
+    const imagem = new Image();
+
+    imagem.onload = () => {
+      const larguraMaxima = 700;
+      const proporcao = Math.min(1, larguraMaxima / Math.max(1, imagem.naturalWidth));
+      const largura = Math.max(1, Math.round(imagem.naturalWidth * proporcao));
+      const altura = Math.max(1, Math.round(imagem.naturalHeight * proporcao));
+      const canvas = document.createElement("canvas");
+      canvas.width = largura;
+      canvas.height = altura;
+      const contexto = canvas.getContext("2d");
+
+      if (!contexto) {
+        resolve(null);
+        return;
+      }
+
+      contexto.fillStyle = "#ffffff";
+      contexto.fillRect(0, 0, largura, altura);
+      contexto.drawImage(imagem, 0, 0, largura, altura);
+
+      canvas.toBlob(
+        async (blob) => {
+          if (!blob) {
+            resolve(null);
+            return;
+          }
+
+          resolve({
+            bytes: new Uint8Array(await blob.arrayBuffer()),
+            largura,
+            altura,
+          });
+        },
+        "image/jpeg",
+        0.92,
+      );
+    };
+
+    imagem.onerror = () => resolve(null);
+    imagem.src = STUDIO_REALCAR_IDENTIDADE.logoPublica;
+  });
+}
+
 function construirPdf(
   dados: AnamnesePdfDados,
   assinatura: ImagemJpeg | null,
+  logo: ImagemJpeg | null,
 ) {
   const paginas: PaginaPdf[] = [];
 
@@ -319,14 +389,39 @@ function construirPdf(
   }
 
   pagina.comandos.push(
-    comandoRetanguloPreenchido(MARGEM_X, pagina.y, LARGURA_CONTEUDO, 56, 0.965),
+    comandoRetanguloPreenchido(MARGEM_X, pagina.y, LARGURA_CONTEUDO, 118, 0.975),
   );
-  pagina.y += 17;
-  texto("STUDIO REALÇAR", { fonte: "F2", tamanho: 15, x: MARGEM_X + 16, espacoDepois: 0 });
-  texto("ANAMNESE ASSINADA", { fonte: "F2", tamanho: 9, x: MARGEM_X + 16, espacoDepois: 0 });
-  pagina.y = TOPO + 70;
 
-  texto(dados.procedimento, { fonte: "F2", tamanho: 17, espacoDepois: 7 });
+  if (logo) {
+    const larguraLogo = 90;
+    const alturaLogo = Math.min(82, (larguraLogo * logo.altura) / logo.largura);
+    const xLogo = (LARGURA_PAGINA - larguraLogo) / 2;
+    const yLogoPdf = ALTURA_PAGINA - (TOPO + 7) - alturaLogo;
+    pagina.comandos.push(
+      ascii(
+        `q ${larguraLogo.toFixed(2)} 0 0 ${alturaLogo.toFixed(2)} ${xLogo.toFixed(2)} ${yLogoPdf.toFixed(2)} cm /ImLogo Do Q\n`,
+      ),
+    );
+  } else {
+    pagina.comandos.push(
+      comandoTextoCentralizado("F2", 15, TOPO + 38, "STUDIO REALÇAR"),
+    );
+  }
+
+  pagina.comandos.push(
+    comandoTextoCentralizado(
+      "F2",
+      9,
+      TOPO + 101,
+      "FICHA DE ANAMNESE ASSINADA",
+    ),
+  );
+  pagina.y = TOPO + 132;
+
+  pagina.comandos.push(
+    comandoTextoCentralizado("F2", 17, pagina.y, dados.procedimento),
+  );
+  pagina.y += 26;
   pagina.comandos.push(comandoLinha(MARGEM_X, pagina.y, MARGEM_X + LARGURA_CONTEUDO, pagina.y));
   pagina.y += 14;
 
@@ -380,11 +475,26 @@ function construirPdf(
     pagina.y += 9;
   }
 
-  garantirEspaco(205);
-  texto("DECLARAÇÃO E ASSINATURA", { fonte: "F2", tamanho: 12, espacoDepois: 8 });
+  const declaracao = dados.declaracaoTexto?.trim() || DECLARACAO_ANAMNESE_LEGADO;
+  const paragrafosDeclaracao = declaracao
+    .split(/\n\s*\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  garantirEspaco(310);
+  texto("DECLARAÇÃO, PRIVACIDADE E ASSINATURA", {
+    fonte: "F2",
+    tamanho: 12,
+    espacoDepois: 8,
+  });
+
+  for (const paragrafo of paragrafosDeclaracao) {
+    texto(paragrafo, { tamanho: 9.5, entreLinhas: 13.5, espacoDepois: 7 });
+  }
+
   texto(
-    "Declaro que as informações fornecidas nesta anamnese são verdadeiras e completas conforme meu conhecimento, e confirmo que revisei as respostas antes da assinatura.",
-    { tamanho: 10, entreLinhas: 14, espacoDepois: 12 },
+    `Responsável: ${STUDIO_REALCAR_IDENTIDADE.responsavel} | Canal de atendimento e privacidade: WhatsApp ${STUDIO_REALCAR_IDENTIDADE.whatsappExibicao}`,
+    { fonte: "F2", tamanho: 8.5, entreLinhas: 12, espacoDepois: 10 },
   );
 
   if (assinatura) {
@@ -394,7 +504,7 @@ function construirPdf(
     const yPdf = ALTURA_PAGINA - pagina.y - alturaImagem;
     pagina.comandos.push(
       ascii(
-        `q ${larguraImagem.toFixed(2)} 0 0 ${alturaImagem.toFixed(2)} ${MARGEM_X.toFixed(2)} ${yPdf.toFixed(2)} cm /Im1 Do Q\n`,
+        `q ${larguraImagem.toFixed(2)} 0 0 ${alturaImagem.toFixed(2)} ${MARGEM_X.toFixed(2)} ${yPdf.toFixed(2)} cm /ImAssinatura Do Q\n`,
       ),
     );
     pagina.y += alturaImagem + 8;
@@ -413,7 +523,11 @@ function construirPdf(
     espacoDepois: 2,
   });
   texto(`Assinado em: ${formatarDataHora(dados.assinadaEm)}`, { tamanho: 9, espacoDepois: 2 });
-  texto(`Identificação interna: anamnese versão ${dados.versao}`, { tamanho: 8, espacoDepois: 0 });
+  texto(`Identificação interna: anamnese versão ${dados.versao}`, { tamanho: 8, espacoDepois: 1 });
+  texto(
+    `Versão da declaração: ${dados.declaracaoVersao || "declaração anterior"}`,
+    { tamanho: 8, espacoDepois: 0 },
+  );
 
   paginas.forEach((item, indice) => {
     item.comandos.push(
@@ -445,13 +559,23 @@ function construirPdf(
     "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>",
   );
 
-  let imagemId: number | null = null;
+  let assinaturaId: number | null = null;
   if (assinatura) {
     const cabecalho = ascii(
       `<< /Type /XObject /Subtype /Image /Width ${assinatura.largura} /Height ${assinatura.altura} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${assinatura.bytes.length} >>\nstream\n`,
     );
-    imagemId = adicionarObjeto(
+    assinaturaId = adicionarObjeto(
       concatenarBytes([cabecalho, assinatura.bytes, ascii("\nendstream")]),
+    );
+  }
+
+  let logoId: number | null = null;
+  if (logo) {
+    const cabecalho = ascii(
+      `<< /Type /XObject /Subtype /Image /Width ${logo.largura} /Height ${logo.altura} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${logo.bytes.length} >>\nstream\n`,
+    );
+    logoId = adicionarObjeto(
+      concatenarBytes([cabecalho, logo.bytes, ascii("\nendstream")]),
     );
   }
 
@@ -467,7 +591,12 @@ function construirPdf(
       ]),
     );
 
-    const recursosImagem = imagemId ? ` /XObject << /Im1 ${imagemId} 0 R >>` : "";
+    const xObjects = [
+      assinaturaId ? `/ImAssinatura ${assinaturaId} 0 R` : null,
+      logoId ? `/ImLogo ${logoId} 0 R` : null,
+    ].filter(Boolean);
+    const recursosImagem =
+      xObjects.length > 0 ? ` /XObject << ${xObjects.join(" ")} >>` : "";
     const paginaId = adicionarObjeto(
       `<< /Type /Page /Parent ${paginasId} 0 R /MediaBox [0 0 ${LARGURA_PAGINA} ${ALTURA_PAGINA}] /Resources << /Font << /F1 ${fonteRegularId} 0 R /F2 ${fonteNegritoId} 0 R >>${recursosImagem} >> /Contents ${conteudoId} 0 R >>`,
     );
@@ -514,8 +643,11 @@ function construirPdf(
 }
 
 export async function gerarArquivoPdfAnamnese(dados: AnamnesePdfDados) {
-  const assinatura = await converterAssinaturaParaJpeg(dados.assinaturaCliente);
-  const bytes = construirPdf(dados, assinatura);
+  const [assinatura, logo] = await Promise.all([
+    converterAssinaturaParaJpeg(dados.assinaturaCliente),
+    converterLogoParaJpeg(),
+  ]);
+  const bytes = construirPdf(dados, assinatura, logo);
   const blob = new Blob([bytes], { type: "application/pdf" });
   const data = formatarData(dados.assinadaEm || dados.dataFicha).replaceAll("/", "-");
   const nomeArquivo = `Anamnese_${nomeArquivoSeguro(dados.procedimento)}_${nomeArquivoSeguro(dados.clienteNome)}_${data}.pdf`;

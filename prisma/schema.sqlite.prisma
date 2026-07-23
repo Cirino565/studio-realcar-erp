@@ -536,6 +536,8 @@ model ClienteAnamnese {
   assinaturaCliente     String?
   assinaturaNome        String?
   termoConsentimento    Boolean  @default(false)
+  declaracaoTexto       String?
+  declaracaoVersao      String?
   status                String   @default("RASCUNHO")
   versao                Int      @default(1)
   finalizadaEm          DateTime?

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   useEffect,
   useMemo,
@@ -29,6 +30,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { formatarData } from "@/lib/format";
 import { baixarBlob, gerarArquivoPdfAnamnese } from "@/lib/anamnese-pdf";
+import {
+  DECLARACAO_ANAMNESE_PARAGRAFOS,
+  DECLARACAO_ANAMNESE_VERSAO,
+  STUDIO_REALCAR_IDENTIDADE,
+} from "@/lib/studio-realcar";
 import { buildWhatsAppUrl } from "@/lib/whatsapp";
 import type {
   ClienteAnamneseData,
@@ -467,7 +473,7 @@ export default function AnamneseMobileForm({
     }
 
     if (dados.get("declaracaoFinal") !== "on") {
-      setErro("Confirme a declaração final antes de assinar.");
+      setErro("Confirme a declaração e a ciência sobre privacidade antes de assinar.");
       rolarPara("assinatura-anamnese");
       return false;
     }
@@ -497,6 +503,8 @@ export default function AnamneseMobileForm({
       profissional: fichaAtual.profissional,
       assinaturaNome: fichaAtual.assinaturaNome,
       assinaturaCliente: fichaAtual.assinaturaCliente,
+      declaracaoTexto: fichaAtual.declaracaoTexto,
+      declaracaoVersao: fichaAtual.declaracaoVersao,
       respostas: respostasOrdenadas.map((resposta) => ({
         perguntaTexto: resposta.perguntaTexto,
         resposta: resposta.resposta,
@@ -597,6 +605,11 @@ export default function AnamneseMobileForm({
               </h3>
               <p className="mt-1 text-sm leading-6 text-emerald-800 dark:text-emerald-200">
                 Versão {fichaAtual.versao} · {fichaAtual.assinadaEm ? formatarData(fichaAtual.assinadaEm) : "assinatura registrada"}
+              </p>
+              <p className="mt-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                {fichaAtual.declaracaoVersao
+                  ? `Declaração e privacidade: ${fichaAtual.declaracaoVersao}`
+                  : "Declaração anterior à atualização de privacidade"}
               </p>
             </div>
           </div>
@@ -815,36 +828,73 @@ export default function AnamneseMobileForm({
 
         <section id="assinatura-anamnese" className="scroll-mt-40 rounded-3xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-400/20 dark:bg-violet-500/10 sm:p-5">
           <div className="flex items-start gap-3">
-            <div className="rounded-2xl bg-white p-3 text-violet-700 shadow-sm dark:bg-white/10 dark:text-violet-200">
-              <FileSignature size={22} />
+            <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-violet-200 bg-white p-1.5 shadow-sm dark:border-violet-400/20">
+              <Image
+                src={STUDIO_REALCAR_IDENTIDADE.logoPublica}
+                alt={`Logo ${STUDIO_REALCAR_IDENTIDADE.nome}`}
+                width={64}
+                height={64}
+                className="size-full object-contain"
+              />
             </div>
-            <div>
+            <div className="min-w-0">
               <h3 className="text-lg font-bold text-slate-950 dark:text-white">
-                Revisão e assinatura
+                Declaração, privacidade e assinatura
               </h3>
               <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                Entregue o celular ao cliente para confirmar e assinar.
+                Entregue o celular ao cliente para revisar, confirmar e assinar.
               </p>
             </div>
           </div>
-          <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-800 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200">
-            <input
-              type="checkbox"
-              name="declaracaoFinal"
-              className="mt-1 size-5 accent-violet-600"
-            />
-            <span>
-              Declaro que as informações fornecidas nesta anamnese são verdadeiras e completas conforme meu conhecimento, e confirmo que revisei as respostas antes da assinatura.
-            </span>
-          </label>
+
+          <div className="mt-5 rounded-3xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.05] sm:p-5">
+            <div className="flex items-start gap-3">
+              <ShieldCheck className="mt-0.5 shrink-0 text-violet-600 dark:text-violet-300" size={21} />
+              <div className="min-w-0">
+                <p className="font-bold text-slate-950 dark:text-white">
+                  Aviso de privacidade e declaração do cliente
+                </p>
+                <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  {STUDIO_REALCAR_IDENTIDADE.nome} · Responsável: {STUDIO_REALCAR_IDENTIDADE.responsavel}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-3 text-sm leading-6 text-slate-700 dark:text-slate-200">
+              {DECLARACAO_ANAMNESE_PARAGRAFOS.map((paragrafo) => (
+                <p key={paragrafo}>{paragrafo}</p>
+              ))}
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50 p-3 text-xs font-semibold leading-5 text-violet-900 dark:border-violet-400/20 dark:bg-violet-500/10 dark:text-violet-100">
+              Canal de atendimento e privacidade: WhatsApp {STUDIO_REALCAR_IDENTIDADE.whatsappExibicao}. As respostas sobre imagens permanecem independentes e valem exatamente como foram marcadas na ficha.
+            </div>
+
+            <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl border-2 border-violet-200 bg-white p-4 text-sm font-semibold leading-6 text-slate-800 dark:border-violet-400/30 dark:bg-white/[0.05] dark:text-slate-100">
+              <input
+                type="checkbox"
+                name="declaracaoFinal"
+                className="mt-1 size-5 shrink-0 accent-violet-600"
+              />
+              <span>
+                Li e estou ciente da declaração acima, confirmo a veracidade das informações e que revisei as respostas antes de assinar.
+              </span>
+            </label>
+
+            <p className="mt-2 text-[0.7rem] font-semibold text-slate-500 dark:text-slate-400">
+              Versão da declaração: {DECLARACAO_ANAMNESE_VERSAO}
+            </p>
+          </div>
+
           <div className="mt-5">
             <p className="mb-3 text-sm font-bold text-slate-900 dark:text-white">
               Assinatura de {clienteNome}
             </p>
             <AssinaturaCanvas />
           </div>
+
           <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100">
-            Depois de finalizada e assinada, esta versão fica bloqueada. Qualquer alteração futura deve ser feita em uma nova versão.
+            Depois de finalizada e assinada, esta versão fica bloqueada. O texto aceito também fica registrado nesta versão. Qualquer alteração futura deve ser feita em uma nova versão.
           </div>
         </section>
       </div>

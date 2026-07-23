@@ -32,6 +32,8 @@ function mapAnamnese(anamnese: NonNullable<Awaited<ReturnType<typeof getClienteC
     assinaturaCliente: anamnese.assinaturaCliente,
     assinaturaNome: anamnese.assinaturaNome,
     termoConsentimento: anamnese.termoConsentimento,
+    declaracaoTexto: anamnese.declaracaoTexto,
+    declaracaoVersao: anamnese.declaracaoVersao,
     status: anamnese.status,
     versao: anamnese.versao,
     finalizadaEm: anamnese.finalizadaEm ? toIsoString(anamnese.finalizadaEm) : null,

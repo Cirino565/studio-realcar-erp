@@ -5,6 +5,10 @@ import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
 import { MODELOS_ANAMNESE_STUDIO } from "@/lib/anamnese-modelos-studio";
+import {
+  DECLARACAO_ANAMNESE_TEXTO,
+  DECLARACAO_ANAMNESE_VERSAO,
+} from "@/lib/studio-realcar";
 
 const TIPOS_PERGUNTA = new Set([
   "SECAO",
@@ -585,7 +589,7 @@ export async function salvarRespostasAnamneseRapida(formData: FormData) {
 
   if (intencao === "finalizar") {
     if (!termoConsentimento) {
-      throw new Error("Confirme a declaração final antes da assinatura.");
+      throw new Error("Confirme a declaração e a ciência sobre privacidade antes da assinatura.");
     }
     if (!assinaturaCliente?.startsWith("data:image/")) {
       throw new Error("A assinatura do cliente é obrigatória para finalizar.");
@@ -628,6 +632,10 @@ export async function salvarRespostasAnamneseRapida(formData: FormData) {
         profissional,
         respostasRapidas: resumoRespostas || null,
         termoConsentimento,
+        declaracaoTexto:
+          intencao === "finalizar" ? DECLARACAO_ANAMNESE_TEXTO : null,
+        declaracaoVersao:
+          intencao === "finalizar" ? DECLARACAO_ANAMNESE_VERSAO : null,
         dataFicha,
         status: intencao === "finalizar" ? "FINALIZADA" : "RASCUNHO",
         assinaturaCliente:
