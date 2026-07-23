@@ -1,4 +1,4 @@
-import { ClienteClinicoTabs } from "@/app/(app)/clientes/components/ClienteClinicoTabs";
+﻿import { ClienteClinicoTabs } from "@/app/(app)/clientes/components/ClienteClinicoTabs";
 import type { ClienteClinicoData } from "@/app/(app)/clientes/types";
 import { requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -30,7 +30,12 @@ function mapAnamnese(anamnese: NonNullable<Awaited<ReturnType<typeof getClienteC
     observacoesClinicas: anamnese.observacoesClinicas,
     respostasRapidas: anamnese.respostasRapidas,
     assinaturaCliente: anamnese.assinaturaCliente,
+    assinaturaNome: anamnese.assinaturaNome,
     termoConsentimento: anamnese.termoConsentimento,
+    status: anamnese.status,
+    versao: anamnese.versao,
+    finalizadaEm: anamnese.finalizadaEm ? toIsoString(anamnese.finalizadaEm) : null,
+    assinadaEm: anamnese.assinadaEm ? toIsoString(anamnese.assinadaEm) : null,
     profissional: anamnese.profissional,
     dataFicha: toIsoString(anamnese.dataFicha),
     updatedAt: toIsoString(anamnese.updatedAt),
@@ -156,6 +161,8 @@ export default async function ClientePage({ params }: ClientePageProps) {
     })),
     anamneseRespostas: cliente.anamneseRespostas.map((resposta) => ({
       id: resposta.id,
+      anamneseId: resposta.anamneseId,
+      perguntaId: resposta.perguntaId,
       procedimento: resposta.procedimento,
       perguntaTexto: resposta.perguntaTexto,
       tipo: resposta.tipo,
@@ -174,3 +181,4 @@ export default async function ClientePage({ params }: ClientePageProps) {
     </div>
   );
 }
+

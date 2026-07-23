@@ -534,11 +534,20 @@ model ClienteAnamnese {
   observacoesClinicas   String?
   respostasRapidas      String?
   assinaturaCliente     String?
+  assinaturaNome        String?
   termoConsentimento    Boolean  @default(false)
+  status                String   @default("RASCUNHO")
+  versao                Int      @default(1)
+  finalizadaEm          DateTime?
+  assinadaEm            DateTime?
   profissional          String?
   dataFicha             DateTime @default(now())
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+
+  respostas             ClienteAnamneseResposta[]
+
+  @@index([clienteId, procedimento, status])
 }
 
 model ClienteFoto {
@@ -634,6 +643,8 @@ model ClienteAnamneseResposta {
   modelo        AnamneseModelo? @relation(fields: [modeloId], references: [id], onDelete: SetNull)
   perguntaId    Int?
   pergunta      AnamnesePergunta? @relation(fields: [perguntaId], references: [id], onDelete: SetNull)
+  anamneseId    Int?
+  anamnese      ClienteAnamnese? @relation(fields: [anamneseId], references: [id], onDelete: Cascade)
   procedimento  String?
   perguntaTexto String
   tipo          String
@@ -643,4 +654,6 @@ model ClienteAnamneseResposta {
   dataResposta  DateTime @default(now())
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  @@index([anamneseId])
 }

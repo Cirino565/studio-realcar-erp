@@ -10,7 +10,6 @@ import {
   ImageIcon,
   Loader2,
   Plus,
-  ShieldCheck,
   Stethoscope,
   Trash2,
 } from "lucide-react";
@@ -22,8 +21,8 @@ import {
   criarProcedimentoCliente,
   excluirRegistroClinico,
 } from "@/actions/cliente-clinico.actions";
-import { salvarRespostasAnamneseRapida } from "@/actions/anamnese-config.actions";
 import { Button } from "@/components/ui/button";
+import AnamneseMobileForm from "./AnamneseMobileForm";
 import { formatarData, formatarMoeda } from "@/lib/format";
 import type { ClienteClinicoData } from "../types";
 
@@ -38,6 +37,22 @@ type Props = {
   data: ClienteClinicoData;
   initialTab?: AbaClinica;
 };
+
+
+const ALIASES_ANAMNESE: Record<string, string> = {
+  botox: "Toxina Botulínica",
+  preenchimento: "Preenchimento com Ácido Hialurônico",
+  "design sobrancelhas": "Design de Sobrancelhas",
+  "design de sobrancelhas": "Design de Sobrancelhas",
+  auricoloterapia: "Auriculoterapia",
+  "ultrasom microfocado": "Ultrassom microfocado",
+  "ultrasom facial ou corporal": "Ultrassom facial ou corporal",
+};
+
+function nomeCanonicoAnamnese(nome: string | null | undefined) {
+  if (!nome) return "";
+  return ALIASES_ANAMNESE[nome.trim().toLocaleLowerCase("pt-BR")] ?? nome;
+}
 
 const procedimentosAnamnesePadrao = [
   "Avaliação",
@@ -205,9 +220,11 @@ export function ClienteClinicoTabs({
 
   const [procedimentoAnamnese, setProcedimentoAnamnese] =
     useState(
-      data.anamnese?.procedimento ||
-        data.procedimentos[0]?.nome ||
-        "Limpeza de pele",
+      nomeCanonicoAnamnese(
+        data.anamnese?.procedimento ||
+          data.procedimentos[0]?.nome ||
+          "Limpeza de pele",
+      ),
     );
 
   function ativarAba(tab: AbaClinica) {
@@ -265,25 +282,15 @@ export function ClienteClinicoTabs({
   const anamneseAtual =
     data.anamneses.find(
       (ficha) =>
-        ficha.procedimento === procedimentoAnamnese,
+        nomeCanonicoAnamnese(ficha.procedimento) ===
+        nomeCanonicoAnamnese(procedimentoAnamnese),
     ) ?? null;
 
   const modeloAnamneseAtual =
     data.anamneseModelos.find(
       (modelo) =>
-        modelo.procedimentoNome === procedimentoAnamnese,
-    ) ??
-    data.anamneseModelos[0] ??
-    null;
-
-  const perguntasConfiguradas =
-    modeloAnamneseAtual?.perguntas ?? [];
-
-  const respostasDoProcedimento =
-    data.anamneseRespostas.filter(
-      (resposta) =>
-        resposta.procedimento === procedimentoAnamnese,
-    );
+        modelo.procedimentoNome === nomeCanonicoAnamnese(procedimentoAnamnese),
+    ) ?? null;
 
   return (
     <section className="app-mobile-safe space-y-5 sm:space-y-6">
@@ -409,7 +416,7 @@ export function ClienteClinicoTabs({
             <SectionHeader
               icon={ClipboardList}
               title="Anamnese do procedimento"
-              description="Uma única ficha por procedimento, com respostas rápidas e observações condicionais para uso no celular."
+              description="Preenchimento otimizado para celular, com rascunho, etapas rápidas, assinatura e histórico por versão."
             />
 
             <div className="min-w-0 space-y-5 p-4 sm:p-6">
@@ -418,220 +425,38 @@ export function ClienteClinicoTabs({
                   <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
                     Procedimento da anamnese
                   </span>
-
                   <select
                     name="procedimentoVisual"
                     value={procedimentoAnamnese}
-                    onChange={(event) =>
-                      setProcedimentoAnamnese(
-                        event.target.value,
-                      )
-                    }
-                    className="premium-input w-full"
+                    onChange={(event) => setProcedimentoAnamnese(event.target.value)}
+                    className="premium-input h-13 w-full text-base"
                   >
-                    {procedimentosDisponiveis.map(
-                      (procedimento) => (
-                        <option
-                          key={procedimento}
-                          value={procedimento}
-                        >
-                          {procedimento}
-                        </option>
-                      ),
-                    )}
+                    {procedimentosDisponiveis.map((procedimento) => (
+                      <option key={procedimento} value={procedimento}>
+                        {procedimento}
+                      </option>
+                    ))}
                   </select>
                 </label>
 
                 <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-4 text-xs leading-5 text-cyan-800 dark:border-cyan-300/20 dark:bg-cyan-400/10 dark:text-cyan-100">
-                  As perguntas são gerenciadas em
-                  Configurações &gt; Anamnese. Para perguntas
-                  de Sim/Não, o campo de observação aparece
-                  quando a resposta é Sim.
+                  Toque nas respostas para preencher. Campos de detalhe aparecem somente quando necessários. Salve como rascunho a qualquer momento e finalize apenas com a assinatura da cliente.
                 </div>
               </div>
 
-              {perguntasConfiguradas.length > 0 ? (
-                <form
-                  action={salvarRespostasAnamneseRapida}
-                  className="rounded-3xl border border-cyan-200 bg-cyan-50/70 p-4 dark:border-cyan-300/20 dark:bg-cyan-400/10 sm:p-5"
-                >
-                  <input
-                    type="hidden"
-                    name="clienteId"
-                    value={data.id}
-                  />
-
-                  <input
-                    type="hidden"
-                    name="modeloId"
-                    value={modeloAnamneseAtual?.id ?? ""}
-                  />
-
-                  <input
-                    type="hidden"
-                    name="procedimento"
-                    value={procedimentoAnamnese}
-                  />
-
-                  <input
-                    type="hidden"
-                    name="totalPerguntas"
-                    value={perguntasConfiguradas.length}
-                  />
-
-                  <div className="mb-5 grid gap-4 md:grid-cols-2">
-                    <Field
-                      label="Profissional responsável"
-                      name="profissional"
-                      defaultValue={
-                        anamneseAtual?.profissional
-                      }
-                      placeholder="Nome da profissional"
-                    />
-
-                    <Field
-                      label="Data da ficha"
-                      name="dataFicha"
-                      type="date"
-                      defaultValue={dateInputValue(
-                        anamneseAtual?.dataFicha,
-                      )}
-                    />
-                  </div>
-
-                  <div className="space-y-3">
-                    {perguntasConfiguradas.map(
-                      (pergunta, index) => {
-                        const respostaAnterior =
-                          data.anamneseRespostas.find(
-                            (resposta) =>
-                              resposta.procedimento ===
-                                procedimentoAnamnese &&
-                              resposta.perguntaTexto ===
-                                pergunta.pergunta,
-                          );
-
-                        return (
-                          <div
-                            key={pergunta.id}
-                            className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-950/25 sm:p-5"
-                          >
-                            <input
-                              type="hidden"
-                              name={`perguntaId_${index}`}
-                              value={pergunta.id}
-                            />
-
-                            <input
-                              type="hidden"
-                              name={`perguntaTexto_${index}`}
-                              value={pergunta.pergunta}
-                            />
-
-                            <input
-                              type="hidden"
-                              name={`tipo_${index}`}
-                              value={pergunta.tipo}
-                            />
-
-                            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                              <p className="text-sm font-semibold leading-6 text-slate-900 dark:text-white">
-                                {pergunta.ordem}.{" "}
-                                {pergunta.pergunta}
-                              </p>
-
-                              {pergunta.obrigatoria ? (
-                                <span className="w-fit rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[0.65rem] font-bold text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200">
-                                  Obrigatória
-                                </span>
-                              ) : null}
-                            </div>
-
-                            <DynamicAnswerField
-                              pergunta={pergunta}
-                              index={index}
-                              respostaAnterior={
-                                respostaAnterior?.resposta ??
-                                null
-                              }
-                              observacaoAnterior={
-                                respostaAnterior?.observacao ??
-                                null
-                              }
-                            />
-                          </div>
-                        );
-                      },
-                    )}
-                  </div>
-
-                  <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-xs leading-5 text-cyan-800/80 dark:text-cyan-100/80">
-                      Ao salvar, a ficha anterior deste mesmo
-                      procedimento é atualizada para evitar
-                      duplicidade no histórico.
-                    </p>
-
-                    <Button
-                      type="submit"
-                      className="w-full sm:w-auto"
-                    >
-                      <ShieldCheck size={17} />
-                      Salvar anamnese
-                    </Button>
-                  </div>
-                </form>
-              ) : (
-                <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100">
-                  Nenhuma pergunta configurada para este
-                  procedimento. Acesse Configurações &gt;
-                  Anamnese para criar ou ativar perguntas.
-                </div>
-              )}
-
-              {respostasDoProcedimento.length > 0 ? (
-                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.035] sm:p-5">
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                    Últimas respostas salvas
-                  </h3>
-
-                  <div className="mt-4 grid gap-3">
-                    {respostasDoProcedimento
-                      .slice(0, 8)
-                      .map((resposta) => (
-                        <div
-                          key={resposta.id}
-                          className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.04]"
-                        >
-                          <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                            {resposta.perguntaTexto}
-                          </p>
-
-                          <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">
-                            Resposta:{" "}
-                            {resposta.resposta || "-"}
-                          </p>
-
-                          {resposta.observacao ? (
-                            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                              Observação:{" "}
-                              {resposta.observacao}
-                            </p>
-                          ) : null}
-
-                          <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
-                            {formatarData(
-                              resposta.dataResposta,
-                            )}{" "}
-                            {resposta.profissional
-                              ? `• ${resposta.profissional}`
-                              : ""}
-                          </p>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              ) : null}
+              <AnamneseMobileForm
+                clienteId={data.id}
+                clienteNome={data.nome}
+                procedimento={procedimentoAnamnese}
+                modelo={modeloAnamneseAtual}
+                fichaAtual={anamneseAtual}
+                historico={data.anamneses.filter(
+                  (ficha) =>
+                    nomeCanonicoAnamnese(ficha.procedimento) ===
+                    nomeCanonicoAnamnese(procedimentoAnamnese),
+                )}
+                respostas={data.anamneseRespostas}
+              />
             </div>
           </div>
         )}
@@ -1102,166 +927,6 @@ export function ClienteClinicoTabs({
         )}
       </div>
     </section>
-  );
-}
-
-function DynamicAnswerField({
-  pergunta,
-  index,
-  respostaAnterior,
-  observacaoAnterior,
-}: {
-  pergunta: {
-    tipo: string;
-    opcoes: string | null;
-  };
-  index: number;
-  respostaAnterior?: string | null;
-  observacaoAnterior?: string | null;
-}) {
-  const [respostaSimNao, setRespostaSimNao] =
-    useState(
-      respostaAnterior === "Sim"
-        ? "Sim"
-        : respostaAnterior === "Não"
-          ? "Não"
-          : "",
-    );
-
-  if (pergunta.tipo === "SIM_NAO") {
-    return (
-      <div className="space-y-3">
-        <div className="grid gap-2 sm:grid-cols-2">
-          <label
-            className={`flex min-h-12 items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
-              respostaSimNao === "Sim"
-                ? "border-violet-300 bg-violet-50 text-violet-800 ring-2 ring-violet-100 dark:border-violet-300/40 dark:bg-violet-500/15 dark:text-white dark:ring-violet-500/10"
-                : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:bg-white/[0.07]"
-            }`}
-          >
-            <input
-              type="radio"
-              name={`resposta_${index}`}
-              value="Sim"
-              defaultChecked={respostaAnterior === "Sim"}
-              onChange={() => setRespostaSimNao("Sim")}
-              className="accent-violet-600"
-            />
-            Sim
-          </label>
-
-          <label
-            className={`flex min-h-12 items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
-              respostaSimNao === "Não"
-                ? "border-violet-300 bg-violet-50 text-violet-800 ring-2 ring-violet-100 dark:border-violet-300/40 dark:bg-violet-500/15 dark:text-white dark:ring-violet-500/10"
-                : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:bg-white/[0.07]"
-            }`}
-          >
-            <input
-              type="radio"
-              name={`resposta_${index}`}
-              value="Não"
-              defaultChecked={respostaAnterior === "Não"}
-              onChange={() => setRespostaSimNao("Não")}
-              className="accent-violet-600"
-            />
-            Não
-          </label>
-        </div>
-
-        {respostaSimNao === "Sim" ? (
-          <textarea
-            name={`observacao_${index}`}
-            rows={3}
-            defaultValue={observacaoAnterior ?? ""}
-            className="premium-input min-h-24 w-full py-3"
-            placeholder="Descreva a observação. Ex: qual alergia, qual medicamento, quando aconteceu..."
-          />
-        ) : null}
-      </div>
-    );
-  }
-
-  if (pergunta.tipo === "MULTIPLA_ESCOLHA") {
-    const opcoes =
-      pergunta.opcoes
-        ?.split("\n")
-        .map((opcao) => opcao.trim())
-        .filter(Boolean) ?? [];
-
-    return (
-      <div className="grid gap-2 sm:grid-cols-2">
-        <select
-          name={`resposta_${index}`}
-          defaultValue={respostaAnterior ?? ""}
-          className="premium-input w-full"
-        >
-          <option value="">Selecione</option>
-
-          {opcoes.map((opcao) => (
-            <option key={opcao} value={opcao}>
-              {opcao}
-            </option>
-          ))}
-        </select>
-
-        <input
-          name={`observacao_${index}`}
-          defaultValue={observacaoAnterior ?? ""}
-          className="premium-input w-full"
-          placeholder="Observação"
-        />
-      </div>
-    );
-  }
-
-  if (pergunta.tipo === "ACEITE") {
-    return (
-      <div className="space-y-3">
-        <label className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-50">
-          <input
-            type="checkbox"
-            name={`resposta_${index}`}
-            value="Aceito"
-            defaultChecked={
-              respostaAnterior === "Aceito"
-            }
-            className="mt-1 size-4 accent-emerald-600"
-          />
-
-          Cliente declara estar ciente e de acordo com
-          esta orientação/termo.
-        </label>
-
-        <input
-          name={`observacao_${index}`}
-          defaultValue={observacaoAnterior ?? ""}
-          className="premium-input w-full"
-          placeholder="Observação opcional"
-        />
-      </div>
-    );
-  }
-
-  if (pergunta.tipo === "TEXTO_LONGO") {
-    return (
-      <textarea
-        name={`resposta_${index}`}
-        rows={4}
-        defaultValue={respostaAnterior ?? ""}
-        className="premium-input min-h-28 w-full py-3"
-        placeholder="Resposta da cliente"
-      />
-    );
-  }
-
-  return (
-    <input
-      name={`resposta_${index}`}
-      defaultValue={respostaAnterior ?? ""}
-      className="premium-input w-full"
-      placeholder="Resposta da cliente"
-    />
   );
 }
 

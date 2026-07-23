@@ -4,62 +4,18 @@ import { requirePermission } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
+import { MODELOS_ANAMNESE_STUDIO } from "@/lib/anamnese-modelos-studio";
 
 const TIPOS_PERGUNTA = new Set([
+  "SECAO",
   "SIM_NAO",
   "TEXTO_CURTO",
   "TEXTO_LONGO",
   "MULTIPLA_ESCOLHA",
+  "MULTIPLA_SELECAO",
   "ACEITE",
+  "NUMERO",
 ]);
-
-const MODELOS_STUDIO_REALCAR = [
-  "Microlabial",
-  "Intradermoterapia",
-  "Hidratação facial",
-  "Protocolo clareamento",
-  "Protocolo secativo",
-  "Endermoterapia facial ou corporal",
-  "Ultrassom facial ou corporal",
-  "Microagulhamento",
-  "Limpeza de pele",
-  "Facial",
-  "Despigmentação micropigmentação ND YAG",
-  "Ultrassom microfocado",
-  "Laser",
-  "Criolipólise",
-  "Drenagem corporal",
-  "Fios de PDO Liso",
-  "PEIM",
-] as const;
-
-const PERGUNTAS_INICIAIS = [
-  {
-    pergunta: "Qual é a principal queixa, objetivo ou expectativa para este atendimento?",
-    tipo: "TEXTO_LONGO",
-    obrigatoria: true,
-  },
-  {
-    pergunta: "Possui alergias conhecidas ou já apresentou reação adversa a algum produto ou procedimento?",
-    tipo: "SIM_NAO",
-    obrigatoria: true,
-  },
-  {
-    pergunta: "Faz uso contínuo de medicamentos ou realizou algum tratamento recente que deva ser informado?",
-    tipo: "SIM_NAO",
-    obrigatoria: true,
-  },
-  {
-    pergunta: "Existe alguma informação de saúde, sensibilidade, restrição ou observação importante para este atendimento?",
-    tipo: "TEXTO_LONGO",
-    obrigatoria: false,
-  },
-  {
-    pergunta: "Declaro que as informações prestadas nesta ficha são verdadeiras e que recebi as orientações referentes ao atendimento.",
-    tipo: "ACEITE",
-    obrigatoria: true,
-  },
-] as const;
 
 function getString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -95,16 +51,17 @@ async function auditar(acao: string, entidade: string, detalhes: string) {
 async function resolverProcedimentoId(
   procedimentoNome: string | null,
   procedimentoIdInformado?: number | null,
+  aliases: string[] = [],
 ) {
   if (procedimentoIdInformado) return procedimentoIdInformado;
   if (!procedimentoNome) return null;
 
+  const nomes = [procedimentoNome, ...aliases].filter(Boolean);
   const servico = await prisma.procedimentoServico.findFirst({
     where: {
-      nome: {
-        equals: procedimentoNome,
-        mode: "insensitive",
-      },
+      OR: nomes.map((nome) => ({
+        nome: { equals: nome, mode: "insensitive" as const },
+      })),
     },
     select: { id: true },
   });
@@ -118,65 +75,107 @@ function revalidarAnamnese() {
 }
 
 export async function criarModelosAnamnesePadrao() {
-  await requirePermission("configuracoes.gerenciar");
+  const usuario = await requirePermission("configuracoes.gerenciar");
 
-  for (const [index, procedimentoNome] of MODELOS_STUDIO_REALCAR.entries()) {
+  for (const [index, definicao] of MODELOS_ANAMNESE_STUDIO.entries()) {
+    const nomesBusca = [definicao.procedimentoNome, ...(definicao.aliases ?? [])];
+
     const modeloExistente = await prisma.anamneseModelo.findFirst({
       where: {
-        procedimentoNome: {
-          equals: procedimentoNome,
-          mode: "insensitive",
-        },
+        OR: nomesBusca.map((nome) => ({
+          procedimentoNome: { equals: nome, mode: "insensitive" as const },
+        })),
       },
       include: {
-        perguntas: { select: { id: true } },
+        perguntas: { orderBy: [{ ordem: "asc" }, { id: "asc" }] },
       },
     });
 
-    const procedimentoId = await resolverProcedimentoId(procedimentoNome);
+    const procedimentoId = await resolverProcedimentoId(
+      definicao.procedimentoNome,
+      null,
+      definicao.aliases ?? [],
+    );
 
     const modelo = modeloExistente
       ? await prisma.anamneseModelo.update({
           where: { id: modeloExistente.id },
           data: {
+            nome: `Anamnese - ${definicao.procedimentoNome}`,
             procedimentoId,
-            status: modeloExistente.status || "Ativo",
-            ordem: modeloExistente.ordem || index + 1,
+            procedimentoNome: definicao.procedimentoNome,
+            descricao: definicao.descricao,
+            status: "Ativo",
+            ordem: index + 1,
           },
         })
       : await prisma.anamneseModelo.create({
           data: {
-            nome: `Anamnese - ${procedimentoNome}`,
+            nome: `Anamnese - ${definicao.procedimentoNome}`,
             procedimentoId,
-            procedimentoNome,
+            procedimentoNome: definicao.procedimentoNome,
+            descricao: definicao.descricao,
             status: "Ativo",
             ordem: index + 1,
-            descricao: `Modelo inicial editável para ${procedimentoNome}. Revise perguntas, termos e contraindicações com a responsável técnica antes do uso definitivo.`,
           },
         });
 
-    const totalPerguntas = modeloExistente?.perguntas.length ?? 0;
+    const existentes = modeloExistente?.perguntas ?? [];
+    const textosNovos = new Set(definicao.perguntas.map((item) => item.pergunta));
 
-    if (totalPerguntas === 0) {
-      await prisma.anamnesePergunta.createMany({
-        data: PERGUNTAS_INICIAIS.map((item, perguntaIndex) => ({
-          modeloId: modelo.id,
-          pergunta: item.pergunta,
-          tipo: item.tipo,
-          obrigatoria: item.obrigatoria,
-          opcoes: null,
-          ativa: true,
-          ordem: perguntaIndex + 1,
-        })),
-      });
+    for (const perguntaExistente of existentes) {
+      if (textosNovos.has(perguntaExistente.pergunta)) continue;
+
+      const possuiHistorico =
+        (await prisma.clienteAnamneseResposta.count({
+          where: { perguntaId: perguntaExistente.id },
+        })) > 0;
+
+      if (possuiHistorico) {
+        await prisma.anamnesePergunta.update({
+          where: { id: perguntaExistente.id },
+          data: { ativa: false },
+        });
+      } else {
+        await prisma.anamnesePergunta.delete({ where: { id: perguntaExistente.id } });
+      }
+    }
+
+    for (const [perguntaIndex, item] of definicao.perguntas.entries()) {
+      const existente = existentes.find(
+        (pergunta) => pergunta.pergunta === item.pergunta,
+      );
+      const data = {
+        modeloId: modelo.id,
+        pergunta: item.pergunta,
+        tipo: item.tipo,
+        opcoes: item.opcoes?.join("\n") ?? null,
+        obrigatoria: item.tipo === "SECAO" ? false : Boolean(item.obrigatoria),
+        ativa: true,
+        ordem: perguntaIndex + 1,
+      };
+
+      if (existente) {
+        await prisma.anamnesePergunta.update({
+          where: { id: existente.id },
+          data,
+        });
+      } else {
+        await prisma.anamnesePergunta.create({ data });
+      }
     }
   }
 
-  await auditar(
-    "Criou modelos de anamnese Studio Realçar",
-    "AnamneseModelo",
-    `${MODELOS_STUDIO_REALCAR.length} modelos verificados/criados sem duplicar modelos existentes`,
-  );
+  await prisma.auditoria.create({
+    data: {
+      modulo: "Configurações",
+      acao: "Sincronizou modelos de anamnese Studio Realçar",
+      entidade: "AnamneseModelo",
+      usuario: usuario.nome || usuario.email,
+      detalhes: `${MODELOS_ANAMNESE_STUDIO.length} modelos clínicos sincronizados com preservação do histórico`,
+    },
+  });
+
   revalidarAnamnese();
 }
 
@@ -414,28 +413,45 @@ export async function excluirPerguntaAnamnese(id: number) {
   revalidarAnamnese();
 }
 
-export async function salvarRespostasAnamneseRapida(formData: FormData) {
-  await requirePermission("clientes.clinico");
-  const clienteId = getNumber(formData, "clienteId");
-  const modeloId = getNumber(formData, "modeloId") || null;
-  const procedimento = getString(formData, "procedimento");
-  const profissional = getString(formData, "profissional");
-  const dataFichaTexto = getString(formData, "dataFicha");
-  const dataFicha = dataFichaTexto
-    ? new Date(`${dataFichaTexto}T12:00:00`)
-    : new Date();
-  const total = getNumber(formData, "totalPerguntas");
+type RespostaRecebida = {
+  clienteId: number;
+  modeloId: number | null;
+  perguntaId: number | null;
+  procedimento: string | null;
+  perguntaTexto: string;
+  tipo: string;
+  resposta: string | null;
+  observacao: string | null;
+  profissional: string | null;
+  dataResposta: Date;
+};
 
-  if (!clienteId || !total) return;
-
-  const respostas = Array.from({ length: total }, (_, index) => {
+function lerRespostasFormulario(
+  formData: FormData,
+  clienteId: number,
+  modeloId: number | null,
+  procedimento: string | null,
+  profissional: string | null,
+  dataFicha: Date,
+  total: number,
+) {
+  return Array.from({ length: total }, (_, index) => {
     const perguntaId = getNumber(formData, `perguntaId_${index}`) || null;
     const perguntaTexto = getString(formData, `perguntaTexto_${index}`);
     const tipo = getString(formData, `tipo_${index}`) || "TEXTO_CURTO";
-    const resposta = getString(formData, `resposta_${index}`);
+
+    if (!perguntaTexto || tipo === "SECAO") return null;
+
+    const valores = formData
+      .getAll(`resposta_${index}`)
+      .filter((valor): valor is string => typeof valor === "string")
+      .map((valor) => valor.trim())
+      .filter(Boolean);
+
+    const resposta = valores.length > 0 ? valores.join(" | ") : null;
     const observacao = getString(formData, `observacao_${index}`);
 
-    if (!perguntaTexto || (!resposta && !observacao)) return null;
+    if (!resposta && !observacao) return null;
 
     return {
       clienteId,
@@ -448,10 +464,12 @@ export async function salvarRespostasAnamneseRapida(formData: FormData) {
       observacao,
       profissional,
       dataResposta: dataFicha,
-    };
-  }).filter((item): item is NonNullable<typeof item> => Boolean(item));
+    } satisfies RespostaRecebida;
+  }).filter((item): item is RespostaRecebida => Boolean(item));
+}
 
-  const resumoRespostas = respostas
+function montarResumoRespostas(respostas: RespostaRecebida[]) {
+  return respostas
     .map(
       (item) =>
         `${item.perguntaTexto}\nResposta: ${item.resposta || "-"}${
@@ -459,60 +477,214 @@ export async function salvarRespostasAnamneseRapida(formData: FormData) {
         }`,
     )
     .join("\n\n---\n\n");
+}
 
-  const termoConsentimento = respostas.some(
-    (item) => item.tipo === "ACEITE" && item.resposta === "Aceito",
+async function validarObrigatorias(
+  modeloId: number | null,
+  respostas: RespostaRecebida[],
+) {
+  if (!modeloId) return;
+
+  const obrigatorias = await prisma.anamnesePergunta.findMany({
+    where: {
+      modeloId,
+      ativa: true,
+      obrigatoria: true,
+      NOT: { tipo: "SECAO" },
+    },
+    select: { id: true, pergunta: true, tipo: true },
+  });
+
+  const respondidas = new Map(
+    respostas.map((resposta) => [resposta.perguntaId, resposta]),
+  );
+
+  const faltantes = obrigatorias.filter((pergunta) => {
+    const resposta = respondidas.get(pergunta.id);
+    if (!resposta?.resposta && !resposta?.observacao) return true;
+    if (pergunta.tipo === "ACEITE" && resposta.resposta !== "Aceito") return true;
+    return false;
+  });
+
+  if (faltantes.length > 0) {
+    throw new Error(
+      `Preencha os campos obrigatórios antes de finalizar: ${faltantes
+        .slice(0, 3)
+        .map((item) => item.pergunta)
+        .join("; ")}${faltantes.length > 3 ? "..." : ""}`,
+    );
+  }
+}
+
+async function obterOuCriarRascunho(
+  clienteId: number,
+  procedimento: string | null,
+  profissional: string | null,
+  dataFicha: Date,
+) {
+  const ultimaFicha = await prisma.clienteAnamnese.findFirst({
+    where: { clienteId, procedimento: procedimento ?? undefined },
+    orderBy: [{ versao: "desc" }, { updatedAt: "desc" }],
+  });
+
+  if (ultimaFicha?.status !== "FINALIZADA") {
+    if (ultimaFicha) {
+      return prisma.clienteAnamnese.update({
+        where: { id: ultimaFicha.id },
+        data: { profissional, dataFicha, status: "RASCUNHO" },
+      });
+    }
+  }
+
+  return prisma.clienteAnamnese.create({
+    data: {
+      clienteId,
+      procedimento,
+      profissional,
+      dataFicha,
+      status: "RASCUNHO",
+      versao: (ultimaFicha?.versao ?? 0) + 1,
+    },
+  });
+}
+
+export async function salvarRespostasAnamneseRapida(formData: FormData) {
+  const usuario = await requirePermission("clientes.clinico");
+  const clienteId = getNumber(formData, "clienteId");
+  const modeloId = getNumber(formData, "modeloId") || null;
+  const procedimento = getString(formData, "procedimento");
+  const profissional = getString(formData, "profissional") || usuario.nome;
+  const dataFichaTexto = getString(formData, "dataFicha");
+  const dataFicha = dataFichaTexto
+    ? new Date(`${dataFichaTexto}T12:00:00`)
+    : new Date();
+  const total = getNumber(formData, "totalPerguntas");
+  const intencao = getString(formData, "intencao") || "rascunho";
+
+  if (!clienteId || !total) {
+    throw new Error("Dados da anamnese incompletos.");
+  }
+
+  const respostas = lerRespostasFormulario(
+    formData,
+    clienteId,
+    modeloId,
+    procedimento,
+    profissional,
+    dataFicha,
+    total,
+  );
+
+  if (intencao === "finalizar") {
+    await validarObrigatorias(modeloId, respostas);
+  }
+
+  const resumoRespostas = montarResumoRespostas(respostas);
+  const termoConsentimento = formData.get("declaracaoFinal") === "on";
+  const assinaturaCliente = getString(formData, "assinaturaCliente");
+
+  if (intencao === "finalizar") {
+    if (!termoConsentimento) {
+      throw new Error("Confirme a declaração final antes da assinatura.");
+    }
+    if (!assinaturaCliente?.startsWith("data:image/")) {
+      throw new Error("A assinatura do cliente é obrigatória para finalizar.");
+    }
+    if (assinaturaCliente.length > 750_000) {
+      throw new Error("A assinatura ficou muito grande. Limpe e assine novamente.");
+    }
+  }
+
+  const cliente = await prisma.cliente.findUnique({
+    where: { id: clienteId },
+    select: { nome: true },
+  });
+
+  const ficha = await obterOuCriarRascunho(
+    clienteId,
+    procedimento,
+    profissional,
+    dataFicha,
   );
 
   await prisma.$transaction(async (tx) => {
     await tx.clienteAnamneseResposta.deleteMany({
-      where: {
-        clienteId,
-        modeloId: modeloId ?? undefined,
-        procedimento: procedimento ?? undefined,
-      },
+      where: { anamneseId: ficha.id },
     });
 
     if (respostas.length > 0) {
-      await tx.clienteAnamneseResposta.createMany({ data: respostas });
+      await tx.clienteAnamneseResposta.createMany({
+        data: respostas.map((resposta) => ({
+          ...resposta,
+          anamneseId: ficha.id,
+        })),
+      });
     }
 
-    const fichaExistente = await tx.clienteAnamnese.findFirst({
-      where: {
-        clienteId,
-        procedimento: procedimento ?? undefined,
+    await tx.clienteAnamnese.update({
+      where: { id: ficha.id },
+      data: {
+        procedimento,
+        profissional,
+        respostasRapidas: resumoRespostas || null,
+        termoConsentimento,
+        dataFicha,
+        status: intencao === "finalizar" ? "FINALIZADA" : "RASCUNHO",
+        assinaturaCliente:
+          intencao === "finalizar" ? assinaturaCliente : null,
+        assinaturaNome:
+          intencao === "finalizar" ? cliente?.nome ?? null : null,
+        assinadaEm: intencao === "finalizar" ? new Date() : null,
+        finalizadaEm: intencao === "finalizar" ? new Date() : null,
       },
-      orderBy: { updatedAt: "desc" },
     });
-
-    const dataFichaClinica = {
-      procedimento,
-      profissional,
-      respostasRapidas: resumoRespostas || null,
-      termoConsentimento,
-      dataFicha,
-    };
-
-    if (fichaExistente) {
-      await tx.clienteAnamnese.update({
-        where: { id: fichaExistente.id },
-        data: dataFichaClinica,
-      });
-    } else {
-      await tx.clienteAnamnese.create({
-        data: {
-          clienteId,
-          ...dataFichaClinica,
-        },
-      });
-    }
   });
 
-  await auditar(
-    "Salvou anamnese do cliente",
-    "ClienteAnamnese",
-    `${clienteId} - ${procedimento || "Sem procedimento"}`,
-  );
+  await prisma.auditoria.create({
+    data: {
+      modulo: "Clientes",
+      acao:
+        intencao === "finalizar"
+          ? "Finalizou e assinou anamnese"
+          : "Salvou rascunho de anamnese",
+      entidade: "ClienteAnamnese",
+      usuario: usuario.nome || usuario.email,
+      detalhes: `${clienteId} - ${procedimento || "Sem procedimento"} - versão ${ficha.versao}`,
+    },
+  });
+
   revalidatePath(`/clientes/${clienteId}`);
   revalidatePath("/clientes");
+}
+
+export async function criarNovaRevisaoAnamnese(
+  clienteId: number,
+  procedimento: string,
+) {
+  const usuario = await requirePermission("clientes.clinico");
+  if (!Number.isInteger(clienteId) || clienteId <= 0 || !procedimento.trim()) {
+    throw new Error("Dados inválidos para criar nova versão da anamnese.");
+  }
+
+  const ultimaFicha = await prisma.clienteAnamnese.findFirst({
+    where: { clienteId, procedimento },
+    orderBy: [{ versao: "desc" }, { updatedAt: "desc" }],
+  });
+
+  if (ultimaFicha && ultimaFicha.status !== "FINALIZADA") {
+    return;
+  }
+
+  await prisma.clienteAnamnese.create({
+    data: {
+      clienteId,
+      procedimento,
+      profissional: usuario.nome,
+      status: "RASCUNHO",
+      versao: (ultimaFicha?.versao ?? 0) + 1,
+      dataFicha: new Date(),
+    },
+  });
+
+  revalidatePath(`/clientes/${clienteId}`);
 }

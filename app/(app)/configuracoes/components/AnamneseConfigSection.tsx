@@ -32,10 +32,13 @@ type Props = {
 };
 
 const tipos = [
+  { value: "SECAO", label: "Seção / título" },
   { value: "SIM_NAO", label: "Sim / Não" },
   { value: "TEXTO_CURTO", label: "Texto curto" },
   { value: "TEXTO_LONGO", label: "Texto longo" },
-  { value: "MULTIPLA_ESCOLHA", label: "Múltipla escolha" },
+  { value: "NUMERO", label: "Número / medida" },
+  { value: "MULTIPLA_ESCOLHA", label: "Seleção única" },
+  { value: "MULTIPLA_SELECAO", label: "Seleção múltipla" },
   { value: "ACEITE", label: "Aceite / Termo" },
 ];
 
@@ -125,15 +128,14 @@ export default function AnamneseConfigSection({ modelos, servicos }: Props) {
           ) : (
             <Sparkles className="h-4 w-4" />
           )}
-          Criar 17 modelos Studio Realçar
+          Sincronizar fichas Studio Realçar
         </Button>
       </div>
 
       <div className="mb-5 rounded-3xl border border-amber-300/20 bg-amber-400/10 p-4 text-sm leading-6 text-amber-100">
-        Os 17 modelos são criados sem duplicar os já existentes. As perguntas
-        iniciais são genéricas e totalmente editáveis. Perguntas clínicas,
-        contraindicações e termos específicos de cada procedimento devem ser
-        revisados pela responsável técnica antes do uso definitivo.
+        Sincroniza as fichas padronizadas do Studio Realçar sem apagar respostas antigas.
+        Perguntas que já possuem histórico são preservadas e desativadas quando substituídas.
+        Conteúdo clínico e contraindicações devem continuar sob validação da responsável técnica.
       </div>
 
       <datalist id="anamnese-procedimentos-cadastrados">
@@ -402,9 +404,8 @@ export default function AnamneseConfigSection({ modelos, servicos }: Props) {
                   Adicionar pergunta, frase ou termo
                 </p>
                 <p className="mt-1 text-xs leading-5 text-slate-400">
-                  Para uma frase de consentimento, escolha “Aceite / Termo”. Para
-                  respostas prontas, use “Múltipla escolha” e informe uma opção
-                  por linha.
+                  Use “Seção / título” para organizar a ficha no celular. Use “Seleção única”
+                  ou “Seleção múltipla” para respostas por toque e informe uma opção por linha.
                 </p>
                 <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_190px_100px]">
                   <input
@@ -435,7 +436,7 @@ export default function AnamneseConfigSection({ modelos, servicos }: Props) {
                 <textarea
                   name="opcoes"
                   className="premium-input mt-3 min-h-20 w-full py-3"
-                  placeholder="Opções para múltipla escolha, uma por linha"
+                  placeholder="Opções de seleção, uma por linha"
                 />
                 <label className="mt-3 flex items-center gap-2 text-sm text-slate-300">
                   <input
