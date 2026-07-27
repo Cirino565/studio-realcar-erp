@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type * as React from "react";
 import { useMemo, useState, useTransition } from "react";
 import {
@@ -1503,18 +1504,27 @@ export default function ConfiguracoesClient({
                   </div>
                 </div>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    startTransition(async () => {
-                      await criarCadastrosAuxiliaresPadrao();
-                    });
-                  }}
-                >
-                  <Sparkles className="h-4 w-4" />
-                  Criar opções padrão
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button asChild variant="destructive">
+                    <Link href="/configuracoes/implantacao">
+                      <ShieldCheck className="h-4 w-4" />
+                      Preparar início oficial
+                    </Link>
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      startTransition(async () => {
+                        await criarCadastrosAuxiliaresPadrao();
+                      });
+                    }}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Criar opções padrão
+                  </Button>
+                </div>
               </div>
 
               <div className="grid gap-5 xl:grid-cols-2">
