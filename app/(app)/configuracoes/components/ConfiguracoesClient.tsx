@@ -48,6 +48,7 @@ import type {
   ProcedimentoServicoView,
 } from "../types";
 import AnamneseConfigSection from "./AnamneseConfigSection";
+import ImportarClientesSection from "./ImportarClientesSection";
 
 type Props = {
   configuracao: ConfiguracaoClinicaView;
@@ -1563,6 +1564,8 @@ export default function ConfiguracoesClient({
                 inicial. Serviços da agenda são usados para duração padrão,
                 valor previsto e bloqueio automático de horário.
               </div>
+
+              <ImportarClientesSection />
             </section>
           )}
 

@@ -28,6 +28,45 @@ function getInitials(nome: string) {
     .join("");
 }
 
+
+function AreaBadges({
+  areaEstetica,
+  areaCilios,
+}: {
+  areaEstetica: boolean;
+  areaCilios: boolean;
+}) {
+  if (areaEstetica && areaCilios) {
+    return (
+      <span className="inline-flex rounded-full border border-fuchsia-200 bg-fuchsia-50 px-2.5 py-1 text-[0.68rem] font-bold text-fuchsia-700 dark:border-fuchsia-400/20 dark:bg-fuchsia-400/10 dark:text-fuchsia-300">
+        Ambas
+      </span>
+    );
+  }
+
+  if (areaEstetica) {
+    return (
+      <span className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[0.68rem] font-bold text-violet-700 dark:border-violet-400/20 dark:bg-violet-400/10 dark:text-violet-300">
+        Estética
+      </span>
+    );
+  }
+
+  if (areaCilios) {
+    return (
+      <span className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[0.68rem] font-bold text-sky-700 dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-300">
+        Cílios
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[0.68rem] font-bold text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400">
+      Sem área definida
+    </span>
+  );
+}
+
 function StatusBadge({ status }: { status: string }) {
   const ativa = status === "Ativa";
 
@@ -70,12 +109,13 @@ export default function ClienteTable({
   return (
     <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.055]">
       <div className="hidden overflow-x-auto xl:block">
-        <table className="w-full min-w-[1020px] text-sm">
+        <table className="w-full min-w-[1140px] text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-[0.68rem] uppercase tracking-[0.14em] text-slate-500 dark:border-white/10 dark:bg-white/[0.025] dark:text-slate-400">
             <tr>
               <th className="px-5 py-4 text-left font-bold">Cliente</th>
               <th className="px-5 py-4 text-left font-bold">Contato</th>
               <th className="px-5 py-4 text-left font-bold">Interesse</th>
+              <th className="px-5 py-4 text-left font-bold">Áreas</th>
               <th className="px-5 py-4 text-left font-bold">Valor gasto</th>
               <th className="px-5 py-4 text-left font-bold">Última visita</th>
               <th className="px-5 py-4 text-left font-bold">Status</th>
@@ -124,6 +164,13 @@ export default function ClienteTable({
                       cliente.procedimento ||
                       "Não informado"}
                   </span>
+                </td>
+
+                <td className="px-5 py-4">
+                  <AreaBadges
+                    areaEstetica={cliente.areaEstetica}
+                    areaCilios={cliente.areaCilios}
+                  />
                 </td>
 
                 <td className="px-5 py-4 font-bold text-emerald-700 dark:text-emerald-300">
@@ -212,6 +259,13 @@ export default function ClienteTable({
               </div>
 
               <StatusBadge status={cliente.status} />
+            </div>
+
+            <div className="mt-3">
+              <AreaBadges
+                areaEstetica={cliente.areaEstetica}
+                areaCilios={cliente.areaCilios}
+              />
             </div>
 
             <div className="mt-4 grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-sm dark:border-white/10 dark:bg-white/[0.04] sm:grid-cols-3">

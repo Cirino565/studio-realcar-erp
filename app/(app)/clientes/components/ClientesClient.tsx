@@ -46,6 +46,8 @@ type ClienteFormData = {
   procedimentoInteresse: string;
   nascimento: string;
   observacoes: string;
+  areaEstetica: boolean;
+  areaCilios: boolean;
 };
 
 export default function ClientesClient({
@@ -61,6 +63,7 @@ export default function ClientesClient({
   const [ordenacao, setOrdenacao] = useState("nome-asc");
   const [procedimentoFiltro, setProcedimentoFiltro] = useState("todos");
   const [retornoFiltro, setRetornoFiltro] = useState("todos");
+  const [areaFiltro, setAreaFiltro] = useState("todas");
   const [modalAberto, setModalAberto] = useState(false);
   const [mensagemAberta, setMensagemAberta] = useState(false);
   const [clienteSelecionado, setClienteSelecionado] =
@@ -99,6 +102,13 @@ export default function ClientesClient({
         (cliente.procedimentoInteresse ?? "").toLowerCase().includes(texto);
 
       const atendeStatus = status === "todos" || cliente.status === status;
+
+      const atendeArea =
+        areaFiltro === "todas" ||
+        (areaFiltro === "estetica" && cliente.areaEstetica && !cliente.areaCilios) ||
+        (areaFiltro === "cilios" && cliente.areaCilios && !cliente.areaEstetica) ||
+        (areaFiltro === "ambas" && cliente.areaEstetica && cliente.areaCilios) ||
+        (areaFiltro === "sem-area" && !cliente.areaEstetica && !cliente.areaCilios);
 
       const agendamentosValidos = (cliente.agendamentos ?? []).filter(
         (agendamento) => agendamento.status !== "Cancelado",
@@ -152,7 +162,7 @@ export default function ClientesClient({
         );
       }
 
-      return atendeTexto && atendeStatus && atendeProcedimento && atendeRetorno;
+      return atendeTexto && atendeStatus && atendeArea && atendeProcedimento && atendeRetorno;
     });
 
     return [...filtrados].sort((a, b) => {
@@ -173,7 +183,7 @@ export default function ClientesClient({
 
       return a.nome.localeCompare(b.nome, "pt-BR");
     });
-  }, [clientes, busca, status, ordenacao, procedimentoFiltro, retornoFiltro]);
+  }, [clientes, busca, status, areaFiltro, ordenacao, procedimentoFiltro, retornoFiltro]);
 
   function novoCliente() {
     setClienteSelecionado(null);
@@ -260,6 +270,8 @@ export default function ClientesClient({
           procedimentos={procedimentosRealizados}
           retorno={retornoFiltro}
           onRetornoChange={setRetornoFiltro}
+          area={areaFiltro}
+          onAreaChange={setAreaFiltro}
         />
 
         <ClienteTable

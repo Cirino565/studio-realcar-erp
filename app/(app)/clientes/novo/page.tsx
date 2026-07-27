@@ -24,6 +24,8 @@ async function salvarNovoCliente(formData: FormData) {
     procedimentoInteresse: getString(formData, "procedimentoInteresse"),
     nascimento: getString(formData, "nascimento"),
     observacoes: getString(formData, "observacoes"),
+    areaEstetica: formData.get("areaEstetica") === "on",
+    areaCilios: formData.get("areaCilios") === "on",
   });
 
   redirect("/clientes");

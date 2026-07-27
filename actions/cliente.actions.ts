@@ -16,6 +16,8 @@ export type ClienteForm = {
   procedimentoInteresse?: string;
   nascimento?: string;
   observacoes?: string;
+  areaEstetica?: boolean;
+  areaCilios?: boolean;
 };
 
 export async function listarClientes() {
@@ -42,6 +44,8 @@ export async function criarCliente(dados: ClienteForm) {
         ? new Date(dados.nascimento)
         : null,
       observacoes: dados.observacoes || null,
+      areaEstetica: Boolean(dados.areaEstetica),
+      areaCilios: Boolean(dados.areaCilios),
     },
   });
 
@@ -68,6 +72,8 @@ export async function atualizarCliente(dados: ClienteForm) {
         ? new Date(dados.nascimento)
         : null,
       observacoes: dados.observacoes || null,
+      areaEstetica: Boolean(dados.areaEstetica),
+      areaCilios: Boolean(dados.areaCilios),
     },
   });
 

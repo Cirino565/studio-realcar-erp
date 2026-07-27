@@ -72,6 +72,8 @@ type FormData = {
   procedimentoInteresse: string;
   nascimento: string;
   observacoes: string;
+  areaEstetica: boolean;
+  areaCilios: boolean;
 };
 
 type Props = {
@@ -161,6 +163,8 @@ function montarFormulario(
       procedimentoInteresse: procedimentoPadrao,
       nascimento: "",
       observacoes: "",
+      areaEstetica: false,
+      areaCilios: false,
     };
   }
 
@@ -177,6 +181,8 @@ function montarFormulario(
       procedimentoPadrao,
     nascimento: formatarDataInput(cliente.nascimento),
     observacoes: cliente.observacoes ?? "",
+    areaEstetica: cliente.areaEstetica ?? false,
+    areaCilios: cliente.areaCilios ?? false,
   };
 }
 
@@ -216,7 +222,7 @@ function NovoClienteForm({
   );
   const [erro, setErro] = useState("");
 
-  function alterarCampo(campo: keyof FormData, valor: string) {
+  function alterarCampo<K extends keyof FormData>(campo: K, valor: FormData[K]) {
     setErro("");
     setForm((atual) => ({ ...atual, [campo]: valor }));
   }
@@ -409,6 +415,35 @@ function NovoClienteForm({
               auxiliares.
             </p>
           </label>
+
+          <fieldset className="sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.035]">
+            <legend className="px-1 text-[0.68rem] font-bold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">
+              Áreas de atendimento
+            </legend>
+            <p className="mb-3 text-xs leading-5 text-slate-500 dark:text-slate-400">
+              Selecione uma ou as duas áreas. Também é possível manter sem área definida.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200">
+                <input
+                  type="checkbox"
+                  checked={form.areaEstetica}
+                  onChange={(event) => alterarCampo("areaEstetica", event.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 accent-violet-600"
+                />
+                Estética
+              </label>
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200">
+                <input
+                  type="checkbox"
+                  checked={form.areaCilios}
+                  onChange={(event) => alterarCampo("areaCilios", event.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 accent-violet-600"
+                />
+                Cílios
+              </label>
+            </div>
+          </fieldset>
         </div>
 
         <label>

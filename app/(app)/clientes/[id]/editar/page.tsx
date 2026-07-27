@@ -59,6 +59,8 @@ export default async function EditarClientePage({ params }: EditarClientePagePro
         (formData.get("procedimentoInteresse") as string) || "",
       nascimento: (formData.get("nascimento") as string) || "",
       observacoes: (formData.get("observacoes") as string) || "",
+      areaEstetica: formData.get("areaEstetica") === "on",
+      areaCilios: formData.get("areaCilios") === "on",
     });
 
     redirect(`/clientes/${clienteId}`);

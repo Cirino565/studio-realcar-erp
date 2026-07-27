@@ -16,6 +16,8 @@ type Props = {
   procedimentos: string[];
   retorno: string;
   onRetornoChange: (retorno: string) => void;
+  area: string;
+  onAreaChange: (area: string) => void;
 };
 
 export default function ClienteSearch({
@@ -30,13 +32,16 @@ export default function ClienteSearch({
   procedimentos,
   retorno,
   onRetornoChange,
+  area,
+  onAreaChange,
 }: Props) {
   const possuiFiltros =
     Boolean(value.trim()) ||
     status !== "todos" ||
     ordenacao !== "nome-asc" ||
     procedimento !== "todos" ||
-    retorno !== "todos";
+    retorno !== "todos" ||
+    area !== "todas";
 
   function limparFiltros() {
     onChange("");
@@ -44,6 +49,7 @@ export default function ClienteSearch({
     onOrdenacaoChange("nome-asc");
     onProcedimentoChange("todos");
     onRetornoChange("todos");
+    onAreaChange("todas");
   }
 
   return (
@@ -115,7 +121,22 @@ export default function ClienteSearch({
         </label>
       </div>
 
-      <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+      <div className="mt-3 grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)_220px]">
+        <label>
+          <span className="sr-only">Filtrar por área</span>
+          <select
+            value={area}
+            onChange={(event) => onAreaChange(event.target.value)}
+            className="premium-input w-full appearance-none"
+          >
+            <option value="todas">Todas as áreas</option>
+            <option value="estetica">Somente Estética</option>
+            <option value="cilios">Somente Cílios</option>
+            <option value="ambas">Estética e Cílios</option>
+            <option value="sem-area">Sem área definida</option>
+          </select>
+        </label>
+
         <label>
           <span className="sr-only">Filtrar por procedimento</span>
           <select

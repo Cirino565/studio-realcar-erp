@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import type { Cliente, OrigemCliente, ProcedimentoInteresse } from "@prisma/client";
 
 import { Button } from "@/components/ui/button";
@@ -214,6 +214,35 @@ export default function ClienteServerForm({
               type="date"
               defaultValue={dateValue(cliente?.nascimento)}
             />
+
+            <fieldset className="min-w-0 rounded-2xl border border-white/[0.10] bg-white/[0.035] p-4 sm:col-span-2">
+              <legend className="px-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                Áreas de atendimento
+              </legend>
+              <p className="mb-3 text-xs leading-5 text-slate-400">
+                Selecione uma ou as duas áreas. O cadastro também pode permanecer sem área definida.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/[0.10] bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-200">
+                  <input
+                    type="checkbox"
+                    name="areaEstetica"
+                    defaultChecked={cliente?.areaEstetica ?? false}
+                    className="h-4 w-4 rounded border-white/20 accent-violet-500"
+                  />
+                  Estética
+                </label>
+                <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/[0.10] bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-200">
+                  <input
+                    type="checkbox"
+                    name="areaCilios"
+                    defaultChecked={cliente?.areaCilios ?? false}
+                    className="h-4 w-4 rounded border-white/20 accent-violet-500"
+                  />
+                  Cílios
+                </label>
+              </div>
+            </fieldset>
 
             <label className="min-w-0 space-y-2 sm:col-span-2">
               <span className="block break-words text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
