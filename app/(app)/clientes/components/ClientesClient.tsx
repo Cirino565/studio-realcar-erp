@@ -41,7 +41,14 @@ type ClienteFormData = {
   telefone: string;
   whatsapp: string;
   cpf: string;
-  instagram: string;
+  cep: string;
+  logradouro: string;
+  numero: string;
+  complemento: string;
+  bairro: string;
+  cidade: string;
+  estado: string;
+  enderecoOriginal: string;
   origem: string;
   procedimentoInteresse: string;
   nascimento: string;
@@ -97,7 +104,11 @@ export default function ClientesClient({
         cliente.telefone.toLowerCase().includes(texto) ||
         (cliente.cpf ?? "").toLowerCase().includes(texto) ||
         (cliente.whatsapp ?? "").toLowerCase().includes(texto) ||
-        (cliente.instagram ?? "").toLowerCase().includes(texto) ||
+        (cliente.cep ?? "").toLowerCase().includes(texto) ||
+        (cliente.logradouro ?? "").toLowerCase().includes(texto) ||
+        (cliente.bairro ?? "").toLowerCase().includes(texto) ||
+        (cliente.cidade ?? "").toLowerCase().includes(texto) ||
+        (cliente.enderecoOriginal ?? "").toLowerCase().includes(texto) ||
         (cliente.origem ?? "").toLowerCase().includes(texto) ||
         (cliente.procedimentoInteresse ?? "").toLowerCase().includes(texto);
 

@@ -74,11 +74,11 @@ function baixarModelo() {
     "telefone",
     "whatsapp",
     "cpf",
-    "instagram",
     "origem",
     "procedimentoInteresse",
     "nascimento",
     "observacoes",
+    "enderecoOriginal",
     "areaEstetica",
     "areaCilios",
     "status",
@@ -88,11 +88,11 @@ function baixarModelo() {
     "(11) 99999-0000",
     "(11) 99999-0000",
     "",
-    "@clienteexemplo",
     "Indicação",
     "Avaliação",
     "15/05/1990",
     "Linha fictícia, remova antes de usar",
+    "Rua Exemplo, 123, Centro",
     "SIM",
     "NÃO",
     "Ativa",
@@ -270,7 +270,7 @@ export default function ImportarClientesSection() {
               className="block w-full rounded-2xl border border-white/[0.10] bg-white/[0.05] px-4 py-3 text-sm text-slate-300 file:mr-4 file:rounded-xl file:border-0 file:bg-violet-500 file:px-4 file:py-2 file:font-semibold file:text-white hover:file:bg-violet-400"
             />
             <span className="text-xs leading-5 text-slate-500">
-              Limite de 5 MB e 10.000 linhas. No Excel, use Salvar como, CSV UTF-8 delimitado por vírgulas.
+              Limite de 5 MB e 10.000 linhas. No Excel, use Salvar como, CSV UTF-8. O modelo utiliza ponto e vírgula como separador.
             </span>
           </label>
 

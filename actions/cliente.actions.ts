@@ -4,6 +4,22 @@ import { requirePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
+function textoOpcional(valor?: string) {
+  return valor?.trim() || null;
+}
+
+function normalizarCep(valor?: string) {
+  const original = valor?.trim() || "";
+  const digitos = original.replace(/\D/g, "");
+  if (!original) return null;
+  if (digitos.length === 8) return `${digitos.slice(0, 5)}-${digitos.slice(5)}`;
+  return original;
+}
+
+function normalizarEstado(valor?: string) {
+  return valor?.trim().toUpperCase().slice(0, 2) || null;
+}
+
 export type ClienteForm = {
   id?: number;
 
@@ -11,7 +27,14 @@ export type ClienteForm = {
   telefone: string;
   whatsapp?: string;
   cpf?: string;
-  instagram?: string;
+  cep?: string;
+  logradouro?: string;
+  numero?: string;
+  complemento?: string;
+  bairro?: string;
+  cidade?: string;
+  estado?: string;
+  enderecoOriginal?: string;
   origem?: string;
   procedimentoInteresse?: string;
   nascimento?: string;
@@ -35,15 +58,22 @@ export async function criarCliente(dados: ClienteForm) {
     data: {
       nome: dados.nome,
       telefone: dados.telefone,
-      whatsapp: dados.whatsapp || null,
-      cpf: dados.cpf || null,
-      instagram: dados.instagram || null,
-      origem: dados.origem || null,
-      procedimentoInteresse: dados.procedimentoInteresse || null,
+      whatsapp: textoOpcional(dados.whatsapp),
+      cpf: textoOpcional(dados.cpf),
+      cep: normalizarCep(dados.cep),
+      logradouro: textoOpcional(dados.logradouro),
+      numero: textoOpcional(dados.numero),
+      complemento: textoOpcional(dados.complemento),
+      bairro: textoOpcional(dados.bairro),
+      cidade: textoOpcional(dados.cidade),
+      estado: normalizarEstado(dados.estado),
+      enderecoOriginal: textoOpcional(dados.enderecoOriginal),
+      origem: textoOpcional(dados.origem),
+      procedimentoInteresse: textoOpcional(dados.procedimentoInteresse),
       nascimento: dados.nascimento
         ? new Date(dados.nascimento)
         : null,
-      observacoes: dados.observacoes || null,
+      observacoes: textoOpcional(dados.observacoes),
       areaEstetica: Boolean(dados.areaEstetica),
       areaCilios: Boolean(dados.areaCilios),
     },
@@ -63,15 +93,22 @@ export async function atualizarCliente(dados: ClienteForm) {
     data: {
       nome: dados.nome,
       telefone: dados.telefone,
-      whatsapp: dados.whatsapp || null,
-      cpf: dados.cpf || null,
-      instagram: dados.instagram || null,
-      origem: dados.origem || null,
-      procedimentoInteresse: dados.procedimentoInteresse || null,
+      whatsapp: textoOpcional(dados.whatsapp),
+      cpf: textoOpcional(dados.cpf),
+      cep: normalizarCep(dados.cep),
+      logradouro: textoOpcional(dados.logradouro),
+      numero: textoOpcional(dados.numero),
+      complemento: textoOpcional(dados.complemento),
+      bairro: textoOpcional(dados.bairro),
+      cidade: textoOpcional(dados.cidade),
+      estado: normalizarEstado(dados.estado),
+      enderecoOriginal: textoOpcional(dados.enderecoOriginal),
+      origem: textoOpcional(dados.origem),
+      procedimentoInteresse: textoOpcional(dados.procedimentoInteresse),
       nascimento: dados.nascimento
         ? new Date(dados.nascimento)
         : null,
-      observacoes: dados.observacoes || null,
+      observacoes: textoOpcional(dados.observacoes),
       areaEstetica: Boolean(dados.areaEstetica),
       areaCilios: Boolean(dados.areaCilios),
     },

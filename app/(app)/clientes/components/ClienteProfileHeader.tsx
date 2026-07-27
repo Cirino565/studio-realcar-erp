@@ -5,6 +5,7 @@ import type { Cliente } from "@/lib/types";
 import {
   Camera,
   FileText,
+  MapPin,
   Sparkles,
   Stethoscope,
 } from "lucide-react";
@@ -16,6 +17,20 @@ type Props = {
   data: ClienteClinicoData;
   cliente: Cliente;
 };
+
+
+function montarEnderecoEstruturado(cliente: Cliente) {
+  const linhaLogradouro = [cliente.logradouro, cliente.numero]
+    .filter(Boolean)
+    .join(", ");
+  const linhaLocalidade = [cliente.bairro, cliente.cidade, cliente.estado]
+    .filter(Boolean)
+    .join(" - ");
+
+  return [linhaLogradouro, cliente.complemento, linhaLocalidade, cliente.cep]
+    .filter(Boolean)
+    .join(" | ");
+}
 
 function getInitials(nome: string) {
   return nome
@@ -40,6 +55,8 @@ export default function ClienteProfileHeader({
   const ultimoProcedimento = data.procedimentos[0];
   const ultimaEvolucao = data.evolucoes[0];
   const totalFotos = data.fotos.length;
+  const enderecoEstruturado = montarEnderecoEstruturado(cliente);
+  const enderecoOriginal = cliente.enderecoOriginal?.trim() || "";
 
   return (
     <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.06] sm:p-6">
@@ -76,6 +93,30 @@ export default function ClienteProfileHeader({
 
           <ClienteProfileActions cliente={cliente} />
         </div>
+
+        {enderecoEstruturado || enderecoOriginal ? (
+          <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-400/20 dark:bg-sky-500/10">
+            <div className="flex items-start gap-3">
+              <MapPin className="mt-0.5 size-5 shrink-0 text-sky-700 dark:text-sky-300" />
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+                  Endereço
+                </p>
+                {enderecoEstruturado ? (
+                  <p className="mt-1 break-words text-sm font-medium text-slate-800 dark:text-slate-100">
+                    {enderecoEstruturado}
+                  </p>
+                ) : null}
+                {enderecoOriginal ? (
+                  <p className="mt-1 break-words text-xs leading-5 text-slate-600 dark:text-slate-300">
+                    {enderecoEstruturado ? "Original importado: " : ""}
+                    {enderecoOriginal}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.04]">

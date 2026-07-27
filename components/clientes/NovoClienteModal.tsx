@@ -4,6 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, Save, UserRound, X } from "lucide-react";
 import type { OrigemCliente, ProcedimentoInteresse } from "@prisma/client";
 
+import EnderecoClienteFields, {
+  type EnderecoClienteValues,
+} from "@/components/clientes/EnderecoClienteFields";
 import { Button } from "@/components/ui/button";
 import type { Cliente } from "@/lib/types";
 
@@ -67,7 +70,14 @@ type FormData = {
   telefone: string;
   whatsapp: string;
   cpf: string;
-  instagram: string;
+  cep: string;
+  logradouro: string;
+  numero: string;
+  complemento: string;
+  bairro: string;
+  cidade: string;
+  estado: string;
+  enderecoOriginal: string;
   origem: string;
   procedimentoInteresse: string;
   nascimento: string;
@@ -158,7 +168,14 @@ function montarFormulario(
       telefone: "",
       whatsapp: "",
       cpf: "",
-      instagram: "",
+      cep: "",
+      logradouro: "",
+      numero: "",
+      complemento: "",
+      bairro: "",
+      cidade: "",
+      estado: "",
+      enderecoOriginal: "",
       origem: origemPadrao,
       procedimentoInteresse: procedimentoPadrao,
       nascimento: "",
@@ -173,7 +190,14 @@ function montarFormulario(
     telefone: formatarTelefone(cliente.telefone ?? ""),
     whatsapp: formatarTelefone(cliente.whatsapp ?? ""),
     cpf: formatarCpf(cliente.cpf ?? ""),
-    instagram: cliente.instagram ?? "",
+    cep: cliente.cep ?? "",
+    logradouro: cliente.logradouro ?? "",
+    numero: cliente.numero ?? "",
+    complemento: cliente.complemento ?? "",
+    bairro: cliente.bairro ?? "",
+    cidade: cliente.cidade ?? "",
+    estado: cliente.estado ?? "",
+    enderecoOriginal: cliente.enderecoOriginal ?? "",
     origem: cliente.origem ?? origemPadrao,
     procedimentoInteresse:
       cliente.procedimentoInteresse ??
@@ -244,7 +268,14 @@ function NovoClienteForm({
       telefone: formatarTelefone(form.telefone || form.whatsapp),
       whatsapp: formatarTelefone(form.whatsapp || form.telefone),
       cpf: formatarCpf(form.cpf),
-      instagram: form.instagram.trim(),
+      cep: form.cep.trim(),
+      logradouro: form.logradouro.trim(),
+      numero: form.numero.trim(),
+      complemento: form.complemento.trim(),
+      bairro: form.bairro.trim(),
+      cidade: form.cidade.trim(),
+      estado: form.estado.trim().toUpperCase(),
+      enderecoOriginal: form.enderecoOriginal.trim(),
       origem: form.origem || origemPadrao,
       procedimentoInteresse:
         form.procedimentoInteresse || procedimentoPadrao,
@@ -367,18 +398,6 @@ function NovoClienteForm({
           </label>
 
           <label>
-            <Label>Instagram</Label>
-            <input
-              name="instagram"
-              value={form.instagram}
-              onChange={(event) => alterarCampo("instagram", event.target.value)}
-              placeholder="@usuario"
-              className="premium-input w-full min-w-0 max-w-full text-base sm:text-sm"
-              autoCapitalize="none"
-            />
-          </label>
-
-          <label>
             <Label>Origem</Label>
             <select
               name="origem"
@@ -415,6 +434,23 @@ function NovoClienteForm({
               auxiliares.
             </p>
           </label>
+
+          <EnderecoClienteFields
+            initialValues={{
+              cep: form.cep,
+              logradouro: form.logradouro,
+              numero: form.numero,
+              complemento: form.complemento,
+              bairro: form.bairro,
+              cidade: form.cidade,
+              estado: form.estado,
+              enderecoOriginal: form.enderecoOriginal,
+            }}
+            onValuesChange={(endereco: EnderecoClienteValues) => {
+              setErro("");
+              setForm((atual) => ({ ...atual, ...endereco }));
+            }}
+          />
 
           <fieldset className="sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.035]">
             <legend className="px-1 text-[0.68rem] font-bold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">

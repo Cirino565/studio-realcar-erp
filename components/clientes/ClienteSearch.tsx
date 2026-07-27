@@ -83,7 +83,7 @@ export default function ClienteSearch({
           <input
             value={value}
             onChange={(event) => onChange(event.target.value)}
-            placeholder="Nome, telefone, CPF, WhatsApp, origem ou procedimento"
+            placeholder="Nome, telefone, CPF, endereço, origem ou procedimento"
             className="premium-input w-full pl-11"
           />
         </label>

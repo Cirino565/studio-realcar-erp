@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Cliente, OrigemCliente, ProcedimentoInteresse } from "@prisma/client";
 
+import EnderecoClienteFields from "@/components/clientes/EnderecoClienteFields";
 import { Button } from "@/components/ui/button";
 
 type Props = {
@@ -165,13 +166,6 @@ export default function ClienteServerForm({
               placeholder="000.000.000-00"
             />
 
-            <Field
-              label="Instagram"
-              name="instagram"
-              defaultValue={cliente?.instagram}
-              placeholder="@perfil"
-            />
-
             <label className="min-w-0 space-y-2">
               <span className="block break-words text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                 Origem
@@ -213,6 +207,19 @@ export default function ClienteServerForm({
               name="nascimento"
               type="date"
               defaultValue={dateValue(cliente?.nascimento)}
+            />
+
+            <EnderecoClienteFields
+              initialValues={{
+                cep: cliente?.cep ?? "",
+                logradouro: cliente?.logradouro ?? "",
+                numero: cliente?.numero ?? "",
+                complemento: cliente?.complemento ?? "",
+                bairro: cliente?.bairro ?? "",
+                cidade: cliente?.cidade ?? "",
+                estado: cliente?.estado ?? "",
+                enderecoOriginal: cliente?.enderecoOriginal ?? "",
+              }}
             />
 
             <fieldset className="min-w-0 rounded-2xl border border-white/[0.10] bg-white/[0.035] p-4 sm:col-span-2">
