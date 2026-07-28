@@ -2,6 +2,7 @@ import { ClienteClinicoTabs } from "@/app/(app)/clientes/components/ClienteClini
 import type { ClienteClinicoData } from "@/app/(app)/clientes/types";
 import { requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isGoogleDriveConfigured } from "@/lib/google-drive";
 import ClienteProfileHeader from "@/app/(app)/clientes/components/ClienteProfileHeader";
 
 type ClientePageProps = {
@@ -52,6 +53,7 @@ async function getClienteClinico(clienteId: number) {
         orderBy: [{ updatedAt: "desc" }, { dataFicha: "desc" }],
       },
       fotos: {
+        where: { excluidaEm: null },
         orderBy: { dataRegistro: "desc" },
       },
       documentos: {
@@ -119,9 +121,16 @@ export default async function ClientePage({ params }: ClientePageProps) {
       id: foto.id,
       titulo: foto.titulo,
       tipo: foto.tipo,
-      url: foto.url,
+      procedimento: foto.procedimento,
+      url:
+        foto.armazenamento === "GOOGLE_DRIVE"
+          ? `/api/clientes/fotos/${foto.id}/arquivo`
+          : foto.url,
       descricao: foto.descricao,
       dataRegistro: toIsoString(foto.dataRegistro),
+      armazenamento: foto.armazenamento,
+      nomeArquivo: foto.nomeArquivo,
+      tamanhoBytes: foto.tamanhoBytes,
     })),
     documentos: cliente.documentos.map((documento) => ({
       id: documento.id,
@@ -163,6 +172,7 @@ export default async function ClientePage({ params }: ClientePageProps) {
         ordem: pergunta.ordem,
       })),
     })),
+    driveConfigurado: isGoogleDriveConfigured(),
     anamneseRespostas: cliente.anamneseRespostas.map((resposta) => ({
       id: resposta.id,
       anamneseId: resposta.anamneseId,

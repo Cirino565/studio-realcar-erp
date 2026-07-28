@@ -1,6 +1,7 @@
 "use server";
 
 import { requirePermission } from "@/lib/auth";
+import { moveDriveFileToTrash, restoreDriveFile } from "@/lib/google-drive";
 import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
@@ -107,7 +108,7 @@ export async function salvarAnamneseCliente(formData: FormData) {
 }
 
 export async function criarFotoCliente(formData: FormData) {
-  await requirePermission("clientes.clinico");
+  const usuario = await requirePermission("clientes.clinico");
   const clienteId = getClienteId(formData);
   const titulo = getString(formData, "titulo");
   const url = getString(formData, "url");
@@ -116,14 +117,28 @@ export async function criarFotoCliente(formData: FormData) {
     throw new Error("Informe o título e o link da foto.");
   }
 
-  await prisma.clienteFoto.create({
+  const foto = await prisma.clienteFoto.create({
     data: {
       clienteId,
       titulo,
       tipo: getString(formData, "tipo") || "Evolução",
+      procedimento: getString(formData, "procedimento"),
       url,
       descricao: getString(formData, "descricao"),
       dataRegistro: getDate(formData, "dataRegistro"),
+      armazenamento: "LINK",
+      enviadaPor: usuario.nome || usuario.email,
+    },
+  });
+
+  await prisma.auditoria.create({
+    data: {
+      modulo: "Clientes",
+      acao: "Cadastrou link de foto clínica",
+      entidade: "ClienteFoto",
+      entidadeId: String(foto.id),
+      usuario: usuario.nome || usuario.email,
+      detalhes: `Cliente ${clienteId}, título ${titulo}.`,
     },
   });
 
@@ -216,23 +231,122 @@ export async function criarDocumentoCliente(formData: FormData) {
 export async function excluirRegistroClinico(
   clienteId: number,
   tipo: "foto" | "evolucao" | "procedimento" | "documento",
-  id: number
+  id: number,
 ) {
-  await requirePermission("clientes.clinico");
+  const usuario = await requirePermission("clientes.clinico");
+
+  if (!Number.isInteger(clienteId) || clienteId <= 0 || !Number.isInteger(id) || id <= 0) {
+    throw new Error("Registro clínico inválido.");
+  }
+
   if (tipo === "foto") {
-    await prisma.clienteFoto.delete({ where: { id } });
+    const foto = await prisma.clienteFoto.findFirst({
+      where: { id, clienteId, excluidaEm: null },
+      select: { id: true, titulo: true, driveFileId: true },
+    });
+
+    if (!foto) {
+      throw new Error("Foto não encontrada ou já excluída.");
+    }
+
+    if (foto.driveFileId) {
+      await moveDriveFileToTrash(foto.driveFileId);
+    }
+
+    try {
+      await prisma.$transaction([
+        prisma.clienteFoto.update({
+          where: { id: foto.id },
+          data: {
+            excluidaEm: new Date(),
+            excluidaPor: usuario.nome || usuario.email,
+          },
+        }),
+        prisma.auditoria.create({
+          data: {
+            modulo: "Clientes",
+            acao: "Excluiu foto clínica",
+            entidade: "ClienteFoto",
+            entidadeId: String(foto.id),
+            usuario: usuario.nome || usuario.email,
+            detalhes: foto.driveFileId
+              ? `Cliente ${clienteId}, título ${foto.titulo}. O arquivo do Drive foi movido para a lixeira.`
+              : `Cliente ${clienteId}, título ${foto.titulo}. Registro antigo por link ocultado.`,
+          },
+        }),
+      ]);
+    } catch (error) {
+      if (foto.driveFileId) {
+        await restoreDriveFile(foto.driveFileId).catch(() => undefined);
+      }
+      throw error;
+    }
   }
 
   if (tipo === "evolucao") {
-    await prisma.clienteEvolucao.delete({ where: { id } });
+    const registro = await prisma.clienteEvolucao.findFirst({
+      where: { id, clienteId },
+      select: { id: true },
+    });
+    if (!registro) throw new Error("Evolução clínica não encontrada.");
+
+    await prisma.$transaction([
+      prisma.clienteEvolucao.delete({ where: { id: registro.id } }),
+      prisma.auditoria.create({
+        data: {
+          modulo: "Clientes",
+          acao: "Excluiu evolução clínica",
+          entidade: "ClienteEvolucao",
+          entidadeId: String(registro.id),
+          usuario: usuario.nome || usuario.email,
+          detalhes: `Cliente ${clienteId}.`,
+        },
+      }),
+    ]);
   }
 
   if (tipo === "procedimento") {
-    await prisma.clienteProcedimento.delete({ where: { id } });
+    const registro = await prisma.clienteProcedimento.findFirst({
+      where: { id, clienteId },
+      select: { id: true },
+    });
+    if (!registro) throw new Error("Procedimento não encontrado.");
+
+    await prisma.$transaction([
+      prisma.clienteProcedimento.delete({ where: { id: registro.id } }),
+      prisma.auditoria.create({
+        data: {
+          modulo: "Clientes",
+          acao: "Excluiu procedimento clínico",
+          entidade: "ClienteProcedimento",
+          entidadeId: String(registro.id),
+          usuario: usuario.nome || usuario.email,
+          detalhes: `Cliente ${clienteId}.`,
+        },
+      }),
+    ]);
   }
 
   if (tipo === "documento") {
-    await prisma.clienteDocumento.delete({ where: { id } });
+    const registro = await prisma.clienteDocumento.findFirst({
+      where: { id, clienteId },
+      select: { id: true },
+    });
+    if (!registro) throw new Error("Documento clínico não encontrado.");
+
+    await prisma.$transaction([
+      prisma.clienteDocumento.delete({ where: { id: registro.id } }),
+      prisma.auditoria.create({
+        data: {
+          modulo: "Clientes",
+          acao: "Excluiu documento clínico",
+          entidade: "ClienteDocumento",
+          entidadeId: String(registro.id),
+          usuario: usuario.nome || usuario.email,
+          detalhes: `Cliente ${clienteId}.`,
+        },
+      }),
+    ]);
   }
 
   revalidatePath(`/clientes/${clienteId}`);

@@ -31,6 +31,16 @@ const adminPassword = get('ADMIN_PASSWORD');
 const operationalEmail = get('OPERATIONAL_EMAIL');
 const operationalPassword = get('OPERATIONAL_PASSWORD');
 
+const driveClientId = get('GOOGLE_DRIVE_CLIENT_ID');
+const driveClientSecret = get('GOOGLE_DRIVE_CLIENT_SECRET');
+const driveRefreshToken = get('GOOGLE_DRIVE_REFRESH_TOKEN');
+const driveValues = [driveClientId, driveClientSecret, driveRefreshToken];
+const driveConfiguredCount = driveValues.filter(Boolean).length;
+
+if (driveConfiguredCount > 0 && driveConfiguredCount < driveValues.length) {
+  errors.push('Google Drive configurado parcialmente. Defina CLIENT_ID, CLIENT_SECRET e REFRESH_TOKEN, ou deixe os tres vazios.');
+}
+
 if (!databaseUrl) {
   errors.push('DATABASE_URL nao definido. Configure um PostgreSQL na hospedagem.');
 } else if (!databaseUrl.startsWith('postgresql://') && !databaseUrl.startsWith('postgres://')) {
@@ -62,6 +72,10 @@ if (errors.length > 0) {
   for (const error of errors) console.error(`- ${error}`);
   console.error('\nUse .env.production.example como modelo.\n');
   process.exit(1);
+}
+
+if (driveConfiguredCount === 0) {
+  console.warn('Aviso: Google Drive ainda nao configurado. O envio de fotos clinicas ficara desativado.');
 }
 
 console.log('Variaveis de hospedagem validadas.');

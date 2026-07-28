@@ -565,16 +565,29 @@ model ClienteAnamnese {
 }
 
 model ClienteFoto {
-  id            Int      @id @default(autoincrement())
-  clienteId     Int
-  cliente       Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  titulo        String
-  tipo          String   @default("Evolução")
-  url           String
-  descricao     String?
-  dataRegistro  DateTime @default(now())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              Int      @id @default(autoincrement())
+  clienteId       Int
+  cliente         Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  titulo          String
+  tipo            String   @default("Evolução")
+  procedimento    String?
+  url             String
+  descricao       String?
+  dataRegistro    DateTime @default(now())
+  armazenamento   String   @default("LINK")
+  driveFileId     String?  @unique
+  nomeArquivo     String?
+  mimeType        String?
+  tamanhoBytes    Int?
+  hashSha256      String?
+  enviadaPor      String?
+  excluidaEm      DateTime?
+  excluidaPor     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([clienteId, excluidaEm, dataRegistro])
+  @@index([hashSha256])
 }
 
 model ClienteDocumento {

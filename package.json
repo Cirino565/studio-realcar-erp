@@ -55,7 +55,9 @@
 
     "deploy:seed": "prisma db seed --schema=prisma/schema.prisma",
 
-    "seed:prod": "prisma db seed --schema=prisma/schema.prisma"
+    "seed:prod": "prisma db seed --schema=prisma/schema.prisma",
+
+    "drive:oauth": "node scripts/google-drive-oauth.mjs"
   },
 
   "dependencies": {

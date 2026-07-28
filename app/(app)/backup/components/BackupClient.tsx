@@ -96,7 +96,7 @@ const nomesMetricas: Record<keyof Omit<BackupMetricas, "total">, string> = {
   anamneseModelos: "Modelos de anamnese",
   anamnesePerguntas: "Perguntas de anamnese",
   anamneseRespostas: "Respostas de anamnese",
-  fotos: "Fotos",
+  fotos: "Fotos, metadados",
   documentos: "Documentos",
   procedimentos: "Procedimentos clínicos",
   evolucoes: "Evoluções",
@@ -156,6 +156,13 @@ export function BackupClient({ backups, metricas, saude }: BackupClientProps) {
             </a>
           </div>
         </div>
+      </section>
+
+      <section className="rounded-3xl border border-amber-300/20 bg-amber-400/10 p-4 text-sm leading-6 text-amber-50 sm:p-5">
+        <p className="font-semibold">Atenção ao backup das fotos clínicas</p>
+        <p className="mt-1 text-amber-100/80">
+          O snapshot JSON inclui os cadastros, identificadores e metadados das fotos, mas não inclui os arquivos físicos armazenados no Google Drive. Mantenha a pasta privada do Drive e uma cópia periódica separada.
+        </p>
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

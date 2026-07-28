@@ -10,22 +10,24 @@ import {
   FileText,
   ImageIcon,
   Loader2,
+  Maximize2,
   Plus,
   Stethoscope,
   Trash2,
+  X,
 } from "lucide-react";
 
 import {
   criarDocumentoCliente,
   criarEvolucaoCliente,
-  criarFotoCliente,
   criarProcedimentoCliente,
   excluirRegistroClinico,
 } from "@/actions/cliente-clinico.actions";
 import { Button } from "@/components/ui/button";
 import AnamneseMobileForm from "./AnamneseMobileForm";
+import { ClienteFotoUploadForm } from "./ClienteFotoUploadForm";
 import { formatarData, formatarMoeda } from "@/lib/format";
-import type { ClienteClinicoData } from "../types";
+import type { ClienteClinicoData, ClienteFotoData } from "../types";
 
 type AbaClinica =
   | "anamnese"
@@ -197,8 +199,21 @@ function DeleteButton({
       variant="destructive"
       disabled={isPending}
       onClick={() => {
+        const nomes: Record<typeof tipo, string> = {
+          foto: "esta foto clínica",
+          evolucao: "esta evolução clínica",
+          procedimento: "este procedimento",
+          documento: "este documento",
+        };
+
+        if (!window.confirm(`Confirma a exclusão de ${nomes[tipo]}?`)) return;
+
         startTransition(() => {
-          void excluirRegistroClinico(clienteId, tipo, id);
+          void excluirRegistroClinico(clienteId, tipo, id).catch((error) => {
+            window.alert(
+              error instanceof Error ? error.message : "Não foi possível excluir o registro.",
+            );
+          });
         });
       }}
       aria-label="Excluir registro"
@@ -220,6 +235,7 @@ export function ClienteClinicoTabs({
     useState<AbaClinica>(initialTab);
   const [resumoMobileAberto, setResumoMobileAberto] =
     useState(false);
+  const [fotoAberta, setFotoAberta] = useState<ClienteFotoData | null>(null);
 
   const [procedimentoAnamnese, setProcedimentoAnamnese] =
     useState(
@@ -249,6 +265,23 @@ export function ClienteClinicoTabs({
       setActiveTab(hash);
     }
   }, []);
+
+  useEffect(() => {
+    if (!fotoAberta) return;
+
+    const overflowAnterior = document.body.style.overflow;
+    const fecharComEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFotoAberta(null);
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", fecharComEscape);
+
+    return () => {
+      document.body.style.overflow = overflowAnterior;
+      window.removeEventListener("keydown", fecharComEscape);
+    };
+  }, [fotoAberta]);
 
   const resumo = useMemo(() => {
     const totalProcedimentos = data.procedimentos.length;
@@ -497,61 +530,14 @@ export function ClienteClinicoTabs({
             <SectionHeader
               icon={ImageIcon}
               title="Fotos da cliente"
-              description="Registro visual de antes, depois e evolução."
+              description="Registro visual privado de antes, depois, evolução e intercorrências."
             />
 
             <div className="grid min-w-0 gap-5 p-4 sm:p-6 lg:grid-cols-[minmax(280px,380px)_minmax(0,1fr)]">
-              <form
-                action={criarFotoCliente}
-                className="h-fit space-y-4 rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/[0.04]"
-              >
-                <input
-                  type="hidden"
-                  name="clienteId"
-                  value={data.id}
-                />
-
-                <Field
-                  label="Título"
-                  name="titulo"
-                  required
-                  placeholder="Ex: Antes da limpeza de pele"
-                />
-
-                <Field
-                  label="Tipo"
-                  name="tipo"
-                  defaultValue="Evolução"
-                  placeholder="Antes, Depois, Evolução"
-                />
-
-                <Field
-                  label="Link da foto"
-                  name="url"
-                  required
-                  placeholder="Cole a URL ou caminho da imagem"
-                />
-
-                <Field
-                  label="Data"
-                  name="dataRegistro"
-                  type="date"
-                  defaultValue={dateInputValue(
-                    new Date().toISOString(),
-                  )}
-                />
-
-                <TextArea
-                  label="Descrição"
-                  name="descricao"
-                  rows={3}
-                />
-
-                <Button type="submit" className="w-full">
-                  <Plus size={17} />
-                  Adicionar foto
-                </Button>
-              </form>
+              <ClienteFotoUploadForm
+                clienteId={data.id}
+                driveConfigurado={data.driveConfigurado}
+              />
 
               <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {data.fotos.length > 0 ? (
@@ -560,14 +546,24 @@ export function ClienteClinicoTabs({
                       key={foto.id}
                       className="min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.04]"
                     >
-                      <div className="aspect-[4/3] bg-slate-100 dark:bg-slate-950/60">
+                      <button
+                        type="button"
+                        onClick={() => setFotoAberta(foto)}
+                        className="group relative block aspect-[4/3] w-full bg-slate-100 text-left dark:bg-slate-950/60"
+                        aria-label={`Abrir foto ${foto.titulo}`}
+                      >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={foto.url}
                           alt={foto.titulo}
-                          className="h-full w-full object-cover"
+                          loading="lazy"
+                          decoding="async"
+                          className="h-full w-full object-contain"
                         />
-                      </div>
+                        <span className="absolute right-3 top-3 flex size-9 items-center justify-center rounded-full bg-slate-950/75 text-white opacity-90 shadow-lg transition group-hover:scale-105 group-hover:bg-slate-950">
+                          <Maximize2 size={17} />
+                        </span>
+                      </button>
 
                       <div className="space-y-3 p-4">
                         <div className="flex items-start justify-between gap-3">
@@ -577,11 +573,14 @@ export function ClienteClinicoTabs({
                             </p>
 
                             <p className="mt-1 text-xs text-slate-500">
-                              {foto.tipo} •{" "}
-                              {formatarData(
-                                foto.dataRegistro,
-                              )}
+                              {foto.tipo} • {formatarData(foto.dataRegistro)}
                             </p>
+
+                            {foto.procedimento ? (
+                              <p className="mt-1 break-words text-xs font-medium text-slate-600 dark:text-slate-300">
+                                {foto.procedimento}
+                              </p>
+                            ) : null}
                           </div>
 
                           <DeleteButton
@@ -589,6 +588,17 @@ export function ClienteClinicoTabs({
                             tipo="foto"
                             id={foto.id}
                           />
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
+                          <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-200">
+                            {foto.armazenamento === "GOOGLE_DRIVE" ? "Drive privado" : "Link antigo"}
+                          </span>
+                          {foto.tamanhoBytes ? (
+                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600 dark:bg-white/[0.06] dark:text-slate-300">
+                              {(foto.tamanhoBytes / 1024 / 1024).toFixed(1)} MB
+                            </span>
+                          ) : null}
                         </div>
 
                         {foto.descricao ? (
@@ -603,7 +613,7 @@ export function ClienteClinicoTabs({
                   <EmptyState
                     icon={ImageIcon}
                     title="Nenhuma foto registrada"
-                    text="Adicione links de fotos para criar o histórico visual da cliente."
+                    text="Tire uma foto ou escolha uma imagem da galeria. O arquivo será armazenado de forma privada no Google Drive."
                   />
                 )}
               </div>
@@ -957,6 +967,54 @@ export function ClienteClinicoTabs({
           </div>
         )}
       </div>
+
+      {fotoAberta ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 p-3 backdrop-blur-sm sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Foto ${fotoAberta.titulo}`}
+          onClick={() => setFotoAberta(null)}
+        >
+          <div
+            className="relative flex max-h-full w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-slate-950 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-white/10 px-4 py-3 sm:px-5">
+              <div className="min-w-0">
+                <p className="break-words font-semibold text-white">{fotoAberta.titulo}</p>
+                <p className="mt-1 text-xs text-slate-300">
+                  {fotoAberta.tipo} • {formatarData(fotoAberta.dataRegistro)}
+                  {fotoAberta.procedimento ? ` • ${fotoAberta.procedimento}` : ""}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFotoAberta(null)}
+                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+                aria-label="Fechar foto"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-black p-2 sm:p-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={fotoAberta.url}
+                alt={fotoAberta.titulo}
+                className="max-h-[78vh] max-w-full object-contain"
+              />
+            </div>
+
+            {fotoAberta.descricao ? (
+              <p className="border-t border-white/10 px-4 py-3 text-sm leading-6 text-slate-200 sm:px-5">
+                {fotoAberta.descricao}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

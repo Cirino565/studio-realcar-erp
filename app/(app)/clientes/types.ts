@@ -32,9 +32,13 @@ export type ClienteFotoData = {
   id: number;
   titulo: string;
   tipo: string;
+  procedimento: string | null;
   url: string;
   descricao: string | null;
   dataRegistro: string;
+  armazenamento: string;
+  nomeArquivo: string | null;
+  tamanhoBytes: number | null;
 };
 
 export type ClienteDocumentoData = {
@@ -77,6 +81,7 @@ export type ClienteClinicoData = {
   evolucoes: ClienteEvolucaoData[];
   anamneseModelos: ClienteAnamneseModeloData[];
   anamneseRespostas: ClienteAnamneseRespostaData[];
+  driveConfigurado: boolean;
 };
 
 export type ClienteAnamnesePerguntaModelo = {
