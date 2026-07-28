@@ -17,6 +17,15 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
+import {
+  getMutedTextColor,
+  getOverlayBackground,
+  getOverlayBorder,
+  getReadableTextColor,
+  mixHexColors,
+  normalizeAgendaColor,
+  withAlpha,
+} from "@/lib/color-contrast";
 
 type ProfissionalAgenda = {
   id: number;
@@ -247,104 +256,60 @@ function getEndHour(date: Date) {
   return 19;
 }
 
-function getPalette(color: string, index: number) {
-  const normalized = (color || "").toLowerCase();
-
-  if (
-    normalized.includes("rose") ||
-    normalized.includes("red") ||
-    normalized.includes("pink") ||
-    normalized.includes("vermelho") ||
-    index % 2 === 1
-  ) {
-    return {
-      solid: "#be123c",
-      gradientEnd: "#e11d48",
-      soft: "rgba(190, 18, 60, 0.10)",
-      border: "rgba(244, 63, 94, 0.42)",
-    };
-  }
-
-  if (normalized.includes("blue") || normalized.includes("azul")) {
-    return {
-      solid: "#2563eb",
-      gradientEnd: "#4f46e5",
-      soft: "rgba(37, 99, 235, 0.10)",
-      border: "rgba(59, 130, 246, 0.42)",
-    };
-  }
-
-  if (normalized.includes("teal") || normalized.includes("green")) {
-    return {
-      solid: "#0f766e",
-      gradientEnd: "#0d9488",
-      soft: "rgba(15, 118, 110, 0.10)",
-      border: "rgba(20, 184, 166, 0.42)",
-    };
-  }
+function createPalette(solid: string, gradientEnd: string) {
+  const middle = mixHexColors(solid, gradientEnd, 0.5);
+  const text = getReadableTextColor(middle);
 
   return {
-    solid: "#7c3aed",
-    gradientEnd: "#a21caf",
-    soft: "rgba(124, 58, 237, 0.10)",
-    border: "rgba(139, 92, 246, 0.42)",
+    solid,
+    gradientEnd,
+    soft: withAlpha(solid, 0.10),
+    border: withAlpha(gradientEnd, 0.42),
+    text,
+    mutedText: getMutedTextColor(text),
+    overlayBackground: getOverlayBackground(text),
+    overlayBorder: getOverlayBorder(text),
   };
+}
+
+function getPalette(color: string, index: number) {
+  const normalized = (color || "").trim().toLowerCase();
+  const fallback = index % 2 === 1 ? "#be123c" : "#7c3aed";
+  const solid = normalizeAgendaColor(normalized, fallback);
+  const lightColor = getReadableTextColor(solid) === "#0f172a";
+  const gradientEnd = mixHexColors(
+    solid,
+    lightColor ? "#0f172a" : "#ffffff",
+    lightColor ? 0.18 : 0.12,
+  );
+
+  return createPalette(solid, gradientEnd);
 }
 
 function getStatusPalette(status: string) {
   const normalized = (status || "Agendado").toLowerCase();
 
   if (normalized === "confirmado") {
-    return {
-      solid: "#059669",
-      gradientEnd: "#10b981",
-      soft: "rgba(5, 150, 105, 0.10)",
-      border: "rgba(16, 185, 129, 0.38)",
-    };
+    return createPalette("#059669", "#10b981");
   }
 
   if (normalized === "em atendimento") {
-    return {
-      solid: "#0891b2",
-      gradientEnd: "#06b6d4",
-      soft: "rgba(8, 145, 178, 0.10)",
-      border: "rgba(6, 182, 212, 0.40)",
-    };
+    return createPalette("#0891b2", "#06b6d4");
   }
 
   if (normalized === "atendido") {
-    return {
-      solid: "#2563eb",
-      gradientEnd: "#3b82f6",
-      soft: "rgba(37, 99, 235, 0.10)",
-      border: "rgba(59, 130, 246, 0.40)",
-    };
+    return createPalette("#2563eb", "#3b82f6");
   }
 
   if (normalized === "faltou") {
-    return {
-      solid: "#d97706",
-      gradientEnd: "#f59e0b",
-      soft: "rgba(217, 119, 6, 0.10)",
-      border: "rgba(245, 158, 11, 0.42)",
-    };
+    return createPalette("#d97706", "#fbbf24");
   }
 
   if (normalized === "cancelado") {
-    return {
-      solid: "#64748b",
-      gradientEnd: "#94a3b8",
-      soft: "rgba(100, 116, 139, 0.10)",
-      border: "rgba(148, 163, 184, 0.45)",
-    };
+    return createPalette("#64748b", "#94a3b8");
   }
 
-  return {
-    solid: "#7c3aed",
-    gradientEnd: "#a21caf",
-    soft: "rgba(124, 58, 237, 0.10)",
-    border: "rgba(139, 92, 246, 0.42)",
-  };
+  return createPalette("#7c3aed", "#a21caf");
 }
 
 function agendaHref(
@@ -436,7 +401,6 @@ export default function AgendaCalendar({
     return {
       top: visibleStart * MINUTE_HEIGHT,
       height: (visibleEnd - visibleStart) * MINUTE_HEIGHT,
-      label: `${almocoVisual.inicio} às ${almocoVisual.fim}`,
     };
   }, [almocoVisual, isSunday, selectedDate, totalMinutes]);
 
@@ -453,10 +417,14 @@ export default function AgendaCalendar({
     start: addDays(selectedDate, -DATE_STRIP_INITIAL_BEFORE),
     end: addDays(selectedDate, DATE_STRIP_INITIAL_AFTER),
   }));
+  const [dateStripVisibleMonth, setDateStripVisibleMonth] = useState(
+    () => new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1),
+  );
   const dateStripRef = useRef<HTMLDivElement | null>(null);
   const prependScrollWidthRef = useRef<number | null>(null);
   const extendingDateStripRef = useRef(false);
   const centeredDateStripRef = useRef(false);
+  const dateStripScrollFrameRef = useRef<number | null>(null);
 
   const weekDays = useMemo(() => {
     const weekStart = startOfWeek(selectedDate);
@@ -481,6 +449,12 @@ export default function AgendaCalendar({
     () => getCalendarDays(calendarViewDate),
     [calendarViewDate],
   );
+
+  useEffect(() => {
+    setDateStripVisibleMonth(
+      new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1),
+    );
+  }, [selectedDate, selectedDateInput]);
 
   useEffect(() => {
     const container = dateStripRef.current;
@@ -511,9 +485,52 @@ export default function AgendaCalendar({
     extendingDateStripRef.current = false;
   }, [dateStripRange.start]);
 
+  function updateDateStripVisibleMonth() {
+    const container = dateStripRef.current;
+    if (!container) return;
+
+    const center = container.scrollLeft + container.clientWidth / 2;
+    let closestDate = "";
+    let closestDistance = Number.POSITIVE_INFINITY;
+
+    container
+      .querySelectorAll<HTMLElement>("[data-agenda-date]")
+      .forEach((element) => {
+        const elementCenter = element.offsetLeft + element.offsetWidth / 2;
+        const distance = Math.abs(elementCenter - center);
+
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestDate = element.dataset.agendaDate || "";
+        }
+      });
+
+    if (!closestDate) return;
+
+    const [year, month] = closestDate.split("-").map(Number);
+    if (!year || !month) return;
+
+    setDateStripVisibleMonth((current) => {
+      if (current.getFullYear() === year && current.getMonth() === month - 1) {
+        return current;
+      }
+
+      return new Date(year, month - 1, 1);
+    });
+  }
+
   function handleDateStripScroll() {
     const container = dateStripRef.current;
-    if (!container || extendingDateStripRef.current) return;
+    if (!container) return;
+
+    if (dateStripScrollFrameRef.current === null) {
+      dateStripScrollFrameRef.current = window.requestAnimationFrame(() => {
+        updateDateStripVisibleMonth();
+        dateStripScrollFrameRef.current = null;
+      });
+    }
+
+    if (extendingDateStripRef.current) return;
 
     const distanceToRight =
       container.scrollWidth - container.scrollLeft - container.clientWidth;
@@ -542,6 +559,14 @@ export default function AgendaCalendar({
       extendingDateStripRef.current = false;
     }
   }, [dateStripRange.end]);
+
+  useEffect(() => {
+    return () => {
+      if (dateStripScrollFrameRef.current !== null) {
+        window.cancelAnimationFrame(dateStripScrollFrameRef.current);
+      }
+    };
+  }, []);
 
   const slots = useMemo(() => {
     if (isSunday) return [];
@@ -798,35 +823,46 @@ export default function AgendaCalendar({
             </button>
           </div>
 
-          <div
-            ref={dateStripRef}
-            onScroll={handleDateStripScroll}
-            className="touch-scroll-x scrollbar-premium order-3 min-w-0 overflow-x-auto pb-1 lg:order-none"
-            aria-label="Navegação contínua por datas"
-          >
-            <div className="flex w-max min-w-full items-center gap-1 px-1">
-              {dateStripDays.map((day) => {
-                const active = isSameDay(day, selectedDate);
-                const todayItem = isSameDay(day, today);
+          <div className="order-3 min-w-0 lg:order-none">
+            <p
+              className="mb-1 text-center text-[0.68rem] font-extrabold tracking-wide text-slate-500 dark:text-slate-300"
+              aria-live="polite"
+            >
+              {formatMonthYear(dateStripVisibleMonth)}
+            </p>
 
-                return (
-                  <a
-                    key={formatDateInput(day)}
-                    data-agenda-date={formatDateInput(day)}
-                    href={agendaHref(day, profissionalFiltro, viewMode)}
-                    className={`flex h-9 w-[82px] flex-none items-center justify-center gap-1 rounded-md border px-2 text-center text-xs font-semibold transition ${
-                      active
-                        ? "border-violet-700 bg-violet-700 text-white shadow-sm"
-                        : todayItem
-                          ? "border-violet-300 bg-violet-50 text-violet-800 hover:bg-violet-100 dark:border-violet-500/50 dark:bg-violet-500/10 dark:text-violet-100"
-                          : "border-violet-200 bg-white text-violet-700 hover:border-violet-300 hover:bg-violet-50 dark:border-violet-500/40 dark:bg-slate-950 dark:text-violet-200 dark:hover:bg-violet-500/10"
-                    }`}
-                  >
-                    <span className="capitalize">{formatWeekday(day)}</span>
-                    <span className="font-extrabold">{String(day.getDate()).padStart(2, "0")}</span>
-                  </a>
-                );
-              })}
+            <div
+              ref={dateStripRef}
+              onScroll={handleDateStripScroll}
+              className="touch-scroll-x scrollbar-premium min-w-0 overflow-x-auto pb-1"
+              aria-label="Navegação contínua por datas"
+            >
+              <div className="flex w-max min-w-full items-center gap-1 px-1">
+                {dateStripDays.map((day) => {
+                  const active = isSameDay(day, selectedDate);
+                  const todayItem = isSameDay(day, today);
+
+                  return (
+                    <a
+                      key={formatDateInput(day)}
+                      data-agenda-date={formatDateInput(day)}
+                      href={agendaHref(day, profissionalFiltro, viewMode)}
+                      className={`flex h-9 w-[82px] flex-none items-center justify-center gap-1 rounded-md border px-2 text-center text-xs font-semibold transition ${
+                        active
+                          ? "border-violet-700 bg-violet-700 text-white shadow-sm"
+                          : todayItem
+                            ? "border-violet-300 bg-violet-50 text-violet-800 hover:bg-violet-100 dark:border-violet-500/50 dark:bg-violet-500/10 dark:text-violet-100"
+                            : "border-violet-200 bg-white text-violet-700 hover:border-violet-300 hover:bg-violet-50 dark:border-violet-500/40 dark:bg-slate-950 dark:text-violet-200 dark:hover:bg-violet-500/10"
+                      }`}
+                    >
+                      <span className="capitalize">{formatWeekday(day)}</span>
+                      <span className="font-extrabold">
+                        {String(day.getDate()).padStart(2, "0")}
+                      </span>
+                    </a>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -967,10 +1003,10 @@ export default function AgendaCalendar({
                             return (
                               <div
                                 key={`lunch-${dateKey}-${itemIndex}`}
-                                className="rounded-md border border-dashed border-amber-300 bg-amber-50 px-2 py-1.5 text-[10px] font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
-                              >
-                                {almocoVisual.inicio}–{almocoVisual.fim} · Almoço
-                              </div>
+                                className="h-3 rounded-sm border-y border-amber-300/90 bg-amber-100 dark:border-amber-400/30 dark:bg-amber-400/15"
+                                title={`${almocoVisual.inicio} às ${almocoVisual.fim}`}
+                                aria-label={`Intervalo de ${almocoVisual.inicio} às ${almocoVisual.fim}`}
+                              />
                             );
                           }
 
@@ -1045,8 +1081,11 @@ export default function AgendaCalendar({
                               </p>
                               <div className="mt-1 flex flex-wrap items-center gap-1">
                                 <span
-                                  className="inline-flex rounded px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-white"
-                                  style={{ backgroundColor: palette.solid }}
+                                  className="inline-flex rounded px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide"
+                                  style={{
+                                    backgroundColor: palette.solid,
+                                    color: getReadableTextColor(palette.solid),
+                                  }}
                                 >
                                   {appointment.status}
                                 </span>
@@ -1157,8 +1196,12 @@ export default function AgendaCalendar({
                 >
                   <div className="flex h-full min-w-0 items-center justify-center gap-2">
                     <span
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white shadow-sm"
-                      style={{ backgroundColor: palette.solid }}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border shadow-sm"
+                      style={{
+                        backgroundColor: palette.solid,
+                        borderColor: palette.border,
+                        color: palette.text,
+                      }}
                     >
                       <UserRound size={14} />
                     </span>
@@ -1220,20 +1263,14 @@ export default function AgendaCalendar({
 
                     {almocoRange ? (
                       <div
-                        className="pointer-events-none absolute left-0 right-0 z-[1] border-y border-amber-200/80 bg-amber-50/75 dark:border-amber-500/20 dark:bg-amber-400/[0.06]"
+                        className="pointer-events-none absolute left-0 right-0 z-[1] border-y border-amber-300/90 bg-amber-100/90 dark:border-amber-400/30 dark:bg-amber-400/15"
                         style={{
                           top: almocoRange.top,
                           height: almocoRange.height,
                         }}
-                      >
-                        {index === 0 && almocoRange.height >= 44 ? (
-                          <div className="flex h-full items-start justify-center pt-2">
-                            <span className="rounded-full border border-amber-300/70 bg-white/85 px-2.5 py-1 text-[0.62rem] font-bold uppercase tracking-[0.12em] text-amber-700 shadow-sm dark:border-amber-500/30 dark:bg-slate-900/80 dark:text-amber-200">
-                              Almoço · {almocoRange.label}
-                            </span>
-                          </div>
-                        ) : null}
-                      </div>
+                        title={`${almocoVisual.inicio} às ${almocoVisual.fim}`}
+                        aria-label={`Intervalo de ${almocoVisual.inicio} às ${almocoVisual.fim}`}
+                      />
                     ) : null}
 
                     {currentTimeLine !== null ? (
@@ -1339,10 +1376,12 @@ export default function AgendaCalendar({
                               onSelectAppointment(appointment);
                             }
                           }}
-                          className="absolute left-0.5 right-0.5 z-10 cursor-pointer overflow-hidden rounded-sm border border-white/20 text-left shadow-sm transition hover:brightness-105 hover:shadow-md sm:left-0.5 sm:right-0.5"
+                          className="absolute left-0.5 right-0.5 z-10 cursor-pointer overflow-hidden rounded-sm border text-left shadow-sm transition hover:brightness-105 hover:shadow-md sm:left-0.5 sm:right-0.5"
                           style={{
                             top,
                             height,
+                            color: statusPalette.text,
+                            borderColor: statusPalette.overlayBorder,
                             background: `linear-gradient(135deg, ${statusPalette.solid}, ${statusPalette.gradientEnd})`,
                             boxShadow: `inset 3px 0 0 ${palette.solid}`,
                           }}
@@ -1351,11 +1390,15 @@ export default function AgendaCalendar({
                             <div className="flex min-w-0 items-start justify-between gap-2">
                               <div className="min-w-0">
                                 <p
-                                  className="text-[0.64rem] font-extrabold leading-tight text-white/95 sm:text-[0.7rem]"
+                                  className="text-[0.64rem] font-extrabold leading-tight sm:text-[0.7rem]"
+                                  style={{ color: statusPalette.mutedText }}
                                 >
                                   {formatTime(appointment.data)} - {formatTime(appointmentEnd(appointment))}
                                 </p>
-                                <p className="mt-0.5 truncate text-[0.72rem] font-extrabold uppercase leading-tight text-white sm:text-xs">
+                                <p
+                                  className="mt-0.5 truncate text-[0.72rem] font-extrabold uppercase leading-tight sm:text-xs"
+                                  style={{ color: statusPalette.text }}
+                                >
                                   {appointment.cliente.nome}
                                 </p>
                               </div>
@@ -1373,7 +1416,12 @@ export default function AgendaCalendar({
 
                                 {appointment.serieId ? (
                                   <span
-                                    className="hidden shrink-0 items-center gap-1 rounded-md border border-white/30 bg-white/15 px-1.5 py-1 text-[10px] font-bold text-white sm:inline-flex"
+                                    className="hidden shrink-0 items-center gap-1 rounded-md border px-1.5 py-1 text-[10px] font-bold sm:inline-flex"
+                                    style={{
+                                      color: statusPalette.text,
+                                      borderColor: statusPalette.overlayBorder,
+                                      backgroundColor: statusPalette.overlayBackground,
+                                    }}
                                     title="Agendamento recorrente"
                                   >
                                     <Repeat2 size={11} />
@@ -1389,7 +1437,12 @@ export default function AgendaCalendar({
                                     event.stopPropagation();
                                     onMessage(appointment);
                                   }}
-                                  className="hidden shrink-0 rounded-md border border-white/30 bg-white/15 p-1 text-white transition hover:bg-white/25 sm:block"
+                                  className="hidden shrink-0 rounded-md border p-1 transition hover:brightness-95 sm:block"
+                                  style={{
+                                    color: statusPalette.text,
+                                    borderColor: statusPalette.overlayBorder,
+                                    backgroundColor: statusPalette.overlayBackground,
+                                  }}
                                   aria-label="Criar mensagem"
                                 >
                                   <MessageCircle size={12} />
@@ -1398,13 +1451,19 @@ export default function AgendaCalendar({
                             </div>
 
                             {height >= 52 ? (
-                              <p className="mt-1 line-clamp-1 text-[0.66rem] font-semibold text-white/95 sm:text-[0.72rem]">
+                              <p
+                                className="mt-1 line-clamp-1 text-[0.66rem] font-semibold sm:text-[0.72rem]"
+                                style={{ color: statusPalette.mutedText }}
+                              >
                                 {appointment.procedimento}
                               </p>
                             ) : null}
 
                             {height >= 82 ? (
-                              <p className="mt-1 line-clamp-1 text-[0.62rem] font-medium text-white/85">
+                              <p
+                                className="mt-1 line-clamp-1 text-[0.62rem] font-medium"
+                                style={{ color: statusPalette.mutedText }}
+                              >
                                 {appointment.status}
                                 {note !== appointment.status ? ` · ${note}` : ""}
                               </p>

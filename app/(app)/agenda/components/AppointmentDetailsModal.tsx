@@ -28,6 +28,11 @@ import {
   iniciarAtendimento,
 } from "@/actions/agendamento.actions";
 import { Button } from "@/components/ui/button";
+import {
+  getReadableTextColor,
+  normalizeAgendaColor,
+  withAlpha,
+} from "@/lib/color-contrast";
 
 type AppointmentDetails = {
   id: number;
@@ -188,6 +193,11 @@ export default function AppointmentDetailsModal({
   if (!open || !appointment) return null;
 
   const currentAppointment = appointment;
+  const professionalColor = normalizeAgendaColor(
+    currentAppointment.profissional?.cor,
+    "#7c3aed",
+  );
+  const professionalTextColor = getReadableTextColor(professionalColor);
 
   const endDate = addMinutes(
     currentAppointment.data,
@@ -519,10 +529,11 @@ export default function AppointmentDetailsModal({
             <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
               <div className="flex items-start gap-3">
                 <div
-                  className="flex size-11 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm"
+                  className="flex size-11 shrink-0 items-center justify-center rounded-2xl border shadow-sm"
                   style={{
-                    backgroundColor:
-                      currentAppointment.profissional?.cor || "#7c3aed",
+                    backgroundColor: professionalColor,
+                    borderColor: withAlpha(professionalColor, 0.36),
+                    color: professionalTextColor,
                   }}
                 >
                   <UserRound size={19} />
