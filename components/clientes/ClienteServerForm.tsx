@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Cliente, OrigemCliente, ProcedimentoInteresse } from "@prisma/client";
 
 import EnderecoClienteFields from "@/components/clientes/EnderecoClienteFields";
+import ProcedimentoSearchSelect from "@/components/clientes/ProcedimentoSearchSelect";
 import { Button } from "@/components/ui/button";
 
 type Props = {
@@ -184,23 +185,17 @@ export default function ClienteServerForm({
               </select>
             </label>
 
-            <label className="min-w-0 space-y-2">
+            <div className="min-w-0 space-y-2">
               <span className="block break-words text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                 Procedimento de interesse
               </span>
 
-              <select
+              <ProcedimentoSearchSelect
                 name="procedimentoInteresse"
+                options={procedimentosDisponiveis}
                 defaultValue={procedimentoPadrao}
-                className="premium-input min-h-12 w-full min-w-0 max-w-full"
-              >
-                {procedimentosDisponiveis.map((procedimento) => (
-                  <option key={procedimento} value={procedimento}>
-                    {procedimento}
-                  </option>
-                ))}
-              </select>
-            </label>
+              />
+            </div>
 
             <Field
               label="Nascimento"

@@ -7,6 +7,7 @@ import type { OrigemCliente, ProcedimentoInteresse } from "@prisma/client";
 import EnderecoClienteFields, {
   type EnderecoClienteValues,
 } from "@/components/clientes/EnderecoClienteFields";
+import ProcedimentoSearchSelect from "@/components/clientes/ProcedimentoSearchSelect";
 import { Button } from "@/components/ui/button";
 import type { Cliente } from "@/lib/types";
 
@@ -262,6 +263,11 @@ function NovoClienteForm({
       return;
     }
 
+    if (!form.procedimentoInteresse) {
+      setErro("Digite e selecione um procedimento cadastrado.");
+      return;
+    }
+
     onSalvar({
       ...form,
       nome: form.nome.trim(),
@@ -413,27 +419,20 @@ function NovoClienteForm({
             </select>
           </label>
 
-          <label className="sm:col-span-2">
+          <div className="sm:col-span-2">
             <Label>Procedimento de interesse</Label>
-            <select
+            <ProcedimentoSearchSelect
               name="procedimentoInteresse"
+              options={procedimentosDisponiveis}
               value={form.procedimentoInteresse}
-              onChange={(event) =>
-                alterarCampo("procedimentoInteresse", event.target.value)
-              }
-              className="premium-input w-full min-w-0 max-w-full text-base sm:text-sm"
-            >
-              {procedimentosDisponiveis.map((procedimento) => (
-                <option key={procedimento} value={procedimento}>
-                  {procedimento}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => alterarCampo("procedimentoInteresse", value)}
+              inputClassName="premium-input w-full min-w-0 max-w-full text-base sm:text-sm"
+            />
             <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-              As opções podem ser gerenciadas em Configurações &gt; Cadastros
-              auxiliares.
+              Digite para localizar e selecione um procedimento cadastrado. As
+              opções são gerenciadas em Configurações &gt; Cadastros auxiliares.
             </p>
-          </label>
+          </div>
 
           <EnderecoClienteFields
             initialValues={{

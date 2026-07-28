@@ -211,6 +211,8 @@ export default function NovoAgendamentoModal({
   const [profissionalId, setProfissionalId] = useState("");
   const [procedimento, setProcedimento] = useState("");
   const [servicoSelecionadoId, setServicoSelecionadoId] = useState("");
+  const [buscaServico, setBuscaServico] = useState("");
+  const [mostrarListaServicos, setMostrarListaServicos] = useState(false);
   const [data, setData] = useState("");
   const [hora, setHora] = useState("09:00");
   const [duracao, setDuracao] = useState("60");
@@ -302,15 +304,20 @@ export default function NovoAgendamentoModal({
 
       if (servicoCorrespondente) {
         setServicoSelecionadoId(String(servicoCorrespondente.id));
+        setProcedimento(servicoCorrespondente.nome);
+        setBuscaServico(servicoCorrespondente.nome);
       } else {
-        setServicoSelecionadoId("outro");
+        setServicoSelecionadoId("");
+        setProcedimento("");
+        setBuscaServico(initialPayload.procedimento);
       }
-
-      setProcedimento(initialPayload.procedimento);
     } else {
       setServicoSelecionadoId("");
       setProcedimento("");
+      setBuscaServico("");
     }
+
+    setMostrarListaServicos(false);
   }, [open, initialPayload, profissionais, servicos, modoEdicao, modoEdicaoBloqueio]);
 
   useEffect(() => {
@@ -369,33 +376,63 @@ export default function NovoAgendamentoModal({
       .slice(0, 6);
   }, [buscaCliente, clientes]);
 
+  const servicosFiltrados = useMemo(() => {
+    const query = normalizarTexto(buscaServico);
+
+    if (!query) {
+      return servicos.slice(0, 10);
+    }
+
+    return servicos
+      .filter((servico) => {
+        return (
+          normalizarTexto(servico.nome).includes(query) ||
+          normalizarTexto(servico.categoria).includes(query)
+        );
+      })
+      .slice(0, 10);
+  }, [buscaServico, servicos]);
+
+  const servicoSelecionado = useMemo(() => {
+    if (!servicoSelecionadoId) return null;
+
+    return (
+      servicos.find(
+        (servico) => String(servico.id) === String(servicoSelecionadoId),
+      ) || null
+    );
+  }, [servicoSelecionadoId, servicos]);
+
   const horariosDisponiveis = horarios.filter((item) => item.disponivel);
   const horariosOcupados = horarios.filter((item) => !item.disponivel).slice(0, 5);
   const total = parseCurrency(valor);
 
-  function selecionarServico(value: string) {
-    setServicoSelecionadoId(value);
-    setErro("");
-
-    if (value === "outro") {
-      setProcedimento("");
-      return;
-    }
-
-    const servico = servicos.find((item) => item.id === Number(value));
-
-    if (!servico) {
-      setProcedimento("");
-      return;
-    }
-
+  function selecionarServico(servico: ServicoAgenda) {
+    setServicoSelecionadoId(String(servico.id));
+    setBuscaServico(servico.nome);
     setProcedimento(servico.nome);
+    setMostrarListaServicos(false);
     setDuracao(String(servico.duracaoPadrao));
     setValor(
       servico.valorPadrao > 0
         ? servico.valorPadrao.toFixed(2).replace(".", ",")
         : "",
     );
+    setErro("");
+  }
+
+  function alterarBuscaServico(value: string) {
+    setBuscaServico(value);
+    setMostrarListaServicos(true);
+    setErro("");
+
+    if (
+      !servicoSelecionado ||
+      normalizarTexto(value) !== normalizarTexto(servicoSelecionado.nome)
+    ) {
+      setServicoSelecionadoId("");
+      setProcedimento("");
+    }
   }
 
   function iniciarNovoCliente() {
@@ -483,8 +520,8 @@ export default function NovoAgendamentoModal({
       return;
     }
 
-    if (!procedimento) {
-      setErro("Selecione ou informe o procedimento.");
+    if (!servicoSelecionadoId || !procedimento) {
+      setErro("Digite e selecione um procedimento cadastrado na lista.");
       return;
     }
 
@@ -963,26 +1000,109 @@ export default function NovoAgendamentoModal({
           <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-700">
             <div className="grid grid-cols-[1fr_auto] items-end gap-4">
               <label className="min-w-0">
-                <span className={labelClassName()}>Serviço</span>
+                <span className={labelClassName()}>Procedimento</span>
                 <div className="relative">
-                  <select
-                    value={servicoSelecionadoId}
-                    onChange={(event) => selecionarServico(event.target.value)}
-                    className={`${fieldClassName()} appearance-none pr-7`}
-                  >
-                    <option value="">Digite para buscar ou selecione um serviço...</option>
-                    {servicos.map((servico) => (
-                      <option key={servico.id} value={servico.id}>
-                        {servico.nome}
-                      </option>
-                    ))}
-                    <option value="outro">Outro procedimento</option>
-                  </select>
-                  <ChevronDown
-                    size={16}
-                    className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-500"
-                  />
+                  <div className="relative">
+                    <Search
+                      size={16}
+                      className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <input
+                      value={buscaServico}
+                      onFocus={() => setMostrarListaServicos(true)}
+                      onBlur={() => {
+                        window.setTimeout(() => setMostrarListaServicos(false), 150);
+                      }}
+                      onChange={(event) => alterarBuscaServico(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Escape") {
+                          setMostrarListaServicos(false);
+                          event.currentTarget.blur();
+                        }
+                      }}
+                      placeholder="Digite para buscar um procedimento"
+                      autoComplete="off"
+                      role="combobox"
+                      aria-expanded={mostrarListaServicos}
+                      aria-controls="lista-procedimentos-agenda"
+                      className={`${fieldClassName()} pl-6 pr-7`}
+                    />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => setMostrarListaServicos((atual) => !atual)}
+                      className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-500 transition hover:text-violet-600 dark:hover:text-violet-400"
+                      aria-label="Mostrar procedimentos"
+                    >
+                      <ChevronDown
+                        size={16}
+                        className={`transition-transform ${mostrarListaServicos ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                  </div>
+
+                  {mostrarListaServicos ? (
+                    <div
+                      id="lista-procedimentos-agenda"
+                      role="listbox"
+                      className="absolute z-50 mt-2 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-900"
+                    >
+                      {servicosFiltrados.length > 0 ? (
+                        servicosFiltrados.map((servico) => {
+                          const selecionado =
+                            String(servico.id) === String(servicoSelecionadoId);
+
+                          return (
+                            <button
+                              key={servico.id}
+                              type="button"
+                              role="option"
+                              aria-selected={selecionado}
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => selecionarServico(servico)}
+                              className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition ${
+                                selecionado
+                                  ? "bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300"
+                                  : "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                              }`}
+                            >
+                              <span className="min-w-0">
+                                <strong className="block truncate text-sm font-semibold">
+                                  {servico.nome}
+                                </strong>
+                                <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
+                                  {servico.categoria || "Sem categoria"} · {servico.duracaoPadrao} min
+                                </span>
+                              </span>
+
+                              <span className="shrink-0 text-xs font-semibold">
+                                {servico.valorPadrao > 0
+                                  ? formatCurrency(servico.valorPadrao)
+                                  : "Sem valor"}
+                              </span>
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <div className="px-3 py-4 text-center text-sm text-slate-500 dark:text-slate-400">
+                          Nenhum procedimento cadastrado encontrado.
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
+
+                {servicoSelecionado ? (
+                  <span className="mt-1.5 flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 size={13} />
+                    Procedimento selecionado
+                  </span>
+                ) : buscaServico ? (
+                  <span className="mt-1.5 block text-xs text-amber-600 dark:text-amber-400">
+                    Selecione uma opção da lista para continuar.
+                  </span>
+                ) : null}
               </label>
 
               <div className="pb-2 text-right">
@@ -993,25 +1113,10 @@ export default function NovoAgendamentoModal({
               </div>
             </div>
 
-            {servicoSelecionadoId === "outro" ? (
-              <label className="mt-3 block">
-                <span className={labelClassName()}>Nome do procedimento</span>
-                <input
-                  value={procedimento}
-                  onChange={(event) => {
-                    setProcedimento(event.target.value);
-                    setErro("");
-                  }}
-                  placeholder="Informe o procedimento"
-                  className={fieldClassName()}
-                />
-              </label>
-            ) : null}
-
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <label>
                 <span className={labelClassName()}>
-                  Duração baseada no serviço
+                  Duração baseada no procedimento
                 </span>
                 <div className="relative">
                   <select
