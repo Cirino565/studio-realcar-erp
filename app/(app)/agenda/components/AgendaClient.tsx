@@ -50,7 +50,9 @@ type AgendamentoAgenda = {
   duracao: number;
   valor: number;
   observacoes: string | null;
+  sinalPago: boolean;
   status: string;
+  statusAntesAtendimento?: string | null;
   serieId?: string | null;
   recorrenciaTipo?: string | null;
   recorrenciaIntervalo?: number | null;
@@ -100,6 +102,7 @@ type NovoAgendamentoPayload = NovoHorarioPayload & {
   valor?: number;
   status?: string;
   observacoes?: string;
+  sinalPago?: boolean;
 };
 
 type Props = {
@@ -292,6 +295,7 @@ export default function AgendaClient({
       duracao: appointment.duracao || 60,
       valor: appointment.valor || 0,
       status: appointment.status,
+      sinalPago: appointment.sinalPago,
       serieId: appointment.serieId,
       recorrenciaTipo: appointment.recorrenciaTipo,
       recorrenciaIndice: appointment.recorrenciaIndice,
@@ -324,6 +328,7 @@ export default function AgendaClient({
       duracao: appointment.duracao || 60,
       valor: 0,
       status: "Agendado",
+      sinalPago: false,
       observacoes: `Retorno referente ao atendimento de ${formatarDataCurta(
         appointment.data,
       )}.`,

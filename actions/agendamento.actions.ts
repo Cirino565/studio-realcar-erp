@@ -33,6 +33,7 @@ type NovoAgendamento = {
   valor?: number;
   status?: string;
   observacoes?: string;
+  sinalPago?: boolean;
   recorrencia?: RecorrenciaAgendaInput;
 };
 
@@ -520,6 +521,7 @@ export async function criarAgendamento(dados: NovoAgendamento) {
         valor: dados.valor || 0,
         status: dados.status || "Agendado",
         observacoes: dados.observacoes || null,
+        sinalPago: Boolean(dados.sinalPago),
         serieId,
         recorrenciaTipo: serieId ? regra.tipo : null,
         recorrenciaIntervalo: serieId ? regra.intervalo : null,
@@ -564,6 +566,9 @@ export async function atualizarAgendamento({
       valor: dados.valor || 0,
       status: dados.status || "Agendado",
       observacoes: dados.observacoes || null,
+      sinalPago: Boolean(dados.sinalPago),
+      statusAntesAtendimento:
+        dados.status === "Em atendimento" ? undefined : null,
     },
   });
 
@@ -842,12 +847,17 @@ export async function iniciarAtendimento(agendamentoId: number) {
     throw new Error("Este atendimento já foi finalizado.");
   }
 
+  if (agendamento.status === "Em atendimento") {
+    throw new Error("Este atendimento já está em andamento.");
+  }
+
   await prisma.$transaction(async (tx) => {
     await tx.agendamento.update({
       where: {
         id: agendamento.id,
       },
       data: {
+        statusAntesAtendimento: agendamento.status,
         status: "Em atendimento",
       },
     });
@@ -860,6 +870,58 @@ export async function iniciarAtendimento(agendamentoId: number) {
         entidadeId: String(agendamento.id),
         usuario: agendamento.profissional?.nome || "Equipe Studio Realçar",
         detalhes: `Atendimento iniciado para ${agendamento.cliente.nome}. Procedimento: ${agendamento.procedimento}.`,
+      },
+    });
+  });
+
+  revalidatePath("/agenda");
+  revalidatePath(`/clientes/${agendamento.clienteId}`);
+  revalidatePath("/");
+}
+
+export async function desfazerInicioAtendimento(agendamentoId: number) {
+  await requirePermission("agenda.gerenciar");
+
+  if (!agendamentoId) {
+    throw new Error("Agendamento inválido.");
+  }
+
+  const agendamento = await prisma.agendamento.findUnique({
+    where: { id: agendamentoId },
+    include: {
+      cliente: { select: { nome: true } },
+      profissional: { select: { nome: true } },
+    },
+  });
+
+  if (!agendamento) {
+    throw new Error("Agendamento não encontrado.");
+  }
+
+  if (agendamento.status !== "Em atendimento") {
+    throw new Error("Este atendimento não está em andamento.");
+  }
+
+  const statusRestaurado =
+    agendamento.statusAntesAtendimento?.trim() || "Agendado";
+
+  await prisma.$transaction(async (tx) => {
+    await tx.agendamento.update({
+      where: { id: agendamento.id },
+      data: {
+        status: statusRestaurado,
+        statusAntesAtendimento: null,
+      },
+    });
+
+    await tx.auditoria.create({
+      data: {
+        modulo: "Agenda",
+        acao: "Desfez início de atendimento",
+        entidade: "Agendamento",
+        entidadeId: String(agendamento.id),
+        usuario: agendamento.profissional?.nome || "Equipe Studio Realçar",
+        detalhes: `Atendimento de ${agendamento.cliente.nome} retornou para o status ${statusRestaurado}.`,
       },
     });
   });
@@ -1000,6 +1062,7 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
       where: { id: agendamento.id },
       data: {
         status: "Atendido",
+        statusAntesAtendimento: null,
         procedimento: procedimentoRealizado,
         valor: valorCobrado,
         observacoes: [agendamento.observacoes, observacoes]

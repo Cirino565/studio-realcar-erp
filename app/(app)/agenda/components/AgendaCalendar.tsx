@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
+  BadgeCheck,
   Ban,
   CalendarDays,
   Check,
@@ -34,7 +35,9 @@ type AgendamentoAgenda = {
   duracao: number;
   valor: number;
   observacoes: string | null;
+  sinalPago: boolean;
   status: string;
+  statusAntesAtendimento?: string | null;
   serieId?: string | null;
   recorrenciaTipo?: string | null;
   recorrenciaIntervalo?: number | null;
@@ -95,7 +98,9 @@ const START_HOUR = 9;
 const SLOT_MINUTES = 30;
 const MINUTE_HEIGHT = 1.5;
 const SAO_PAULO_TIMEZONE = "America/Sao_Paulo";
-
+const DATE_STRIP_BATCH_DAYS = 30;
+const DATE_STRIP_INITIAL_BEFORE = 21;
+const DATE_STRIP_INITIAL_AFTER = 42;
 
 type AlmocoVisualConfig = {
   ativo: boolean;
@@ -444,16 +449,99 @@ export default function AgendaCalendar({
   const [calendarDraftDate, setCalendarDraftDate] = useState(
     () => new Date(selectedDate),
   );
+  const [dateStripRange, setDateStripRange] = useState(() => ({
+    start: addDays(selectedDate, -DATE_STRIP_INITIAL_BEFORE),
+    end: addDays(selectedDate, DATE_STRIP_INITIAL_AFTER),
+  }));
+  const dateStripRef = useRef<HTMLDivElement | null>(null);
+  const prependScrollWidthRef = useRef<number | null>(null);
+  const extendingDateStripRef = useRef(false);
+  const centeredDateStripRef = useRef(false);
 
   const weekDays = useMemo(() => {
     const weekStart = startOfWeek(selectedDate);
     return Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
   }, [selectedDate]);
 
+  const dateStripDays = useMemo(() => {
+    const totalDays = Math.max(
+      1,
+      Math.round(
+        (dateStripRange.end.getTime() - dateStripRange.start.getTime()) /
+          86_400_000,
+      ) + 1,
+    );
+
+    return Array.from({ length: totalDays }, (_, index) =>
+      addDays(dateStripRange.start, index),
+    );
+  }, [dateStripRange]);
+
   const calendarDays = useMemo(
     () => getCalendarDays(calendarViewDate),
     [calendarViewDate],
   );
+
+  useEffect(() => {
+    const container = dateStripRef.current;
+    if (!container || centeredDateStripRef.current) return;
+
+    const selected = container.querySelector<HTMLElement>(
+      `[data-agenda-date="${selectedDateInput}"]`,
+    );
+
+    if (!selected) return;
+
+    selected.scrollIntoView({
+      behavior: "auto",
+      block: "nearest",
+      inline: "center",
+    });
+    centeredDateStripRef.current = true;
+  }, [dateStripDays, selectedDateInput]);
+
+  useEffect(() => {
+    const container = dateStripRef.current;
+    const previousScrollWidth = prependScrollWidthRef.current;
+
+    if (!container || previousScrollWidth === null) return;
+
+    container.scrollLeft += container.scrollWidth - previousScrollWidth;
+    prependScrollWidthRef.current = null;
+    extendingDateStripRef.current = false;
+  }, [dateStripRange.start]);
+
+  function handleDateStripScroll() {
+    const container = dateStripRef.current;
+    if (!container || extendingDateStripRef.current) return;
+
+    const distanceToRight =
+      container.scrollWidth - container.scrollLeft - container.clientWidth;
+
+    if (container.scrollLeft < 220) {
+      extendingDateStripRef.current = true;
+      prependScrollWidthRef.current = container.scrollWidth;
+      setDateStripRange((current) => ({
+        ...current,
+        start: addDays(current.start, -DATE_STRIP_BATCH_DAYS),
+      }));
+      return;
+    }
+
+    if (distanceToRight < 220) {
+      extendingDateStripRef.current = true;
+      setDateStripRange((current) => ({
+        ...current,
+        end: addDays(current.end, DATE_STRIP_BATCH_DAYS),
+      }));
+    }
+  }
+
+  useEffect(() => {
+    if (prependScrollWidthRef.current === null) {
+      extendingDateStripRef.current = false;
+    }
+  }, [dateStripRange.end]);
 
   const slots = useMemo(() => {
     if (isSunday) return [];
@@ -710,15 +798,21 @@ export default function AgendaCalendar({
             </button>
           </div>
 
-          <div className="order-3 min-w-0 overflow-x-auto lg:order-none lg:overflow-visible">
-            <div className="mx-auto flex w-fit min-w-max items-center justify-center gap-1">
-              {weekDays.map((day) => {
+          <div
+            ref={dateStripRef}
+            onScroll={handleDateStripScroll}
+            className="touch-scroll-x scrollbar-premium order-3 min-w-0 overflow-x-auto pb-1 lg:order-none"
+            aria-label="Navegação contínua por datas"
+          >
+            <div className="flex w-max min-w-full items-center gap-1 px-1">
+              {dateStripDays.map((day) => {
                 const active = isSameDay(day, selectedDate);
                 const todayItem = isSameDay(day, today);
 
                 return (
                   <a
                     key={formatDateInput(day)}
+                    data-agenda-date={formatDateInput(day)}
                     href={agendaHref(day, profissionalFiltro, viewMode)}
                     className={`flex h-9 w-[82px] flex-none items-center justify-center gap-1 rounded-md border px-2 text-center text-xs font-semibold transition ${
                       active
@@ -949,12 +1043,20 @@ export default function AgendaCalendar({
                               <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-slate-600 dark:text-slate-300">
                                 {appointment.procedimento}
                               </p>
-                              <span
-                                className="mt-1 inline-flex rounded px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-white"
-                                style={{ backgroundColor: palette.solid }}
-                              >
-                                {appointment.status}
-                              </span>
+                              <div className="mt-1 flex flex-wrap items-center gap-1">
+                                <span
+                                  className="inline-flex rounded px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-white"
+                                  style={{ backgroundColor: palette.solid }}
+                                >
+                                  {appointment.status}
+                                </span>
+                                {appointment.sinalPago ? (
+                                  <span className="inline-flex items-center gap-1 rounded bg-emerald-600 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-white">
+                                    <BadgeCheck size={10} />
+                                    Sinal pago
+                                  </span>
+                                ) : null}
+                              </div>
                               <div className="mt-1 flex min-w-0 items-center justify-between gap-2 text-[10px] font-semibold text-slate-400">
                                 <span className="inline-flex min-w-0 items-center gap-1.5 truncate">
                                   <span
@@ -1258,29 +1360,41 @@ export default function AgendaCalendar({
                                 </p>
                               </div>
 
-                              {appointment.serieId ? (
-                                <span
-                                  className="hidden shrink-0 items-center gap-1 rounded-md border border-white/30 bg-white/15 px-1.5 py-1 text-[10px] font-bold text-white sm:inline-flex"
-                                  title="Agendamento recorrente"
-                                >
-                                  <Repeat2 size={11} />
-                                  {appointment.recorrenciaIndice && appointment.recorrenciaTotal
-                                    ? `${appointment.recorrenciaIndice}/${appointment.recorrenciaTotal}`
-                                    : ""}
-                                </span>
-                              ) : null}
+                              <div className="flex shrink-0 items-center gap-1">
+                                {appointment.sinalPago ? (
+                                  <span
+                                    className="inline-flex items-center gap-1 rounded-md border border-white/35 bg-emerald-500/90 px-1.5 py-1 text-[9px] font-extrabold uppercase tracking-wide text-white"
+                                    title="Sinal pago"
+                                  >
+                                    <BadgeCheck size={11} />
+                                    <span className="hidden xl:inline">Sinal</span>
+                                  </span>
+                                ) : null}
 
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  onMessage(appointment);
-                                }}
-                                className="hidden shrink-0 rounded-md border border-white/30 bg-white/15 p-1 text-white transition hover:bg-white/25 sm:block"
-                                aria-label="Criar mensagem"
-                              >
-                                <MessageCircle size={12} />
-                              </button>
+                                {appointment.serieId ? (
+                                  <span
+                                    className="hidden shrink-0 items-center gap-1 rounded-md border border-white/30 bg-white/15 px-1.5 py-1 text-[10px] font-bold text-white sm:inline-flex"
+                                    title="Agendamento recorrente"
+                                  >
+                                    <Repeat2 size={11} />
+                                    {appointment.recorrenciaIndice && appointment.recorrenciaTotal
+                                      ? `${appointment.recorrenciaIndice}/${appointment.recorrenciaTotal}`
+                                      : ""}
+                                  </span>
+                                ) : null}
+
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    onMessage(appointment);
+                                  }}
+                                  className="hidden shrink-0 rounded-md border border-white/30 bg-white/15 p-1 text-white transition hover:bg-white/25 sm:block"
+                                  aria-label="Criar mensagem"
+                                >
+                                  <MessageCircle size={12} />
+                                </button>
+                              </div>
                             </div>
 
                             {height >= 52 ? (

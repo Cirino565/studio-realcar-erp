@@ -96,7 +96,9 @@ model Agendamento {
   duracao        Int           @default(60)
   valor          Float         @default(0)
   observacoes    String?
+  sinalPago            Boolean       @default(false)
   status               String        @default("Agendado")
+  statusAntesAtendimento String?
   serieId              String?
   recorrenciaTipo      String?
   recorrenciaIntervalo Int?

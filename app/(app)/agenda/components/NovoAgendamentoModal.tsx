@@ -74,6 +74,7 @@ type NovoAgendamentoPayload = NovoHorarioPayload & {
   valor?: number;
   status?: string;
   observacoes?: string;
+  sinalPago?: boolean;
 };
 
 type Props = {
@@ -216,6 +217,7 @@ export default function NovoAgendamentoModal({
   const [valor, setValor] = useState("");
   const [status, setStatus] = useState("Agendado");
   const [observacoes, setObservacoes] = useState("");
+  const [sinalPago, setSinalPago] = useState(false);
   const [motivoBloqueio, setMotivoBloqueio] = useState("Almoço");
   const [recorrenciaTipo, setRecorrenciaTipo] = useState<
     "nenhuma" | "semanal" | "quinzenal" | "mensal" | "personalizada"
@@ -285,6 +287,7 @@ export default function NovoAgendamentoModal({
     setValor(valorParaInput(initialPayload?.valor));
     setStatus(initialPayload?.status || "Agendado");
     setObservacoes(initialPayload?.observacoes || "");
+    setSinalPago(Boolean(initialPayload?.sinalPago));
     setMotivoBloqueio(initialPayload?.motivoBloqueio || "Almoço");
     setRecorrenciaTipo("nenhuma");
     setRecorrenciaIntervalo("1");
@@ -517,6 +520,7 @@ export default function NovoAgendamentoModal({
         valor: parseCurrency(valor),
         status,
         observacoes,
+        sinalPago,
         recorrencia: modoEdicao ? { tipo: "nenhuma" as const } : recorrencia,
       };
 
@@ -1045,6 +1049,23 @@ export default function NovoAgendamentoModal({
                 />
               </label>
             </div>
+
+            <label className="mt-4 flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+              <span>
+                <span className="block text-sm font-bold text-emerald-800 dark:text-emerald-200">
+                  Pagou sinal
+                </span>
+                <span className="mt-0.5 block text-xs text-emerald-700/80 dark:text-emerald-300/80">
+                  Exibe um marcador visível diretamente na agenda.
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                checked={sinalPago}
+                onChange={(event) => setSinalPago(event.target.checked)}
+                className="size-5 shrink-0 accent-emerald-600"
+              />
+            </label>
 
             {!modoEdicao ? (
               <div className="mt-4 rounded-md border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-800/40">

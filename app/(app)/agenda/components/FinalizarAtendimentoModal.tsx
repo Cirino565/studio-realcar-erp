@@ -33,6 +33,7 @@ type AppointmentForFinish = {
   duracao: number;
   valor: number;
   observacoes: string | null;
+  sinalPago: boolean;
   status: string;
   createdAt?: string;
   updatedAt?: string;

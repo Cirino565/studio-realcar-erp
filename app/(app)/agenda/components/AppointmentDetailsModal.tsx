@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import {
   Activity,
   AlertCircle,
+  BadgeCheck,
   CalendarClock,
   CheckCircle2,
   ClipboardList,
@@ -13,6 +14,7 @@ import {
   Phone,
   PlayCircle,
   Repeat2,
+  RotateCcw,
   Sparkles,
   Trash2,
   UserRound,
@@ -21,6 +23,7 @@ import {
 
 import {
   cancelarSerieAgendamento,
+  desfazerInicioAtendimento,
   excluirAgendamento,
   iniciarAtendimento,
 } from "@/actions/agendamento.actions";
@@ -35,7 +38,9 @@ type AppointmentDetails = {
   duracao: number;
   valor: number;
   observacoes: string | null;
+  sinalPago: boolean;
   status: string;
+  statusAntesAtendimento?: string | null;
   serieId?: string | null;
   recorrenciaTipo?: string | null;
   recorrenciaIntervalo?: number | null;
@@ -227,6 +232,34 @@ export default function AppointmentDetailsModal({
     });
   }
 
+  function handleDesfazerInicio() {
+    setError(null);
+
+    if (!atendimentoEmAndamento) {
+      setError("Este atendimento não está em andamento.");
+      return;
+    }
+
+    const confirmou = window.confirm(
+      "Voltar o atendimento para o status anterior e liberar novamente as opções de edição?",
+    );
+
+    if (!confirmou) return;
+
+    startTransition(async () => {
+      try {
+        await desfazerInicioAtendimento(currentAppointment.id);
+        window.location.reload();
+      } catch (error) {
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Não foi possível voltar o atendimento ao status anterior.",
+        );
+      }
+    });
+  }
+
   const podeGerenciarAgendamento =
     !atendimentoFinalizado && !atendimentoEmAndamento;
 
@@ -335,6 +368,13 @@ export default function AppointmentDetailsModal({
                       {currentAppointment.recorrenciaIndice && currentAppointment.recorrenciaTotal
                         ? ` ${currentAppointment.recorrenciaIndice}/${currentAppointment.recorrenciaTotal}`
                         : ""}
+                    </span>
+                  ) : null}
+
+                  {currentAppointment.sinalPago ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                      <BadgeCheck size={12} />
+                      Sinal pago
                     </span>
                   ) : null}
 
@@ -550,6 +590,19 @@ export default function AppointmentDetailsModal({
                         ? "Atendimento finalizado"
                         : "Iniciar atendimento"}
                 </Button>
+
+                {atendimentoEmAndamento ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleDesfazerInicio}
+                    disabled={isPending}
+                    className="h-12 justify-start rounded-xl border-cyan-200 bg-cyan-50 px-4 text-cyan-800 hover:bg-cyan-100 hover:text-cyan-900 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <RotateCcw size={18} />
+                    {isPending ? "Voltando status..." : "Voltar ao status anterior"}
+                  </Button>
+                ) : null}
 
                 <Button
                   type="button"
