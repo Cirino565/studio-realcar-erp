@@ -191,25 +191,29 @@ function RespostaMobile({
           {["Não", "Sim"].map((opcao) => {
             const ativo = simNao === opcao;
             return (
-              <label
-                key={opcao}
-                className={`flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 px-4 text-base font-bold transition ${
-                  ativo
-                    ? "border-violet-500 bg-violet-50 text-violet-800 dark:border-violet-400 dark:bg-violet-500/15 dark:text-violet-100"
-                    : "border-slate-200 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name={`resposta_${index}`}
-                  value={opcao}
-                  checked={ativo}
-                  onChange={() => setSimNao(opcao)}
-                  className="sr-only"
-                />
-                {ativo ? <CheckCircle2 size={19} /> : null}
-                {opcao}
-              </label>
+              <div key={opcao}>
+                {ativo ? (
+                  <input
+                    type="hidden"
+                    name={`resposta_${index}`}
+                    value={opcao}
+                  />
+                ) : null}
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={ativo}
+                  onClick={() => setSimNao(ativo ? "" : opcao)}
+                  className={`flex min-h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 px-4 text-base font-bold transition ${
+                    ativo
+                      ? "border-violet-500 bg-violet-50 text-violet-800 dark:border-violet-400 dark:bg-violet-500/15 dark:text-violet-100"
+                      : "border-slate-200 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200"
+                  }`}
+                >
+                  {ativo ? <CheckCircle2 size={19} /> : null}
+                  {opcao}
+                </button>
+              </div>
             );
           })}
         </div>
@@ -726,6 +730,7 @@ export default function AnamneseMobileForm({
       ref={formRef}
       action={salvarRespostasAnamneseRapida}
       onChange={atualizarProgresso}
+      onClick={() => window.requestAnimationFrame(atualizarProgresso)}
       onSubmit={(event: ReactFormEvent<HTMLFormElement>) => {
         const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
         if (submitter?.value === "finalizar" && !validarFinalizacao()) {

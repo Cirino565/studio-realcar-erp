@@ -137,7 +137,7 @@ export async function criarEvolucaoCliente(formData: FormData) {
   const descricao = getString(formData, "descricao");
 
   if (!titulo || !descricao) {
-    throw new Error("Informe o título e a evolução clínica.");
+    throw new Error("Informe o procedimento e a evolução clínica.");
   }
 
   await prisma.clienteEvolucao.create({

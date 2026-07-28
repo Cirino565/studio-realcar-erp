@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
+  ChevronDown,
   ClipboardList,
   FileText,
   ImageIcon,
@@ -217,6 +218,8 @@ export function ClienteClinicoTabs({
 }: Props) {
   const [activeTab, setActiveTab] =
     useState<AbaClinica>(initialTab);
+  const [resumoMobileAberto, setResumoMobileAberto] =
+    useState(false);
 
   const [procedimentoAnamnese, setProcedimentoAnamnese] =
     useState(
@@ -229,6 +232,7 @@ export function ClienteClinicoTabs({
 
   function ativarAba(tab: AbaClinica) {
     setActiveTab(tab);
+    setResumoMobileAberto(false);
 
     if (typeof window !== "undefined") {
       window.history.replaceState(null, "", `#${tab}`);
@@ -294,7 +298,33 @@ export function ClienteClinicoTabs({
 
   return (
     <section className="app-mobile-safe space-y-5 sm:space-y-6">
-      <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <button
+        type="button"
+        onClick={() => setResumoMobileAberto((aberto) => !aberto)}
+        aria-expanded={resumoMobileAberto}
+        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm dark:border-white/10 dark:bg-white/[0.06] sm:hidden"
+      >
+        <span className="min-w-0">
+          <span className="block text-sm font-bold text-slate-900 dark:text-white">
+            Resumo clínico e financeiro
+          </span>
+          <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+            Oculto por padrão no celular para preservar a privacidade da cliente.
+          </span>
+        </span>
+        <ChevronDown
+          size={19}
+          className={`shrink-0 text-slate-500 transition-transform ${
+            resumoMobileAberto ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      <div
+        className={`${
+          resumoMobileAberto ? "grid" : "hidden"
+        } min-w-0 gap-3 sm:grid sm:grid-cols-2 xl:grid-cols-4`}
+      >
         <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.06] sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">
@@ -601,10 +631,10 @@ export function ClienteClinicoTabs({
                 />
 
                 <Field
-                  label="Título"
+                  label="Procedimento"
                   name="titulo"
                   required
-                  placeholder="Ex: Evolução após 7 dias"
+                  placeholder="Ex: Limpeza de pele"
                 />
 
                 <Field

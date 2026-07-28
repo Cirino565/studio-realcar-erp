@@ -249,6 +249,7 @@ export default function NovoAgendamentoModal({
   const agendamentoDiretoAgenda = Boolean(
     !modoEdicao &&
       !modoEdicaoBloqueio &&
+      initialPayload?.modo !== "retorno" &&
       initialPayload?.profissionalId &&
       initialPayload?.data &&
       initialPayload?.hora,

@@ -176,6 +176,7 @@ export default async function Home() {
   const [
     agendaHoje,
     confirmacoesAmanha,
+    confirmadosAmanha,
     posAtendimento,
     clientesComNascimento,
     clientesReativacao,
@@ -202,6 +203,18 @@ export default async function Home() {
       where: {
         data: { gte: inicioAmanha, lt: inicioDepoisAmanha },
         status: "Agendado",
+      },
+      include: {
+        cliente: { select: { nome: true, whatsapp: true, telefone: true } },
+        profissional: { select: { nome: true } },
+      },
+      orderBy: { data: "asc" },
+    }),
+
+    prisma.agendamento.findMany({
+      where: {
+        data: { gte: inicioAmanha, lt: inicioDepoisAmanha },
+        status: "Confirmado",
       },
       include: {
         cliente: { select: { nome: true, whatsapp: true, telefone: true } },
@@ -530,6 +543,23 @@ export default async function Home() {
     ),
   }));
 
+  const clientesConfirmadosAmanha = confirmadosAmanha.map((agendamento) => ({
+    id: agendamento.id,
+    cliente: agendamento.cliente.nome,
+    procedimento: agendamento.procedimento,
+    horario: formatarHorario(agendamento.data),
+    profissional: agendamento.profissional?.nome || null,
+    whatsappUrl: buildWhatsAppUrl(
+      agendamento.cliente.whatsapp || agendamento.cliente.telefone,
+      buildWhatsAppMessage({
+        template: "reminder",
+        clientName: agendamento.cliente.nome,
+        procedure: agendamento.procedimento,
+        appointmentDate: agendamento.data,
+      }),
+    ),
+  }));
+
   const dataAgendaHoje = hojeISO;
   const dataAgendaAmanha = amanhaISO;
 
@@ -578,7 +608,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-9">
         <CardIndicador
           titulo="Atendimentos hoje"
           valor={agendaHoje.length}
@@ -594,6 +624,14 @@ export default async function Home() {
           href="#confirmacoes"
           icon={Bell}
           tone="amber"
+        />
+        <CardIndicador
+          titulo="Confirmados amanhã"
+          valor={confirmadosAmanha.length}
+          descricao="Presença já confirmada."
+          href="#confirmados-amanha"
+          icon={BadgeCheck}
+          tone="emerald"
         />
         <CardIndicador
           titulo="Pós-atendimento"
@@ -731,30 +769,106 @@ export default async function Home() {
           </div>
         </div>
 
-        <div id="confirmacoes" className="premium-card p-4 sm:p-5">
-          <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <Bell className="size-5 text-amber-600" />
-                <h2 className="text-lg font-bold text-slate-950">Confirmar amanhã</h2>
+        <div className="space-y-4">
+          <div id="confirmacoes" className="premium-card p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Bell className="size-5 text-amber-600" />
+                  <h2 className="text-lg font-bold text-slate-950">Confirmar amanhã</h2>
+                </div>
+                <p className="mt-1 text-sm text-slate-500">
+                  Envie a mensagem e marque a presença confirmada.
+                </p>
               </div>
-              <p className="mt-1 text-sm text-slate-500">
-                Envie a mensagem e marque a presença confirmada.
-              </p>
+              <Link
+                href={`/agenda?data=${dataAgendaAmanha}`}
+                className="shrink-0 text-xs font-bold text-violet-700"
+              >
+                Ver amanhã
+              </Link>
             </div>
-            <Link
-              href={`/agenda?data=${dataAgendaAmanha}`}
-              className="shrink-0 text-xs font-bold text-violet-700"
-            >
-              Ver amanhã
-            </Link>
+
+            <div className="mt-4">
+              <CentralDoDiaClient
+                confirmacoes={confirmacoes}
+                podeGerenciarAgenda={podeGerenciarAgenda}
+              />
+            </div>
           </div>
 
-          <div className="mt-4">
-            <CentralDoDiaClient
-              confirmacoes={confirmacoes}
-              podeGerenciarAgenda={podeGerenciarAgenda}
-            />
+          <div id="confirmados-amanha" className="premium-card p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <BadgeCheck className="size-5 text-emerald-600" />
+                  <h2 className="text-lg font-bold text-slate-950">Confirmados de amanhã</h2>
+                </div>
+                <p className="mt-1 text-sm text-slate-500">
+                  Clientes que já confirmaram presença.
+                </p>
+              </div>
+              <Link
+                href={`/agenda?data=${dataAgendaAmanha}`}
+                className="shrink-0 text-xs font-bold text-violet-700"
+              >
+                Ver amanhã
+              </Link>
+            </div>
+
+            <div className="mt-4 space-y-2.5">
+              {clientesConfirmadosAmanha.length > 0 ? (
+                clientesConfirmadosAmanha.map((item) => (
+                  <div
+                    key={item.id}
+                    className="rounded-2xl border border-emerald-100 bg-white p-3 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-slate-900">
+                          {item.cliente}
+                        </p>
+                        <p className="mt-0.5 truncate text-sm text-slate-500">
+                          {item.procedimento}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold text-slate-600">
+                          <span className="rounded-lg bg-violet-50 px-2 py-1 text-violet-700">
+                            {item.horario}
+                          </span>
+                          {item.profissional ? (
+                            <span className="rounded-lg bg-slate-100 px-2 py-1">
+                              {item.profissional}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                        Confirmado
+                      </span>
+                    </div>
+
+                    <WhatsAppLink
+                      href={item.whatsappUrl}
+                      className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-700"
+                    >
+                      <MessageCircle className="size-4" />
+                      WhatsApp
+                    </WhatsAppLink>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center">
+                  <BadgeCheck className="mx-auto size-6 text-slate-400" />
+                  <p className="mt-2 text-sm font-semibold text-slate-800">
+                    Nenhum cliente confirmado para amanhã.
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    As confirmações aparecerão aqui assim que forem registradas.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </section>
@@ -1048,6 +1162,7 @@ export default async function Home() {
             <div className="mt-3 space-y-2 text-sm text-slate-600">
               <p><strong className="text-slate-900">{agendaHoje.length}</strong> atendimento(s) ativo(s) hoje.</p>
               <p><strong className="text-slate-900">{confirmacoesAmanha.length}</strong> confirmação(ões) pendente(s) para amanhã.</p>
+              <p><strong className="text-slate-900">{confirmadosAmanha.length}</strong> cliente(s) confirmado(s) para amanhã.</p>
               <p><strong className="text-slate-900">{clientesReativacao.length}</strong> cliente(s) priorizado(s) para reativação.</p>
               <p><strong className="text-slate-900">{followUpsVencidos.length}</strong> follow-up(s) vencido(s) e <strong className="text-slate-900">{negociacoesParadas.length}</strong> negociação(ões) sem contato há 3+ dias.</p>
             </div>
