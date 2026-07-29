@@ -1,6 +1,7 @@
 import { canAccess, requirePagePermission } from "@/lib/auth";
 import { formatarMoeda } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { decodificarMensagemModelo } from "@/lib/mensagem-modelo.server";
 import {
   buildClientWhatsAppMessage,
   buildWhatsAppMessage,
@@ -1006,11 +1007,14 @@ export default async function Home() {
               aniversariantesHoje.map((cliente) => {
                 const mensagemAniversario = modeloAniversario
                   ? modeloAniversario.ativo
-                    ? renderizarMensagemModelo(modeloAniversario.corpo, {
-                        primeiro_nome: primeiroNome(cliente.nome),
-                        nome: cliente.nome,
-                        clinica: nomeClinica,
-                      })
+                    ? renderizarMensagemModelo(
+                        decodificarMensagemModelo(modeloAniversario.corpo),
+                        {
+                          primeiro_nome: primeiroNome(cliente.nome),
+                          nome: cliente.nome,
+                          clinica: nomeClinica,
+                        },
+                      )
                     : null
                   : buildClientWhatsAppMessage({
                       template: "birthday",

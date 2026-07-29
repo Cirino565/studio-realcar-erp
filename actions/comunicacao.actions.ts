@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 
 import { requirePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import {
+  codificarMensagemModelo,
+  decodificarMensagemModelo,
+  mensagemModeloEstaCodificada,
+} from "@/lib/mensagem-modelo.server";
 
 const TIMEZONE_OFFSET = "-03:00";
 
@@ -183,9 +188,10 @@ export async function salvarMensagemModelo(dados: {
 }) {
   const usuario = await requirePermission("marketing.gerenciar");
   const nome = dados.nome.trim();
-  const corpo = dados.corpo.trim();
+  const corpoRecebido = dados.corpo.trim();
+  const corpoTexto = decodificarMensagemModelo(corpoRecebido).trim();
 
-  if (!nome || !corpo) {
+  if (!nome || !corpoTexto) {
     throw new Error("Nome e texto do modelo são obrigatórios.");
   }
 
@@ -193,7 +199,9 @@ export async function salvarMensagemModelo(dados: {
     where: { id: dados.id },
     data: {
       nome,
-      corpo,
+      corpo: mensagemModeloEstaCodificada(corpoRecebido)
+        ? corpoRecebido
+        : codificarMensagemModelo(corpoTexto),
       ativo: dados.ativo,
     },
   });

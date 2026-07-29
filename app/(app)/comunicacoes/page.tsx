@@ -1,5 +1,6 @@
 import { canAccess, requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { decodificarMensagemModelo } from "@/lib/mensagem-modelo.server";
 
 import ComunicacoesClient from "./components/ComunicacoesClient";
 import type {
@@ -204,7 +205,10 @@ export default async function ComunicacoesPage({ searchParams }: ComunicacoesPag
   ]);
 
   const clinica = configuracao?.nome || "Studio Realçar";
-  const modelosTipados = modelos as MensagemModeloItem[];
+  const modelosTipados = modelos.map((modelo) => ({
+    ...modelo,
+    corpo: decodificarMensagemModelo(modelo.corpo),
+  })) as MensagemModeloItem[];
   const modelosPorChave = new Map<string, MensagemModeloItem>(
     modelosTipados.map((modelo) => [modelo.chave, modelo]),
   );

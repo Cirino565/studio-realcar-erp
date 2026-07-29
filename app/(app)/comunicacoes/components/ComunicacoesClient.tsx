@@ -45,6 +45,20 @@ type Props = {
 
 type Tab = "fila" | "modelos" | "historico";
 
+
+const PREFIXO_MENSAGEM_UTF8 = "utf8b64:";
+
+function codificarMensagemModeloNoNavegador(valor: string) {
+  const bytes = new TextEncoder().encode(valor);
+  let binario = "";
+
+  for (let indice = 0; indice < bytes.length; indice += 1) {
+    binario += String.fromCharCode(bytes[indice]);
+  }
+
+  return `${PREFIXO_MENSAGEM_UTF8}${btoa(binario)}`;
+}
+
 const categoriaStyle: Record<string, string> = {
   "Confirmação de agendamento": "border-amber-200 bg-amber-50 text-amber-700",
   "Pós-atendimento": "border-emerald-200 bg-emerald-50 text-emerald-700",
@@ -106,7 +120,12 @@ function ModeloCard({ modelo, podeGerenciar }: { modelo: MensagemModeloItem; pod
   function salvar() {
     startTransition(async () => {
       try {
-        await salvarMensagemModelo({ id: modelo.id, nome, corpo, ativo });
+        await salvarMensagemModelo({
+          id: modelo.id,
+          nome,
+          corpo: codificarMensagemModeloNoNavegador(corpo),
+          ativo,
+        });
         setMensagem("Modelo salvo.");
         router.refresh();
       } catch (error) {
