@@ -245,11 +245,14 @@ export function buildMarketingWhatsAppMessage({
 
 export function buildWhatsAppUrl(phone: string | null | undefined, message: string) {
   const normalizedPhone = normalizeBrazilianPhone(phone);
-  const encodedMessage = encodeURIComponent(message);
+  const params = new URLSearchParams();
 
-  if (!normalizedPhone) {
-    return `https://wa.me/?text=${encodedMessage}`;
+  if (normalizedPhone) {
+    params.set("phone", normalizedPhone);
   }
 
-  return `https://wa.me/${normalizedPhone}?text=${encodedMessage}`;
+  // O URLSearchParams aplica codificação UTF-8 corretamente, inclusive para emojis.
+  params.set("text", message.normalize("NFC"));
+
+  return `https://api.whatsapp.com/send?${params.toString()}`;
 }

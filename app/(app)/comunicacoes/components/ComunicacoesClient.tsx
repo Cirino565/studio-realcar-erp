@@ -254,7 +254,13 @@ export default function ComunicacoesClient({
     if (!selecionado || !mensagemEditada.trim()) return;
 
     const url = buildWhatsAppUrl(selecionado.telefone, mensagemEditada);
-    window.open(url, "_blank", "noopener,noreferrer");
+    const link = document.createElement("a");
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
 
     if (!podeGerenciar) return;
 

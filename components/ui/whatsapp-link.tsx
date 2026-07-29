@@ -42,11 +42,9 @@ const WhatsAppLink = React.forwardRef<HTMLAnchorElement, WhatsAppLinkProps>(
         return;
       }
 
-      event.preventDefault();
+      // Mantém a navegação nativa do link. Isso evita recodificação da URL
+      // por chamadas programáticas e preserva emojis no texto do WhatsApp.
       cleanupMobileState();
-
-      window.open(href, "_blank", "noopener,noreferrer");
-
       window.setTimeout(cleanupMobileState, 150);
       window.setTimeout(cleanupMobileState, 700);
     }
