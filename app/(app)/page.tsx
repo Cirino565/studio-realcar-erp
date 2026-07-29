@@ -710,7 +710,7 @@ export default async function Home() {
                   key={agendamento.id}
                   className="grid gap-3 p-4 sm:grid-cols-[72px_minmax(0,1fr)_auto] sm:items-center"
                 >
-                  <div className="rounded-xl bg-slate-950 px-2.5 py-2 text-center text-sm font-bold tabular-nums text-white">
+                  <div className="rounded-xl border border-violet-200 bg-violet-50 px-2.5 py-2 text-center text-sm font-extrabold tabular-nums text-violet-800 shadow-sm">
                     {formatarHorario(agendamento.data)}
                   </div>
 

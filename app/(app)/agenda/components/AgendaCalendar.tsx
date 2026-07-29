@@ -1090,8 +1090,8 @@ export default function AgendaCalendar({
                                   {appointment.status}
                                 </span>
                                 {appointment.sinalPago ? (
-                                  <span className="inline-flex items-center gap-1 rounded bg-emerald-600 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-white">
-                                    <BadgeCheck size={10} />
+                                  <span className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-slate-700 shadow-sm dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100">
+                                    <BadgeCheck size={10} className="text-violet-600 dark:text-violet-300" />
                                     Sinal pago
                                   </span>
                                 ) : null}
@@ -1406,10 +1406,10 @@ export default function AgendaCalendar({
                               <div className="flex shrink-0 items-center gap-1">
                                 {appointment.sinalPago ? (
                                   <span
-                                    className="inline-flex items-center gap-1 rounded-md border border-white/35 bg-emerald-500/90 px-1.5 py-1 text-[9px] font-extrabold uppercase tracking-wide text-white"
+                                    className="inline-flex items-center gap-1 rounded-md border border-white/80 bg-white/90 px-1.5 py-1 text-[9px] font-extrabold uppercase tracking-wide text-slate-800 shadow-sm"
                                     title="Sinal pago"
                                   >
-                                    <BadgeCheck size={11} />
+                                    <BadgeCheck size={11} className="text-violet-600" />
                                     <span className="hidden xl:inline">Sinal</span>
                                   </span>
                                 ) : null}

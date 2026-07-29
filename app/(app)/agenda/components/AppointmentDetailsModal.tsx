@@ -382,7 +382,7 @@ export default function AppointmentDetailsModal({
                   ) : null}
 
                   {currentAppointment.sinalPago ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700">
                       <BadgeCheck size={12} />
                       Sinal pago
                     </span>
