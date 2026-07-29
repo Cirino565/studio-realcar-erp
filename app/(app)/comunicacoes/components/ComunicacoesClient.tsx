@@ -40,6 +40,7 @@ type Props = {
   historico: ComunicacaoHistoricoItem[];
   resumo: ComunicacaoResumo;
   podeGerenciar: boolean;
+  initialTab: Tab;
 };
 
 type Tab = "fila" | "modelos" | "historico";
@@ -115,7 +116,7 @@ function ModeloCard({ modelo, podeGerenciar }: { modelo: MensagemModeloItem; pod
   }
 
   return (
-    <article className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:p-5">
+    <article id={`modelo-${modelo.chave}`} className="scroll-mt-24 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <span className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-violet-700 dark:border-violet-400/20 dark:bg-violet-500/10 dark:text-violet-300">
@@ -172,10 +173,17 @@ function ModeloCard({ modelo, podeGerenciar }: { modelo: MensagemModeloItem; pod
   );
 }
 
-export default function ComunicacoesClient({ fila, modelos, historico, resumo, podeGerenciar }: Props) {
+export default function ComunicacoesClient({
+  fila,
+  modelos,
+  historico,
+  resumo,
+  podeGerenciar,
+  initialTab,
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [tab, setTab] = useState<Tab>("fila");
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [busca, setBusca] = useState("");
   const [categoria, setCategoria] = useState("Todas");
   const [selecionado, setSelecionado] = useState<ComunicacaoFilaItem | null>(null);

@@ -210,5 +210,6 @@ export async function salvarMensagemModelo(dados: {
   });
 
   revalidatePath("/comunicacoes");
+  revalidatePath("/");
   return modelo;
 }

@@ -81,6 +81,19 @@ function formatarDataCurta(data: Date | string) {
   }).format(new Date(data));
 }
 
+function primeiroNome(nome: string) {
+  return nome.trim().split(/\s+/)[0] || nome;
+}
+
+function renderizarMensagemModelo(
+  corpo: string,
+  variaveis: Record<string, string | null | undefined>,
+) {
+  return corpo.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, chave: string) => {
+    return variaveis[chave] ?? "";
+  });
+}
+
 function statusClasses(status: string) {
   const normalizado = status.toLowerCase();
 
@@ -186,6 +199,8 @@ export default async function Home() {
     totalLeadsAbertos,
     lancamentosMes,
     totalClientes,
+    modeloAniversario,
+    configuracaoClinica,
   ] = await Promise.all([
     prisma.agendamento.findMany({
       where: {
@@ -333,6 +348,15 @@ export default async function Home() {
     }),
 
     prisma.cliente.count(),
+
+    prisma.mensagemModelo.findUnique({
+      where: { chave: "aniversario" },
+      select: { corpo: true, ativo: true },
+    }),
+
+    prisma.configuracaoClinica.findFirst({
+      select: { nome: true },
+    }),
   ]);
 
   const [anoHoje, mesHoje, diaHoje] = hojeISO.split("-").map(Number);
@@ -345,6 +369,8 @@ export default async function Home() {
       );
     })
     .slice(0, 10);
+
+  const nomeClinica = configuracaoClinica?.nome?.trim() || "Studio Realçar";
 
   const produtosCriticos = produtosAtivos
     .filter((produto) => produto.quantidade <= produto.estoqueMinimo)
@@ -965,34 +991,63 @@ export default async function Home() {
               <Gift className="size-5 text-rose-600" />
               <h2 className="text-lg font-bold text-slate-950">Aniversariantes</h2>
             </div>
-            <p className="mt-1 text-sm text-slate-500">Relacionamento simples que não deve ser esquecido.</p>
+            <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm text-slate-500">Relacionamento simples que não deve ser esquecido.</p>
+              {podeGerenciarMarketing ? (
+                <Link href="/comunicacoes?aba=modelos#modelo-aniversario" className="text-xs font-bold text-violet-700 hover:text-violet-900">
+                  Editar mensagem
+                </Link>
+              ) : null}
+            </div>
           </div>
 
           <div className="mt-4 space-y-2.5">
             {aniversariantesHoje.length > 0 ? (
-              aniversariantesHoje.map((cliente) => (
-                <div key={cliente.id} className="flex items-center justify-between gap-3 rounded-2xl border border-rose-100 bg-rose-50/60 p-3">
-                  <div className="min-w-0">
-                    <Link href={`/clientes/${cliente.id}`} className="truncate font-bold text-slate-900 hover:text-violet-700">
-                      {cliente.nome}
-                    </Link>
-                    <p className="mt-0.5 text-xs font-semibold text-rose-600">Aniversário hoje</p>
+              aniversariantesHoje.map((cliente) => {
+                const mensagemAniversario = modeloAniversario
+                  ? modeloAniversario.ativo
+                    ? renderizarMensagemModelo(modeloAniversario.corpo, {
+                        primeiro_nome: primeiroNome(cliente.nome),
+                        nome: cliente.nome,
+                        clinica: nomeClinica,
+                      })
+                    : null
+                  : buildClientWhatsAppMessage({
+                      template: "birthday",
+                      clientName: cliente.nome,
+                      clinicName: nomeClinica,
+                    });
+
+                return (
+                  <div key={cliente.id} className="flex items-center justify-between gap-3 rounded-2xl border border-rose-100 bg-rose-50/60 p-3">
+                    <div className="min-w-0">
+                      <Link href={`/clientes/${cliente.id}`} className="truncate font-bold text-slate-900 hover:text-violet-700">
+                        {cliente.nome}
+                      </Link>
+                      <p className="mt-0.5 text-xs font-semibold text-rose-600">Aniversário hoje</p>
+                    </div>
+                    {mensagemAniversario ? (
+                      <WhatsAppLink
+                        href={buildWhatsAppUrl(
+                          cliente.whatsapp || cliente.telefone,
+                          mensagemAniversario,
+                        )}
+                        className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+                      >
+                        <MessageCircle className="size-3.5" />
+                        Mensagem
+                      </WhatsAppLink>
+                    ) : podeGerenciarMarketing ? (
+                      <Link
+                        href="/comunicacoes?aba=modelos#modelo-aniversario"
+                        className="inline-flex min-h-9 shrink-0 items-center rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50"
+                      >
+                        Ativar modelo
+                      </Link>
+                    ) : null}
                   </div>
-                  <WhatsAppLink
-                    href={buildWhatsAppUrl(
-                      cliente.whatsapp || cliente.telefone,
-                      buildClientWhatsAppMessage({
-                        template: "birthday",
-                        clientName: cliente.nome,
-                      }),
-                    )}
-                    className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700"
-                  >
-                    <MessageCircle className="size-3.5" />
-                    Mensagem
-                  </WhatsAppLink>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-500">
                 Nenhum aniversário cadastrado para hoje.

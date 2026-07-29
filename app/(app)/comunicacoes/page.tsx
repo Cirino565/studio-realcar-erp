@@ -78,7 +78,14 @@ function chaveRegistro(params: {
   return `sem-id:${params.categoria}`;
 }
 
-export default async function ComunicacoesPage() {
+type ComunicacoesPageProps = {
+  searchParams: Promise<{ aba?: string | string[] }>;
+};
+
+export default async function ComunicacoesPage({ searchParams }: ComunicacoesPageProps) {
+  const params = await searchParams;
+  const abaParam = Array.isArray(params.aba) ? params.aba[0] : params.aba;
+  const initialTab = abaParam === "modelos" || abaParam === "historico" ? abaParam : "fila";
   const usuario = await requirePagePermission("marketing.visualizar");
   const podeGerenciar = canAccess(usuario, "marketing.gerenciar");
 
@@ -470,6 +477,7 @@ export default async function ComunicacoesPage() {
       historico={historicoSerializado}
       resumo={resumo}
       podeGerenciar={podeGerenciar}
+      initialTab={initialTab}
     />
   );
 }
