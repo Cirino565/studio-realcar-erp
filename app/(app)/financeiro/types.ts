@@ -20,6 +20,10 @@ export type LancamentoFinanceiro = {
   origem?: string | null;
   agendamentoId?: number | null;
   clienteId?: number | null;
+  venda?: {
+    id: number;
+    situacao: string;
+  } | null;
   createdAt: Date;
   updatedAt: Date;
 };

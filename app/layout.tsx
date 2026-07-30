@@ -21,8 +21,12 @@ const themeScript = `
 
     var root = document.documentElement;
 
-    root.classList.remove("theme-light", "theme-dark");
+    root.classList.remove("theme-light", "theme-dark", "dark");
     root.classList.add("theme-" + savedTheme);
+
+    if (savedTheme === "dark") {
+      root.classList.add("dark");
+    }
     root.dataset.theme = savedTheme;
     root.style.colorScheme = savedTheme;
 
@@ -48,7 +52,7 @@ export default async function RootLayout({
   return (
     <html
       lang="pt-BR"
-      className={`theme-${initialTheme}`}
+      className={`theme-${initialTheme}${initialTheme === "dark" ? " dark" : ""}`}
       data-theme={initialTheme}
       style={{ colorScheme: initialTheme }}
       suppressHydrationWarning

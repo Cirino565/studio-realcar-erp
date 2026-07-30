@@ -6,6 +6,14 @@ import FinanceiroClient from "./components/FinanceiroClient";
 export default async function FinanceiroPage() {
   await requirePagePermission("financeiro.visualizar");
   const lancamentos = await prisma.lancamento.findMany({
+    include: {
+      venda: {
+        select: {
+          id: true,
+          situacao: true,
+        },
+      },
+    },
     orderBy: [
       {
         data: "desc",

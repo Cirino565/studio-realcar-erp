@@ -63,8 +63,12 @@ function emitThemeChange() {
 function applyTheme(theme: ThemeMode) {
   const root = document.documentElement;
 
-  root.classList.remove("theme-light", "theme-dark");
+  root.classList.remove("theme-light", "theme-dark", "dark");
   root.classList.add(`theme-${theme}`);
+
+  if (theme === "dark") {
+    root.classList.add("dark");
+  }
   root.dataset.theme = theme;
   root.style.colorScheme = theme;
 

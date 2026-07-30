@@ -2,7 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
   --color-background: var(--background);
@@ -53,7 +53,55 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-:root {
+
+:root,
+.theme-light {
+  --background: oklch(0.985 0.004 270);
+  --foreground: oklch(0.22 0.025 270);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.22 0.025 270);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.22 0.025 270);
+
+  --primary: oklch(0.56 0.22 300);
+  --primary-foreground: oklch(0.985 0 0);
+
+  --secondary: oklch(0.955 0.012 270);
+  --secondary-foreground: oklch(0.28 0.025 270);
+
+  --muted: oklch(0.96 0.01 270);
+  --muted-foreground: oklch(0.48 0.025 270);
+
+  --accent: oklch(0.94 0.03 300);
+  --accent-foreground: oklch(0.42 0.16 300);
+
+  --destructive: oklch(0.56 0.22 25);
+
+  --border: oklch(0.9 0.012 270);
+  --input: oklch(0.88 0.012 270);
+  --ring: oklch(0.6 0.2 300);
+
+  --chart-1: oklch(0.58 0.2 300);
+  --chart-2: oklch(0.54 0.15 180);
+  --chart-3: oklch(0.56 0.17 135);
+  --chart-4: oklch(0.6 0.17 70);
+  --chart-5: oklch(0.58 0.2 25);
+
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.28 0.025 270);
+  --sidebar-primary: oklch(0.56 0.22 300);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.955 0.018 300);
+  --sidebar-accent-foreground: oklch(0.4 0.15 300);
+  --sidebar-border: oklch(0.9 0.012 270);
+  --sidebar-ring: oklch(0.6 0.2 300);
+
+  --radius: 1rem;
+}
+
+.theme-dark {
   --background: oklch(0.18 0.025 270);
   --foreground: oklch(0.985 0 0);
 
@@ -63,41 +111,42 @@
   --popover: oklch(0.225 0.026 270);
   --popover-foreground: oklch(0.985 0 0);
 
-  --primary: oklch(0.64 0.22 300);
+  --primary: oklch(0.68 0.2 300);
   --primary-foreground: oklch(0.985 0 0);
 
   --secondary: oklch(0.3 0.03 270);
   --secondary-foreground: oklch(0.985 0 0);
 
   --muted: oklch(0.31 0.025 270);
-  --muted-foreground: oklch(0.74 0.025 270);
+  --muted-foreground: oklch(0.76 0.02 270);
 
   --accent: oklch(0.31 0.05 300);
   --accent-foreground: oklch(0.985 0 0);
 
-  --destructive: oklch(0.62 0.22 25);
+  --destructive: oklch(0.68 0.2 25);
 
   --border: oklch(1 0 0 / 0.12);
   --input: oklch(1 0 0 / 0.13);
-  --ring: oklch(0.64 0.22 300);
+  --ring: oklch(0.68 0.2 300);
 
-  --chart-1: oklch(0.68 0.2 300);
-  --chart-2: oklch(0.68 0.17 180);
-  --chart-3: oklch(0.72 0.19 135);
-  --chart-4: oklch(0.74 0.2 70);
-  --chart-5: oklch(0.68 0.22 25);
+  --chart-1: oklch(0.7 0.18 300);
+  --chart-2: oklch(0.72 0.15 180);
+  --chart-3: oklch(0.74 0.17 135);
+  --chart-4: oklch(0.76 0.18 70);
+  --chart-5: oklch(0.72 0.2 25);
 
   --sidebar: oklch(0.19 0.025 270);
   --sidebar-foreground: oklch(0.96 0 0);
-  --sidebar-primary: oklch(0.64 0.22 300);
+  --sidebar-primary: oklch(0.68 0.2 300);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.28 0.035 270);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 0.12);
-  --sidebar-ring: oklch(0.64 0.22 300);
+  --sidebar-ring: oklch(0.68 0.2 300);
 
   --radius: 1rem;
 }
+
 
 * {
   box-sizing: border-box;
@@ -108,7 +157,7 @@ html {
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
-  background: #111827;
+  background: var(--background);
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
@@ -1226,4 +1275,206 @@ body {
   overflow-x: clip;
   overscroll-behavior-x: none;
   touch-action: pan-y;
+}
+
+/* ======================================================================
+   THEME CONTRACT V2
+   Final contrast layer for the complete application. The root now also
+   receives Tailwind's .dark class, so component-level dark: utilities work.
+   These rules normalize legacy screens that still use fixed color classes.
+   ====================================================================== */
+
+.theme-light {
+  background-color: #f8fafc;
+  color-scheme: light;
+}
+
+.theme-dark {
+  background-color: #0b1220;
+  color-scheme: dark;
+}
+
+.theme-light .app-shell {
+  background:
+    radial-gradient(circle at top left, rgba(139, 92, 246, 0.08), transparent 28rem),
+    radial-gradient(circle at top right, rgba(236, 72, 153, 0.05), transparent 30rem),
+    #f8fafc;
+  color: #0f172a;
+}
+
+.theme-dark .app-shell {
+  background:
+    radial-gradient(circle at top left, rgba(139, 92, 246, 0.13), transparent 28rem),
+    radial-gradient(circle at top right, rgba(236, 72, 153, 0.08), transparent 30rem),
+    #0b1220;
+  color: #f8fafc;
+}
+
+/* Fixed dark surfaces from older screens become proper light surfaces. */
+.theme-light .app-shell .bg-slate-950,
+.theme-light .app-shell .bg-slate-900,
+.theme-light .app-shell .bg-slate-800,
+.theme-light .app-shell .bg-\[\#111827\],
+.theme-light .app-shell .bg-\[\#11131d\],
+.theme-light .app-shell .bg-\[\#151a2a\],
+.theme-light .app-shell .bg-\[\#171d2d\],
+.theme-light .app-shell .bg-\[\#171d2a\],
+.theme-light .app-shell .bg-\[\#1d2437\],
+.theme-light .app-shell .bg-\[\#20283b\],
+.theme-light .app-shell .bg-\[\#0b1220\] {
+  background-color: #ffffff !important;
+}
+
+/* Light semantic text. Old dark-first screens frequently use 100-300 tones. */
+.theme-light .app-shell :is(.text-violet-100, .text-violet-200, .text-violet-300) {
+  color: #6d28d9 !important;
+}
+.theme-light .app-shell :is(.text-fuchsia-100, .text-fuchsia-200, .text-fuchsia-300, .text-pink-100, .text-pink-200, .text-pink-300) {
+  color: #a21caf !important;
+}
+.theme-light .app-shell :is(.text-emerald-100, .text-emerald-200, .text-emerald-300, .text-green-100, .text-green-200, .text-green-300) {
+  color: #047857 !important;
+}
+.theme-light .app-shell :is(.text-rose-100, .text-rose-200, .text-rose-300, .text-red-100, .text-red-200, .text-red-300) {
+  color: #be123c !important;
+}
+.theme-light .app-shell :is(.text-amber-100, .text-amber-200, .text-amber-300, .text-yellow-100, .text-yellow-200, .text-yellow-300, .text-orange-100, .text-orange-200, .text-orange-300) {
+  color: #a16207 !important;
+}
+.theme-light .app-shell :is(.text-blue-100, .text-blue-200, .text-blue-300, .text-cyan-100, .text-cyan-200, .text-cyan-300, .text-sky-100, .text-sky-200, .text-sky-300, .text-teal-100, .text-teal-200, .text-teal-300) {
+  color: #0369a1 !important;
+}
+
+/* Dark semantic text. Fixed dark colors become readable on dark surfaces. */
+.theme-dark .app-shell :is(.text-fuchsia-500, .text-fuchsia-600, .text-fuchsia-700, .text-fuchsia-800, .text-fuchsia-900, .text-fuchsia-950, .text-pink-500, .text-pink-600, .text-pink-700, .text-pink-800, .text-pink-900, .text-pink-950) {
+  color: #f0abfc !important;
+}
+.theme-dark .app-shell :is(.text-sky-500, .text-sky-600, .text-sky-700, .text-sky-800, .text-sky-900, .text-sky-950, .text-teal-500, .text-teal-600, .text-teal-700, .text-teal-800, .text-teal-900, .text-teal-950) {
+  color: #7dd3fc !important;
+}
+.theme-dark .app-shell :is(.text-orange-500, .text-orange-600, .text-orange-700, .text-orange-800, .text-orange-900, .text-orange-950, .text-yellow-500, .text-yellow-600, .text-yellow-700, .text-yellow-800, .text-yellow-900, .text-yellow-950) {
+  color: #fcd34d !important;
+}
+
+/* Pastel semantic surfaces remain dark in dark mode, including opacity variants. */
+.theme-dark .app-shell [class*="bg-violet-50"],
+.theme-dark .app-shell [class*="bg-violet-100"] {
+  background-color: rgba(139, 92, 246, 0.13) !important;
+}
+.theme-dark .app-shell [class*="bg-fuchsia-50"],
+.theme-dark .app-shell [class*="bg-fuchsia-100"],
+.theme-dark .app-shell [class*="bg-pink-50"],
+.theme-dark .app-shell [class*="bg-pink-100"] {
+  background-color: rgba(217, 70, 239, 0.12) !important;
+}
+.theme-dark .app-shell [class*="bg-emerald-50"],
+.theme-dark .app-shell [class*="bg-emerald-100"],
+.theme-dark .app-shell [class*="bg-green-50"],
+.theme-dark .app-shell [class*="bg-green-100"] {
+  background-color: rgba(16, 185, 129, 0.10) !important;
+}
+.theme-dark .app-shell [class*="bg-rose-50"],
+.theme-dark .app-shell [class*="bg-rose-100"],
+.theme-dark .app-shell [class*="bg-red-50"],
+.theme-dark .app-shell [class*="bg-red-100"] {
+  background-color: rgba(244, 63, 94, 0.10) !important;
+}
+.theme-dark .app-shell [class*="bg-amber-50"],
+.theme-dark .app-shell [class*="bg-amber-100"],
+.theme-dark .app-shell [class*="bg-yellow-50"],
+.theme-dark .app-shell [class*="bg-yellow-100"],
+.theme-dark .app-shell [class*="bg-orange-50"],
+.theme-dark .app-shell [class*="bg-orange-100"] {
+  background-color: rgba(245, 158, 11, 0.10) !important;
+}
+.theme-dark .app-shell [class*="bg-blue-50"],
+.theme-dark .app-shell [class*="bg-blue-100"],
+.theme-dark .app-shell [class*="bg-cyan-50"],
+.theme-dark .app-shell [class*="bg-cyan-100"],
+.theme-dark .app-shell [class*="bg-sky-50"],
+.theme-dark .app-shell [class*="bg-sky-100"],
+.theme-dark .app-shell [class*="bg-teal-50"],
+.theme-dark .app-shell [class*="bg-teal-100"] {
+  background-color: rgba(14, 165, 233, 0.10) !important;
+}
+
+/* Preserve white text on strong buttons, dark overlays and vivid status chips. */
+.theme-light .app-shell :is(
+  [class*="bg-violet-500"],
+  [class*="bg-violet-600"],
+  [class*="bg-violet-700"],
+  [class*="bg-fuchsia-500"],
+  [class*="bg-fuchsia-600"],
+  [class*="bg-emerald-500"],
+  [class*="bg-emerald-600"],
+  [class*="bg-emerald-700"],
+  [class*="bg-rose-500"],
+  [class*="bg-rose-600"],
+  [class*="bg-rose-700"],
+  [class*="bg-cyan-500"],
+  [class*="bg-cyan-600"],
+  [class*="bg-blue-500"],
+  [class*="bg-blue-600"],
+  [class*="bg-slate-700"],
+  [class*="bg-slate-800"],
+  [class*="bg-slate-900"],
+  [class*="bg-slate-950"],
+  [class*="bg-black"],
+  [class*="from-violet-500"],
+  [class*="from-violet-600"],
+  [class*="from-fuchsia-500"]
+).text-white,
+.theme-light .app-shell :is(
+  [class*="bg-violet-500"],
+  [class*="bg-violet-600"],
+  [class*="bg-violet-700"],
+  [class*="bg-fuchsia-500"],
+  [class*="bg-fuchsia-600"],
+  [class*="bg-emerald-500"],
+  [class*="bg-emerald-600"],
+  [class*="bg-emerald-700"],
+  [class*="bg-rose-500"],
+  [class*="bg-rose-600"],
+  [class*="bg-rose-700"],
+  [class*="bg-cyan-500"],
+  [class*="bg-cyan-600"],
+  [class*="bg-blue-500"],
+  [class*="bg-blue-600"],
+  [class*="bg-black"],
+  [class*="from-violet-500"],
+  [class*="from-violet-600"],
+  [class*="from-fuchsia-500"]
+) .text-white {
+  color: #ffffff !important;
+}
+
+/* Tooltips, dialogs and native controls inherit the active palette. */
+.theme-light .app-shell [role="dialog"],
+.theme-light .app-shell [role="menu"],
+.theme-light .app-shell [role="listbox"] {
+  color: #0f172a;
+}
+.theme-dark .app-shell [role="dialog"],
+.theme-dark .app-shell [role="menu"],
+.theme-dark .app-shell [role="listbox"] {
+  color: #f8fafc;
+}
+
+.theme-light .app-shell :where(input, select, textarea):disabled {
+  background-color: #f1f5f9 !important;
+  color: #64748b !important;
+  opacity: 1;
+}
+.theme-dark .app-shell :where(input, select, textarea):disabled {
+  background-color: rgba(255, 255, 255, 0.035) !important;
+  color: #94a3b8 !important;
+  opacity: 1;
+}
+
+/* Visible keyboard focus in both themes. */
+.theme-light .app-shell :where(button, a, input, select, textarea):focus-visible {
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.16) !important;
+}
+.theme-dark .app-shell :where(button, a, input, select, textarea):focus-visible {
+  box-shadow: 0 0 0 4px rgba(167, 139, 250, 0.20) !important;
 }
