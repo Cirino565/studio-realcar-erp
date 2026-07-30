@@ -74,18 +74,31 @@ type FiltroStatusProduto = "Ativos" | "Inativos" | "Todos";
 function numeroDoFormulario(value: FormDataEntryValue | null, fallback = 0) {
   if (value === null) return fallback;
 
-  const texto = String(value)
-    .replace(/\./g, "")
-    .replace(",", ".")
-    .trim();
+  const texto = String(value).trim().replace(/\s/g, "");
 
   if (!texto) return fallback;
 
-  const numero = Number(texto);
+  const ultimaVirgula = texto.lastIndexOf(",");
+  const ultimoPonto = texto.lastIndexOf(".");
+  let normalizado = texto;
+
+  if (ultimaVirgula >= 0 && ultimoPonto >= 0) {
+    if (ultimaVirgula > ultimoPonto) {
+      // Formato brasileiro: 1.234,56
+      normalizado = texto.replace(/\./g, "").replace(",", ".");
+    } else {
+      // Formato internacional: 1,234.56
+      normalizado = texto.replace(/,/g, "");
+    }
+  } else if (ultimaVirgula >= 0) {
+    // Formato brasileiro sem separador de milhar: 34,30
+    normalizado = texto.replace(",", ".");
+  }
+
+  const numero = Number(normalizado);
 
   return Number.isFinite(numero) ? numero : fallback;
 }
-
 function inteiroDoFormulario(value: FormDataEntryValue | null, fallback = 0) {
   return Math.trunc(numeroDoFormulario(value, fallback));
 }
