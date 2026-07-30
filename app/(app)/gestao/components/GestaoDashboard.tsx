@@ -642,13 +642,13 @@ export default function GestaoDashboard({ data }: Props) {
             items={data.rankings.margemPorProcedimento}
           />
           <RankingList
-            title="Receita por produto"
-            description="Produtos efetivamente vendidos em vendas pagas, incluindo itens adicionados durante o atendimento."
+            title="Receita por produto ou kit"
+            description="Produtos avulsos e kits efetivamente vendidos em vendas pagas, incluindo itens adicionados durante o atendimento."
             items={data.rankings.receitaPorProduto}
           />
           <RankingList
-            title="Margem direta por produto"
-            description="Preço vendido menos o custo de compra histórico de cada produto no momento da venda."
+            title="Margem direta por produto ou kit"
+            description="Preço vendido menos o custo histórico dos produtos avulsos ou dos componentes de cada kit no momento da venda."
             items={data.rankings.margemPorProduto}
           />
           <RankingList

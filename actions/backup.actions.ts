@@ -27,6 +27,8 @@ async function contarRegistrosBackup() {
     evolucoes,
     vendas,
     vendaItens,
+    kitsProdutos,
+    kitsProdutosItens,
   ] = await Promise.all([
     prisma.cliente.count(),
     prisma.agendamento.count(),
@@ -49,9 +51,11 @@ async function contarRegistrosBackup() {
     prisma.clienteEvolucao.count(),
     prisma.venda.count(),
     prisma.vendaItem.count(),
+    prisma.kitProduto.count(),
+    prisma.kitProdutoItem.count(),
   ]);
 
-  const total = clientes + agendamentos + lancamentos + fornecedores + produtos + movimentacoes + leads + campanhas + usuarios + perfis + permissoes + automacoes + configuracoes + auditoria + anamneses + fotos + documentos + procedimentos + evolucoes + vendas + vendaItens;
+  const total = clientes + agendamentos + lancamentos + fornecedores + produtos + movimentacoes + leads + campanhas + usuarios + perfis + permissoes + automacoes + configuracoes + auditoria + anamneses + fotos + documentos + procedimentos + evolucoes + vendas + vendaItens + kitsProdutos + kitsProdutosItens;
 
   return {
     clientes,
@@ -75,6 +79,8 @@ async function contarRegistrosBackup() {
     evolucoes,
     vendas,
     vendaItens,
+    kitsProdutos,
+    kitsProdutosItens,
     total,
   };
 }

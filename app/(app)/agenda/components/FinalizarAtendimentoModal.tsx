@@ -19,9 +19,17 @@ import {
 
 import { finalizarAtendimento } from "@/actions/agendamento.actions";
 import ProdutosVendaEditor from "@/components/vendas/ProdutosVendaEditor";
+import KitsVendaEditor from "@/components/vendas/KitsVendaEditor";
 import type {
+  ItemKitVendaDraft,
   ItemProdutoVendaDraft,
+  KitVendaOption,
   ProdutoVendaOption,
+} from "@/lib/vendas.types";
+import {
+  custoUnitarioKit,
+  necessidadesEstoqueVenda,
+  valorUnitarioKit,
 } from "@/lib/vendas.types";
 
 import type { AppointmentDetails } from "./AppointmentDetailsModal";
@@ -41,6 +49,8 @@ type Props = {
   appointment: AppointmentDetails | null;
   servicos: ServicoFinalizacao[];
   produtos: ProdutoVendaOption[];
+  kits: KitVendaOption[];
+  podeAutorizarEstoqueNegativo: boolean;
   onAgendarRetorno?: (appointment: AppointmentDetails) => void;
 };
 
@@ -108,6 +118,8 @@ export default function FinalizarAtendimentoModal({
   appointment,
   servicos,
   produtos,
+  kits,
+  podeAutorizarEstoqueNegativo,
   onAgendarRetorno,
 }: Props) {
   const [procedimentoRealizado, setProcedimentoRealizado] = useState("");
@@ -118,6 +130,8 @@ export default function FinalizarAtendimentoModal({
   const [valorServico, setValorServico] = useState(0);
   const [custoServico, setCustoServico] = useState(0);
   const [itensProdutos, setItensProdutos] = useState<ItemProdutoVendaDraft[]>([]);
+  const [itensKits, setItensKits] = useState<ItemKitVendaDraft[]>([]);
+  const [permitirEstoqueNegativo, setPermitirEstoqueNegativo] = useState(false);
   const [formaPagamento, setFormaPagamento] = useState("Pix");
   const [statusPagamento, setStatusPagamento] = useState("Pago");
   const [confirmando, setConfirmando] = useState(false);
@@ -135,6 +149,8 @@ export default function FinalizarAtendimentoModal({
       setValorServico(0);
       setCustoServico(0);
       setItensProdutos([]);
+      setItensKits([]);
+      setPermitirEstoqueNegativo(false);
       setFormaPagamento("Pix");
       setStatusPagamento("Pago");
       setConfirmando(false);
@@ -153,6 +169,8 @@ export default function FinalizarAtendimentoModal({
     setValorServico(Number(appointment.valor || servico?.valorPadrao || 0));
     setCustoServico(Number(servico?.custoPadrao || 0));
     setItensProdutos([]);
+    setItensKits([]);
+    setPermitirEstoqueNegativo(false);
     setFormaPagamento("Pix");
     setStatusPagamento("Pago");
     setEvolucao("");
@@ -162,14 +180,24 @@ export default function FinalizarAtendimentoModal({
   }, [open, appointment, servicos]);
 
   const totais = useMemo(() => {
-    const totalProdutos = itensProdutos.reduce(
+    const totalProdutosAvulsos = itensProdutos.reduce(
       (total, item) => total + item.valorUnitario * item.quantidade,
       0,
     );
-    const custoProdutos = itensProdutos.reduce(
+    const custoProdutosAvulsos = itensProdutos.reduce(
       (total, item) => total + item.custoUnitario * item.quantidade,
       0,
     );
+    const totalKits = itensKits.reduce(
+      (total, item) => total + valorUnitarioKit(item) * item.quantidadeKits,
+      0,
+    );
+    const custoKits = itensKits.reduce(
+      (total, item) => total + custoUnitarioKit(item) * item.quantidadeKits,
+      0,
+    );
+    const totalProdutos = totalProdutosAvulsos + totalKits;
+    const custoProdutos = custoProdutosAvulsos + custoKits;
     const total = valorServico + totalProdutos;
     const custo = custoServico + custoProdutos;
     const margem = total - custo;
@@ -182,7 +210,12 @@ export default function FinalizarAtendimentoModal({
       margem,
       margemPercentual: total > 0 ? (margem / total) * 100 : 0,
     };
-  }, [itensProdutos, valorServico, custoServico]);
+  }, [itensProdutos, itensKits, valorServico, custoServico]);
+
+  const estoqueInsuficiente = useMemo(
+    () => necessidadesEstoqueVenda(itensProdutos, itensKits),
+    [itensProdutos, itensKits],
+  );
 
   if (!open || !appointment) return null;
 
@@ -221,6 +254,13 @@ export default function FinalizarAtendimentoModal({
       return;
     }
 
+    if (estoqueInsuficiente.length > 0 && !permitirEstoqueNegativo) {
+      setError(
+        "Há estoque insuficiente. Ajuste os itens ou solicite autorização de um administrador.",
+      );
+      return;
+    }
+
     setConfirmando(true);
   }
 
@@ -243,6 +283,18 @@ export default function FinalizarAtendimentoModal({
             quantidade: item.quantidade,
             valorUnitario: item.valorUnitario,
           })),
+          kits: itensKits.map((item) => ({
+            kitId: item.kitId,
+            quantidade: item.quantidadeKits,
+            componentes:
+              item.tipo === "FLEXIVEL"
+                ? item.componentes.map((componente) => ({
+                    produtoId: componente.produtoId,
+                    quantidade: componente.quantidadePorKit,
+                  }))
+                : undefined,
+          })),
+          permitirEstoqueNegativo,
           formaPagamento,
           statusPagamento,
           evolucao: evolucaoClinica,
@@ -509,8 +561,60 @@ export default function FinalizarAtendimentoModal({
                     itens={itensProdutos}
                     onChange={setItensProdutos}
                     compact
+                    podeExcederEstoque={podeAutorizarEstoqueNegativo}
                   />
                 </section>
+
+                <section className="rounded-2xl border border-violet-200 bg-white p-4 shadow-sm">
+                  <div className="mb-3 flex items-center gap-2">
+                    <Package size={16} className="text-violet-600" />
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Kits vendidos junto</p>
+                      <p className="mt-0.5 text-[11px] text-slate-500">
+                        O sistema baixa automaticamente cada produto que compõe o kit.
+                      </p>
+                    </div>
+                  </div>
+                  <KitsVendaEditor
+                    kits={kits}
+                    itens={itensKits}
+                    onChange={setItensKits}
+                    compact
+                  />
+                </section>
+
+                {estoqueInsuficiente.length > 0 ? (
+                  <section className="rounded-2xl border border-amber-300 bg-amber-50 p-4">
+                    <div className="flex items-start gap-2.5">
+                      <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-700" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-amber-900">Estoque insuficiente</p>
+                        <p className="mt-1 text-[11px] leading-5 text-amber-800">
+                          {estoqueInsuficiente
+                            .map((item) => `${item.nome}: precisa ${item.necessario}, disponível ${item.disponivel}`)
+                            .join("; ")}
+                        </p>
+                        {podeAutorizarEstoqueNegativo ? (
+                          <label className="mt-3 flex items-start gap-2 rounded-xl border border-amber-300 bg-white/70 p-3">
+                            <input
+                              type="checkbox"
+                              checked={permitirEstoqueNegativo}
+                              onChange={(event) => setPermitirEstoqueNegativo(event.target.checked)}
+                              className="mt-0.5 size-4"
+                            />
+                            <span className="text-xs font-semibold text-amber-900">
+                              Autorizar estoque negativo nesta finalização. A autorização ficará registrada.
+                            </span>
+                          </label>
+                        ) : (
+                          <p className="mt-2 text-[11px] font-semibold text-amber-900">
+                            Ajuste os itens ou solicite autorização de um administrador.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </section>
+                ) : null}
 
                 <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -612,6 +716,36 @@ export default function FinalizarAtendimentoModal({
                         <div key={item.produtoId} className="flex justify-between gap-3 text-xs">
                           <span className="text-slate-600">{item.quantidade}x {item.nome}</span>
                           <strong className="text-slate-900">{formatCurrency(item.valorUnitario * item.quantidade)}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                {itensKits.length > 0 ? (
+                  <section className="rounded-2xl border border-violet-200 bg-violet-50 p-4 shadow-sm">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-violet-500">Kits</p>
+                    <div className="mt-2 space-y-3">
+                      {itensKits.map((item) => (
+                        <div key={item.clientKey} className="text-xs">
+                          <div className="flex justify-between gap-3">
+                            <span className="font-semibold text-slate-700">
+                              {item.quantidadeKits}x {item.nome}
+                            </span>
+                            <strong className="text-slate-900">
+                              {formatCurrency(
+                                valorUnitarioKit(item) * item.quantidadeKits,
+                              )}
+                            </strong>
+                          </div>
+                          <p className="mt-1 text-[10px] leading-4 text-slate-500">
+                            {item.componentes
+                              .map(
+                                (componente) =>
+                                  `${componente.quantidadePorKit}x ${componente.nome} por kit`,
+                              )
+                              .join(", ")}
+                          </p>
                         </div>
                       ))}
                     </div>

@@ -20,6 +20,7 @@ type Props = {
   itens: ItemProdutoVendaDraft[];
   onChange: (itens: ItemProdutoVendaDraft[]) => void;
   compact?: boolean;
+  podeExcederEstoque?: boolean;
 };
 
 export default function ProdutosVendaEditor({
@@ -27,6 +28,7 @@ export default function ProdutosVendaEditor({
   itens,
   onChange,
   compact = false,
+  podeExcederEstoque = false,
 }: Props) {
   const [produtoSelecionado, setProdutoSelecionado] = useState("");
 
@@ -34,9 +36,10 @@ export default function ProdutosVendaEditor({
     () =>
       produtos.filter(
         (produto) =>
-          produto.status.toLowerCase() === "ativo" && produto.quantidade > 0,
+          produto.status.toLowerCase() === "ativo" &&
+          (produto.quantidade > 0 || podeExcederEstoque),
       ),
-    [produtos],
+    [produtos, podeExcederEstoque],
   );
 
   function adicionarProduto() {
@@ -48,7 +51,12 @@ export default function ProdutosVendaEditor({
     const existente = itens.find((item) => item.produtoId === produto.id);
 
     if (existente) {
-      if (existente.quantidade >= existente.estoqueDisponivel) return;
+      if (
+        !podeExcederEstoque &&
+        existente.quantidade >= existente.estoqueDisponivel
+      ) {
+        return;
+      }
       onChange(
         itens.map((item) =>
           item.produtoId === produto.id
@@ -80,10 +88,12 @@ export default function ProdutosVendaEditor({
         item.produtoId === produtoId
           ? {
               ...item,
-              quantidade: Math.min(
-                item.estoqueDisponivel,
-                Math.max(1, Math.trunc(quantidade || 1)),
-              ),
+              quantidade: podeExcederEstoque
+                ? Math.max(1, Math.trunc(quantidade || 1))
+                : Math.min(
+                    item.estoqueDisponivel,
+                    Math.max(1, Math.trunc(quantidade || 1)),
+                  ),
             }
           : item,
       ),
@@ -189,7 +199,7 @@ export default function ProdutosVendaEditor({
                       <input
                         type="number"
                         min={1}
-                        max={item.estoqueDisponivel}
+                        max={podeExcederEstoque ? undefined : item.estoqueDisponivel}
                         value={item.quantidade}
                         onChange={(event) =>
                           atualizarQuantidade(
@@ -204,7 +214,10 @@ export default function ProdutosVendaEditor({
                         onClick={() =>
                           atualizarQuantidade(item.produtoId, item.quantidade + 1)
                         }
-                        disabled={item.quantidade >= item.estoqueDisponivel}
+                        disabled={
+                          !podeExcederEstoque &&
+                          item.quantidade >= item.estoqueDisponivel
+                        }
                         className="flex h-full w-9 items-center justify-center text-slate-500 disabled:opacity-30"
                       >
                         <Plus className="size-3.5" />

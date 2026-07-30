@@ -787,7 +787,9 @@ export async function obterDadosGestao(
     venda.itens.filter((item) => item.tipo === "SERVICO"),
   );
   const itensProdutoVendas = vendasPagas.flatMap((venda) =>
-    venda.itens.filter((item) => item.tipo === "PRODUTO"),
+    venda.itens.filter(
+      (item) => item.tipo === "PRODUTO" || item.tipo === "KIT",
+    ),
   );
 
   const receitaPorProcedimento = agruparRanking([

@@ -1,11 +1,11 @@
-import { canAccess, requirePagePermission } from "@/lib/auth";
+import { canAccess, isAdminUser, requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import VendasClient from "./components/VendasClient";
 
 export default async function VendasPage() {
   const usuario = await requirePagePermission("financeiro.visualizar");
 
-  const [clientes, produtos, vendas] = await Promise.all([
+  const [clientes, produtos, kits, vendas] = await Promise.all([
     prisma.cliente.findMany({
       where: { status: { not: "Inativa" } },
       orderBy: { nome: "asc" },
@@ -30,6 +30,29 @@ export default async function VendasPage() {
         status: true,
       },
     }),
+    prisma.kitProduto.findMany({
+      where: { status: "Ativo" },
+      orderBy: { nome: "asc" },
+      include: {
+        itens: {
+          orderBy: [{ ordem: "asc" }, { id: "asc" }],
+          include: {
+            produto: {
+              select: {
+                id: true,
+                nome: true,
+                categoria: true,
+                unidade: true,
+                quantidade: true,
+                valorCompra: true,
+                valorVenda: true,
+                status: true,
+              },
+            },
+          },
+        },
+      },
+    }),
     prisma.venda.findMany({
       orderBy: [{ data: "desc" }, { id: "desc" }],
       take: 60,
@@ -46,6 +69,10 @@ export default async function VendasPage() {
             custoUnitario: true,
             valorTotal: true,
             custoTotal: true,
+            grupoKitId: true,
+            kitNomeHistorico: true,
+            kitTipoHistorico: true,
+            acrescimoUnitario: true,
           },
         },
       },
@@ -56,11 +83,13 @@ export default async function VendasPage() {
     <VendasClient
       clientes={clientes}
       produtos={produtos}
+      kits={kits}
       vendas={vendas.map((venda) => ({
         ...venda,
         data: venda.data.toISOString(),
       }))}
       podeGerenciar={canAccess(usuario, "financeiro.gerenciar")}
+      podeAutorizarEstoqueNegativo={isAdminUser(usuario)}
     />
   );
 }

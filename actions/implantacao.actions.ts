@@ -418,6 +418,8 @@ export async function prepararInicioOficial(
       await tx.cliente.deleteMany();
 
       if (dados.apagarProdutosFornecedores) {
+        await tx.kitProdutoItem.deleteMany();
+        await tx.kitProduto.deleteMany();
         await tx.produto.deleteMany();
         await tx.fornecedor.deleteMany();
       } else {
@@ -452,7 +454,12 @@ export async function prepararInicioOficial(
       ];
 
       if (dados.apagarProdutosFornecedores) {
-        tabelasParaReiniciar.push("Produto", "Fornecedor");
+        tabelasParaReiniciar.push(
+          "KitProdutoItem",
+          "KitProduto",
+          "Produto",
+          "Fornecedor",
+        );
       }
 
       await reiniciarSequencias(tx, tabelasParaReiniciar);
@@ -468,8 +475,8 @@ export async function prepararInicioOficial(
             `${resumoAntes.totalOperacional} registros operacionais de teste identificados antes da limpeza.`,
             `${PROCEDIMENTOS_INICIAIS.length} procedimentos oficiais processados.`,
             dados.apagarProdutosFornecedores
-              ? "Produtos e fornecedores de teste removidos."
-              : "Catálogo de produtos preservado e quantidades zeradas para contagem física.",
+              ? "Produtos, kits e fornecedores de teste removidos."
+              : "Catálogo de produtos e kits preservado, com quantidades dos produtos zeradas para contagem física.",
           ].join(" "),
         },
       });

@@ -1,4 +1,4 @@
-import type { ProdutoVendaOption } from "@/lib/vendas.types";
+import type { KitVendaOption, ProdutoVendaOption } from "@/lib/vendas.types";
 
 export type ClienteVendaOption = {
   id: number;
@@ -29,12 +29,18 @@ export type VendaHistoricoItem = {
     custoUnitario: number;
     valorTotal: number;
     custoTotal: number;
+    grupoKitId: string | null;
+    kitNomeHistorico: string | null;
+    kitTipoHistorico: string | null;
+    acrescimoUnitario: number;
   }>;
 };
 
 export type VendasPageData = {
   clientes: ClienteVendaOption[];
   produtos: ProdutoVendaOption[];
+  kits: KitVendaOption[];
   vendas: VendaHistoricoItem[];
   podeGerenciar: boolean;
+  podeAutorizarEstoqueNegativo: boolean;
 };

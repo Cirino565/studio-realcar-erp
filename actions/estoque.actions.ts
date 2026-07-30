@@ -133,6 +133,16 @@ export async function updateProduto(id: number, data: ProdutoInput) {
 export async function deleteProduto(id: number) {
   await requirePermission("estoque.gerenciar");
 
+  const vinculosKit = await prisma.kitProdutoItem.count({
+    where: { produtoId: id },
+  });
+
+  if (vinculosKit > 0) {
+    throw new Error(
+      "Este produto participa de um ou mais kits. Remova-o das composições antes de excluir.",
+    );
+  }
+
   await prisma.produto.delete({
     where: {
       id,

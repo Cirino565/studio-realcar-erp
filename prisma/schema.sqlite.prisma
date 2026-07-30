@@ -212,6 +212,41 @@ model Produto {
   movimentacoes  MovimentacaoEstoque[]
   itensCompra    CompraItem[]
   itensVenda     VendaItem[]
+  itensKit       KitProdutoItem[]
+}
+
+model KitProduto {
+  id                Int      @id @default(autoincrement())
+  nome              String   @unique
+  tipo              String
+  precoVenda        Float    @default(0)
+  quantidadeEscolha Int      @default(1)
+  permitirRepeticao Boolean  @default(false)
+  status            String   @default("Ativo")
+  observacoes       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  itens             KitProdutoItem[]
+  itensVenda        VendaItem[]
+
+  @@index([status, nome])
+}
+
+model KitProdutoItem {
+  id           Int        @id @default(autoincrement())
+  kitProdutoId Int
+  kitProduto   KitProduto @relation(fields: [kitProdutoId], references: [id], onDelete: Cascade)
+  produtoId    Int
+  produto      Produto    @relation(fields: [produtoId], references: [id], onDelete: Restrict)
+  quantidade   Int        @default(1)
+  acrescimo    Float      @default(0)
+  ordem        Int        @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([kitProdutoId, produtoId])
+  @@index([produtoId])
 }
 
 model MovimentacaoEstoque {
@@ -266,6 +301,12 @@ model VendaItem {
   produto               Produto?  @relation(fields: [produtoId], references: [id], onDelete: SetNull)
   procedimentoServicoId Int?
   procedimentoServico   ProcedimentoServico? @relation(fields: [procedimentoServicoId], references: [id], onDelete: SetNull)
+  kitProdutoId          Int?
+  kitProduto            KitProduto? @relation(fields: [kitProdutoId], references: [id], onDelete: SetNull)
+  grupoKitId            String?
+  kitNomeHistorico      String?
+  kitTipoHistorico      String?
+  acrescimoUnitario     Float     @default(0)
   descricao             String
   quantidade            Int       @default(1)
   valorUnitario         Float     @default(0)
@@ -279,6 +320,8 @@ model VendaItem {
   @@index([vendaId])
   @@index([produtoId])
   @@index([procedimentoServicoId])
+  @@index([kitProdutoId])
+  @@index([grupoKitId])
   @@index([tipo])
 }
 

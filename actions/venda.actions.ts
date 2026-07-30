@@ -2,13 +2,19 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requirePermission } from "@/lib/auth";
+import { isAdminUser, requirePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { criarVendaNoTx, type VendaProdutoInput } from "@/lib/vendas";
+import {
+  criarVendaNoTx,
+  type VendaKitInput,
+  type VendaProdutoInput,
+} from "@/lib/vendas";
 
 export type CriarVendaProdutosInput = {
   clienteId: number;
   produtos: VendaProdutoInput[];
+  kits?: VendaKitInput[];
+  permitirEstoqueNegativo?: boolean;
   formaPagamento?: string;
   statusPagamento?: string;
   observacoes?: string;
@@ -38,9 +44,19 @@ export async function criarVendaProdutos(dados: CriarVendaProdutosInput) {
   const produtos = (dados.produtos || []).filter(
     (item) => item.produtoId > 0 && item.quantidade > 0,
   );
+  const kits = (dados.kits || []).filter(
+    (item) => item.kitId > 0 && item.quantidade > 0,
+  );
 
-  if (produtos.length === 0) {
-    throw new Error("Adicione pelo menos um produto à venda.");
+  if (produtos.length === 0 && kits.length === 0) {
+    throw new Error("Adicione pelo menos um produto ou kit à venda.");
+  }
+
+  const permitirEstoqueNegativo =
+    Boolean(dados.permitirEstoqueNegativo) && isAdminUser(usuarioAtual);
+
+  if (dados.permitirEstoqueNegativo && !permitirEstoqueNegativo) {
+    throw new Error("Somente administradores podem autorizar estoque negativo.");
   }
 
   const cliente = await prisma.cliente.findUnique({
@@ -61,6 +77,11 @@ export async function criarVendaProdutos(dados: CriarVendaProdutosInput) {
       origem: "Vendas",
       observacoes: dados.observacoes,
       produtos,
+      kits,
+      permitirEstoqueNegativo,
+      estoqueNegativoAutorizadoPor: permitirEstoqueNegativo
+        ? usuarioAtual.email
+        : null,
     });
 
     await tx.auditoria.create({
@@ -70,7 +91,7 @@ export async function criarVendaProdutos(dados: CriarVendaProdutosInput) {
         entidade: "Venda",
         entidadeId: String(venda.vendaId),
         usuario: usuarioAtual.email,
-        detalhes: `Cliente: ${cliente.nome}. Total: R$ ${venda.valorTotal.toFixed(2)}. Custo: R$ ${venda.custoTotal.toFixed(2)}.`,
+        detalhes: `Cliente: ${cliente.nome}. Total: R$ ${venda.valorTotal.toFixed(2)}. Custo: R$ ${venda.custoTotal.toFixed(2)}.${venda.estoqueNegativoAutorizado ? ` Estoque negativo autorizado por ${usuarioAtual.email}.` : ""}`,
       },
     });
 

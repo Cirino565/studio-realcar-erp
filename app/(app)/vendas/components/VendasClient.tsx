@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  AlertTriangle,
   CheckCircle2,
   CircleDollarSign,
   PackageCheck,
@@ -13,18 +14,30 @@ import {
 
 import { criarVendaProdutos } from "@/actions/venda.actions";
 import ProdutosVendaEditor from "@/components/vendas/ProdutosVendaEditor";
-import type { ItemProdutoVendaDraft } from "@/lib/vendas.types";
+import KitsVendaEditor from "@/components/vendas/KitsVendaEditor";
+import type {
+  ItemKitVendaDraft,
+  ItemProdutoVendaDraft,
+  KitVendaOption,
+  ProdutoVendaOption,
+} from "@/lib/vendas.types";
+import {
+  custoUnitarioKit,
+  necessidadesEstoqueVenda,
+  valorUnitarioKit,
+} from "@/lib/vendas.types";
 import type {
   ClienteVendaOption,
   VendaHistoricoItem,
 } from "../types";
-import type { ProdutoVendaOption } from "@/lib/vendas.types";
 
 type Props = {
   clientes: ClienteVendaOption[];
   produtos: ProdutoVendaOption[];
+  kits: KitVendaOption[];
   vendas: VendaHistoricoItem[];
   podeGerenciar: boolean;
+  podeAutorizarEstoqueNegativo: boolean;
 };
 
 const FORMAS_PAGAMENTO = [
@@ -54,12 +67,16 @@ function dataHora(value: string) {
 export default function VendasClient({
   clientes,
   produtos,
+  kits,
   vendas,
   podeGerenciar,
+  podeAutorizarEstoqueNegativo,
 }: Props) {
   const router = useRouter();
   const [clienteId, setClienteId] = useState("");
   const [itens, setItens] = useState<ItemProdutoVendaDraft[]>([]);
+  const [itensKits, setItensKits] = useState<ItemKitVendaDraft[]>([]);
+  const [permitirEstoqueNegativo, setPermitirEstoqueNegativo] = useState(false);
   const [formaPagamento, setFormaPagamento] = useState("Pix");
   const [statusPagamento, setStatusPagamento] = useState("Pago");
   const [observacoes, setObservacoes] = useState("");
@@ -68,14 +85,24 @@ export default function VendasClient({
   const [isPending, startTransition] = useTransition();
 
   const resumo = useMemo(() => {
-    const receita = itens.reduce(
+    const receitaProdutos = itens.reduce(
       (total, item) => total + item.valorUnitario * item.quantidade,
       0,
     );
-    const custo = itens.reduce(
+    const custoProdutos = itens.reduce(
       (total, item) => total + item.custoUnitario * item.quantidade,
       0,
     );
+    const receitaKits = itensKits.reduce(
+      (total, item) => total + valorUnitarioKit(item) * item.quantidadeKits,
+      0,
+    );
+    const custoKits = itensKits.reduce(
+      (total, item) => total + custoUnitarioKit(item) * item.quantidadeKits,
+      0,
+    );
+    const receita = receitaProdutos + receitaKits;
+    const custo = custoProdutos + custoKits;
     const margem = receita - custo;
     return {
       receita,
@@ -83,7 +110,12 @@ export default function VendasClient({
       margem,
       margemPercentual: receita > 0 ? (margem / receita) * 100 : 0,
     };
-  }, [itens]);
+  }, [itens, itensKits]);
+
+  const estoqueInsuficiente = useMemo(
+    () => necessidadesEstoqueVenda(itens, itensKits),
+    [itens, itensKits],
+  );
 
   const vendasPagas = vendas.filter(
     (venda) => venda.statusPagamento.toLowerCase() === "pago",
@@ -100,6 +132,8 @@ export default function VendasClient({
   function limpar() {
     setClienteId("");
     setItens([]);
+    setItensKits([]);
+    setPermitirEstoqueNegativo(false);
     setFormaPagamento("Pix");
     setStatusPagamento("Pago");
     setObservacoes("");
@@ -114,8 +148,12 @@ export default function VendasClient({
       setErro("Selecione a cliente da venda.");
       return;
     }
-    if (itens.length === 0) {
-      setErro("Adicione pelo menos um produto.");
+    if (itens.length === 0 && itensKits.length === 0) {
+      setErro("Adicione pelo menos um produto ou kit.");
+      return;
+    }
+    if (estoqueInsuficiente.length > 0 && !permitirEstoqueNegativo) {
+      setErro("Há estoque insuficiente. Um administrador precisa autorizar o saldo negativo ou ajustar a venda.");
       return;
     }
 
@@ -128,6 +166,18 @@ export default function VendasClient({
             quantidade: item.quantidade,
             valorUnitario: item.valorUnitario,
           })),
+          kits: itensKits.map((item) => ({
+            kitId: item.kitId,
+            quantidade: item.quantidadeKits,
+            componentes:
+              item.tipo === "FLEXIVEL"
+                ? item.componentes.map((componente) => ({
+                    produtoId: componente.produtoId,
+                    quantidade: componente.quantidadePorKit,
+                  }))
+                : undefined,
+          })),
+          permitirEstoqueNegativo,
           formaPagamento,
           statusPagamento,
           observacoes,
@@ -149,7 +199,7 @@ export default function VendasClient({
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-violet-600">Nível 3A+</p>
           <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 dark:text-white">Vendas e rentabilidade</h1>
           <p className="mt-1 max-w-3xl text-sm text-slate-500 dark:text-slate-400">
-            Venda produtos sem criar agendamento. Vendas feitas junto ao atendimento também aparecem aqui com serviço e produtos separados.
+            Venda produtos e kits sem criar agendamento. Vendas feitas junto ao atendimento também aparecem aqui com serviço e produtos separados.
           </p>
         </div>
       </div>
@@ -167,8 +217,8 @@ export default function VendasClient({
               <ShoppingCart className="size-5" />
             </div>
             <div>
-              <h2 className="font-bold text-slate-950 dark:text-white">Nova venda de produtos</h2>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">A baixa de estoque, histórico da cliente e lançamento financeiro são criados juntos.</p>
+              <h2 className="font-bold text-slate-950 dark:text-white">Nova venda de produtos e kits</h2>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">A baixa dos produtos, inclusive componentes dos kits, o histórico da cliente e o lançamento financeiro são criados juntos.</p>
             </div>
           </div>
 
@@ -184,7 +234,53 @@ export default function VendasClient({
               </select>
             </label>
 
-            <ProdutosVendaEditor produtos={produtos} itens={itens} onChange={setItens} />
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Produtos avulsos</p>
+              <ProdutosVendaEditor
+                produtos={produtos}
+                itens={itens}
+                onChange={setItens}
+                podeExcederEstoque={podeAutorizarEstoqueNegativo}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Kits</p>
+              <KitsVendaEditor kits={kits} itens={itensKits} onChange={setItensKits} />
+            </div>
+
+            {estoqueInsuficiente.length > 0 ? (
+              <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-900">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold">Estoque insuficiente para concluir esta composicao</p>
+                    <p className="mt-1 text-[11px] leading-5">
+                      {estoqueInsuficiente
+                        .map((item) => `${item.nome}: precisa ${item.necessario}, disponivel ${item.disponivel}`)
+                        .join("; ")}
+                    </p>
+                    {podeAutorizarEstoqueNegativo ? (
+                      <label className="mt-3 flex items-start gap-2 rounded-xl border border-amber-300 bg-white/70 p-3">
+                        <input
+                          type="checkbox"
+                          checked={permitirEstoqueNegativo}
+                          onChange={(event) => setPermitirEstoqueNegativo(event.target.checked)}
+                          className="mt-0.5 size-4"
+                        />
+                        <span className="text-xs font-semibold">
+                          Autorizar estoque negativo nesta venda. A autorização ficará registrada na auditoria.
+                        </span>
+                      </label>
+                    ) : (
+                      <p className="mt-2 text-[11px] font-semibold">
+                        Ajuste os itens ou solicite autorização de um administrador.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             <div className="grid gap-3 sm:grid-cols-2">
               <label>
@@ -218,7 +314,7 @@ export default function VendasClient({
             </div>
 
             <div className="flex justify-end">
-              <button type="button" onClick={salvarVenda} disabled={isPending || itens.length === 0 || !clienteId} className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 text-sm font-bold text-white transition hover:bg-violet-700 disabled:opacity-40">
+              <button type="button" onClick={salvarVenda} disabled={isPending || (itens.length === 0 && itensKits.length === 0) || !clienteId || (estoqueInsuficiente.length > 0 && !permitirEstoqueNegativo)} className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 text-sm font-bold text-white transition hover:bg-violet-700 disabled:opacity-40">
                 <PackageCheck className="size-4" />
                 {isPending ? "Registrando..." : `Registrar venda · ${moeda(resumo.receita)}`}
               </button>
@@ -261,8 +357,29 @@ function VendaRow({ venda }: { venda: VendaHistoricoItem }) {
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${venda.statusPagamento.toLowerCase() === "pago" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{venda.statusPagamento}</span>
           </div>
           <p className="mt-1 text-xs text-slate-500">{dataHora(venda.data)} · {venda.origem} · {venda.formaPagamento || "Pagamento não informado"}</p>
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-            {venda.itens.map((item) => <span key={item.id}>{item.quantidade}x {item.descricao} · {moeda(item.valorTotal)}</span>)}
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
+            {venda.itens
+              .filter((item) => item.tipo !== "KIT_COMPONENTE")
+              .map((item) => {
+                const componentes =
+                  item.tipo === "KIT" && item.grupoKitId
+                    ? venda.itens.filter(
+                        (componente) =>
+                          componente.tipo === "KIT_COMPONENTE" &&
+                          componente.grupoKitId === item.grupoKitId,
+                      )
+                    : [];
+                return (
+                  <span key={item.id}>
+                    {item.quantidade}x {item.descricao} · {moeda(item.valorTotal)}
+                    {componentes.length > 0 ? (
+                      <small className="ml-1 text-[10px] text-slate-400">
+                        ({componentes.map((componente) => `${componente.quantidade}x ${componente.descricao}`).join(", ")})
+                      </small>
+                    ) : null}
+                  </span>
+                );
+              })}
           </div>
         </div>
         <div className="shrink-0 sm:text-right">

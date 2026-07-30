@@ -27,8 +27,10 @@ import {
   updateProduto,
 } from "@/actions/estoque.actions";
 import StatCard from "@/components/dashboard/StatCard";
+import KitsEstoqueSection from "@/components/kits/KitsEstoqueSection";
 import { Button } from "@/components/ui/button";
 import { formatarDataHora, formatarMoeda } from "@/lib/format";
+import type { KitVendaOption } from "@/lib/vendas.types";
 
 type ProdutoComFornecedor = Produto & {
   fornecedor: Fornecedor | null;
@@ -42,6 +44,8 @@ type Props = {
   produtos: ProdutoComFornecedor[];
   fornecedores: Fornecedor[];
   movimentacoes: MovimentacaoComProduto[];
+  kits: KitVendaOption[];
+  podeGerenciar: boolean;
 };
 
 type ProdutoModalState =
@@ -225,6 +229,8 @@ export default function EstoqueClient({
   produtos,
   fornecedores,
   movimentacoes,
+  kits,
+  podeGerenciar,
 }: Props) {
   const router = useRouter();
 
@@ -508,6 +514,12 @@ export default function EstoqueClient({
           </div>
         ) : null}
       </section>
+
+      <KitsEstoqueSection
+        kits={kits}
+        produtos={produtos}
+        podeGerenciar={podeGerenciar}
+      />
 
       <section className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.035] shadow-2xl shadow-black/10">
         <div className="flex flex-col gap-2 border-b border-white/10 bg-white/[0.03] p-5 sm:flex-row sm:items-center sm:justify-between">

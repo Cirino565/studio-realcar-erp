@@ -2,9 +2,13 @@
 
 import { randomUUID } from "node:crypto";
 
-import { requirePermission } from "@/lib/auth";
+import { isAdminUser, requirePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { criarVendaNoTx, type VendaProdutoInput } from "@/lib/vendas";
+import {
+  criarVendaNoTx,
+  type VendaKitInput,
+  type VendaProdutoInput,
+} from "@/lib/vendas";
 import { revalidatePath } from "next/cache";
 
 type ClienteNovoAgendamento = {
@@ -939,6 +943,8 @@ export type FinalizarAtendimentoInput = {
   valorCobrado: number;
   custoServico?: number;
   produtos?: VendaProdutoInput[];
+  kits?: VendaKitInput[];
+  permitirEstoqueNegativo?: boolean;
   formaPagamento: string;
   statusPagamento: string;
   evolucao?: string;
@@ -947,7 +953,7 @@ export type FinalizarAtendimentoInput = {
 };
 
 export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
-  await requirePermission("agenda.gerenciar");
+  const usuarioAtual = await requirePermission("agenda.gerenciar");
 
   if (!dados.agendamentoId) {
     throw new Error("Agendamento inválido.");
@@ -1014,6 +1020,15 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
   const produtos = (dados.produtos || []).filter(
     (item) => item.produtoId > 0 && item.quantidade > 0,
   );
+  const kits = (dados.kits || []).filter(
+    (item) => item.kitId > 0 && item.quantidade > 0,
+  );
+  const permitirEstoqueNegativo =
+    Boolean(dados.permitirEstoqueNegativo) && isAdminUser(usuarioAtual);
+
+  if (dados.permitirEstoqueNegativo && !permitirEstoqueNegativo) {
+    throw new Error("Somente administradores podem autorizar estoque negativo.");
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.clienteProcedimento.create({
@@ -1056,6 +1071,11 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
         custoUnitario: custoServico,
       },
       produtos,
+      kits,
+      permitirEstoqueNegativo,
+      estoqueNegativoAutorizadoPor: permitirEstoqueNegativo
+        ? usuarioAtual.email
+        : null,
     });
 
     await tx.agendamento.update({
@@ -1113,7 +1133,7 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
         entidade: "Venda",
         entidadeId: String(venda.vendaId),
         usuario: profissional,
-        detalhes: `Atendimento finalizado para ${agendamento.cliente.nome}. Evolução: ${evolucaoClinica ? "registrada" : "pendente"}. Serviço: R$ ${venda.totalServicos.toFixed(2)}. Produtos: R$ ${venda.totalProdutos.toFixed(2)}. Total: R$ ${venda.valorTotal.toFixed(2)}. Custo direto: R$ ${venda.custoTotal.toFixed(2)}. Pagamento: ${statusPagamento}.`,
+        detalhes: `Atendimento finalizado para ${agendamento.cliente.nome}. Evolução: ${evolucaoClinica ? "registrada" : "pendente"}. Serviço: R$ ${venda.totalServicos.toFixed(2)}. Produtos e kits: R$ ${venda.totalProdutos.toFixed(2)}. Total: R$ ${venda.valorTotal.toFixed(2)}. Custo direto: R$ ${venda.custoTotal.toFixed(2)}. Pagamento: ${statusPagamento}.${venda.estoqueNegativoAutorizado ? ` Estoque negativo autorizado por ${usuarioAtual.email}.` : ""}`,
       },
     });
   });

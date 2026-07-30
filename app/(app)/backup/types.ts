@@ -18,6 +18,8 @@ export type BackupMetricas = {
   lancamentos: number;
   fornecedores: number;
   produtos: number;
+  kitsProdutos: number;
+  kitsProdutosItens: number;
   movimentacoes: number;
   compras: number;
   compraItens: number;
