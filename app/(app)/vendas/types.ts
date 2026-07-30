@@ -9,6 +9,7 @@ export type ClienteVendaOption = {
 
 export type VendaHistoricoItem = {
   id: number;
+  agendamentoId: number | null;
   data: string;
   cliente: { id: number; nome: string } | null;
   totalServicos: number;
@@ -19,10 +20,17 @@ export type VendaHistoricoItem = {
   custoTotal: number;
   formaPagamento: string | null;
   statusPagamento: string;
+  situacao: string;
+  canceladaEm: string | null;
+  canceladaPor: string | null;
+  motivoCancelamento: string | null;
   origem: string;
+  observacoes: string | null;
   itens: Array<{
     id: number;
     tipo: string;
+    produtoId: number | null;
+    kitProdutoId: number | null;
     descricao: string;
     quantidade: number;
     valorUnitario: number;
@@ -43,4 +51,5 @@ export type VendasPageData = {
   vendas: VendaHistoricoItem[];
   podeGerenciar: boolean;
   podeAutorizarEstoqueNegativo: boolean;
+  podeAdministrarVendas: boolean;
 };

@@ -563,6 +563,7 @@ export async function obterDadosGestao(
     prisma.venda.findMany({
       where: {
         statusPagamento: "Pago",
+        situacao: { not: "CANCELADA" },
         lancamento: {
           is: {
             statusPagamento: "Pago",
@@ -623,7 +624,10 @@ export async function obterDadosGestao(
     (item) => item.valor,
   );
   const aReceberLancamentos = lancamentos.filter(
-    (item) => item.tipo === "ENTRADA" && !isPago(item.statusPagamento),
+    (item) =>
+      item.tipo === "ENTRADA" &&
+      !isPago(item.statusPagamento) &&
+      item.statusPagamento?.trim().toLowerCase() !== "cancelado",
   );
   const aReceber = somarValores(aReceberLancamentos, (item) => item.valor);
 

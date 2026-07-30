@@ -143,6 +143,16 @@ export async function deleteProduto(id: number) {
     );
   }
 
+  const vinculosVenda = await prisma.vendaItem.count({
+    where: { produtoId: id },
+  });
+
+  if (vinculosVenda > 0) {
+    throw new Error(
+      "Este produto possui histórico de vendas e não pode ser excluído. Altere o status para Inativo para preservar estoque, estornos e auditoria.",
+    );
+  }
+
   await prisma.produto.delete({
     where: {
       id,

@@ -63,6 +63,8 @@ export default async function VendasPage() {
           select: {
             id: true,
             tipo: true,
+            produtoId: true,
+            kitProdutoId: true,
             descricao: true,
             quantidade: true,
             valorUnitario: true,
@@ -87,9 +89,11 @@ export default async function VendasPage() {
       vendas={vendas.map((venda) => ({
         ...venda,
         data: venda.data.toISOString(),
+        canceladaEm: venda.canceladaEm?.toISOString() ?? null,
       }))}
       podeGerenciar={canAccess(usuario, "financeiro.gerenciar")}
       podeAutorizarEstoqueNegativo={isAdminUser(usuario)}
+      podeAdministrarVendas={isAdminUser(usuario)}
     />
   );
 }
