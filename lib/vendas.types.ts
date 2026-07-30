@@ -41,6 +41,8 @@ export type KitVendaOption = {
   precoVenda: number;
   quantidadeEscolha: number;
   permitirRepeticao: boolean;
+  descontoTipo: string;
+  descontoValor: number;
   status: string;
   observacoes: string | null;
   itens: KitProdutoItemOption[];
@@ -53,6 +55,7 @@ export type ItemKitComponenteDraft = {
   quantidadePorKit: number;
   estoqueDisponivel: number;
   custoUnitario: number;
+  valorVendaUnitario: number;
   acrescimoUnitario: number;
 };
 
@@ -63,6 +66,8 @@ export type ItemKitVendaDraft = {
   tipo: "FIXO" | "FLEXIVEL";
   quantidadeKits: number;
   precoBaseUnitario: number;
+  descontoTipo: string;
+  descontoValor: number;
   componentes: ItemKitComponenteDraft[];
 };
 
@@ -75,7 +80,17 @@ export type KitVendaInput = {
   }>;
 };
 
-export function valorUnitarioKit(item: ItemKitVendaDraft) {
+export function valorBrutoUnitarioKit(item: ItemKitVendaDraft) {
+  if (item.tipo === "FLEXIVEL") {
+    return item.componentes.reduce(
+      (total, componente) =>
+        total +
+        (componente.valorVendaUnitario + componente.acrescimoUnitario) *
+          componente.quantidadePorKit,
+      0,
+    );
+  }
+
   return (
     item.precoBaseUnitario +
     item.componentes.reduce(
@@ -84,6 +99,25 @@ export function valorUnitarioKit(item: ItemKitVendaDraft) {
       0,
     )
   );
+}
+
+export function descontoUnitarioKit(item: ItemKitVendaDraft) {
+  if (item.tipo !== "FLEXIVEL") return 0;
+
+  const bruto = valorBrutoUnitarioKit(item);
+  const valor = Math.max(0, Number(item.descontoValor || 0));
+
+  if (item.descontoTipo === "PERCENTUAL") {
+    return Math.min(bruto, bruto * Math.min(100, valor) / 100);
+  }
+  if (item.descontoTipo === "VALOR") {
+    return Math.min(bruto, valor);
+  }
+  return 0;
+}
+
+export function valorUnitarioKit(item: ItemKitVendaDraft) {
+  return Math.max(0, valorBrutoUnitarioKit(item) - descontoUnitarioKit(item));
 }
 
 export function custoUnitarioKit(item: ItemKitVendaDraft) {

@@ -19,6 +19,8 @@ export type SalvarKitProdutoInput = {
   precoVenda: number;
   quantidadeEscolha?: number;
   permitirRepeticao?: boolean;
+  descontoTipo?: "NENHUM" | "PERCENTUAL" | "VALOR";
+  descontoValor?: number;
   status?: string;
   observacoes?: string;
   itens: KitProdutoItemInput[];
@@ -51,8 +53,18 @@ function validarKit(dados: SalvarKitProdutoInput) {
   if (!nome) throw new Error("Informe o nome do kit.");
 
   const tipo = dados.tipo === "FLEXIVEL" ? "FLEXIVEL" : "FIXO";
-  const precoVenda = numeroNaoNegativo(dados.precoVenda);
-  const quantidadeEscolha = inteiroPositivo(dados.quantidadeEscolha, 1);
+  const precoVenda = tipo === "FIXO" ? numeroNaoNegativo(dados.precoVenda) : 0;
+  const descontoTipo =
+    tipo === "FLEXIVEL" &&
+    (dados.descontoTipo === "PERCENTUAL" || dados.descontoTipo === "VALOR")
+      ? dados.descontoTipo
+      : "NENHUM";
+  const descontoValor =
+    descontoTipo === "NENHUM" ? 0 : numeroNaoNegativo(dados.descontoValor);
+
+  if (descontoTipo === "PERCENTUAL" && descontoValor > 100) {
+    throw new Error("O desconto percentual não pode ser maior que 100%.");
+  }
 
   const mapa = new Map<number, KitProdutoItemInput>();
   for (const item of dados.itens || []) {
@@ -67,7 +79,7 @@ function validarKit(dados: SalvarKitProdutoInput) {
   const itens = Array.from(mapa.values()).map((item, index) => ({
     produtoId: Math.trunc(Number(item.produtoId)),
     quantidade: tipo === "FIXO" ? inteiroPositivo(item.quantidade, 1) : 1,
-    acrescimo: numeroNaoNegativo(item.acrescimo),
+    acrescimo: tipo === "FIXO" ? numeroNaoNegativo(item.acrescimo) : 0,
     ordem: Number.isFinite(Number(item.ordem)) ? Math.trunc(Number(item.ordem)) : index,
   }));
 
@@ -79,22 +91,15 @@ function validarKit(dados: SalvarKitProdutoInput) {
     );
   }
 
-  if (
-    tipo === "FLEXIVEL" &&
-    !dados.permitirRepeticao &&
-    itens.length < quantidadeEscolha
-  ) {
-    throw new Error(
-      "O kit flexível sem repetição precisa ter produtos permitidos suficientes para a quantidade de escolhas.",
-    );
-  }
-
   return {
     nome,
     tipo,
     precoVenda,
-    quantidadeEscolha: tipo === "FLEXIVEL" ? quantidadeEscolha : itens.reduce((t, i) => t + i.quantidade, 0),
+    quantidadeEscolha:
+      tipo === "FLEXIVEL" ? 0 : itens.reduce((t, i) => t + i.quantidade, 0),
     permitirRepeticao: tipo === "FLEXIVEL" ? Boolean(dados.permitirRepeticao) : false,
+    descontoTipo,
+    descontoValor,
     status:
       dados.status?.trim().toLowerCase() === "inativo" ? "Inativo" : "Ativo",
     observacoes: limparTexto(dados.observacoes),
@@ -149,6 +154,8 @@ export async function salvarKitProduto(dados: SalvarKitProdutoInput) {
             precoVenda: normalizado.precoVenda,
             quantidadeEscolha: normalizado.quantidadeEscolha,
             permitirRepeticao: normalizado.permitirRepeticao,
+            descontoTipo: normalizado.descontoTipo,
+            descontoValor: normalizado.descontoValor,
             status: normalizado.status,
             observacoes: normalizado.observacoes,
           },
@@ -160,6 +167,8 @@ export async function salvarKitProduto(dados: SalvarKitProdutoInput) {
             precoVenda: normalizado.precoVenda,
             quantidadeEscolha: normalizado.quantidadeEscolha,
             permitirRepeticao: normalizado.permitirRepeticao,
+            descontoTipo: normalizado.descontoTipo,
+            descontoValor: normalizado.descontoValor,
             status: normalizado.status,
             observacoes: normalizado.observacoes,
           },
@@ -186,7 +195,10 @@ export async function salvarKitProduto(dados: SalvarKitProdutoInput) {
         entidade: "KitProduto",
         entidadeId: String(kit.id),
         usuario: usuario.email,
-        detalhes: `${normalizado.nome}. Tipo: ${normalizado.tipo}. Itens configurados: ${normalizado.itens.length}. Preço: R$ ${normalizado.precoVenda.toFixed(2)}.`,
+        detalhes:
+          normalizado.tipo === "FLEXIVEL"
+            ? `${normalizado.nome}. Tipo: FLEXIVEL. Produtos permitidos: ${normalizado.itens.length}. Seleção livre. Desconto: ${normalizado.descontoTipo} ${normalizado.descontoValor.toFixed(2)}.`
+            : `${normalizado.nome}. Tipo: FIXO. Itens configurados: ${normalizado.itens.length}. Preço: R$ ${normalizado.precoVenda.toFixed(2)}.`,
       },
     });
 

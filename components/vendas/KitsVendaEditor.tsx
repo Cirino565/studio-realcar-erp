@@ -9,6 +9,8 @@ import type {
 } from "@/lib/vendas.types";
 import {
   custoUnitarioKit,
+  descontoUnitarioKit,
+  valorBrutoUnitarioKit,
   valorUnitarioKit,
 } from "@/lib/vendas.types";
 
@@ -57,6 +59,28 @@ export default function KitsVendaEditor({
     (total, quantidade) => total + quantidade,
     0,
   );
+  const subtotalFlexivel =
+    kitAtual?.tipo === "FLEXIVEL"
+      ? kitAtual.itens.reduce(
+          (total, item) =>
+            total +
+            (item.produto.valorVenda + item.acrescimo) *
+              (selecaoFlexivel[item.produtoId] || 0),
+          0,
+        )
+      : 0;
+  const descontoFlexivel =
+    kitAtual?.tipo === "FLEXIVEL"
+      ? kitAtual.descontoTipo === "PERCENTUAL"
+        ? Math.min(
+            subtotalFlexivel,
+            subtotalFlexivel * Math.min(100, Math.max(0, kitAtual.descontoValor)) / 100,
+          )
+        : kitAtual.descontoTipo === "VALOR"
+          ? Math.min(subtotalFlexivel, Math.max(0, kitAtual.descontoValor))
+          : 0
+      : 0;
+  const totalFlexivel = Math.max(0, subtotalFlexivel - descontoFlexivel);
 
   function mudarKit(value: string) {
     setKitSelecionado(value);
@@ -68,8 +92,12 @@ export default function KitsVendaEditor({
     if (!kitAtual || kitAtual.tipo !== "FLEXIVEL") return;
     setSelecaoFlexivel((atual) => {
       const quantidadeAtual = atual[produtoId] || 0;
-      const limite = kitAtual.permitirRepeticao ? kitAtual.quantidadeEscolha : 1;
-      const proxima = Math.max(0, Math.min(limite, quantidadeAtual + delta));
+      const proxima = Math.max(
+        0,
+        kitAtual.permitirRepeticao
+          ? quantidadeAtual + delta
+          : Math.min(1, quantidadeAtual + delta),
+      );
       const copia = { ...atual };
       if (proxima === 0) delete copia[produtoId];
       else copia[produtoId] = proxima;
@@ -90,11 +118,12 @@ export default function KitsVendaEditor({
         quantidadePorKit: item.quantidade,
         estoqueDisponivel: item.produto.quantidade,
         custoUnitario: item.produto.valorCompra,
+        valorVendaUnitario: item.produto.valorVenda,
         acrescimoUnitario: item.acrescimo,
       }));
     } else {
-      if (totalSelecionado !== kitAtual.quantidadeEscolha) {
-        setErro(`Escolha exatamente ${kitAtual.quantidadeEscolha} item(ns).`);
+      if (totalSelecionado <= 0) {
+        setErro("Selecione ao menos um produto para formar o kit.");
         return;
       }
       componentes = kitAtual.itens
@@ -106,6 +135,7 @@ export default function KitsVendaEditor({
           quantidadePorKit: selecaoFlexivel[item.produtoId],
           estoqueDisponivel: item.produto.quantidade,
           custoUnitario: item.produto.valorCompra,
+          valorVendaUnitario: item.produto.valorVenda,
           acrescimoUnitario: item.acrescimo,
         }));
     }
@@ -118,7 +148,9 @@ export default function KitsVendaEditor({
         nome: kitAtual.nome,
         tipo: kitAtual.tipo === "FLEXIVEL" ? "FLEXIVEL" : "FIXO",
         quantidadeKits: 1,
-        precoBaseUnitario: kitAtual.precoVenda,
+        precoBaseUnitario: kitAtual.tipo === "FIXO" ? kitAtual.precoVenda : 0,
+        descontoTipo: kitAtual.descontoTipo,
+        descontoValor: kitAtual.descontoValor,
         componentes,
       },
     ]);
@@ -153,7 +185,7 @@ export default function KitsVendaEditor({
             <option value="">Adicionar kit...</option>
             {kitsAtivos.map((kit) => (
               <option key={kit.id} value={kit.id}>
-                {kit.nome} · {kit.tipo === "FIXO" ? "fixo" : `escolha ${kit.quantidadeEscolha}`} · {kit.tipo === "FIXO"
+                {kit.nome} · {kit.tipo === "FIXO" ? "fixo" : "seleção livre"} · {kit.tipo === "FIXO"
                   ? moeda(
                       kit.precoVenda +
                         kit.itens.reduce(
@@ -162,14 +194,14 @@ export default function KitsVendaEditor({
                           0,
                         ),
                     )
-                  : `base ${moeda(kit.precoVenda)}`}
+                  : "total calculado"}
               </option>
             ))}
           </select>
           <button
             type="button"
             onClick={adicionarKit}
-            disabled={!kitAtual || (kitAtual.tipo === "FLEXIVEL" && totalSelecionado !== kitAtual.quantidadeEscolha)}
+            disabled={!kitAtual || (kitAtual.tipo === "FLEXIVEL" && totalSelecionado <= 0)}
             className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-3 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-40"
           >
             <Boxes className="size-4" />
@@ -181,10 +213,10 @@ export default function KitsVendaEditor({
           <div className="mt-3 space-y-2">
             <div className="flex items-center justify-between gap-3 text-xs">
               <p className="font-bold text-violet-900 dark:text-violet-200">
-                Escolha {kitAtual.quantidadeEscolha} item(ns)
+                Selecione livremente os produtos
               </p>
-              <span className={totalSelecionado === kitAtual.quantidadeEscolha ? "font-bold text-emerald-700" : "font-bold text-amber-700"}>
-                {totalSelecionado}/{kitAtual.quantidadeEscolha}
+              <span className={totalSelecionado > 0 ? "font-bold text-emerald-700" : "font-bold text-amber-700"}>
+                {totalSelecionado} item(ns)
               </span>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
@@ -195,8 +227,7 @@ export default function KitsVendaEditor({
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs font-bold text-slate-900 dark:text-white">{item.produto.nome}</p>
                       <p className="text-[10px] text-slate-500">
-                        Estoque {item.produto.quantidade}
-                        {item.acrescimo > 0 ? ` · + ${moeda(item.acrescimo)}` : ""}
+                        {moeda(item.produto.valorVenda)} · estoque {item.produto.quantidade}
                       </p>
                     </div>
                     <button type="button" onClick={() => ajustarSelecao(item.produtoId, -1)} disabled={quantidade <= 0} className="rounded-lg border border-slate-200 p-1 text-slate-500 disabled:opacity-30">
@@ -206,7 +237,7 @@ export default function KitsVendaEditor({
                     <button
                       type="button"
                       onClick={() => ajustarSelecao(item.produtoId, 1)}
-                      disabled={totalSelecionado >= kitAtual.quantidadeEscolha || (!kitAtual.permitirRepeticao && quantidade >= 1)}
+                      disabled={!kitAtual.permitirRepeticao && quantidade >= 1}
                       className="rounded-lg border border-slate-200 p-1 text-slate-500 disabled:opacity-30"
                     >
                       <Plus className="size-3.5" />
@@ -218,6 +249,22 @@ export default function KitsVendaEditor({
             {!kitAtual.permitirRepeticao ? (
               <p className="text-[10px] text-slate-500">Este kit não permite repetir o mesmo produto.</p>
             ) : null}
+            <div className="rounded-xl border border-violet-200 bg-white p-3 text-xs dark:border-violet-400/20 dark:bg-white/5">
+              <div className="flex items-center justify-between gap-3 text-slate-600 dark:text-slate-300">
+                <span>Soma dos produtos</span>
+                <strong>{moeda(subtotalFlexivel)}</strong>
+              </div>
+              {descontoFlexivel > 0 ? (
+                <div className="mt-1 flex items-center justify-between gap-3 text-emerald-700 dark:text-emerald-300">
+                  <span>Desconto do kit</span>
+                  <strong>- {moeda(descontoFlexivel)}</strong>
+                </div>
+              ) : null}
+              <div className="mt-2 flex items-center justify-between gap-3 border-t border-violet-100 pt-2 text-sm font-black text-violet-800 dark:border-violet-400/20 dark:text-violet-200">
+                <span>Total do kit</span>
+                <span>{moeda(totalFlexivel)}</span>
+              </div>
+            </div>
           </div>
         ) : kitAtual ? (
           <p className="mt-2 text-[11px] text-slate-600 dark:text-slate-300">
@@ -230,6 +277,8 @@ export default function KitsVendaEditor({
       {itens.length > 0 ? (
         <div className="space-y-2">
           {itens.map((item) => {
+            const valorBrutoUnitario = valorBrutoUnitarioKit(item);
+            const descontoUnitario = descontoUnitarioKit(item);
             const valorUnitario = valorUnitarioKit(item);
             const custoUnitario = custoUnitarioKit(item);
             const valorTotal = valorUnitario * item.quantidadeKits;
@@ -264,7 +313,13 @@ export default function KitsVendaEditor({
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Preço por kit</p>
                     <p className="mt-1 text-sm font-bold text-slate-900 dark:text-white">{moeda(valorUnitario)}</p>
-                    <p className="text-[10px] text-slate-500">Base {moeda(item.precoBaseUnitario)} + acréscimos</p>
+                    <p className="text-[10px] text-slate-500">
+                      {item.tipo === "FLEXIVEL"
+                        ? descontoUnitario > 0
+                          ? `Produtos ${moeda(valorBrutoUnitario)} - desconto ${moeda(descontoUnitario)}`
+                          : `Soma dos produtos: ${moeda(valorBrutoUnitario)}`
+                        : `Base ${moeda(item.precoBaseUnitario)} + acréscimos`}
+                    </p>
                   </div>
                   <div className="sm:text-right">
                     <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Subtotal</p>

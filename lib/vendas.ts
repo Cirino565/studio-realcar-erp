@@ -52,6 +52,21 @@ function quantidadeSegura(value: unknown) {
   return Math.max(0, numero);
 }
 
+function calcularDescontoKit(
+  valorBruto: number,
+  tipo: string,
+  valorConfigurado: unknown,
+) {
+  const valor = dinheiroSeguro(valorConfigurado);
+  if (tipo === "PERCENTUAL") {
+    return Math.min(valorBruto, valorBruto * Math.min(100, valor) / 100);
+  }
+  if (tipo === "VALOR") {
+    return Math.min(valorBruto, valor);
+  }
+  return 0;
+}
+
 function normalizarStatusPagamento(value?: string | null) {
   return value?.trim() || "Pago";
 }
@@ -161,10 +176,8 @@ export async function criarVendaNoTx(
         (total, quantidade) => total + quantidade,
         0,
       );
-      if (totalEscolhido !== kit.quantidadeEscolha) {
-        throw new Error(
-          `O kit ${kit.nome} exige exatamente ${kit.quantidadeEscolha} item(ns).`,
-        );
+      if (totalEscolhido <= 0) {
+        throw new Error(`Selecione ao menos um produto para o kit ${kit.nome}.`);
       }
       if (!kit.permitirRepeticao && Array.from(selecao.values()).some((q) => q > 1)) {
         throw new Error(`O kit ${kit.nome} não permite repetir produtos.`);
@@ -183,17 +196,10 @@ export async function criarVendaNoTx(
       throw new Error(`O kit ${kit.nome} não possui composição válida.`);
     }
 
-    const acrescimoUnitario = componentesPorKit.reduce(
-      (total, componente) =>
-        total + componente.acrescimo * componente.quantidade,
-      0,
-    );
-
     return {
       kit,
       quantidadeKits,
       componentesPorKit,
-      valorUnitario: dinheiroSeguro(kit.precoVenda) + acrescimoUnitario,
     };
   });
 
@@ -257,20 +263,50 @@ export async function criarVendaNoTx(
       const quantidadeTotal =
         componente.quantidade * kitNormalizado.quantidadeKits;
       const custoUnitario = dinheiroSeguro(produto.valorCompra);
+      const valorVendaUnitario = dinheiroSeguro(produto.valorVenda);
       return {
         produto,
         quantidadePorKit: componente.quantidade,
         quantidadeTotal,
         acrescimoUnitario: componente.acrescimo,
         custoUnitario,
+        valorVendaUnitario,
         custoTotal: custoUnitario * quantidadeTotal,
       };
     });
 
+    const valorBrutoUnitario =
+      kitNormalizado.kit.tipo === "FLEXIVEL"
+        ? componentes.reduce(
+            (total, item) =>
+              total +
+              (item.valorVendaUnitario + item.acrescimoUnitario) *
+                item.quantidadePorKit,
+            0,
+          )
+        : dinheiroSeguro(kitNormalizado.kit.precoVenda) +
+          componentes.reduce(
+            (total, item) =>
+              total + item.acrescimoUnitario * item.quantidadePorKit,
+            0,
+          );
+    const descontoUnitario =
+      kitNormalizado.kit.tipo === "FLEXIVEL"
+        ? calcularDescontoKit(
+            valorBrutoUnitario,
+            kitNormalizado.kit.descontoTipo,
+            kitNormalizado.kit.descontoValor,
+          )
+        : 0;
+    const valorUnitario = Math.max(0, valorBrutoUnitario - descontoUnitario);
+
     return {
       ...kitNormalizado,
       componentes,
-      valorTotal: kitNormalizado.valorUnitario * kitNormalizado.quantidadeKits,
+      valorBrutoUnitario,
+      descontoUnitario,
+      valorUnitario,
+      valorTotal: valorUnitario * kitNormalizado.quantidadeKits,
       custoTotal: componentes.reduce((total, item) => total + item.custoTotal, 0),
     };
   });
@@ -468,7 +504,7 @@ export async function criarVendaNoTx(
           acrescimoUnitario: componente.acrescimoUnitario,
           descricao: componente.produto.nome,
           quantidade: componente.quantidadeTotal,
-          valorUnitario: 0,
+          valorUnitario: componente.valorVendaUnitario,
           custoUnitario: componente.custoUnitario,
           valorTotal: 0,
           custoTotal: 0,

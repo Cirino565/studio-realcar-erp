@@ -24,6 +24,8 @@ type FormState = {
   precoVenda: number;
   quantidadeEscolha: number;
   permitirRepeticao: boolean;
+  descontoTipo: "NENHUM" | "PERCENTUAL" | "VALOR";
+  descontoValor: number;
   status: string;
   observacoes: string;
   itens: ItemForm[];
@@ -48,8 +50,10 @@ function formularioVazio(): FormState {
     nome: "",
     tipo: "FIXO",
     precoVenda: 0,
-    quantidadeEscolha: 3,
+    quantidadeEscolha: 0,
     permitirRepeticao: false,
+    descontoTipo: "NENHUM",
+    descontoValor: 0,
     status: "Ativo",
     observacoes: "",
     itens: [],
@@ -64,6 +68,11 @@ function formularioDoKit(kit: KitVendaOption): FormState {
     precoVenda: kit.precoVenda,
     quantidadeEscolha: kit.quantidadeEscolha,
     permitirRepeticao: kit.permitirRepeticao,
+    descontoTipo:
+      kit.descontoTipo === "PERCENTUAL" || kit.descontoTipo === "VALOR"
+        ? kit.descontoTipo
+        : "NENHUM",
+    descontoValor: kit.descontoValor,
     status: kit.status,
     observacoes: kit.observacoes || "",
     itens: kit.itens.map((item) => ({
@@ -253,7 +262,7 @@ export default function KitsEstoqueSection({
                     <p className="mt-1 text-lg font-black text-violet-200">
                       {fixo
                         ? moeda(precoExibido)
-                        : `Base ${moeda(kit.precoVenda)}`}
+                        : "Valor calculado na venda"}
                     </p>
                   </div>
                   {podeGerenciar ? (
@@ -275,16 +284,20 @@ export default function KitsEstoqueSection({
                 <p className="mt-3 text-xs leading-5 text-slate-400">
                   {fixo
                     ? kit.itens.map((item) => `${item.quantidade}x ${item.produto.nome}`).join(", ")
-                    : `Escolha ${kit.quantidadeEscolha} item(ns) entre ${kit.itens.length} produtos permitidos${kit.permitirRepeticao ? ", com repetição" : ", sem repetição"}.`}
+                    : `Seleção livre entre ${kit.itens.length} produtos permitidos${kit.permitirRepeticao ? ", com repetição" : ", sem repetição"}. A cliente pode escolher quantos itens precisar.`}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-semibold text-slate-400">
-                  {fixo ? <span>Disponibilidade calculada: {Number.isFinite(disponibilidade) ? disponibilidade : 0} kit(s)</span> : <span>Disponibilidade depende da escolha</span>}
+                  {fixo ? <span>Disponibilidade calculada: {Number.isFinite(disponibilidade) ? disponibilidade : 0} kit(s)</span> : <span>Preço = soma dos produtos escolhidos</span>}
                   {acrescimoFixo > 0 ? (
                     <span>
                       Base {moeda(kit.precoVenda)} + {moeda(acrescimoFixo)} premium
                     </span>
-                  ) : kit.itens.some((item) => item.acrescimo > 0) ? (
-                    <span>Preço varia conforme os produtos premium escolhidos</span>
+                  ) : null}
+                  {!fixo && kit.descontoTipo === "PERCENTUAL" && kit.descontoValor > 0 ? (
+                    <span>Desconto de {kit.descontoValor}%</span>
+                  ) : null}
+                  {!fixo && kit.descontoTipo === "VALOR" && kit.descontoValor > 0 ? (
+                    <span>Desconto de {moeda(kit.descontoValor)}</span>
                   ) : null}
                 </div>
               </article>
@@ -316,25 +329,77 @@ export default function KitsEstoqueSection({
                 </label>
                 <label>
                   <span className="mb-1.5 block text-xs font-bold text-slate-300">Tipo</span>
-                  <select value={form.tipo} onChange={(event) => setForm({ ...form, tipo: event.target.value as FormState["tipo"], itens: [] })} className="premium-input w-full">
+                  <select
+                    value={form.tipo}
+                    onChange={(event) => {
+                      const tipo = event.target.value as FormState["tipo"];
+                      setForm({
+                        ...form,
+                        tipo,
+                        itens: [],
+                        precoVenda: tipo === "FLEXIVEL" ? 0 : form.precoVenda,
+                        quantidadeEscolha: 0,
+                        descontoTipo: tipo === "FLEXIVEL" ? form.descontoTipo : "NENHUM",
+                        descontoValor: tipo === "FLEXIVEL" ? form.descontoValor : 0,
+                      });
+                    }}
+                    className="premium-input w-full"
+                  >
                     <option value="FIXO">Kit fixo</option>
                     <option value="FLEXIVEL">Kit flexível</option>
                   </select>
                 </label>
-                <label>
-                  <span className="mb-1.5 block text-xs font-bold text-slate-300">Preço base do kit</span>
-                  <input type="number" min="0" step="0.01" value={form.precoVenda} onChange={(event) => setForm({ ...form, precoVenda: Math.max(0, Number(event.target.value) || 0) })} className="premium-input w-full" />
-                </label>
+                {form.tipo === "FIXO" ? (
+                  <label>
+                    <span className="mb-1.5 block text-xs font-bold text-slate-300">Preço base do kit</span>
+                    <input type="number" min="0" step="0.01" value={form.precoVenda} onChange={(event) => setForm({ ...form, precoVenda: Math.max(0, Number(event.target.value) || 0) })} className="premium-input w-full" />
+                  </label>
+                ) : (
+                  <div className="rounded-2xl border border-violet-400/20 bg-violet-500/10 px-4 py-3 text-xs leading-5 text-violet-100">
+                    O preço será calculado automaticamente pela soma dos produtos escolhidos no momento da venda.
+                  </div>
+                )}
                 {form.tipo === "FLEXIVEL" ? (
                   <>
-                    <label>
-                      <span className="mb-1.5 block text-xs font-bold text-slate-300">Quantidade que a cliente escolhe</span>
-                      <input type="number" min="1" value={form.quantidadeEscolha} onChange={(event) => setForm({ ...form, quantidadeEscolha: Math.max(1, Math.trunc(Number(event.target.value) || 1)) })} className="premium-input w-full" />
-                    </label>
                     <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
                       <input type="checkbox" checked={form.permitirRepeticao} onChange={(event) => setForm({ ...form, permitirRepeticao: event.target.checked })} className="size-4" />
                       <span className="text-sm text-slate-200">Permitir repetir o mesmo produto</span>
                     </label>
+                    <label>
+                      <span className="mb-1.5 block text-xs font-bold text-slate-300">Desconto do kit</span>
+                      <select
+                        value={form.descontoTipo}
+                        onChange={(event) => {
+                          const descontoTipo = event.target.value as FormState["descontoTipo"];
+                          setForm({
+                            ...form,
+                            descontoTipo,
+                            descontoValor: descontoTipo === "NENHUM" ? 0 : form.descontoValor,
+                          });
+                        }}
+                        className="premium-input w-full"
+                      >
+                        <option value="NENHUM">Sem desconto</option>
+                        <option value="PERCENTUAL">Desconto percentual</option>
+                        <option value="VALOR">Desconto em reais</option>
+                      </select>
+                    </label>
+                    {form.descontoTipo !== "NENHUM" ? (
+                      <label>
+                        <span className="mb-1.5 block text-xs font-bold text-slate-300">
+                          {form.descontoTipo === "PERCENTUAL" ? "Percentual de desconto" : "Valor do desconto"}
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          max={form.descontoTipo === "PERCENTUAL" ? 100 : undefined}
+                          step="0.01"
+                          value={form.descontoValor}
+                          onChange={(event) => setForm({ ...form, descontoValor: Math.max(0, Number(event.target.value) || 0) })}
+                          className="premium-input w-full"
+                        />
+                      </label>
+                    ) : null}
                   </>
                 ) : null}
               </div>
@@ -354,21 +419,23 @@ export default function KitsEstoqueSection({
                     const produto = produtos.find((produto) => produto.id === item.produtoId);
                     if (!produto) return null;
                     return (
-                      <div key={item.produtoId} className="grid gap-2 rounded-xl border border-white/10 bg-slate-950/60 p-3 sm:grid-cols-[1fr_130px_150px_auto] sm:items-end">
+                      <div key={item.produtoId} className={`grid gap-2 rounded-xl border border-white/10 bg-slate-950/60 p-3 sm:items-end ${form.tipo === "FIXO" ? "sm:grid-cols-[1fr_130px_150px_auto]" : "sm:grid-cols-[1fr_auto]"}`}>
                         <div>
                           <p className="text-sm font-bold text-white">{produto.nome}</p>
-                          <p className="text-[10px] text-slate-400">Estoque atual {produto.quantidade} {produto.unidade}</p>
+                          <p className="text-[10px] text-slate-400">Estoque {produto.quantidade} {produto.unidade} · venda {moeda(produto.valorVenda)}</p>
                         </div>
                         {form.tipo === "FIXO" ? (
-                          <label>
-                            <span className="mb-1 block text-[10px] font-bold text-slate-400">Quantidade no kit</span>
-                            <input type="number" min="1" value={item.quantidade} onChange={(event) => atualizarItem(item.produtoId, { quantidade: Math.max(1, Math.trunc(Number(event.target.value) || 1)) })} className="premium-input h-10 w-full" />
-                          </label>
-                        ) : <div />}
-                        <label>
-                          <span className="mb-1 block text-[10px] font-bold text-slate-400">Acréscimo premium</span>
-                          <input type="number" min="0" step="0.01" value={item.acrescimo} onChange={(event) => atualizarItem(item.produtoId, { acrescimo: Math.max(0, Number(event.target.value) || 0) })} className="premium-input h-10 w-full" />
-                        </label>
+                          <>
+                            <label>
+                              <span className="mb-1 block text-[10px] font-bold text-slate-400">Quantidade no kit</span>
+                              <input type="number" min="1" value={item.quantidade} onChange={(event) => atualizarItem(item.produtoId, { quantidade: Math.max(1, Math.trunc(Number(event.target.value) || 1)) })} className="premium-input h-10 w-full" />
+                            </label>
+                            <label>
+                              <span className="mb-1 block text-[10px] font-bold text-slate-400">Acréscimo premium</span>
+                              <input type="number" min="0" step="0.01" value={item.acrescimo} onChange={(event) => atualizarItem(item.produtoId, { acrescimo: Math.max(0, Number(event.target.value) || 0) })} className="premium-input h-10 w-full" />
+                            </label>
+                          </>
+                        ) : null}
                         <button type="button" onClick={() => removerItem(item.produtoId)} className="h-10 rounded-xl border border-rose-400/20 px-3 text-xs font-bold text-rose-300 hover:bg-rose-500/10">Remover</button>
                       </div>
                     );

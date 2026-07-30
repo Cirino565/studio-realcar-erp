@@ -222,6 +222,8 @@ model KitProduto {
   precoVenda        Float    @default(0)
   quantidadeEscolha Int      @default(1)
   permitirRepeticao Boolean  @default(false)
+  descontoTipo      String   @default("NENHUM")
+  descontoValor     Float    @default(0)
   status            String   @default("Ativo")
   observacoes       String?
   createdAt         DateTime @default(now())

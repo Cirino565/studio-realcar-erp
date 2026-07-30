@@ -363,6 +363,7 @@ export default function VendasClient({
                   ),
                   estoqueDisponivel: produto.quantidade,
                   custoUnitario: produto.valorCompra,
+                  valorVendaUnitario: produto.valorVenda,
                   acrescimoUnitario: config.acrescimo,
                 },
               ];
@@ -374,6 +375,7 @@ export default function VendasClient({
               quantidadePorKit: config.quantidade,
               estoqueDisponivel: config.produto.quantidade,
               custoUnitario: config.produto.valorCompra,
+              valorVendaUnitario: config.produto.valorVenda,
               acrescimoUnitario: config.acrescimo,
             }));
 
@@ -388,7 +390,9 @@ export default function VendasClient({
         nome: kit.nome,
         tipo: kit.tipo === "FLEXIVEL" ? "FLEXIVEL" : "FIXO",
         quantidadeKits: item.quantidade,
-        precoBaseUnitario: kit.precoVenda,
+        precoBaseUnitario: kit.tipo === "FIXO" ? kit.precoVenda : 0,
+        descontoTipo: kit.descontoTipo,
+        descontoValor: kit.descontoValor,
         componentes,
       });
     }
