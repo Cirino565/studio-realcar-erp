@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requirePermission } from "@/lib/auth";
+import { isAdminUser, requirePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export type KitProdutoItemInput = {
@@ -250,4 +250,73 @@ export async function alterarStatusKitProduto(id: number, status: "Ativo" | "Ina
 
   revalidarKits();
   return { ok: true };
+}
+
+export async function excluirOuArquivarKitProduto(id: number) {
+  const usuario = await requirePermission("estoque.gerenciar");
+  if (!isAdminUser(usuario)) {
+    throw new Error("Somente administradores podem excluir ou arquivar kits.");
+  }
+
+  const kitId = Math.trunc(Number(id));
+  if (!kitId || kitId <= 0) throw new Error("Kit inválido.");
+
+  const kit = await prisma.kitProduto.findUnique({
+    where: { id: kitId },
+    select: {
+      id: true,
+      nome: true,
+      status: true,
+      _count: { select: { itensVenda: true } },
+    },
+  });
+
+  if (!kit) throw new Error("Kit não encontrado.");
+
+  if (kit._count.itensVenda > 0) {
+    await prisma.$transaction(async (tx) => {
+      await tx.kitProduto.update({
+        where: { id: kit.id },
+        data: { status: "Inativo" },
+      });
+      await tx.auditoria.create({
+        data: {
+          modulo: "Estoque",
+          acao: "Arquivou kit com histórico de vendas",
+          entidade: "KitProduto",
+          entidadeId: String(kit.id),
+          usuario: usuario.email,
+          detalhes: `${kit.nome}. O kit possui ${kit._count.itensVenda} item(ns) de venda vinculados e foi preservado para auditoria.`,
+        },
+      });
+    });
+
+    revalidarKits();
+    return {
+      ok: true,
+      modo: "ARQUIVADO" as const,
+      mensagem: `O kit ${kit.nome} já possui histórico e foi arquivado, não excluído.`,
+    };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.kitProduto.delete({ where: { id: kit.id } });
+    await tx.auditoria.create({
+      data: {
+        modulo: "Estoque",
+        acao: "Excluiu kit sem histórico de vendas",
+        entidade: "KitProduto",
+        entidadeId: String(kit.id),
+        usuario: usuario.email,
+        detalhes: kit.nome,
+      },
+    });
+  });
+
+  revalidarKits();
+  return {
+    ok: true,
+    modo: "EXCLUIDO" as const,
+    mensagem: `Kit ${kit.nome} excluído definitivamente.`,
+  };
 }

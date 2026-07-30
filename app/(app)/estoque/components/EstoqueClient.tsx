@@ -46,6 +46,7 @@ type Props = {
   movimentacoes: MovimentacaoComProduto[];
   kits: KitVendaOption[];
   podeGerenciar: boolean;
+  podeExcluirKits: boolean;
 };
 
 type ProdutoModalState =
@@ -231,6 +232,7 @@ export default function EstoqueClient({
   movimentacoes,
   kits,
   podeGerenciar,
+  podeExcluirKits,
 }: Props) {
   const router = useRouter();
 
@@ -519,6 +521,7 @@ export default function EstoqueClient({
         kits={kits}
         produtos={produtos}
         podeGerenciar={podeGerenciar}
+        podeExcluir={podeExcluirKits}
       />
 
       <section className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.035] shadow-2xl shadow-black/10">

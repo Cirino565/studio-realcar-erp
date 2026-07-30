@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Boxes, CheckCircle2, Pencil, Plus, Power, X } from "lucide-react";
+import { Boxes, CheckCircle2, Pencil, Plus, Power, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import {
   alterarStatusKitProduto,
+  excluirOuArquivarKitProduto,
   salvarKitProduto,
 } from "@/actions/kit.actions";
 import type { KitVendaOption, ProdutoVendaOption } from "@/lib/vendas.types";
@@ -32,6 +33,7 @@ type Props = {
   kits: KitVendaOption[];
   produtos: ProdutoVendaOption[];
   podeGerenciar: boolean;
+  podeExcluir: boolean;
 };
 
 function moeda(value: number) {
@@ -76,6 +78,7 @@ export default function KitsEstoqueSection({
   kits,
   produtos,
   podeGerenciar,
+  podeExcluir,
 }: Props) {
   const router = useRouter();
   const [form, setForm] = useState<FormState | null>(null);
@@ -145,6 +148,30 @@ export default function KitsEstoqueSection({
         router.refresh();
       } catch (error) {
         setErro(error instanceof Error ? error.message : "Não foi possível alterar o kit.");
+      }
+    });
+  }
+
+  function excluirKit(kit: KitVendaOption) {
+    setErro("");
+    setMensagem("");
+
+    const confirmado = globalThis.confirm(
+      `Excluir o kit ${kit.nome}? Se ele já tiver histórico de venda, será apenas arquivado.`,
+    );
+    if (!confirmado) return;
+
+    startTransition(async () => {
+      try {
+        const resultado = await excluirOuArquivarKitProduto(kit.id);
+        setMensagem(resultado.mensagem);
+        router.refresh();
+      } catch (error) {
+        setErro(
+          error instanceof Error
+            ? error.message
+            : "Não foi possível excluir ou arquivar o kit.",
+        );
       }
     });
   }
@@ -237,6 +264,11 @@ export default function KitsEstoqueSection({
                       <button type="button" onClick={() => alternarStatus(kit)} disabled={isPending} className="rounded-xl border border-white/10 p-2 text-slate-300 hover:bg-white/10 disabled:opacity-40" aria-label={`Alterar status de ${kit.nome}`}>
                         <Power className="size-4" />
                       </button>
+                      {podeExcluir ? (
+                        <button type="button" onClick={() => excluirKit(kit)} disabled={isPending} className="rounded-xl border border-rose-400/20 p-2 text-rose-300 hover:bg-rose-500/10 disabled:opacity-40" aria-label={`Excluir ou arquivar ${kit.nome}`}>
+                          <Trash2 className="size-4" />
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>

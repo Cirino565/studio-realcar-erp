@@ -66,6 +66,7 @@ export async function marcarLancamentoPago(
           id: true,
           totalServicos: true,
           totalProdutos: true,
+          situacao: true,
         },
       },
     },
@@ -79,6 +80,16 @@ export async function marcarLancamentoPago(
     return {
       ok: false,
       mensagem: "Somente entradas pendentes podem ser marcadas como pagas.",
+    };
+  }
+
+  if (
+    existente.statusPagamento.toLowerCase() === "cancelado" ||
+    existente.venda?.situacao === "CANCELADA"
+  ) {
+    return {
+      ok: false,
+      mensagem: "Este lançamento pertence a uma venda cancelada e não pode ser marcado como pago.",
     };
   }
 
@@ -105,8 +116,30 @@ export async function marcarLancamentoPago(
       }
     }
 
-    await tx.lancamento.update({
-      where: { id },
+    if (existente.venda) {
+      const vendaAtualizada = await tx.venda.updateMany({
+        where: {
+          id: existente.venda.id,
+          situacao: { not: "CANCELADA" },
+        },
+        data: {
+          statusPagamento: "Pago",
+          formaPagamento: forma,
+        },
+      });
+
+      if (vendaAtualizada.count !== 1) {
+        throw new Error(
+          "A venda vinculada foi cancelada ou alterada por outro usuário.",
+        );
+      }
+    }
+
+    const lancamentoAtualizado = await tx.lancamento.updateMany({
+      where: {
+        id,
+        statusPagamento: { not: "Cancelado" },
+      },
       data: {
         statusPagamento: "Pago",
         formaPagamento: forma,
@@ -117,14 +150,10 @@ export async function marcarLancamentoPago(
       },
     });
 
-    if (existente.venda) {
-      await tx.venda.update({
-        where: { id: existente.venda.id },
-        data: {
-          statusPagamento: "Pago",
-          formaPagamento: forma,
-        },
-      });
+    if (lancamentoAtualizado.count !== 1) {
+      throw new Error(
+        "O lançamento foi cancelado ou alterado por outro usuário.",
+      );
     }
 
     await tx.auditoria.create({

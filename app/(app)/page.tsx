@@ -323,7 +323,7 @@ export default async function Home() {
 
     prisma.lancamento.findMany({
       where: {
-        statusPagamento: { not: "Pago" },
+        statusPagamento: { notIn: ["Pago", "Cancelado"] },
         data: { lt: inicioAmanha },
       },
       orderBy: { data: "asc" },
@@ -364,7 +364,10 @@ export default async function Home() {
     }),
 
     prisma.lancamento.findMany({
-      where: { data: { gte: inicioMes, lt: inicioProximoMes } },
+      where: {
+        data: { gte: inicioMes, lt: inicioProximoMes },
+        statusPagamento: { not: "Cancelado" },
+      },
       select: { tipo: true, valor: true, statusPagamento: true },
     }),
 

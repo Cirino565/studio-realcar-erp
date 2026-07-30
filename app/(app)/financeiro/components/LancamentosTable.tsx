@@ -131,7 +131,7 @@ export default function LancamentosTable({
                   <td className="px-5 py-4 text-right">
                     <div className="flex justify-end gap-2">
                       {lancamento.tipo === "ENTRADA" &&
-                      (lancamento.statusPagamento || "Pago").toLowerCase() !== "pago" ? (
+                      !["pago", "cancelado"].includes((lancamento.statusPagamento || "Pago").toLowerCase()) ? (
                         <Button
                           type="button"
                           variant="outline"
@@ -188,7 +188,7 @@ export default function LancamentosTable({
 
                 <div className="flex items-center gap-2">
                   {lancamento.tipo === "ENTRADA" &&
-                  (lancamento.statusPagamento || "Pago").toLowerCase() !== "pago" ? (
+                  !["pago", "cancelado"].includes((lancamento.statusPagamento || "Pago").toLowerCase()) ? (
                     <Button
                       type="button"
                       variant="outline"

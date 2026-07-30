@@ -1,4 +1,4 @@
-import { canAccess, requirePagePermission } from "@/lib/auth";
+import { canAccess, isAdminUser, requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import EstoqueClient from "./components/EstoqueClient";
 
@@ -39,6 +39,7 @@ export default async function EstoquePage() {
       movimentacoes={movimentacoes}
       kits={kits}
       podeGerenciar={canAccess(usuario, "estoque.gerenciar")}
+      podeExcluirKits={isAdminUser(usuario)}
     />
   );
 }

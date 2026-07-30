@@ -278,6 +278,10 @@ model Venda {
   custoTotal          Float     @default(0)
   formaPagamento      String?
   statusPagamento     String    @default("Pago")
+  situacao            String    @default("ATIVA")
+  canceladaEm         DateTime?
+  canceladaPor        String?
+  motivoCancelamento  String?
   origem              String    @default("Venda")
   observacoes         String?
   data                DateTime  @default(now())
@@ -290,6 +294,7 @@ model Venda {
   @@index([agendamentoId, data])
   @@index([data])
   @@index([statusPagamento, data])
+  @@index([situacao, data])
 }
 
 model VendaItem {
