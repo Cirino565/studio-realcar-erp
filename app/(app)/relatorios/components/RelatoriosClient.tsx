@@ -209,7 +209,12 @@ function gerarCsv(data: RelatoriosData, periodo: PeriodoRelatorio) {
     ["Estoque crítico"],
     ["Produto", "Quantidade", "Mínimo", "Fornecedor"],
     ...data.produtos
-      .filter((produto) => produto.quantidade <= produto.estoqueMinimo)
+      .filter(
+        (produto) =>
+          produto.status.toLowerCase() === "ativo" &&
+          produto.estoqueMinimo > 0 &&
+          produto.quantidade <= produto.estoqueMinimo,
+      )
       .map((produto) => [
         produto.nome,
         String(produto.quantidade),
@@ -353,7 +358,12 @@ function FluxoMensal({ lancamentos }: { lancamentos: LancamentoRelatorio[] }) {
 
 function ProdutosCriticos({ produtos }: { produtos: ProdutoRelatorio[] }) {
   const criticos = produtos
-    .filter((produto) => produto.quantidade <= produto.estoqueMinimo)
+    .filter(
+      (produto) =>
+        produto.status.toLowerCase() === "ativo" &&
+        produto.estoqueMinimo > 0 &&
+        produto.quantidade <= produto.estoqueMinimo,
+    )
     .sort((a, b) => a.quantidade - b.quantidade)
     .slice(0, 8);
 
@@ -518,8 +528,18 @@ export default function RelatoriosClient({ data }: Props) {
     [data.clientes, lancamentosFiltrados]
   );
 
-  const produtosCriticos = data.produtos.filter((produto) => produto.quantidade <= produto.estoqueMinimo);
-  const valorEstoque = data.produtos.reduce((acc, produto) => acc + produto.quantidade * produto.valorCompra, 0);
+  const produtosAtivos = data.produtos.filter(
+    (produto) => produto.status.toLowerCase() === "ativo",
+  );
+  const produtosCriticos = produtosAtivos.filter(
+    (produto) =>
+      produto.estoqueMinimo > 0 &&
+      produto.quantidade <= produto.estoqueMinimo,
+  );
+  const valorEstoque = produtosAtivos.reduce(
+    (acc, produto) => acc + produto.quantidade * produto.valorCompra,
+    0,
+  );
   const campanhasInvestimento = data.campanhas.reduce((acc, campanha) => acc + campanha.investimento, 0);
   const leadsPeriodo = data.leads.filter((lead) => isWithinPeriod(lead.createdAt, periodo));
   const conversaoEstimativa = leadsPeriodo.length > 0 ? (clientesFiltrados.length / (clientesFiltrados.length + leadsPeriodo.length)) * 100 : 0;
@@ -716,11 +736,11 @@ export default function RelatoriosClient({ data }: Props) {
 
       {aba === "estoque" ? (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <ProdutosCriticos produtos={data.produtos} />
+          <ProdutosCriticos produtos={produtosAtivos} />
           <BarList
             title="Valor por categoria"
             items={Object.entries(
-              data.produtos.reduce<Record<string, number>>((acc, produto) => {
+              produtosAtivos.reduce<Record<string, number>>((acc, produto) => {
                 const categoria = produto.categoria || "Sem categoria";
                 acc[categoria] = (acc[categoria] || 0) + produto.quantidade * produto.valorCompra;
                 return acc;
@@ -739,7 +759,7 @@ export default function RelatoriosClient({ data }: Props) {
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <div className="rounded-2xl border border-white/[0.10] bg-slate-950/35 p-4">
                 <p className="text-sm text-slate-400">Produtos cadastrados</p>
-                <p className="mt-3 text-2xl font-semibold text-white">{data.produtos.length}</p>
+                <p className="mt-3 text-2xl font-semibold text-white">{produtosAtivos.length}</p>
               </div>
               <div className="rounded-2xl border border-white/[0.10] bg-slate-950/35 p-4">
                 <p className="text-sm text-slate-400">Valor de compra</p>

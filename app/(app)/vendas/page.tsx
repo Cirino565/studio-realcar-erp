@@ -31,7 +31,14 @@ export default async function VendasPage() {
       },
     }),
     prisma.kitProduto.findMany({
-      where: { status: "Ativo" },
+      where: {
+        status: "Ativo",
+        itens: {
+          every: {
+            produto: { status: "Ativo" },
+          },
+        },
+      },
       orderBy: { nome: "asc" },
       include: {
         itens: {

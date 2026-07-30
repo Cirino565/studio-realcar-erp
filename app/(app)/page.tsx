@@ -397,7 +397,11 @@ export default async function Home() {
   const nomeClinica = configuracaoClinica?.nome?.trim() || "Studio Realçar";
 
   const produtosCriticos = produtosAtivos
-    .filter((produto) => produto.quantidade <= produto.estoqueMinimo)
+    .filter(
+      (produto) =>
+        produto.estoqueMinimo > 0 &&
+        produto.quantidade <= produto.estoqueMinimo,
+    )
     .slice(0, 10);
 
   const totalFinanceiroPendente = financeiroPendente.reduce(

@@ -49,7 +49,11 @@ async function carregarInsights(): Promise<AutomacaoInsight[]> {
     }),
   ]);
 
-  const produtosCriticos = produtosAtivos.filter((produto) => produto.quantidade <= produto.estoqueMinimo).length;
+  const produtosCriticos = produtosAtivos.filter(
+    (produto) =>
+      produto.estoqueMinimo > 0 &&
+      produto.quantidade <= produto.estoqueMinimo,
+  ).length;
 
   return [
     {

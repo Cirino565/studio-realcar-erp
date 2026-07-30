@@ -11,6 +11,7 @@ import {
   PackagePlus,
   Pencil,
   Plus,
+  Power,
   Save,
   Search,
   Trash2,
@@ -20,6 +21,7 @@ import {
 import { useRouter } from "next/navigation";
 
 import {
+  alterarStatusProduto,
   createFornecedor,
   createProduto,
   deleteProduto,
@@ -67,6 +69,8 @@ type MovimentacaoModalState =
     }
   | null;
 
+type FiltroStatusProduto = "Ativos" | "Inativos" | "Todos";
+
 function numeroDoFormulario(value: FormDataEntryValue | null, fallback = 0) {
   if (value === null) return fallback;
 
@@ -98,7 +102,18 @@ function fornecedorIdDoFormulario(value: FormDataEntryValue | null) {
   return Number.isFinite(id) && id > 0 ? id : null;
 }
 
+function produtoEstaAtivo(produto: Pick<Produto, "status">) {
+  return produto.status.toLowerCase() === "ativo";
+}
+
 function statusProduto(produto: ProdutoComFornecedor) {
+  if (!produtoEstaAtivo(produto)) {
+    return {
+      texto: "Inativo",
+      classe: "bg-slate-500/10 text-slate-300 ring-slate-400/20",
+    };
+  }
+
   if (produto.quantidade <= 0) {
     return {
       texto: "Sem estoque",
@@ -106,7 +121,10 @@ function statusProduto(produto: ProdutoComFornecedor) {
     };
   }
 
-  if (produto.quantidade <= produto.estoqueMinimo) {
+  if (
+    produto.estoqueMinimo > 0 &&
+    produto.quantidade <= produto.estoqueMinimo
+  ) {
     return {
       texto: "Baixo estoque",
       classe: "bg-amber-500/10 text-amber-300 ring-amber-400/20",
@@ -237,6 +255,8 @@ export default function EstoqueClient({
   const router = useRouter();
 
   const [busca, setBusca] = useState("");
+  const [filtroStatus, setFiltroStatus] =
+    useState<FiltroStatusProduto>("Ativos");
   const [produtoModal, setProdutoModal] = useState<ProdutoModalState>(null);
   const [movimentacaoModal, setMovimentacaoModal] =
     useState<MovimentacaoModalState>(null);
@@ -245,10 +265,23 @@ export default function EstoqueClient({
   const [mensagem, setMensagem] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
+  const produtosAtivos = useMemo(
+    () => produtos.filter(produtoEstaAtivo),
+    [produtos],
+  );
+
   const produtosFiltrados = useMemo(() => {
     const termo = busca.toLowerCase().trim();
 
     return produtos.filter((produto) => {
+      const ativo = produtoEstaAtivo(produto);
+      const atendeStatus =
+        filtroStatus === "Todos" ||
+        (filtroStatus === "Ativos" && ativo) ||
+        (filtroStatus === "Inativos" && !ativo);
+
+      if (!atendeStatus) return false;
+
       const texto =
         `${produto.nome} ${produto.categoria ?? ""} ${produto.unidade} ${
           produto.fornecedor?.nome ?? ""
@@ -256,24 +289,28 @@ export default function EstoqueClient({
 
       return !termo || texto.includes(termo);
     });
-  }, [busca, produtos]);
+  }, [busca, filtroStatus, produtos]);
 
-  const totalProdutos = produtos.length;
+  const totalProdutos = produtosAtivos.length;
 
-  const valorEstoque = produtos.reduce(
+  const valorEstoque = produtosAtivos.reduce(
     (acc, produto) => acc + produto.quantidade * produto.valorCompra,
-    0
+    0,
   );
 
-  const baixoEstoque = produtos.filter(
-    (produto) => produto.quantidade <= produto.estoqueMinimo
+  const baixoEstoque = produtosAtivos.filter(
+    (produto) =>
+      produto.estoqueMinimo > 0 &&
+      produto.quantidade <= produto.estoqueMinimo,
   ).length;
 
   const fornecedoresAtivos = fornecedores.filter(
     (fornecedor) => fornecedor.status !== "Inativo"
   ).length;
 
-  const giroMes = movimentacoes.length;
+  const giroMes = movimentacoes.filter((movimentacao) =>
+    produtoEstaAtivo(movimentacao.produto),
+  ).length;
 
   function limparAlertas() {
     setMensagem(null);
@@ -384,6 +421,36 @@ export default function EstoqueClient({
     }
   }
 
+  async function handleAlterarStatusProduto(produto: ProdutoComFornecedor) {
+    limparAlertas();
+
+    const ativo = produtoEstaAtivo(produto);
+    const novoStatus = ativo ? "Inativo" : "Ativo";
+    const confirmou = window.confirm(
+      ativo
+        ? `Desativar o produto "${produto.nome}"? Ele deixará de aparecer nos indicadores e nas operações atuais. O histórico será preservado.`
+        : `Reativar o produto "${produto.nome}" para uso em indicadores, movimentações, kits e vendas?`,
+    );
+
+    if (!confirmou) return;
+
+    setSalvando(true);
+
+    try {
+      await alterarStatusProduto(produto.id, novoStatus);
+      setMensagem(
+        novoStatus === "Ativo"
+          ? "Produto reativado com sucesso."
+          : "Produto desativado com sucesso. O histórico foi preservado.",
+      );
+      router.refresh();
+    } catch (error) {
+      tratarErro(error);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
   async function handleExcluirProduto(produto: ProdutoComFornecedor) {
     limparAlertas();
 
@@ -412,7 +479,7 @@ export default function EstoqueClient({
         <StatCard
           titulo="Produtos"
           valor={String(totalProdutos)}
-          descricao="Total cadastrados"
+          descricao="Ativos cadastrados"
         />
 
         <StatCard
@@ -454,7 +521,26 @@ export default function EstoqueClient({
             />
           </label>
 
-          <div className="grid gap-2 sm:grid-cols-2 xl:flex">
+          <div className="flex flex-wrap gap-2 xl:justify-end">
+            {(["Ativos", "Inativos", "Todos"] as FiltroStatusProduto[]).map(
+              (opcao) => (
+                <button
+                  key={opcao}
+                  type="button"
+                  onClick={() => setFiltroStatus(opcao)}
+                  className={`min-h-10 rounded-xl border px-3 text-xs font-semibold transition ${
+                    filtroStatus === opcao
+                      ? "border-violet-400/40 bg-violet-500/15 text-violet-100"
+                      : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.07] hover:text-slate-200"
+                  }`}
+                >
+                  {opcao}
+                </button>
+              ),
+            )}
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2 xl:flex xl:col-span-2 xl:justify-end">
             <Button
               type="button"
               onClick={() => {
@@ -589,7 +675,9 @@ export default function EstoqueClient({
                   return (
                     <tr
                       key={produto.id}
-                      className="text-slate-300 transition hover:bg-white/[0.03]"
+                      className={`text-slate-300 transition hover:bg-white/[0.03] ${
+                        produtoEstaAtivo(produto) ? "" : "opacity-70"
+                      }`}
                     >
                       <td className="px-5 py-4">
                         <div>
@@ -636,7 +724,9 @@ export default function EstoqueClient({
                         <span
                           className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${status.classe}`}
                         >
-                          {produto.quantidade <= produto.estoqueMinimo ? (
+                          {produtoEstaAtivo(produto) &&
+                          produto.estoqueMinimo > 0 &&
+                          produto.quantidade <= produto.estoqueMinimo ? (
                             <AlertTriangle className="h-3 w-3" />
                           ) : null}
                           {status.texto}
@@ -649,7 +739,12 @@ export default function EstoqueClient({
                             type="button"
                             size="icon-sm"
                             variant="outline"
-                            title="Entrada"
+                            title={
+                              produtoEstaAtivo(produto)
+                                ? "Entrada"
+                                : "Reative o produto para movimentar"
+                            }
+                            disabled={salvando || !produtoEstaAtivo(produto)}
                             onClick={() => {
                               limparAlertas();
                               setMovimentacaoModal({
@@ -665,7 +760,12 @@ export default function EstoqueClient({
                             type="button"
                             size="icon-sm"
                             variant="outline"
-                            title="Saída"
+                            title={
+                              produtoEstaAtivo(produto)
+                                ? "Saída"
+                                : "Reative o produto para movimentar"
+                            }
+                            disabled={salvando || !produtoEstaAtivo(produto)}
                             onClick={() => {
                               limparAlertas();
                               setMovimentacaoModal({
@@ -691,6 +791,21 @@ export default function EstoqueClient({
                             }}
                           >
                             <Pencil className="h-4 w-4" />
+                          </Button>
+
+                          <Button
+                            type="button"
+                            size="icon-sm"
+                            variant={produtoEstaAtivo(produto) ? "outline" : "secondary"}
+                            title={
+                              produtoEstaAtivo(produto)
+                                ? "Desativar produto"
+                                : "Reativar produto"
+                            }
+                            disabled={salvando}
+                            onClick={() => handleAlterarStatusProduto(produto)}
+                          >
+                            <Power className="h-4 w-4" />
                           </Button>
 
                           <Button
@@ -988,7 +1103,7 @@ export default function EstoqueClient({
                 >
                   <option value="">Selecione um produto</option>
 
-                  {produtos.map((produto) => (
+                  {produtosAtivos.map((produto) => (
                     <option key={produto.id} value={produto.id}>
                       {produto.nome} • estoque atual: {produto.quantidade}{" "}
                       {produto.unidade}

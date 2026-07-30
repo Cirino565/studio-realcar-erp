@@ -34,6 +34,10 @@ function limparTexto(value?: string) {
 function revalidarEstoque() {
   revalidatePath("/estoque");
   revalidatePath("/relatorios");
+  revalidatePath("/vendas");
+  revalidatePath("/agenda");
+  revalidatePath("/automacoes");
+  revalidatePath("/backup");
   revalidatePath("/");
 }
 
@@ -130,6 +134,66 @@ export async function updateProduto(id: number, data: ProdutoInput) {
   };
 }
 
+export async function alterarStatusProduto(
+  id: number,
+  status: "Ativo" | "Inativo",
+) {
+  const usuario = await requirePermission("estoque.gerenciar");
+  const produtoId = Math.trunc(Number(id));
+
+  if (!produtoId || produtoId <= 0) {
+    throw new Error("Produto inválido.");
+  }
+
+  if (status !== "Ativo" && status !== "Inativo") {
+    throw new Error("Status de produto inválido.");
+  }
+
+  const produto = await prisma.$transaction(async (tx) => {
+    const atual = await tx.produto.findUnique({
+      where: { id: produtoId },
+      select: { id: true, nome: true, status: true },
+    });
+
+    if (!atual) {
+      throw new Error("Produto não encontrado.");
+    }
+
+    if (atual.status === status) {
+      return atual;
+    }
+
+    const atualizado = await tx.produto.update({
+      where: { id: produtoId },
+      data: { status },
+      select: { id: true, nome: true, status: true },
+    });
+
+    await tx.auditoria.create({
+      data: {
+        modulo: "Estoque",
+        acao: status === "Ativo" ? "Reativou produto" : "Inativou produto",
+        entidade: "Produto",
+        entidadeId: String(produtoId),
+        usuario: usuario.email,
+        detalhes:
+          status === "Ativo"
+            ? `${atualizado.nome}. Produto reativado para indicadores, movimentações, kits e vendas.`
+            : `${atualizado.nome}. Produto retirado dos indicadores e das operações atuais, com histórico preservado.`,
+      },
+    });
+
+    return atualizado;
+  });
+
+  revalidarEstoque();
+
+  return {
+    ok: true,
+    status: produto.status,
+  };
+}
+
 export async function deleteProduto(id: number) {
   await requirePermission("estoque.gerenciar");
 
@@ -196,6 +260,12 @@ export async function registrarMovimentacao(data: {
 
     if (!produto) {
       throw new Error("Produto não encontrado.");
+    }
+
+    if (produto.status.toLowerCase() !== "ativo") {
+      throw new Error(
+        `O produto ${produto.nome} está inativo. Reative-o antes de registrar uma movimentação.`,
+      );
     }
 
     const novaQuantidade =
