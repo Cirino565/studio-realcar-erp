@@ -36,6 +36,7 @@ import {
   withAlpha,
 } from "@/lib/color-contrast";
 
+import AnamneseAtendimentoModal from "./AnamneseAtendimentoModal";
 import ClienteQuickEditModal from "./ClienteQuickEditModal";
 
 export type ClienteAtendimentoDetalhes = {
@@ -206,6 +207,7 @@ export default function AppointmentDetailsModal({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isManagingSeries, setIsManagingSeries] = useState(false);
   const [editandoCliente, setEditandoCliente] = useState(false);
+  const [abrindoAnamnese, setAbrindoAnamnese] = useState(false);
   const [registrandoEvolucao, setRegistrandoEvolucao] = useState(false);
 
   useLockBodyScroll(open);
@@ -215,6 +217,7 @@ export default function AppointmentDetailsModal({
     setIsDeleting(false);
     setIsManagingSeries(false);
     setEditandoCliente(false);
+    setAbrindoAnamnese(false);
     setRegistrandoEvolucao(false);
   }, [open, appointment?.id]);
 
@@ -438,15 +441,14 @@ export default function AppointmentDetailsModal({
 
             <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
               <div className="grid gap-2">
-                <a
-                  href={`/clientes/${currentAppointment.clienteId}#anamnese`}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  type="button"
+                  onClick={() => setAbrindoAnamnese(true)}
                   className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2.5 text-sm font-bold text-violet-800 hover:bg-violet-100"
                 >
                   <span className="flex items-center gap-2"><ClipboardList size={17} />2. Abrir anamnese</span>
-                  <span className="text-[10px] font-semibold text-violet-600">mantém esta tela</span>
-                </a>
+                  <span className="text-[10px] font-semibold text-violet-600">abre sobre o atendimento</span>
+                </button>
 
                 {!atendimentoEmAndamento && !atendimentoFinalizado ? (
                   <button
@@ -585,6 +587,14 @@ export default function AppointmentDetailsModal({
         cliente={currentAppointment.cliente}
         onClose={() => setEditandoCliente(false)}
         onSaved={onClienteUpdated}
+      />
+
+      <AnamneseAtendimentoModal
+        open={abrindoAnamnese}
+        clienteId={currentAppointment.clienteId}
+        clienteNome={currentAppointment.cliente.nome}
+        procedimento={currentAppointment.procedimento}
+        onClose={() => setAbrindoAnamnese(false)}
       />
 
       <RegistrarEvolucaoPendenteModal

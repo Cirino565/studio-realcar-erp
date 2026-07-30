@@ -140,7 +140,10 @@ export default function ClienteQuickEditModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[140] h-[100dvh] overflow-hidden">
+    <div
+      className="fixed inset-0 z-[140] h-[100dvh] w-[100vw] overflow-hidden overscroll-none"
+      style={{ touchAction: "pan-y" }}
+    >
       <button
         type="button"
         aria-label="Fechar edição rápida da cliente"
@@ -148,7 +151,10 @@ export default function ClienteQuickEditModal({
         className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
       />
 
-      <aside className="absolute inset-y-0 right-0 flex h-[100dvh] w-full max-w-[620px] flex-col overflow-hidden border-l border-slate-200 bg-slate-50 shadow-2xl">
+      <aside
+        className="absolute inset-y-0 right-0 flex h-[100dvh] w-[100vw] min-w-0 max-w-[620px] flex-col overflow-hidden border-l border-slate-200 bg-slate-50 shadow-2xl"
+        style={{ touchAction: "pan-y" }}
+      >
         <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-3 sm:px-5">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
@@ -177,8 +183,8 @@ export default function ClienteQuickEditModal({
           </div>
         </header>
 
-        <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
-          <div className="space-y-4">
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-4 sm:px-5">
+          <div className="w-full min-w-0 max-w-full space-y-4">
             {erro ? (
               <div className="flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
                 <AlertCircle size={17} className="mt-0.5 shrink-0" />
