@@ -24,32 +24,7 @@ import type {
   ProdutoVendaOption,
 } from "@/lib/vendas.types";
 
-type AppointmentForFinish = {
-  id: number;
-  clienteId: number;
-  profissionalId: number | null;
-  procedimento: string;
-  data: string;
-  duracao: number;
-  valor: number;
-  observacoes: string | null;
-  sinalPago: boolean;
-  status: string;
-  createdAt?: string;
-  updatedAt?: string;
-  cliente: {
-    nome: string;
-    telefone?: string | null;
-    whatsapp?: string | null;
-  };
-  profissional: {
-    id: number;
-    nome: string;
-    area: string | null;
-    cor: string;
-    status: string;
-  } | null;
-};
+import type { AppointmentDetails } from "./AppointmentDetailsModal";
 
 type ServicoFinalizacao = {
   id: number;
@@ -63,10 +38,10 @@ type ServicoFinalizacao = {
 type Props = {
   open: boolean;
   onClose: () => void;
-  appointment: AppointmentForFinish | null;
+  appointment: AppointmentDetails | null;
   servicos: ServicoFinalizacao[];
   produtos: ProdutoVendaOption[];
-  onAgendarRetorno?: (appointment: AppointmentForFinish) => void;
+  onAgendarRetorno?: (appointment: AppointmentDetails) => void;
 };
 
 const FORMAS_PAGAMENTO = [
@@ -246,22 +221,11 @@ export default function FinalizarAtendimentoModal({
       return;
     }
 
-    if (!evolucao.trim()) {
-      setError("Informe a evolução ou observação clínica do atendimento.");
-      return;
-    }
-
     setConfirmando(true);
   }
 
   function handleFinalizarConfirmado() {
-    const evolucaoClinica = evolucao.trim();
-
-    if (!evolucaoClinica) {
-      setError("Informe a evolução ou observação clínica do atendimento.");
-      setConfirmando(false);
-      return;
-    }
+    const evolucaoClinica = evolucao.trim() || undefined;
 
     setError(null);
 
@@ -311,6 +275,7 @@ export default function FinalizarAtendimentoModal({
     onAgendarRetorno(currentAppointment);
   }
 
+  const evolucaoRegistradaNestaFinalizacao = Boolean(evolucao.trim());
   const etapa = finalizado ? "success" : confirmando ? "review" : "form";
 
   return (
@@ -390,6 +355,11 @@ export default function FinalizarAtendimentoModal({
                       <p className="mt-1 text-xs leading-5 text-emerald-700">
                         O histórico preservou preço vendido, custos do momento e produtos adicionados.
                       </p>
+                      {!evolucaoRegistradaNestaFinalizacao ? (
+                        <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                          A evolução ficou pendente e já aparece na Central do Dia para preenchimento posterior.
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 </section>
@@ -475,7 +445,7 @@ export default function FinalizarAtendimentoModal({
                   <label className="block border-b border-slate-100 p-4">
                     <div className="mb-1.5 flex items-center gap-2">
                       <ClipboardCheck size={16} className="text-violet-600" />
-                      <span className="text-xs font-bold text-slate-900">Evolução da cliente</span>
+                      <span className="text-xs font-bold text-slate-900">Evolução da cliente, opcional agora</span>
                     </div>
                     <textarea
                       value={evolucao}
@@ -483,9 +453,12 @@ export default function FinalizarAtendimentoModal({
                         setEvolucao(event.target.value);
                         setError(null);
                       }}
-                      placeholder="Descreva como foi o atendimento."
+                      placeholder="Descreva agora ou deixe em branco para registrar depois."
                       className="min-h-24 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900 outline-none focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100"
                     />
+                    <p className="mt-2 text-[11px] leading-4 text-slate-500">
+                      Se ficar em branco, o atendimento será encerrado normalmente e a evolução entrará na fila de pendências.
+                    </p>
                   </label>
 
                   <div className="p-4">
@@ -602,7 +575,12 @@ export default function FinalizarAtendimentoModal({
                     <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-700" />
                     <div>
                       <p className="text-xs font-bold text-amber-900">Confirmar finalização?</p>
-                      <p className="mt-1 text-[11px] leading-4 text-amber-800">Esta operação cria o histórico clínico, a venda, o financeiro e as baixas de estoque em uma única transação.</p>
+                      <p className="mt-1 text-[11px] leading-4 text-amber-800">
+                        Esta operação conclui o atendimento, a venda, o financeiro e as baixas de estoque em uma única transação.
+                        {!evolucaoRegistradaNestaFinalizacao
+                          ? " A evolução será marcada como pendente para preenchimento posterior."
+                          : " A evolução será registrada agora."}
+                      </p>
                     </div>
                   </div>
                 </section>
@@ -616,6 +594,14 @@ export default function FinalizarAtendimentoModal({
                   <ResumoLinha label="Custo direto histórico" value={formatCurrency(totais.custo)} />
                   <ResumoLinha label="Margem direta" value={`${formatCurrency(totais.margem)} · ${totais.margemPercentual.toFixed(1).replace(".", ",")}%`} />
                   <ResumoLinha label="Pagamento" value={`${formaPagamento} · ${statusPagamento}`} />
+                  <ResumoLinha
+                    label="Evolução"
+                    value={
+                      evolucaoRegistradaNestaFinalizacao
+                        ? "Será registrada agora"
+                        : "Ficará pendente para depois"
+                    }
+                  />
                 </section>
 
                 {itensProdutos.length > 0 ? (
@@ -661,7 +647,11 @@ export default function FinalizarAtendimentoModal({
                   className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                 >
                   <CheckCircle2 size={15} />
-                  {isPending ? "Finalizando..." : `Confirmar ${formatCurrency(totais.total)}`}
+                  {isPending
+                    ? "Finalizando..."
+                    : evolucaoRegistradaNestaFinalizacao
+                      ? `Confirmar ${formatCurrency(totais.total)}`
+                      : "Finalizar e deixar evolução pendente"}
                 </button>
               </div>
             </footer>

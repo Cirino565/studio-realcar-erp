@@ -1,4 +1,4 @@
-import { isAdminUser, requirePagePermission } from "@/lib/auth";
+import { canAccess, isAdminUser, requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 import AgendaClient from "./components/AgendaClient";
@@ -110,6 +110,8 @@ function encontrarProfissionalDoUsuario<
 export default async function AgendaPage({ searchParams }: AgendaPageProps) {
   const usuario = await requirePagePermission("agenda.visualizar");
   const usuarioAdmin = isAdminUser(usuario);
+  const podeEditarCliente = canAccess(usuario, "clientes.gerenciar");
+  const podeRegistrarEvolucao = canAccess(usuario, "clientes.clinico");
 
   const resolvedSearchParams = searchParams ? await searchParams : {};
 
@@ -224,9 +226,21 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
       include: {
         cliente: {
           select: {
+            id: true,
             nome: true,
             telefone: true,
             whatsapp: true,
+            cpf: true,
+            nascimento: true,
+            cep: true,
+            logradouro: true,
+            numero: true,
+            complemento: true,
+            bairro: true,
+            cidade: true,
+            estado: true,
+            enderecoOriginal: true,
+            observacoes: true,
           },
         },
         profissional: {
@@ -271,8 +285,16 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
         agendamentos={agendamentos.map((agendamento) => ({
           ...agendamento,
           data: agendamento.data.toISOString(),
+          evolucaoPendenteDesde:
+            agendamento.evolucaoPendenteDesde?.toISOString() || null,
+          evolucaoRegistradaEm:
+            agendamento.evolucaoRegistradaEm?.toISOString() || null,
           createdAt: agendamento.createdAt.toISOString(),
           updatedAt: agendamento.updatedAt.toISOString(),
+          cliente: {
+            ...agendamento.cliente,
+            nascimento: agendamento.cliente.nascimento?.toISOString() || null,
+          },
         }))}
         bloqueios={bloqueios.map((bloqueio) => ({
           ...bloqueio,
@@ -289,6 +311,8 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
         initialClienteId={clienteIdParam}
         initialView={viewMode}
         horarioAtendimento={configuracaoClinica?.horarioAtendimento || null}
+        podeEditarCliente={podeEditarCliente}
+        podeRegistrarEvolucao={podeRegistrarEvolucao}
       />
     </div>
   );

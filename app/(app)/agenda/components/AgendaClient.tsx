@@ -7,7 +7,10 @@ import { Button } from "@/components/ui/button";
 import type { ProdutoVendaOption } from "@/lib/vendas.types";
 
 import AgendaCalendar, { type NovoHorarioPayload } from "./AgendaCalendar";
-import AppointmentDetailsModal from "./AppointmentDetailsModal";
+import AppointmentDetailsModal, {
+  type AppointmentDetails,
+  type ClienteAtendimentoDetalhes,
+} from "./AppointmentDetailsModal";
 import AppointmentMessageModal from "./AppointmentMessageModal";
 import FinalizarAtendimentoModal from "./FinalizarAtendimentoModal";
 import NovoAgendamentoModal from "./NovoAgendamentoModal";
@@ -41,32 +44,7 @@ type ServicoAgenda = {
   custoPadrao: number;
 };
 
-type AgendamentoAgenda = {
-  id: number;
-  clienteId: number;
-  profissionalId: number | null;
-  procedimento: string;
-  data: string;
-  duracao: number;
-  valor: number;
-  observacoes: string | null;
-  sinalPago: boolean;
-  status: string;
-  statusAntesAtendimento?: string | null;
-  serieId?: string | null;
-  recorrenciaTipo?: string | null;
-  recorrenciaIntervalo?: number | null;
-  recorrenciaIndice?: number | null;
-  recorrenciaTotal?: number | null;
-  createdAt?: string;
-  updatedAt?: string;
-  cliente: {
-    nome: string;
-    telefone?: string | null;
-    whatsapp?: string | null;
-  };
-  profissional: ProfissionalAgenda | null;
-};
+type AgendamentoAgenda = AppointmentDetails;
 
 type BloqueioAgenda = {
   id: number;
@@ -118,6 +96,8 @@ type Props = {
   initialClienteId?: string | null;
   initialView: "day" | "week";
   horarioAtendimento?: string | null;
+  podeEditarCliente: boolean;
+  podeRegistrarEvolucao: boolean;
 };
 
 function parseLocalDate(value: string) {
@@ -191,6 +171,8 @@ export default function AgendaClient({
   initialClienteId,
   initialView,
   horarioAtendimento,
+  podeEditarCliente,
+  podeRegistrarEvolucao,
 }: Props) {
   const [selectedDate, setSelectedDate] = useState(() =>
     parseLocalDate(initialDate),
@@ -211,6 +193,9 @@ export default function AgendaClient({
           }
         : null,
     );
+
+  const [agendamentosAtuais, setAgendamentosAtuais] =
+    useState<AgendamentoAgenda[]>(agendamentos);
 
   const [selectedAppointment, setSelectedAppointment] =
     useState<AgendamentoAgenda | null>(null);
@@ -256,7 +241,6 @@ export default function AgendaClient({
       tipoAtendimento: "agendamento",
     });
   }
-
 
   function abrirEdicaoBloqueio(bloqueio: BloqueioAgenda) {
     setNovoHorario({
@@ -335,6 +319,40 @@ export default function AgendaClient({
     });
   }
 
+  function atualizarClienteNoFluxo(cliente: ClienteAtendimentoDetalhes) {
+    setAgendamentosAtuais((atuais) =>
+      atuais.map((item) =>
+        item.clienteId === cliente.id
+          ? { ...item, cliente: { ...item.cliente, ...cliente } }
+          : item,
+      ),
+    );
+
+    setSelectedAppointment((atual) =>
+      atual && atual.clienteId === cliente.id
+        ? { ...atual, cliente: { ...atual.cliente, ...cliente } }
+        : atual,
+    );
+  }
+
+  function marcarEvolucaoConcluida(agendamentoId: number) {
+    const atualizado = {
+      evolucaoStatus: "CONCLUIDA",
+      evolucaoPendenteDesde: null,
+      evolucaoRegistradaEm: new Date().toISOString(),
+    };
+
+    setAgendamentosAtuais((atuais) =>
+      atuais.map((item) =>
+        item.id === agendamentoId ? { ...item, ...atualizado } : item,
+      ),
+    );
+
+    setSelectedAppointment((atual) =>
+      atual?.id === agendamentoId ? { ...atual, ...atualizado } : atual,
+    );
+  }
+
   return (
     <div className="w-full max-w-full overflow-x-hidden pb-6 lg:overflow-visible lg:pb-0">
       <div className="w-full max-w-full min-w-0">
@@ -373,7 +391,7 @@ export default function AgendaClient({
             onProfissionalFiltroChange={handleProfissionalFiltroChange}
             profissionais={profissionaisVisiveis}
             todosProfissionais={profissionais}
-            agendamentos={agendamentos}
+            agendamentos={agendamentosAtuais}
             bloqueios={bloqueios}
             onNovoHorario={abrirNovoHorario}
             onSelectAppointment={setSelectedAppointment}
@@ -398,11 +416,15 @@ export default function AgendaClient({
       <AppointmentDetailsModal
         open={Boolean(selectedAppointment)}
         appointment={selectedAppointment}
+        podeEditarCliente={podeEditarCliente}
+        podeRegistrarEvolucao={podeRegistrarEvolucao}
         onClose={() => setSelectedAppointment(null)}
         onWhatsApp={abrirWhatsApp}
         onEditar={abrirEdicao}
         onFinalizar={abrirFinalizacao}
         onReagendar={abrirReagendamento}
+        onClienteUpdated={atualizarClienteNoFluxo}
+        onEvolucaoRegistrada={marcarEvolucaoConcluida}
       />
 
       <AppointmentMessageModal

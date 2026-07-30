@@ -1,6 +1,6 @@
 import { ClienteClinicoTabs } from "@/app/(app)/clientes/components/ClienteClinicoTabs";
 import type { ClienteClinicoData } from "@/app/(app)/clientes/types";
-import { requirePagePermission } from "@/lib/auth";
+import { canAccess, requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isGoogleDriveConfigured } from "@/lib/google-drive";
 import ClienteProfileHeader from "@/app/(app)/clientes/components/ClienteProfileHeader";
@@ -65,6 +65,19 @@ async function getClienteClinico(clienteId: number) {
       evolucoes: {
         orderBy: { dataRegistro: "desc" },
       },
+      agendamentos: {
+        where: {
+          status: "Atendido",
+          evolucaoStatus: "PENDENTE",
+        },
+        include: {
+          profissional: { select: { nome: true } },
+        },
+        orderBy: [
+          { evolucaoPendenteDesde: "asc" },
+          { updatedAt: "asc" },
+        ],
+      },
       anamneseRespostas: {
         orderBy: { dataResposta: "desc" },
       },
@@ -73,7 +86,7 @@ async function getClienteClinico(clienteId: number) {
 }
 
 export default async function ClientePage({ params }: ClientePageProps) {
-  await requirePagePermission("clientes.visualizar");
+  const usuario = await requirePagePermission("clientes.visualizar");
 
   const { id } = await params;
   const clienteId = Number(id);
@@ -156,6 +169,18 @@ export default async function ClientePage({ params }: ClientePageProps) {
       profissional: evolucao.profissional,
       dataRegistro: toIsoString(evolucao.dataRegistro),
     })),
+    evolucoesPendentes: cliente.agendamentos.map((agendamento) => ({
+      id: agendamento.id,
+      clienteId: cliente.id,
+      cliente: cliente.nome,
+      procedimento: agendamento.procedimento,
+      profissional: agendamento.profissional?.nome || null,
+      data: toIsoString(agendamento.data),
+      pendenteDesde: toIsoString(
+        agendamento.evolucaoPendenteDesde || agendamento.updatedAt,
+      ),
+    })),
+    podeRegistrarEvolucao: canAccess(usuario, "clientes.clinico"),
     anamneseModelos: anamneseModelos.map((modelo) => ({
       id: modelo.id,
       nome: modelo.nome,

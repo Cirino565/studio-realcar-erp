@@ -5,9 +5,11 @@ import { useEffect, useState, useTransition } from "react";
 import {
   Activity,
   AlertCircle,
+  AlertTriangle,
   BadgeCheck,
   CalendarClock,
   CheckCircle2,
+  ChevronRight,
   ClipboardList,
   MessageCircle,
   Pencil,
@@ -15,7 +17,6 @@ import {
   PlayCircle,
   Repeat2,
   RotateCcw,
-  Sparkles,
   Trash2,
   UserRound,
   X,
@@ -27,6 +28,7 @@ import {
   excluirAgendamento,
   iniciarAtendimento,
 } from "@/actions/agendamento.actions";
+import RegistrarEvolucaoPendenteModal from "@/components/atendimento/RegistrarEvolucaoPendenteModal";
 import { Button } from "@/components/ui/button";
 import {
   getReadableTextColor,
@@ -34,7 +36,27 @@ import {
   withAlpha,
 } from "@/lib/color-contrast";
 
-type AppointmentDetails = {
+import ClienteQuickEditModal from "./ClienteQuickEditModal";
+
+export type ClienteAtendimentoDetalhes = {
+  id: number;
+  nome: string;
+  telefone: string;
+  whatsapp: string | null;
+  cpf: string | null;
+  nascimento: string | null;
+  cep: string | null;
+  logradouro: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  estado: string | null;
+  enderecoOriginal: string | null;
+  observacoes: string | null;
+};
+
+export type AppointmentDetails = {
   id: number;
   clienteId: number;
   profissionalId: number | null;
@@ -46,6 +68,10 @@ type AppointmentDetails = {
   sinalPago: boolean;
   status: string;
   statusAntesAtendimento?: string | null;
+  evolucaoStatus?: string | null;
+  evolucaoPendenteDesde?: string | null;
+  evolucaoRegistradaEm?: string | null;
+  evolucaoRegistradaPor?: string | null;
   serieId?: string | null;
   recorrenciaTipo?: string | null;
   recorrenciaIntervalo?: number | null;
@@ -53,11 +79,7 @@ type AppointmentDetails = {
   recorrenciaTotal?: number | null;
   createdAt?: string;
   updatedAt?: string;
-  cliente: {
-    nome: string;
-    telefone?: string | null;
-    whatsapp?: string | null;
-  };
+  cliente: ClienteAtendimentoDetalhes;
   profissional: {
     id: number;
     nome: string;
@@ -70,11 +92,15 @@ type AppointmentDetails = {
 type Props = {
   open: boolean;
   appointment: AppointmentDetails | null;
+  podeEditarCliente: boolean;
+  podeRegistrarEvolucao: boolean;
   onClose: () => void;
   onWhatsApp: (appointment: AppointmentDetails) => void;
   onEditar: (appointment: AppointmentDetails) => void;
   onFinalizar: (appointment: AppointmentDetails) => void;
   onReagendar: (appointment: AppointmentDetails) => void;
+  onClienteUpdated: (cliente: ClienteAtendimentoDetalhes) => void;
+  onEvolucaoRegistrada: (agendamentoId: number) => void;
 };
 
 function useLockBodyScroll(open: boolean) {
@@ -109,6 +135,7 @@ function formatDateTime(value: Date | string) {
     month: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "America/Sao_Paulo",
   }).format(new Date(value));
 }
 
@@ -116,6 +143,7 @@ function formatTime(value: Date | string) {
   return new Intl.DateTimeFormat("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "America/Sao_Paulo",
   }).format(new Date(value));
 }
 
@@ -129,15 +157,12 @@ function formatCurrency(value: number) {
 function addMinutes(value: Date | string, minutes: number) {
   const date = new Date(value);
   date.setMinutes(date.getMinutes() + minutes);
-
   return date;
 }
 
 function getInitials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
-
   if (parts.length === 0) return "CL";
-
   return parts
     .slice(0, 2)
     .map((part) => part.charAt(0).toUpperCase())
@@ -145,42 +170,43 @@ function getInitials(name: string) {
 }
 
 function statusClass(status: string) {
-  if (status === "Confirmado") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  }
-
-  if (status === "Em atendimento") {
-    return "border-cyan-200 bg-cyan-50 text-cyan-700";
-  }
-
-  if (status === "Atendido") {
-    return "border-blue-200 bg-blue-50 text-blue-700";
-  }
-
-  if (status === "Faltou") {
-    return "border-amber-200 bg-amber-50 text-amber-700";
-  }
-
-  if (status === "Cancelado") {
-    return "border-rose-200 bg-rose-50 text-rose-700";
-  }
-
+  if (status === "Confirmado") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (status === "Em atendimento") return "border-cyan-200 bg-cyan-50 text-cyan-700";
+  if (status === "Atendido") return "border-blue-200 bg-blue-50 text-blue-700";
+  if (status === "Faltou") return "border-amber-200 bg-amber-50 text-amber-700";
+  if (status === "Cancelado") return "border-rose-200 bg-rose-50 text-rose-700";
   return "border-violet-200 bg-violet-50 text-violet-700";
+}
+
+function cadastroPendente(cliente: ClienteAtendimentoDetalhes) {
+  const pendencias: string[] = [];
+  if (!cliente.nascimento) pendencias.push("nascimento");
+  if (!cliente.cpf) pendencias.push("CPF");
+  if (!cliente.cep || !cliente.logradouro || !cliente.cidade || !cliente.estado) {
+    pendencias.push("endereço");
+  }
+  return pendencias;
 }
 
 export default function AppointmentDetailsModal({
   open,
   appointment,
+  podeEditarCliente,
+  podeRegistrarEvolucao,
   onClose,
   onWhatsApp,
   onEditar,
   onFinalizar,
   onReagendar,
+  onClienteUpdated,
+  onEvolucaoRegistrada,
 }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isManagingSeries, setIsManagingSeries] = useState(false);
+  const [editandoCliente, setEditandoCliente] = useState(false);
+  const [registrandoEvolucao, setRegistrandoEvolucao] = useState(false);
 
   useLockBodyScroll(open);
 
@@ -188,6 +214,8 @@ export default function AppointmentDetailsModal({
     setError(null);
     setIsDeleting(false);
     setIsManagingSeries(false);
+    setEditandoCliente(false);
+    setRegistrandoEvolucao(false);
   }, [open, appointment?.id]);
 
   if (!open || !appointment) return null;
@@ -198,12 +226,7 @@ export default function AppointmentDetailsModal({
     "#7c3aed",
   );
   const professionalTextColor = getReadableTextColor(professionalColor);
-
-  const endDate = addMinutes(
-    currentAppointment.data,
-    currentAppointment.duracao,
-  );
-
+  const endDate = addMinutes(currentAppointment.data, currentAppointment.duracao);
   const phone =
     currentAppointment.cliente.whatsapp ||
     currentAppointment.cliente.telefone ||
@@ -212,6 +235,9 @@ export default function AppointmentDetailsModal({
   const atendimentoFinalizado = currentAppointment.status === "Atendido";
   const atendimentoCancelado = currentAppointment.status === "Cancelado";
   const atendimentoEmAndamento = currentAppointment.status === "Em atendimento";
+  const evolucaoPendente = currentAppointment.evolucaoStatus === "PENDENTE";
+  const pendenciasCadastro = cadastroPendente(currentAppointment.cliente);
+  const podeGerenciarAgendamento = !atendimentoFinalizado && !atendimentoEmAndamento;
 
   function handleIniciar() {
     setError(null);
@@ -226,11 +252,9 @@ export default function AppointmentDetailsModal({
       return;
     }
 
-    const appointmentId = currentAppointment.id;
-
     startTransition(async () => {
       try {
-        await iniciarAtendimento(appointmentId);
+        await iniciarAtendimento(currentAppointment.id);
         window.location.reload();
       } catch (error) {
         setError(
@@ -250,11 +274,7 @@ export default function AppointmentDetailsModal({
       return;
     }
 
-    const confirmou = window.confirm(
-      "Voltar o atendimento para o status anterior e liberar novamente as opções de edição?",
-    );
-
-    if (!confirmou) return;
+    if (!window.confirm("Voltar o atendimento para o status anterior?")) return;
 
     startTransition(async () => {
       try {
@@ -270,24 +290,15 @@ export default function AppointmentDetailsModal({
     });
   }
 
-  const podeGerenciarAgendamento =
-    !atendimentoFinalizado && !atendimentoEmAndamento;
-
   async function handleExcluir() {
     setError(null);
 
     if (!podeGerenciarAgendamento) {
-      setError(
-        "Atendimentos em andamento ou finalizados não podem ser excluídos diretamente.",
-      );
+      setError("Atendimentos em andamento ou finalizados não podem ser excluídos diretamente.");
       return;
     }
 
-    const confirmou = window.confirm(
-      `Excluir o agendamento de ${currentAppointment.cliente.nome}? Esta ação não poderá ser desfeita.`,
-    );
-
-    if (!confirmou) return;
+    if (!window.confirm(`Excluir o agendamento de ${currentAppointment.cliente.nome}?`)) return;
 
     setIsDeleting(true);
 
@@ -307,23 +318,19 @@ export default function AppointmentDetailsModal({
 
   async function handleCancelarSerie(escopo: "seguintes" | "toda") {
     setError(null);
-
     if (!currentAppointment.serieId) return;
 
     const mensagem =
       escopo === "toda"
-        ? "Cancelar todos os agendamentos pendentes desta série? Atendimentos já finalizados serão preservados."
-        : "Cancelar este agendamento e todas as próximas ocorrências pendentes da série?";
+        ? "Cancelar todos os agendamentos pendentes desta série?"
+        : "Cancelar este agendamento e as próximas ocorrências pendentes?";
 
     if (!window.confirm(mensagem)) return;
 
     setIsManagingSeries(true);
 
     try {
-      await cancelarSerieAgendamento({
-        id: currentAppointment.id,
-        escopo,
-      });
+      await cancelarSerieAgendamento({ id: currentAppointment.id, escopo });
       onClose();
       window.location.reload();
     } catch (error) {
@@ -349,457 +356,257 @@ export default function AppointmentDetailsModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="appointment-details-title"
-        className="absolute inset-y-0 right-0 flex h-[100dvh] w-full max-w-[540px] flex-col overflow-hidden border-l border-slate-200 bg-slate-50 shadow-2xl shadow-slate-950/20"
+        className="absolute inset-y-0 right-0 flex h-[100dvh] w-full max-w-[560px] flex-col overflow-hidden border-l border-slate-200 bg-slate-50 shadow-2xl shadow-slate-950/20"
       >
-        <header className="relative shrink-0 overflow-hidden border-b border-slate-200 bg-white px-5 py-5 sm:px-6 sm:py-6">
-          <div className="pointer-events-none absolute -right-14 -top-16 h-44 w-44 rounded-full bg-violet-100 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-16 left-12 h-36 w-36 rounded-full bg-rose-100 blur-3xl" />
-
-          <div className="relative flex items-start justify-between gap-4">
-            <div className="flex min-w-0 items-center gap-4">
-              <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-violet-600 text-base font-bold text-white shadow-lg shadow-violet-600/20">
+        <header className="relative shrink-0 border-b border-slate-200 bg-white px-4 py-3 sm:px-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-xs font-bold text-white shadow-sm">
                 {getInitials(currentAppointment.cliente.nome)}
               </div>
 
               <div className="min-w-0">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span
-                    className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClass(
-                      currentAppointment.status,
-                    )}`}
-                  >
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusClass(currentAppointment.status)}`}>
                     {currentAppointment.status}
                   </span>
-
-                  {currentAppointment.serieId ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700">
-                      <Repeat2 size={12} />
-                      Recorrente
-                      {currentAppointment.recorrenciaIndice && currentAppointment.recorrenciaTotal
-                        ? ` ${currentAppointment.recorrenciaIndice}/${currentAppointment.recorrenciaTotal}`
-                        : ""}
-                    </span>
-                  ) : null}
-
                   {currentAppointment.sinalPago ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700">
-                      <BadgeCheck size={12} />
-                      Sinal pago
+                    <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700">
+                      <BadgeCheck size={11} /> Sinal pago
                     </span>
                   ) : null}
-
-                  {atendimentoEmAndamento ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-cyan-50 px-2.5 py-1 text-xs font-semibold text-cyan-700">
-                      <span className="size-1.5 animate-pulse rounded-full bg-cyan-500" />
-                      Em andamento
+                  {evolucaoPendente ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                      <AlertTriangle size={11} /> Evolução pendente
                     </span>
                   ) : null}
                 </div>
-
-                <h2
-                  id="appointment-details-title"
-                  className="truncate text-xl font-bold tracking-tight text-slate-950 sm:text-2xl"
-                >
+                <h2 id="appointment-details-title" className="mt-1 truncate text-base font-bold text-slate-950">
                   {currentAppointment.cliente.nome}
                 </h2>
-
-                <p className="mt-1 truncate text-sm font-medium text-slate-500">
-                  {currentAppointment.procedimento}
-                </p>
+                <p className="truncate text-xs text-slate-500">{currentAppointment.procedimento}</p>
               </div>
             </div>
 
             <button
               type="button"
               onClick={onClose}
-              className="shrink-0 rounded-xl border border-slate-200 bg-white p-2.5 text-slate-500 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+              className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 text-slate-500 hover:bg-slate-50 hover:text-slate-900"
               aria-label="Fechar"
             >
-              <X size={18} />
+              <X size={17} />
             </button>
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
-          <div className="space-y-5">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-5 sm:py-4">
+          <div className="space-y-3">
             {error ? (
-              <div className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-700">
-                <AlertCircle size={19} className="mt-0.5 shrink-0" />
-
-                <div>
-                  <p className="text-sm font-semibold">
-                    Não foi possível continuar
-                  </p>
-
-                  <p className="mt-1 text-sm leading-6 text-rose-600">
-                    {error}
-                  </p>
-                </div>
+              <div className="flex items-start gap-2.5 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-rose-700">
+                <AlertCircle size={18} className="mt-0.5 shrink-0" />
+                <p className="text-sm">{error}</p>
               </div>
             ) : null}
 
-            <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-              <div className="border-b border-slate-100 px-4 py-3.5 sm:px-5">
-                <div className="flex items-center gap-2">
-                  <CalendarClock size={17} className="text-violet-600" />
-
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Atendimento
-                  </h3>
+            <button
+              type="button"
+              onClick={() => podeEditarCliente && setEditandoCliente(true)}
+              className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-violet-200 hover:bg-violet-50/40 disabled:cursor-default"
+              disabled={!podeEditarCliente}
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+                  <UserRound size={18} />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-px bg-slate-100">
-                <div className="bg-white p-4 sm:p-5">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Data e horário
-                  </p>
-
-                  <p className="mt-2 text-sm font-bold capitalize text-slate-900">
-                    {formatDateTime(currentAppointment.data)}
-                  </p>
-
-                  <p className="mt-1 text-xs text-slate-500">
-                    {formatTime(currentAppointment.data)} até{" "}
-                    {formatTime(endDate)}
-                  </p>
-                </div>
-
-                <div className="bg-white p-4 sm:p-5">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Duração
-                  </p>
-
-                  <p className="mt-2 text-sm font-bold text-slate-900">
-                    {currentAppointment.duracao} minutos
-                  </p>
-
-                  <p className="mt-1 text-xs text-slate-500">
-                    Agenda ocupada até {formatTime(endDate)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="border-t border-slate-100 p-4 sm:p-5">
-                <div className="flex items-start gap-3">
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
-                    <Sparkles size={18} />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Procedimento
-                    </p>
-
-                    <p className="mt-1 text-base font-bold text-slate-950">
-                      {currentAppointment.procedimento}
-                    </p>
-
-                    <p className="mt-1 text-sm font-semibold text-violet-700">
-                      {formatCurrency(currentAppointment.valor)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-              <div className="flex items-start gap-3">
-                <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600">
-                  <UserRound size={19} />
-                </div>
-
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Cliente
-                  </p>
-
-                  <p className="mt-1 truncate text-base font-bold text-slate-950">
-                    {currentAppointment.cliente.nome}
-                  </p>
-
-                  <p className="mt-2 flex items-center gap-2 text-sm text-slate-500">
-                    <Phone size={14} />
-                    {phone}
-                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">1. Cliente</p>
+                    {podeEditarCliente ? <ChevronRight size={16} className="text-slate-400" /> : null}
+                  </div>
+                  <p className="mt-0.5 truncate text-sm font-bold text-slate-950">{currentAppointment.cliente.nome}</p>
+                  <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500"><Phone size={12} />{phone}</p>
+                  {pendenciasCadastro.length > 0 ? (
+                    <p className="mt-2 text-[11px] font-semibold text-amber-700">
+                      Completar: {pendenciasCadastro.join(", ")}
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-[11px] font-semibold text-emerald-700">Cadastro essencial completo</p>
+                  )}
                 </div>
+              </div>
+            </button>
+
+            <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+              <div className="grid gap-2">
+                <a
+                  href={`/clientes/${currentAppointment.clienteId}#anamnese`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2.5 text-sm font-bold text-violet-800 hover:bg-violet-100"
+                >
+                  <span className="flex items-center gap-2"><ClipboardList size={17} />2. Abrir anamnese</span>
+                  <span className="text-[10px] font-semibold text-violet-600">mantém esta tela</span>
+                </a>
+
+                {!atendimentoEmAndamento && !atendimentoFinalizado ? (
+                  <button
+                    type="button"
+                    onClick={handleIniciar}
+                    disabled={isPending || atendimentoCancelado}
+                    className="flex min-h-11 items-center justify-between gap-3 rounded-xl bg-cyan-600 px-3 py-2.5 text-sm font-bold text-white hover:bg-cyan-700 disabled:opacity-50"
+                  >
+                    <span className="flex items-center gap-2"><PlayCircle size={17} />3. Iniciar atendimento</span>
+                    <ChevronRight size={16} />
+                  </button>
+                ) : null}
+
+                {atendimentoEmAndamento ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onFinalizar(currentAppointment)}
+                      className="flex min-h-11 items-center justify-between gap-3 rounded-xl bg-emerald-600 px-3 py-2.5 text-sm font-bold text-white hover:bg-emerald-700"
+                    >
+                      <span className="flex items-center gap-2"><CheckCircle2 size={17} />4. Finalizar atendimento</span>
+                      <ChevronRight size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDesfazerInicio}
+                      disabled={isPending}
+                      className="flex min-h-10 items-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-bold text-cyan-800 hover:bg-cyan-100 disabled:opacity-50"
+                    >
+                      <RotateCcw size={15} /> Voltar ao status anterior
+                    </button>
+                  </>
+                ) : null}
+
+                {atendimentoFinalizado ? (
+                  <div className={`rounded-xl border p-3 ${evolucaoPendente ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className={`text-xs font-bold ${evolucaoPendente ? "text-amber-900" : "text-emerald-900"}`}>
+                          4. Evolução clínica
+                        </p>
+                        <p className={`mt-1 text-[11px] ${evolucaoPendente ? "text-amber-700" : "text-emerald-700"}`}>
+                          {evolucaoPendente
+                            ? "Atendimento encerrado. O registro clínico ainda precisa ser concluído."
+                            : "Evolução registrada para este atendimento."}
+                        </p>
+                      </div>
+                      {evolucaoPendente ? <AlertTriangle size={18} className="shrink-0 text-amber-700" /> : <CheckCircle2 size={18} className="shrink-0 text-emerald-700" />}
+                    </div>
+                    {evolucaoPendente ? (
+                      <button
+                        type="button"
+                        onClick={() => setRegistrandoEvolucao(true)}
+                        disabled={!podeRegistrarEvolucao}
+                        className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-amber-600 px-3 text-xs font-bold text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+                      >
+                        <Activity size={15} /> {podeRegistrarEvolucao ? "Registrar evolução agora" : "Sem permissão clínica"}
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             </section>
 
-            <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-              <div className="flex items-start gap-3">
+            <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Data e horário</p>
+                  <p className="mt-1 text-sm font-bold capitalize text-slate-900">{formatDateTime(currentAppointment.data)}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">{formatTime(currentAppointment.data)} até {formatTime(endDate)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Procedimento</p>
+                  <p className="mt-1 text-sm font-bold text-slate-900">{currentAppointment.procedimento}</p>
+                  <p className="mt-0.5 text-xs font-bold text-violet-700">{formatCurrency(currentAppointment.valor)}</p>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center gap-3 border-t border-slate-100 pt-3">
                 <div
-                  className="flex size-11 shrink-0 items-center justify-center rounded-2xl border shadow-sm"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-xl border"
                   style={{
                     backgroundColor: professionalColor,
                     borderColor: withAlpha(professionalColor, 0.36),
                     color: professionalTextColor,
                   }}
                 >
-                  <UserRound size={19} />
+                  <UserRound size={16} />
                 </div>
-
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Profissional responsável
-                  </p>
-
-                  <p className="mt-1 truncate text-base font-bold text-slate-950">
-                    {currentAppointment.profissional?.nome || "Não definida"}
-                  </p>
-
-                  <p className="mt-1 text-sm text-slate-500">
-                    {currentAppointment.profissional?.area ||
-                      "Área não informada"}
-                  </p>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-slate-900">{currentAppointment.profissional?.nome || "Não definida"}</p>
+                  <p className="truncate text-xs text-slate-500">{currentAppointment.profissional?.area || "Área não informada"}</p>
                 </div>
               </div>
             </section>
 
             {currentAppointment.observacoes ? (
-              <section className="rounded-3xl border border-amber-200 bg-amber-50 p-4 sm:p-5">
-                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
-                  Observações do agendamento
-                </p>
-
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-amber-900">
-                  {currentAppointment.observacoes}
-                </p>
+              <section className="rounded-2xl border border-amber-200 bg-amber-50 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700">Observações do agendamento</p>
+                <p className="mt-1.5 whitespace-pre-wrap text-sm leading-5 text-amber-900">{currentAppointment.observacoes}</p>
               </section>
             ) : null}
 
-            <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-                  Fluxo do atendimento
-                </p>
-
-                <p className="mt-1 text-sm text-slate-500">
-                  Escolha a próxima ação para esta cliente.
-                </p>
-              </div>
-
-              <div className="mt-4 grid gap-3">
-                <Button
-                  type="button"
-                  onClick={handleIniciar}
-                  disabled={
-                    isPending ||
-                    atendimentoFinalizado ||
-                    atendimentoCancelado ||
-                    atendimentoEmAndamento
-                  }
-                  className="h-12 justify-start rounded-xl bg-violet-600 px-4 text-white shadow-sm shadow-violet-600/20 hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <PlayCircle size={18} />
-
-                  {isPending
-                    ? "Iniciando atendimento..."
-                    : atendimentoEmAndamento
-                      ? "Atendimento em andamento"
-                      : atendimentoFinalizado
-                        ? "Atendimento finalizado"
-                        : "Iniciar atendimento"}
+            <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Ações complementares</p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <Button type="button" variant="outline" onClick={() => onWhatsApp(currentAppointment)} className="h-10 rounded-xl border-emerald-200 text-xs text-emerald-700 hover:bg-emerald-50">
+                  <MessageCircle size={15} /> Mensagem
                 </Button>
-
-                {atendimentoEmAndamento ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleDesfazerInicio}
-                    disabled={isPending}
-                    className="h-12 justify-start rounded-xl border-cyan-200 bg-cyan-50 px-4 text-cyan-800 hover:bg-cyan-100 hover:text-cyan-900 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <RotateCcw size={18} />
-                    {isPending ? "Voltando status..." : "Voltar ao status anterior"}
-                  </Button>
-                ) : null}
-
-                <Button
-                  type="button"
-                  onClick={() => onFinalizar(currentAppointment)}
-                  disabled={atendimentoFinalizado || atendimentoCancelado}
-                  className="h-12 justify-start rounded-xl bg-emerald-600 px-4 text-white shadow-sm shadow-emerald-600/20 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <CheckCircle2 size={18} />
-
-                  {atendimentoFinalizado
-                    ? "Atendimento finalizado"
-                    : "Finalizar atendimento"}
+                <Button type="button" variant="outline" onClick={() => onReagendar(currentAppointment)} className="h-10 rounded-xl border-slate-200 text-xs text-slate-700 hover:bg-slate-50">
+                  <CalendarClock size={15} /> Retorno
                 </Button>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => onReagendar(currentAppointment)}
-                  className="h-12 justify-start rounded-xl border-slate-200 bg-white px-4 text-slate-700 hover:bg-slate-50 hover:text-slate-950"
-                >
-                  <CalendarClock size={18} />
-                  Reagendar ou criar retorno
+                <Button type="button" variant="outline" onClick={() => onEditar(currentAppointment)} disabled={!podeGerenciarAgendamento || isDeleting} className="h-10 rounded-xl border-slate-200 text-xs text-slate-700 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-50">
+                  <Pencil size={15} /> Editar agenda
                 </Button>
-              </div>
-            </section>
-
-            <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-                  Gerenciar agendamento
-                </p>
-
-                <p className="mt-1 text-sm text-slate-500">
-                  Corrija dados lançados incorretamente ou exclua um agendamento ainda não finalizado.
-                </p>
-              </div>
-
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => onEditar(currentAppointment)}
-                  disabled={!podeGerenciarAgendamento || isDeleting}
-                  className="h-11 rounded-xl border-slate-200 bg-white text-slate-700 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Pencil size={16} />
-                  Editar agendamento
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleExcluir}
-                  disabled={!podeGerenciarAgendamento || isDeleting}
-                  className="h-11 rounded-xl border-rose-200 bg-white text-rose-700 hover:bg-rose-50 hover:text-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Trash2 size={16} />
-                  {isDeleting ? "Excluindo..." : "Excluir agendamento"}
+                <Button type="button" variant="outline" onClick={handleExcluir} disabled={!podeGerenciarAgendamento || isDeleting} className="h-10 rounded-xl border-rose-200 text-xs text-rose-700 hover:bg-rose-50 disabled:opacity-50">
+                  <Trash2 size={15} /> {isDeleting ? "Excluindo" : "Excluir"}
                 </Button>
               </div>
 
               {currentAppointment.serieId && podeGerenciarAgendamento ? (
-                <div className="mt-4 rounded-2xl border border-violet-200 bg-violet-50/70 p-3">
-                  <div className="flex items-start gap-2">
-                    <Repeat2 size={16} className="mt-0.5 shrink-0 text-violet-700" />
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-wide text-violet-800">
-                        Série recorrente
-                      </p>
-                      <p className="mt-1 text-xs leading-5 text-violet-700">
-                        Editar altera somente esta ocorrência. Para interromper a repetição, cancele as próximas ocorrências ou toda a série pendente.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => handleCancelarSerie("seguintes")}
-                      disabled={isManagingSeries}
-                      className="h-10 border-violet-200 bg-white text-xs text-violet-700 hover:bg-violet-100"
-                    >
-                      Cancelar este e próximos
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => handleCancelarSerie("toda")}
-                      disabled={isManagingSeries}
-                      className="h-10 border-rose-200 bg-white text-xs text-rose-700 hover:bg-rose-50"
-                    >
-                      Cancelar série pendente
-                    </Button>
+                <div className="mt-3 rounded-xl border border-violet-200 bg-violet-50 p-3">
+                  <div className="flex items-center gap-2 text-xs font-bold text-violet-800"><Repeat2 size={14} />Série recorrente</div>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => handleCancelarSerie("seguintes")} disabled={isManagingSeries} className="h-9 rounded-lg border border-violet-200 bg-white px-2 text-[10px] font-bold text-violet-700 disabled:opacity-50">Cancelar próximos</button>
+                    <button type="button" onClick={() => handleCancelarSerie("toda")} disabled={isManagingSeries} className="h-9 rounded-lg border border-rose-200 bg-white px-2 text-[10px] font-bold text-rose-700 disabled:opacity-50">Cancelar série</button>
                   </div>
                 </div>
               ) : null}
-
-              {!podeGerenciarAgendamento ? (
-                <p className="mt-3 text-xs leading-5 text-slate-500">
-                  Atendimentos em andamento ou finalizados ficam protegidos para evitar inconsistências no prontuário e no financeiro.
-                </p>
-              ) : null}
-            </section>
-
-            <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-                Ações rápidas
-              </p>
-
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <Button
-                  asChild
-                  variant="outline"
-                  className="h-auto min-h-20 flex-col gap-2 rounded-2xl border-slate-200 bg-slate-50 px-3 py-4 text-slate-700 hover:bg-violet-50 hover:text-violet-700"
-                >
-                  <a href={`/clientes/${currentAppointment.clienteId}`}>
-                    <UserRound size={19} />
-                    <span className="text-xs font-semibold">
-                      Ficha completa
-                    </span>
-                  </a>
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => onWhatsApp(currentAppointment)}
-                  className="h-auto min-h-20 flex-col gap-2 rounded-2xl border-slate-200 bg-slate-50 px-3 py-4 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700"
-                >
-                  <MessageCircle size={19} />
-                  <span className="text-xs font-semibold">Criar mensagem</span>
-                </Button>
-
-                <Button
-                  asChild
-                  variant="outline"
-                  className="h-auto min-h-20 flex-col gap-2 rounded-2xl border-slate-200 bg-slate-50 px-3 py-4 text-slate-700 hover:bg-violet-50 hover:text-violet-700"
-                >
-                  <a
-                    href={`/clientes/${currentAppointment.clienteId}#anamnese`}
-                  >
-                    <ClipboardList size={19} />
-                    <span className="text-xs font-semibold">Anamnese</span>
-                  </a>
-                </Button>
-
-                <Button
-                  asChild
-                  variant="outline"
-                  className="h-auto min-h-20 flex-col gap-2 rounded-2xl border-slate-200 bg-slate-50 px-3 py-4 text-slate-700 hover:bg-violet-50 hover:text-violet-700"
-                >
-                  <a
-                    href={`/clientes/${currentAppointment.clienteId}#evolucao`}
-                  >
-                    <Activity size={19} />
-                    <span className="text-xs font-semibold">Evolução</span>
-                  </a>
-                </Button>
-              </div>
             </section>
           </div>
         </div>
-
-        <footer className="shrink-0 border-t border-slate-200 bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-5">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Button
-              type="button"
-              onClick={() => onWhatsApp(currentAppointment)}
-              className="h-11 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700"
-            >
-              <MessageCircle size={16} />
-              Escolher mensagem
-            </Button>
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="h-11 rounded-xl border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-            >
-              Fechar detalhes
-            </Button>
-          </div>
-        </footer>
       </aside>
+
+      <ClienteQuickEditModal
+        open={editandoCliente}
+        cliente={currentAppointment.cliente}
+        onClose={() => setEditandoCliente(false)}
+        onSaved={onClienteUpdated}
+      />
+
+      <RegistrarEvolucaoPendenteModal
+        open={registrandoEvolucao}
+        item={{
+          id: currentAppointment.id,
+          clienteId: currentAppointment.clienteId,
+          cliente: currentAppointment.cliente.nome,
+          procedimento: currentAppointment.procedimento,
+          profissional: currentAppointment.profissional?.nome || null,
+          data: currentAppointment.data,
+          pendenteDesde:
+            currentAppointment.evolucaoPendenteDesde ||
+            currentAppointment.updatedAt ||
+            currentAppointment.data,
+        }}
+        onClose={() => setRegistrandoEvolucao(false)}
+        onSaved={(agendamentoId) => {
+          setRegistrandoEvolucao(false);
+          onEvolucaoRegistrada(agendamentoId);
+        }}
+      />
     </div>
   );
 }

@@ -136,3 +136,90 @@ export async function buscarCliente(id: number) {
     },
   });
 }
+
+export type ClienteAtendimentoForm = {
+  id: number;
+  telefone: string;
+  whatsapp?: string;
+  cpf?: string;
+  nascimento?: string;
+  cep?: string;
+  logradouro?: string;
+  numero?: string;
+  complemento?: string;
+  bairro?: string;
+  cidade?: string;
+  estado?: string;
+  enderecoOriginal?: string;
+  observacoes?: string;
+};
+
+export async function atualizarClienteNoAtendimento(
+  dados: ClienteAtendimentoForm,
+) {
+  await requirePermission("clientes.gerenciar");
+
+  if (!dados.id || dados.id <= 0) {
+    throw new Error("Cliente inválida.");
+  }
+
+  const telefone = dados.telefone?.trim();
+  const whatsapp = textoOpcional(dados.whatsapp);
+
+  if (!telefone && !whatsapp) {
+    throw new Error("Informe pelo menos o telefone ou o WhatsApp da cliente.");
+  }
+
+  const nascimento = dados.nascimento
+    ? new Date(`${dados.nascimento}T12:00:00.000Z`)
+    : null;
+
+  if (nascimento && Number.isNaN(nascimento.getTime())) {
+    throw new Error("Data de nascimento inválida.");
+  }
+
+  const cliente = await prisma.cliente.update({
+    where: { id: dados.id },
+    data: {
+      telefone: telefone || whatsapp || "",
+      whatsapp,
+      cpf: textoOpcional(dados.cpf),
+      nascimento,
+      cep: normalizarCep(dados.cep),
+      logradouro: textoOpcional(dados.logradouro),
+      numero: textoOpcional(dados.numero),
+      complemento: textoOpcional(dados.complemento),
+      bairro: textoOpcional(dados.bairro),
+      cidade: textoOpcional(dados.cidade),
+      estado: normalizarEstado(dados.estado),
+      enderecoOriginal: textoOpcional(dados.enderecoOriginal),
+      observacoes: textoOpcional(dados.observacoes),
+    },
+    select: {
+      id: true,
+      nome: true,
+      telefone: true,
+      whatsapp: true,
+      cpf: true,
+      nascimento: true,
+      cep: true,
+      logradouro: true,
+      numero: true,
+      complemento: true,
+      bairro: true,
+      cidade: true,
+      estado: true,
+      enderecoOriginal: true,
+      observacoes: true,
+    },
+  });
+
+  revalidatePath("/agenda");
+  revalidatePath("/clientes");
+  revalidatePath(`/clientes/${dados.id}`);
+
+  return {
+    ...cliente,
+    nascimento: cliente.nascimento?.toISOString() || null,
+  };
+}

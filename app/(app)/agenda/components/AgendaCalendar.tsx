@@ -17,6 +17,7 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
+import type { AppointmentDetails } from "./AppointmentDetailsModal";
 import {
   getMutedTextColor,
   getOverlayBackground,
@@ -35,32 +36,7 @@ type ProfissionalAgenda = {
   status: string;
 };
 
-type AgendamentoAgenda = {
-  id: number;
-  clienteId: number;
-  profissionalId: number | null;
-  procedimento: string;
-  data: string;
-  duracao: number;
-  valor: number;
-  observacoes: string | null;
-  sinalPago: boolean;
-  status: string;
-  statusAntesAtendimento?: string | null;
-  serieId?: string | null;
-  recorrenciaTipo?: string | null;
-  recorrenciaIntervalo?: number | null;
-  recorrenciaIndice?: number | null;
-  recorrenciaTotal?: number | null;
-  createdAt?: string;
-  updatedAt?: string;
-  cliente: {
-    nome: string;
-    telefone?: string | null;
-    whatsapp?: string | null;
-  };
-  profissional: ProfissionalAgenda | null;
-};
+type AgendamentoAgenda = AppointmentDetails;
 
 type BloqueioAgenda = {
   id: number;

@@ -941,7 +941,7 @@ export type FinalizarAtendimentoInput = {
   produtos?: VendaProdutoInput[];
   formaPagamento: string;
   statusPagamento: string;
-  evolucao: string;
+  evolucao?: string;
   observacoes?: string;
   dataAtendimento?: string;
 };
@@ -955,10 +955,6 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
 
   if (!dados.procedimentoRealizado?.trim()) {
     throw new Error("Informe o procedimento realizado.");
-  }
-
-  if (!dados.evolucao?.trim()) {
-    throw new Error("Informe a evolução/observação clínica do atendimento.");
   }
 
   const valorCobrado = Number.isFinite(Number(dados.valorCobrado))
@@ -999,6 +995,7 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
 
   const procedimentoRealizado = dados.procedimentoRealizado.trim();
   const observacoes = dados.observacoes?.trim() || null;
+  const evolucaoClinica = dados.evolucao?.trim() || null;
 
   const servicoBase = dados.procedimentoServicoId
     ? await prisma.procedimentoServico.findUnique({
@@ -1031,15 +1028,18 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
       },
     });
 
-    await tx.clienteEvolucao.create({
-      data: {
-        clienteId: agendamento.clienteId,
-        titulo: `Atendimento - ${procedimentoRealizado}`,
-        descricao: dados.evolucao.trim(),
-        profissional,
-        dataRegistro: dataAtendimento,
-      },
-    });
+    if (evolucaoClinica) {
+      await tx.clienteEvolucao.create({
+        data: {
+          clienteId: agendamento.clienteId,
+          agendamentoId: agendamento.id,
+          titulo: `Atendimento - ${procedimentoRealizado}`,
+          descricao: evolucaoClinica,
+          profissional,
+          dataRegistro: dataAtendimento,
+        },
+      });
+    }
 
     const venda = await criarVendaNoTx(tx, {
       clienteId: agendamento.clienteId,
@@ -1063,6 +1063,10 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
       data: {
         status: "Atendido",
         statusAntesAtendimento: null,
+        evolucaoStatus: evolucaoClinica ? "CONCLUIDA" : "PENDENTE",
+        evolucaoPendenteDesde: evolucaoClinica ? null : dataAtendimento,
+        evolucaoRegistradaEm: evolucaoClinica ? dataAtendimento : null,
+        evolucaoRegistradaPor: evolucaoClinica ? profissional : null,
         procedimento: procedimentoRealizado,
         valor: valorCobrado,
         observacoes: [agendamento.observacoes, observacoes]
@@ -1103,11 +1107,13 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
     await tx.auditoria.create({
       data: {
         modulo: "Agenda",
-        acao: "Finalizou atendimento e registrou venda",
+        acao: evolucaoClinica
+          ? "Finalizou atendimento, registrou evolução e venda"
+          : "Finalizou atendimento com evolução pendente e registrou venda",
         entidade: "Venda",
         entidadeId: String(venda.vendaId),
         usuario: profissional,
-        detalhes: `Atendimento finalizado para ${agendamento.cliente.nome}. Serviço: R$ ${venda.totalServicos.toFixed(2)}. Produtos: R$ ${venda.totalProdutos.toFixed(2)}. Total: R$ ${venda.valorTotal.toFixed(2)}. Custo direto: R$ ${venda.custoTotal.toFixed(2)}. Pagamento: ${statusPagamento}.`,
+        detalhes: `Atendimento finalizado para ${agendamento.cliente.nome}. Evolução: ${evolucaoClinica ? "registrada" : "pendente"}. Serviço: R$ ${venda.totalServicos.toFixed(2)}. Produtos: R$ ${venda.totalProdutos.toFixed(2)}. Total: R$ ${venda.valorTotal.toFixed(2)}. Custo direto: R$ ${venda.custoTotal.toFixed(2)}. Pagamento: ${statusPagamento}.`,
       },
     });
   });
@@ -1122,6 +1128,115 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
   revalidatePath("/relatorios");
   revalidatePath("/marketing");
   revalidatePath("/");
+}
+
+export type RegistrarEvolucaoPendenteInput = {
+  agendamentoId: number;
+  descricao: string;
+  profissional?: string;
+  dataRegistro?: string;
+};
+
+export async function registrarEvolucaoPendente(
+  dados: RegistrarEvolucaoPendenteInput,
+) {
+  const usuario = await requirePermission("clientes.clinico");
+
+  if (!dados.agendamentoId) {
+    throw new Error("Atendimento inválido.");
+  }
+
+  const descricao = dados.descricao?.trim();
+
+  if (!descricao) {
+    throw new Error("Informe a evolução clínica.");
+  }
+
+  const dataRegistro = dados.dataRegistro
+    ? new Date(dados.dataRegistro)
+    : new Date();
+
+  if (Number.isNaN(dataRegistro.getTime())) {
+    throw new Error("Data da evolução inválida.");
+  }
+
+  const agendamento = await prisma.agendamento.findUnique({
+    where: { id: dados.agendamentoId },
+    include: {
+      cliente: { select: { id: true, nome: true } },
+      profissional: { select: { nome: true } },
+      evolucao: { select: { id: true } },
+    },
+  });
+
+  if (!agendamento) {
+    throw new Error("Atendimento não encontrado.");
+  }
+
+  if (agendamento.status !== "Atendido") {
+    throw new Error("A evolução posterior só pode ser registrada em atendimento finalizado.");
+  }
+
+  if (agendamento.evolucao || agendamento.evolucaoStatus === "CONCLUIDA") {
+    throw new Error("Este atendimento já possui evolução registrada.");
+  }
+
+  if (agendamento.evolucaoStatus !== "PENDENTE") {
+    throw new Error("Este atendimento não está marcado com evolução pendente.");
+  }
+
+  const profissional =
+    dados.profissional?.trim() ||
+    agendamento.profissional?.nome ||
+    usuario.nome ||
+    usuario.email;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.clienteEvolucao.create({
+      data: {
+        clienteId: agendamento.clienteId,
+        agendamentoId: agendamento.id,
+        titulo: `Atendimento - ${agendamento.procedimento}`,
+        descricao,
+        profissional,
+        dataRegistro,
+      },
+    });
+
+    await tx.agendamento.update({
+      where: { id: agendamento.id },
+      data: {
+        evolucaoStatus: "CONCLUIDA",
+        evolucaoPendenteDesde: null,
+        evolucaoRegistradaEm: dataRegistro,
+        evolucaoRegistradaPor: profissional,
+      },
+    });
+
+    await tx.auditoria.create({
+      data: {
+        modulo: "Clientes",
+        acao: "Registrou evolução pendente",
+        entidade: "Agendamento",
+        entidadeId: String(agendamento.id),
+        usuario: profissional,
+        detalhes: `Evolução do atendimento ${agendamento.procedimento} registrada posteriormente para ${agendamento.cliente.nome}.`,
+      },
+    });
+  });
+
+  revalidatePath("/agenda");
+  revalidatePath("/");
+  revalidatePath(`/clientes/${agendamento.clienteId}`);
+
+  return {
+    ok: true,
+    agendamentoId: agendamento.id,
+    clienteId: agendamento.clienteId,
+    evolucaoStatus: "CONCLUIDA" as const,
+    evolucaoRegistradaEm: dataRegistro.toISOString(),
+    evolucaoRegistradaPor: profissional,
+  };
 }
 
 export type HorarioDisponivelAgenda = {

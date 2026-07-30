@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
+  AlertTriangle,
   ChevronDown,
   ClipboardList,
   FileText,
@@ -23,6 +24,7 @@ import {
   criarProcedimentoCliente,
   excluirRegistroClinico,
 } from "@/actions/cliente-clinico.actions";
+import RegistrarEvolucaoPendenteModal from "@/components/atendimento/RegistrarEvolucaoPendenteModal";
 import { Button } from "@/components/ui/button";
 import AnamneseMobileForm from "./AnamneseMobileForm";
 import { ClienteFotoUploadForm } from "./ClienteFotoUploadForm";
@@ -40,7 +42,6 @@ type Props = {
   data: ClienteClinicoData;
   initialTab?: AbaClinica;
 };
-
 
 const ALIASES_ANAMNESE: Record<string, string> = {
   botox: "Toxina Botulínica",
@@ -236,6 +237,10 @@ export function ClienteClinicoTabs({
   const [resumoMobileAberto, setResumoMobileAberto] =
     useState(false);
   const [fotoAberta, setFotoAberta] = useState<ClienteFotoData | null>(null);
+  const [evolucaoPendenteSelecionada, setEvolucaoPendenteSelecionada] =
+    useState<number | null>(null);
+  const [evolucoesPendentesResolvidas, setEvolucoesPendentesResolvidas] =
+    useState<number[]>([]);
 
   const [procedimentoAnamnese, setProcedimentoAnamnese] =
     useState(
@@ -315,6 +320,14 @@ export function ClienteClinicoTabs({
       ...procedimentosAnamnesePadrao,
     ]),
   );
+
+  const evolucoesPendentesVisiveis = data.evolucoesPendentes.filter(
+    (item) => !evolucoesPendentesResolvidas.includes(item.id),
+  );
+  const evolucaoPendenteAtual =
+    evolucoesPendentesVisiveis.find(
+      (item) => item.id === evolucaoPendenteSelecionada,
+    ) || null;
 
   const anamneseAtual =
     data.anamneses.find(
@@ -628,6 +641,46 @@ export function ClienteClinicoTabs({
               title="Evolução clínica"
               description="Acompanhamento técnico e observações de cada etapa."
             />
+
+            {evolucoesPendentesVisiveis.length > 0 ? (
+              <div className="mx-4 mt-4 rounded-3xl border border-amber-200 bg-amber-50 p-4 sm:mx-6 sm:p-5">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-700" />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-amber-950">
+                      {evolucoesPendentesVisiveis.length} evolução(ões) pendente(s)
+                    </p>
+                    <p className="mt-1 text-sm leading-5 text-amber-800">
+                      Estes atendimentos foram finalizados e ainda aguardam o registro clínico.
+                    </p>
+                    <div className="mt-3 space-y-2">
+                      {evolucoesPendentesVisiveis.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setEvolucaoPendenteSelecionada(item.id)}
+                          disabled={!data.podeRegistrarEvolucao}
+                          className="flex w-full items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-white px-3 py-3 text-left transition hover:border-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-bold text-slate-900">
+                              {item.procedimento}
+                            </span>
+                            <span className="mt-0.5 block text-xs text-slate-500">
+                              {formatarData(item.data)}
+                              {item.profissional ? ` • ${item.profissional}` : ""}
+                            </span>
+                          </span>
+                          <span className="shrink-0 text-xs font-bold text-amber-700">
+                            {data.podeRegistrarEvolucao ? "Registrar" : "Sem permissão"}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             <div className="grid min-w-0 gap-5 p-4 sm:p-6 lg:grid-cols-[minmax(280px,380px)_minmax(0,1fr)]">
               <form
@@ -967,6 +1020,24 @@ export function ClienteClinicoTabs({
           </div>
         )}
       </div>
+
+      <RegistrarEvolucaoPendenteModal
+        open={Boolean(evolucaoPendenteAtual)}
+        item={evolucaoPendenteAtual}
+        temProxima={evolucoesPendentesVisiveis.length > 1}
+        onClose={() => setEvolucaoPendenteSelecionada(null)}
+        onSaved={(id) => {
+          const indice = evolucoesPendentesVisiveis.findIndex(
+            (item) => item.id === id,
+          );
+          const proxima =
+            evolucoesPendentesVisiveis[indice + 1] ||
+            evolucoesPendentesVisiveis.find((item) => item.id !== id) ||
+            null;
+          setEvolucoesPendentesResolvidas((atuais) => [...atuais, id]);
+          setEvolucaoPendenteSelecionada(proxima?.id || null);
+        }}
+      />
 
       {fotoAberta ? (
         <div

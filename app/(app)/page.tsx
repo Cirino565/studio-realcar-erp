@@ -8,6 +8,7 @@ import {
   buildWhatsAppUrl,
 } from "@/lib/whatsapp";
 import {
+  Activity,
   ArrowUpRight,
   BadgeCheck,
   Bell,
@@ -25,6 +26,7 @@ import {
 import Link from "next/link";
 
 import CentralDoDiaClient from "@/components/dashboard/CentralDoDiaClient";
+import EvolucoesPendentesClient from "@/components/dashboard/EvolucoesPendentesClient";
 import FilaComercialClient from "@/components/dashboard/FilaComercialClient";
 import { WhatsAppLink } from "@/components/ui/whatsapp-link";
 
@@ -162,6 +164,7 @@ function CardIndicador({
 export default async function Home() {
   const usuario = await requirePagePermission("dashboard.visualizar");
   const podeGerenciarAgenda = canAccess(usuario, "agenda.gerenciar");
+  const podeRegistrarEvolucao = canAccess(usuario, "clientes.clinico");
   const podeGerenciarMarketing = canAccess(usuario, "marketing.gerenciar");
 
   const agora = new Date();
@@ -192,6 +195,7 @@ export default async function Home() {
     confirmacoesAmanha,
     confirmadosAmanha,
     posAtendimento,
+    evolucoesPendentes,
     clientesComNascimento,
     clientesReativacao,
     produtosAtivos,
@@ -250,6 +254,22 @@ export default async function Home() {
       },
       orderBy: { data: "desc" },
       take: 10,
+    }),
+
+    prisma.agendamento.findMany({
+      where: {
+        status: "Atendido",
+        evolucaoStatus: "PENDENTE",
+      },
+      include: {
+        cliente: { select: { id: true, nome: true } },
+        profissional: { select: { nome: true } },
+      },
+      orderBy: [
+        { evolucaoPendenteDesde: "asc" },
+        { updatedAt: "asc" },
+      ],
+      take: 30,
     }),
 
     prisma.cliente.findMany({
@@ -587,6 +607,18 @@ export default async function Home() {
     ),
   }));
 
+  const itensEvolucaoPendente = evolucoesPendentes.map((agendamento) => ({
+    id: agendamento.id,
+    clienteId: agendamento.clienteId,
+    cliente: agendamento.cliente.nome,
+    procedimento: agendamento.procedimento,
+    profissional: agendamento.profissional?.nome || null,
+    data: agendamento.data.toISOString(),
+    pendenteDesde:
+      agendamento.evolucaoPendenteDesde?.toISOString() ||
+      agendamento.updatedAt.toISOString(),
+  }));
+
   const dataAgendaHoje = hojeISO;
   const dataAgendaAmanha = amanhaISO;
 
@@ -635,7 +667,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-9">
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-10">
         <CardIndicador
           titulo="Atendimentos hoje"
           valor={agendaHoje.length}
@@ -667,6 +699,14 @@ export default async function Home() {
           href="#pos-atendimento"
           icon={MessageCircle}
           tone="emerald"
+        />
+        <CardIndicador
+          titulo="Evoluções pendentes"
+          valor={itensEvolucaoPendente.length}
+          descricao="Atendimentos finalizados aguardando registro clínico."
+          href="#evolucoes-pendentes"
+          icon={Activity}
+          tone="amber"
         />
         <CardIndicador
           titulo="Aniversariantes"
@@ -797,6 +837,30 @@ export default async function Home() {
         </div>
 
         <div className="space-y-4">
+          <div id="evolucoes-pendentes" className="premium-card p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Activity className="size-5 text-amber-600" />
+                  <h2 className="text-lg font-bold text-slate-950">Evoluções pendentes</h2>
+                </div>
+                <p className="mt-1 text-sm text-slate-500">
+                  Registros clínicos deixados para concluir após os atendimentos.
+                </p>
+              </div>
+              <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">
+                {itensEvolucaoPendente.length}
+              </span>
+            </div>
+
+            <div className="mt-4">
+              <EvolucoesPendentesClient
+                itens={itensEvolucaoPendente}
+                podeRegistrar={podeRegistrarEvolucao}
+              />
+            </div>
+          </div>
+
           <div id="confirmacoes" className="premium-card p-4 sm:p-5">
             <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-4">
               <div>

@@ -99,6 +99,10 @@ model Agendamento {
   sinalPago            Boolean       @default(false)
   status               String        @default("Agendado")
   statusAntesAtendimento String?
+  evolucaoStatus        String?
+  evolucaoPendenteDesde DateTime?
+  evolucaoRegistradaEm  DateTime?
+  evolucaoRegistradaPor String?
   serieId              String?
   recorrenciaTipo      String?
   recorrenciaIntervalo Int?
@@ -110,8 +114,10 @@ model Agendamento {
   lead                 Lead?
   comunicacoes          ComunicacaoRegistro[]
   vendas                Venda[]
+  evolucao              ClienteEvolucao?
 
   @@index([serieId])
+  @@index([evolucaoStatus, evolucaoPendenteDesde])
 }
 
 model Profissional {
@@ -621,6 +627,8 @@ model ClienteEvolucao {
   id            Int      @id @default(autoincrement())
   clienteId     Int
   cliente       Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  agendamentoId Int?     @unique
+  agendamento   Agendamento? @relation(fields: [agendamentoId], references: [id], onDelete: SetNull)
   titulo        String
   descricao     String
   profissional  String?
