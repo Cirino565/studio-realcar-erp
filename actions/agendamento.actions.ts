@@ -3,6 +3,7 @@
 import { randomUUID } from "node:crypto";
 
 import { isAdminUser, requirePermission } from "@/lib/auth";
+import { obterAreaPadraoAgendamento } from "@/lib/area-cliente";
 import { prisma } from "@/lib/prisma";
 import {
   criarVendaNoTx,
@@ -38,6 +39,8 @@ type NovoAgendamento = {
   status?: string;
   observacoes?: string;
   sinalPago?: boolean;
+  areaEstetica?: boolean;
+  areaCilios?: boolean;
   recorrencia?: RecorrenciaAgendaInput;
 };
 
@@ -469,7 +472,13 @@ async function validarDatasNoHorarioFuncionamento(
 }
 
 export async function criarAgendamento(dados: NovoAgendamento) {
-  await requirePermission("agenda.gerenciar");
+  const usuarioAtual = await requirePermission("agenda.gerenciar");
+  const areaPadrao = obterAreaPadraoAgendamento(
+    usuarioAtual.nome,
+    isAdminUser(usuarioAtual),
+  );
+  const areaEstetica = Boolean(dados.areaEstetica) || areaPadrao === "estetica";
+  const areaCilios = Boolean(dados.areaCilios) || areaPadrao === "cilios";
 
   const dataBase = parseLocalDateTime(dados.data);
   const duracao = dados.duracao || 60;
@@ -509,10 +518,20 @@ export async function criarAgendamento(dados: NovoAgendamento) {
           procedimentoInteresse:
             dados.novoCliente.procedimentoInteresse || dados.procedimento,
           observacoes: dados.novoCliente.observacoes || null,
+          areaEstetica,
+          areaCilios,
         },
       });
 
       clienteId = cliente.id;
+    } else if (areaEstetica || areaCilios) {
+      await tx.cliente.update({
+        where: { id: clienteId },
+        data: {
+          areaEstetica: areaEstetica ? true : undefined,
+          areaCilios: areaCilios ? true : undefined,
+        },
+      });
     }
 
     await tx.agendamento.createMany({
@@ -536,6 +555,7 @@ export async function criarAgendamento(dados: NovoAgendamento) {
   });
 
   revalidatePath("/agenda");
+  revalidatePath("/clientes");
   revalidatePath("/");
 }
 
@@ -557,26 +577,39 @@ export async function atualizarAgendamento({
 
   const clienteId = dados.clienteId || (await resolverCliente(dados));
 
-  await prisma.agendamento.update({
-    where: {
-      id,
-    },
-    data: {
-      clienteId,
-      profissionalId: dados.profissionalId || null,
-      procedimento: dados.procedimento,
-      data,
-      duracao,
-      valor: dados.valor || 0,
-      status: dados.status || "Agendado",
-      observacoes: dados.observacoes || null,
-      sinalPago: Boolean(dados.sinalPago),
-      statusAntesAtendimento:
-        dados.status === "Em atendimento" ? undefined : null,
-    },
+  await prisma.$transaction(async (tx) => {
+    if (dados.areaEstetica || dados.areaCilios) {
+      await tx.cliente.update({
+        where: { id: clienteId },
+        data: {
+          areaEstetica: dados.areaEstetica ? true : undefined,
+          areaCilios: dados.areaCilios ? true : undefined,
+        },
+      });
+    }
+
+    await tx.agendamento.update({
+      where: {
+        id,
+      },
+      data: {
+        clienteId,
+        profissionalId: dados.profissionalId || null,
+        procedimento: dados.procedimento,
+        data,
+        duracao,
+        valor: dados.valor || 0,
+        status: dados.status || "Agendado",
+        observacoes: dados.observacoes || null,
+        sinalPago: Boolean(dados.sinalPago),
+        statusAntesAtendimento:
+          dados.status === "Em atendimento" ? undefined : null,
+      },
+    });
   });
 
   revalidatePath("/agenda");
+  revalidatePath("/clientes");
   revalidatePath("/");
 }
 

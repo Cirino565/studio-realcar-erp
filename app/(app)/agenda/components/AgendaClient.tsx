@@ -20,6 +20,8 @@ type ClienteAgenda = {
   nome: string;
   telefone: string;
   whatsapp: string | null;
+  areaEstetica: boolean;
+  areaCilios: boolean;
 };
 
 type ProfissionalAgenda = {
@@ -93,6 +95,7 @@ type Props = {
   produtos: ProdutoVendaOption[];
   kits: KitVendaOption[];
   podeAutorizarEstoqueNegativo: boolean;
+  areaPadraoAgendamento: "estetica" | "cilios" | null;
   initialDate: string;
   initialProfissionalFiltro: string;
   initialClienteId?: string | null;
@@ -170,6 +173,7 @@ export default function AgendaClient({
   produtos,
   kits,
   podeAutorizarEstoqueNegativo,
+  areaPadraoAgendamento,
   initialDate,
   initialProfissionalFiltro,
   initialClienteId,
@@ -414,6 +418,7 @@ export default function AgendaClient({
         profissionais={profissionais}
         origensCliente={origensCliente}
         servicos={servicos}
+        areaPadraoAgendamento={areaPadraoAgendamento}
         initialPayload={novoHorario}
       />
 

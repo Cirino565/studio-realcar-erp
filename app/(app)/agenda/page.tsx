@@ -1,4 +1,5 @@
 import { canAccess, isAdminUser, requirePagePermission } from "@/lib/auth";
+import { obterAreaPadraoAgendamento } from "@/lib/area-cliente";
 import { prisma } from "@/lib/prisma";
 
 import AgendaClient from "./components/AgendaClient";
@@ -110,6 +111,10 @@ function encontrarProfissionalDoUsuario<
 export default async function AgendaPage({ searchParams }: AgendaPageProps) {
   const usuario = await requirePagePermission("agenda.visualizar");
   const usuarioAdmin = isAdminUser(usuario);
+  const areaPadraoAgendamento = obterAreaPadraoAgendamento(
+    usuario.nome,
+    usuarioAdmin,
+  );
   const podeEditarCliente = canAccess(usuario, "clientes.gerenciar");
   const podeRegistrarEvolucao = canAccess(usuario, "clientes.clinico");
 
@@ -143,6 +148,8 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
         nome: true,
         telefone: true,
         whatsapp: true,
+        areaEstetica: true,
+        areaCilios: true,
       },
     }),
 
@@ -332,6 +339,7 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
         produtos={produtos}
         kits={kits}
         podeAutorizarEstoqueNegativo={usuarioAdmin}
+        areaPadraoAgendamento={areaPadraoAgendamento}
         initialDate={toDateInput(dataSelecionada)}
         initialProfissionalFiltro={profissionalFiltro}
         initialClienteId={clienteIdParam}

@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 
 import { criarAgendamento } from "@/actions/agendamento.actions";
 import { Button } from "@/components/ui/button";
-import { requirePagePermission } from "@/lib/auth";
+import { isAdminUser, requirePagePermission } from "@/lib/auth";
+import { obterAreaPadraoAgendamento } from "@/lib/area-cliente";
 import { prisma } from "@/lib/prisma";
 
 type Props = {
@@ -102,13 +103,19 @@ async function salvarAgendamentoMobile(formData: FormData) {
     valor: getNumber(formData, "valor"),
     status: getString(formData, "status") || "Agendado",
     observacoes: getString(formData, "observacoes"),
+    areaEstetica: formData.get("areaEstetica") === "on",
+    areaCilios: formData.get("areaCilios") === "on",
   });
 
   redirect(`/agenda?data=${data}`);
 }
 
 export default async function NovoAgendamentoPage({ searchParams }: Props) {
-  await requirePagePermission("agenda.gerenciar");
+  const usuario = await requirePagePermission("agenda.gerenciar");
+  const areaPadraoAgendamento = obterAreaPadraoAgendamento(
+    usuario.nome,
+    isAdminUser(usuario),
+  );
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const dataPadrao = validDate(resolvedSearchParams.data);
   const horaPadrao = validTime(resolvedSearchParams.hora);
@@ -176,6 +183,35 @@ export default async function NovoAgendamentoPage({ searchParams }: Props) {
                   )}
                 </select>
               </label>
+
+              <div className="space-y-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Área da cliente</span>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label className="flex items-center gap-2 rounded-xl border border-white/[0.08] px-3 py-3 text-sm text-slate-200">
+                    <input
+                      name="areaEstetica"
+                      type="checkbox"
+                      defaultChecked={areaPadraoAgendamento === "estetica"}
+                      disabled={areaPadraoAgendamento === "estetica"}
+                      className="size-4 accent-violet-500 disabled:cursor-not-allowed"
+                    />
+                    Estética
+                  </label>
+                  <label className="flex items-center gap-2 rounded-xl border border-white/[0.08] px-3 py-3 text-sm text-slate-200">
+                    <input
+                      name="areaCilios"
+                      type="checkbox"
+                      defaultChecked={areaPadraoAgendamento === "cilios"}
+                      disabled={areaPadraoAgendamento === "cilios"}
+                      className="size-4 accent-violet-500 disabled:cursor-not-allowed"
+                    />
+                    Cílios
+                  </label>
+                </div>
+                <p className="text-xs leading-5 text-slate-500">
+                  As áreas marcadas serão acrescentadas ao cadastro da cliente.
+                </p>
+              </div>
             </section>
 
             <section className="space-y-4 rounded-3xl border border-white/[0.08] bg-white/[0.025] p-4 sm:p-5">

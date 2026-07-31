@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   AlertCircle,
   Ban,
@@ -37,6 +37,8 @@ type Cliente = {
   nome: string;
   telefone: string;
   whatsapp: string | null;
+  areaEstetica: boolean;
+  areaCilios: boolean;
 };
 
 type Profissional = {
@@ -86,6 +88,7 @@ type Props = {
   profissionais: Profissional[];
   origensCliente: OpcaoAuxiliar[];
   servicos: ServicoAgenda[];
+  areaPadraoAgendamento: "estetica" | "cilios" | null;
   initialPayload: NovoAgendamentoPayload | null;
 };
 
@@ -200,6 +203,7 @@ export default function NovoAgendamentoModal({
   profissionais,
   origensCliente,
   servicos,
+  areaPadraoAgendamento,
   initialPayload,
 }: Props) {
   const [tipoAtendimento, setTipoAtendimento] = useState<"agendamento" | "bloqueio">("agendamento");
@@ -210,11 +214,14 @@ export default function NovoAgendamentoModal({
   const [novoClienteNome, setNovoClienteNome] = useState("");
   const [novoClienteWhatsapp, setNovoClienteWhatsapp] = useState("");
   const [novoClienteOrigem, setNovoClienteOrigem] = useState("");
+  const [areaEstetica, setAreaEstetica] = useState(false);
+  const [areaCilios, setAreaCilios] = useState(false);
   const [profissionalId, setProfissionalId] = useState("");
   const [procedimento, setProcedimento] = useState("");
   const [servicoSelecionadoId, setServicoSelecionadoId] = useState("");
   const [buscaServico, setBuscaServico] = useState("");
   const [mostrarListaServicos, setMostrarListaServicos] = useState(false);
+  const servicoComboboxRef = useRef<HTMLDivElement>(null);
   const [data, setData] = useState("");
   const [hora, setHora] = useState("09:00");
   const [duracao, setDuracao] = useState("1 hora");
@@ -252,6 +259,9 @@ export default function NovoAgendamentoModal({
       (initialPayload?.modo === "retorno" || initialPayload?.clienteId),
   );
 
+  const areaAutomaticaAtiva =
+    !modoEdicao && !modoEdicaoBloqueio ? areaPadraoAgendamento : null;
+
   const agendamentoDiretoAgenda = Boolean(
     !modoEdicao &&
       !modoEdicaoBloqueio &&
@@ -276,6 +286,18 @@ export default function NovoAgendamentoModal({
     setNovoClienteNome("");
     setNovoClienteWhatsapp("");
     setNovoClienteOrigem("");
+
+    const clienteInicial = initialPayload?.clienteId
+      ? clientes.find(
+          (cliente) => String(cliente.id) === String(initialPayload.clienteId),
+        )
+      : null;
+    setAreaEstetica(
+      Boolean(clienteInicial?.areaEstetica) || areaAutomaticaAtiva === "estetica",
+    );
+    setAreaCilios(
+      Boolean(clienteInicial?.areaCilios) || areaAutomaticaAtiva === "cilios",
+    );
 
     setProfissionalId(
       initialPayload?.profissionalId
@@ -320,7 +342,36 @@ export default function NovoAgendamentoModal({
     }
 
     setMostrarListaServicos(false);
-  }, [open, initialPayload, profissionais, servicos, modoEdicao, modoEdicaoBloqueio]);
+  }, [
+    open,
+    initialPayload,
+    profissionais,
+    servicos,
+    clientes,
+    areaPadraoAgendamento,
+    areaAutomaticaAtiva,
+    modoEdicao,
+    modoEdicaoBloqueio,
+  ]);
+
+  useEffect(() => {
+    if (!mostrarListaServicos) return;
+
+    function fecharListaAoClicarFora(event: PointerEvent) {
+      if (
+        servicoComboboxRef.current &&
+        !servicoComboboxRef.current.contains(event.target as Node)
+      ) {
+        setMostrarListaServicos(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", fecharListaAoClicarFora);
+
+    return () => {
+      document.removeEventListener("pointerdown", fecharListaAoClicarFora);
+    };
+  }, [mostrarListaServicos]);
 
   useEffect(() => {
     if (!open || !profissionalId || !data) {
@@ -392,19 +443,21 @@ export default function NovoAgendamentoModal({
 
   const servicosFiltrados = useMemo(() => {
     const query = normalizarTexto(buscaServico);
+    const lista = query
+      ? servicos.filter((servico) => {
+          return (
+            normalizarTexto(servico.nome).includes(query) ||
+            normalizarTexto(servico.categoria).includes(query)
+          );
+        })
+      : servicos;
 
-    if (!query) {
-      return servicos.slice(0, 10);
-    }
-
-    return servicos
-      .filter((servico) => {
-        return (
-          normalizarTexto(servico.nome).includes(query) ||
-          normalizarTexto(servico.categoria).includes(query)
-        );
-      })
-      .slice(0, 10);
+    return [...lista].sort((a, b) =>
+      a.nome.localeCompare(b.nome, "pt-BR", {
+        sensitivity: "base",
+        numeric: true,
+      }),
+    );
   }, [buscaServico, servicos]);
 
   const servicoSelecionado = useMemo(() => {
@@ -449,8 +502,27 @@ export default function NovoAgendamentoModal({
     }
   }
 
+  function aplicarAreasPadrao() {
+    setAreaEstetica(areaAutomaticaAtiva === "estetica");
+    setAreaCilios(areaAutomaticaAtiva === "cilios");
+  }
+
+  function selecionarCliente(cliente: Cliente) {
+    setClienteId(String(cliente.id));
+    setTipoCliente("existente");
+    setBuscaCliente("");
+    setAreaEstetica(
+      cliente.areaEstetica || areaAutomaticaAtiva === "estetica",
+    );
+    setAreaCilios(
+      cliente.areaCilios || areaAutomaticaAtiva === "cilios",
+    );
+    setErro("");
+  }
+
   function iniciarNovoCliente() {
     setTipoCliente("novo");
+    aplicarAreasPadrao();
 
     if (buscaCliente && !onlyDigits(buscaCliente)) {
       setNovoClienteNome(buscaCliente.trim());
@@ -465,6 +537,7 @@ export default function NovoAgendamentoModal({
     setNovoClienteNome("");
     setNovoClienteWhatsapp("");
     setNovoClienteOrigem("");
+    aplicarAreasPadrao();
     setErro("");
   }
 
@@ -572,6 +645,8 @@ export default function NovoAgendamentoModal({
         status,
         observacoes,
         sinalPago,
+        areaEstetica,
+        areaCilios,
         recorrencia: modoEdicao ? { tipo: "nenhuma" as const } : recorrencia,
       };
 
@@ -928,6 +1003,7 @@ export default function NovoAgendamentoModal({
                     onClick={() => {
                       setClienteId("");
                       setBuscaCliente("");
+                      aplicarAreasPadrao();
                     }}
                     className="text-xs font-semibold text-violet-700 hover:text-violet-900 dark:text-violet-300"
                   >
@@ -962,12 +1038,7 @@ export default function NovoAgendamentoModal({
                           <button
                             key={cliente.id}
                             type="button"
-                            onClick={() => {
-                              setClienteId(String(cliente.id));
-                              setTipoCliente("existente");
-                              setBuscaCliente("");
-                              setErro("");
-                            }}
+                            onClick={() => selecionarCliente(cliente)}
                             className="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-2.5 text-left transition last:border-b-0 hover:bg-violet-50 dark:border-slate-800 dark:hover:bg-violet-500/10"
                           >
                             <div className="min-w-0">
@@ -1011,11 +1082,52 @@ export default function NovoAgendamentoModal({
             )}
           </div>
 
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-800/40">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200">
+                Área da cliente
+              </span>
+              {areaAutomaticaAtiva ? (
+                <span className="text-[11px] font-medium text-violet-700 dark:text-violet-300">
+                  Padrão automático: {areaAutomaticaAtiva === "estetica" ? "Estética" : "Cílios"}
+                </span>
+              ) : null}
+            </div>
+
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                <input
+                  type="checkbox"
+                  checked={areaEstetica}
+                  disabled={areaAutomaticaAtiva === "estetica"}
+                  onChange={(event) => setAreaEstetica(event.target.checked)}
+                  className="size-4 accent-violet-600 disabled:cursor-not-allowed"
+                />
+                Estética
+              </label>
+
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                <input
+                  type="checkbox"
+                  checked={areaCilios}
+                  disabled={areaAutomaticaAtiva === "cilios"}
+                  onChange={(event) => setAreaCilios(event.target.checked)}
+                  className="size-4 accent-violet-600 disabled:cursor-not-allowed"
+                />
+                Cílios
+              </label>
+            </div>
+
+            <p className="mt-2 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+              Ao salvar, as áreas marcadas serão acrescentadas ao cadastro da cliente. Áreas já cadastradas não serão removidas nesta tela.
+            </p>
+          </div>
+
           <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-700">
             <div className="grid grid-cols-[1fr_auto] items-end gap-4">
               <label className="min-w-0">
                 <span className={labelClassName()}>Procedimento</span>
-                <div className="relative">
+                <div ref={servicoComboboxRef} className="relative">
                   <div className="relative">
                     <Search
                       size={16}
@@ -1024,9 +1136,6 @@ export default function NovoAgendamentoModal({
                     <input
                       value={buscaServico}
                       onFocus={() => setMostrarListaServicos(true)}
-                      onBlur={() => {
-                        window.setTimeout(() => setMostrarListaServicos(false), 150);
-                      }}
                       onChange={(event) => alterarBuscaServico(event.target.value)}
                       onKeyDown={(event) => {
                         if (event.key === "Escape") {
@@ -1060,7 +1169,7 @@ export default function NovoAgendamentoModal({
                     <div
                       id="lista-procedimentos-agenda"
                       role="listbox"
-                      className="absolute z-50 mt-2 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-900"
+                      className="absolute z-50 mt-2 max-h-64 w-full overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-900"
                     >
                       {servicosFiltrados.length > 0 ? (
                         servicosFiltrados.map((servico) => {
