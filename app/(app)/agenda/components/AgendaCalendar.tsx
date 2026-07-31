@@ -1347,6 +1347,7 @@ export default function AgendaCalendar({
                       );
                       const note = getAppointmentNote(appointment);
                       const statusPalette = getStatusPalette(appointment.status);
+                      const isCompactAppointment = height < 70;
 
                       return (
                         <article
@@ -1369,7 +1370,11 @@ export default function AgendaCalendar({
                             boxShadow: `inset 3px 0 0 ${palette.solid}`,
                           }}
                         >
-                          <div className="flex h-full min-w-0 flex-col px-2.5 py-1.5">
+                          <div
+                            className={`flex h-full min-w-0 flex-col px-2.5 ${
+                              isCompactAppointment ? "py-1" : "py-1.5"
+                            }`}
+                          >
                             <div className="flex min-w-0 items-start justify-between gap-2">
                               <div className="min-w-0">
                                 <p
@@ -1445,7 +1450,9 @@ export default function AgendaCalendar({
 
                             {height >= 52 ? (
                               <p
-                                className="mt-1 line-clamp-1 text-[0.66rem] font-semibold sm:text-[0.72rem]"
+                                className={`${
+                                  isCompactAppointment ? "mt-0.5" : "mt-1"
+                                } line-clamp-1 text-[0.66rem] font-semibold leading-tight sm:text-[0.72rem]`}
                                 style={{ color: statusPalette.mutedText }}
                               >
                                 {appointment.procedimento}
