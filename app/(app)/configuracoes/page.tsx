@@ -48,8 +48,8 @@ export default async function ConfiguracoesPage() {
   const [configuracao, origens, procedimentosInteresse, servicos, anamneseModelos] = await Promise.all([
     prisma.configuracaoClinica.findFirst(),
     prisma.origemCliente.findMany({ orderBy: [{ ordem: "asc" }, { nome: "asc" }] }),
-    prisma.procedimentoInteresse.findMany({ orderBy: [{ ordem: "asc" }, { nome: "asc" }] }),
-    prisma.procedimentoServico.findMany({ orderBy: [{ ordem: "asc" }, { nome: "asc" }] }),
+    prisma.procedimentoInteresse.findMany({ orderBy: [{ nome: "asc" }, { id: "asc" }] }),
+    prisma.procedimentoServico.findMany({ orderBy: [{ nome: "asc" }, { id: "asc" }] }),
     prisma.anamneseModelo.findMany({
       include: {
         perguntas: { orderBy: [{ ordem: "asc" }, { id: "asc" }] },

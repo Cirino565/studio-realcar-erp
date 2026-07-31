@@ -1,5 +1,7 @@
 "use server";
 
+import type { Prisma } from "@prisma/client";
+
 import { requirePermission } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
@@ -26,6 +28,54 @@ function toSafeOrder(value?: number) {
   return Math.max(0, Math.round(value ?? 0));
 }
 
+
+function ordenarPorNome<T extends { nome: string }>(items: T[]) {
+  return [...items].sort((a, b) =>
+    a.nome.localeCompare(b.nome, "pt-BR", {
+      sensitivity: "base",
+      numeric: true,
+    }),
+  );
+}
+
+async function reordenarProcedimentosInteresse(tx: Prisma.TransactionClient) {
+  const itens = ordenarPorNome(
+    await tx.procedimentoInteresse.findMany({
+      select: { id: true, nome: true, ordem: true },
+    }),
+  );
+
+  await Promise.all(
+    itens.map((item, index) =>
+      item.ordem === index
+        ? Promise.resolve(item)
+        : tx.procedimentoInteresse.update({
+            where: { id: item.id },
+            data: { ordem: index },
+          }),
+    ),
+  );
+}
+
+async function reordenarProcedimentosServico(tx: Prisma.TransactionClient) {
+  const itens = ordenarPorNome(
+    await tx.procedimentoServico.findMany({
+      select: { id: true, nome: true, ordem: true },
+    }),
+  );
+
+  await Promise.all(
+    itens.map((item, index) =>
+      item.ordem === index
+        ? Promise.resolve(item)
+        : tx.procedimentoServico.update({
+            where: { id: item.id },
+            data: { ordem: index },
+          }),
+    ),
+  );
+}
+
 async function registrarAuditoria(acao: string, entidade: string, detalhes: string) {
   await prisma.auditoria.create({
     data: {
@@ -42,7 +92,7 @@ export async function listarCadastrosAuxiliares() {
   await requirePermission("configuracoes.gerenciar");
   const [origens, procedimentos] = await Promise.all([
     prisma.origemCliente.findMany({ orderBy: [{ ordem: "asc" }, { nome: "asc" }] }),
-    prisma.procedimentoInteresse.findMany({ orderBy: [{ ordem: "asc" }, { nome: "asc" }] }),
+    prisma.procedimentoInteresse.findMany({ orderBy: [{ nome: "asc" }, { id: "asc" }] }),
   ]);
 
   return { origens, procedimentos };
@@ -104,13 +154,17 @@ export async function criarProcedimentoInteresse(dados: CadastroAuxiliarInput) {
   const nome = normalizarNome(dados.nome);
   if (!nome) return;
 
-  await prisma.procedimentoInteresse.create({
-    data: {
-      nome,
-      descricao: toNullableText(dados.descricao),
-      status: dados.status || "Ativo",
-      ordem: toSafeOrder(dados.ordem),
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.procedimentoInteresse.create({
+      data: {
+        nome,
+        descricao: toNullableText(dados.descricao),
+        status: dados.status || "Ativo",
+        ordem: 0,
+      },
+    });
+
+    await reordenarProcedimentosInteresse(tx);
   });
 
   await registrarAuditoria("Criou procedimento de interesse", "ProcedimentoInteresse", nome);
@@ -124,14 +178,17 @@ export async function atualizarProcedimentoInteresse(dados: CadastroAuxiliarInpu
   const nome = normalizarNome(dados.nome);
   if (!nome) return;
 
-  await prisma.procedimentoInteresse.update({
-    where: { id: dados.id },
-    data: {
-      nome,
-      descricao: toNullableText(dados.descricao),
-      status: dados.status || "Ativo",
-      ordem: toSafeOrder(dados.ordem),
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.procedimentoInteresse.update({
+      where: { id: dados.id },
+      data: {
+        nome,
+        descricao: toNullableText(dados.descricao),
+        status: dados.status || "Ativo",
+      },
+    });
+
+    await reordenarProcedimentosInteresse(tx);
   });
 
   await registrarAuditoria("Atualizou procedimento de interesse", "ProcedimentoInteresse", nome);
@@ -144,7 +201,10 @@ export async function excluirProcedimentoInteresse(id: number) {
   const procedimento = await prisma.procedimentoInteresse.findUnique({ where: { id } });
   if (!procedimento) return;
 
-  await prisma.procedimentoInteresse.delete({ where: { id } });
+  await prisma.$transaction(async (tx) => {
+    await tx.procedimentoInteresse.delete({ where: { id } });
+    await reordenarProcedimentosInteresse(tx);
+  });
   await registrarAuditoria("Excluiu procedimento de interesse", "ProcedimentoInteresse", procedimento.nome);
   revalidatePath("/configuracoes");
   revalidatePath("/clientes");
@@ -177,22 +237,25 @@ export async function criarCadastrosAuxiliaresPadrao() {
     "Outro",
   ];
 
-  await prisma.$transaction([
-    ...origens.map((nome, index) =>
-      prisma.origemCliente.upsert({
+  await prisma.$transaction(async (tx) => {
+    for (const [index, nome] of origens.entries()) {
+      await tx.origemCliente.upsert({
         where: { nome },
         create: { nome, ordem: index + 1, status: "Ativa" },
         update: { ordem: index + 1 },
-      })
-    ),
-    ...procedimentos.map((nome, index) =>
-      prisma.procedimentoInteresse.upsert({
+      });
+    }
+
+    for (const nome of procedimentos) {
+      await tx.procedimentoInteresse.upsert({
         where: { nome },
-        create: { nome, ordem: index + 1, status: "Ativo" },
-        update: { ordem: index + 1 },
-      })
-    ),
-  ]);
+        create: { nome, ordem: 0, status: "Ativo" },
+        update: {},
+      });
+    }
+
+    await reordenarProcedimentosInteresse(tx);
+  });
 
   await registrarAuditoria("Criou cadastros auxiliares padrão", "CadastrosAuxiliares", "Origens e procedimentos de interesse");
   revalidatePath("/configuracoes");
@@ -216,17 +279,21 @@ export async function criarProcedimentoServico(dados: ProcedimentoServicoInput) 
   const nome = normalizarNome(dados.nome);
   if (!nome) return;
 
-  await prisma.procedimentoServico.create({
-    data: {
-      nome,
-      categoria: toNullableText(dados.categoria),
-      descricao: toNullableText(dados.descricao),
-      duracaoPadrao: toSafeOrder(dados.duracaoPadrao) || 60,
-      valorPadrao: Number.isFinite(dados.valorPadrao) ? Number(dados.valorPadrao) : 0,
-      custoPadrao: Number.isFinite(dados.custoPadrao) ? Math.max(0, Number(dados.custoPadrao)) : 0,
-      status: dados.status || "Ativo",
-      ordem: toSafeOrder(dados.ordem),
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.procedimentoServico.create({
+      data: {
+        nome,
+        categoria: toNullableText(dados.categoria),
+        descricao: toNullableText(dados.descricao),
+        duracaoPadrao: toSafeOrder(dados.duracaoPadrao) || 60,
+        valorPadrao: Number.isFinite(dados.valorPadrao) ? Number(dados.valorPadrao) : 0,
+        custoPadrao: Number.isFinite(dados.custoPadrao) ? Math.max(0, Number(dados.custoPadrao)) : 0,
+        status: dados.status || "Ativo",
+        ordem: 0,
+      },
+    });
+
+    await reordenarProcedimentosServico(tx);
   });
 
   await registrarAuditoria("Criou serviço/procedimento", "ProcedimentoServico", nome);
@@ -240,18 +307,21 @@ export async function atualizarProcedimentoServico(dados: ProcedimentoServicoInp
   const nome = normalizarNome(dados.nome);
   if (!nome) return;
 
-  await prisma.procedimentoServico.update({
-    where: { id: dados.id },
-    data: {
-      nome,
-      categoria: toNullableText(dados.categoria),
-      descricao: toNullableText(dados.descricao),
-      duracaoPadrao: toSafeOrder(dados.duracaoPadrao) || 60,
-      valorPadrao: Number.isFinite(dados.valorPadrao) ? Number(dados.valorPadrao) : 0,
-      custoPadrao: Number.isFinite(dados.custoPadrao) ? Math.max(0, Number(dados.custoPadrao)) : 0,
-      status: dados.status || "Ativo",
-      ordem: toSafeOrder(dados.ordem),
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.procedimentoServico.update({
+      where: { id: dados.id },
+      data: {
+        nome,
+        categoria: toNullableText(dados.categoria),
+        descricao: toNullableText(dados.descricao),
+        duracaoPadrao: toSafeOrder(dados.duracaoPadrao) || 60,
+        valorPadrao: Number.isFinite(dados.valorPadrao) ? Number(dados.valorPadrao) : 0,
+        custoPadrao: Number.isFinite(dados.custoPadrao) ? Math.max(0, Number(dados.custoPadrao)) : 0,
+        status: dados.status || "Ativo",
+      },
+    });
+
+    await reordenarProcedimentosServico(tx);
   });
 
   await registrarAuditoria("Atualizou serviço/procedimento", "ProcedimentoServico", nome);
@@ -264,7 +334,10 @@ export async function excluirProcedimentoServico(id: number) {
   const servico = await prisma.procedimentoServico.findUnique({ where: { id } });
   if (!servico) return;
 
-  await prisma.procedimentoServico.delete({ where: { id } });
+  await prisma.$transaction(async (tx) => {
+    await tx.procedimentoServico.delete({ where: { id } });
+    await reordenarProcedimentosServico(tx);
+  });
   await registrarAuditoria("Excluiu serviço/procedimento", "ProcedimentoServico", servico.nome);
   revalidatePath("/configuracoes");
   revalidatePath("/agenda");

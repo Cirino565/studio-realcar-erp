@@ -40,6 +40,7 @@ import {
   excluirProcedimentoServico,
 } from "@/actions/cadastro-auxiliar.actions";
 import { Button } from "@/components/ui/button";
+import { formatarDuracao, interpretarDuracao } from "@/lib/duracao";
 import type {
   AnamneseModeloView,
   CadastroAuxiliarView,
@@ -322,12 +323,22 @@ function MessagePreview({
   );
 }
 
+function ordenarPorNome<T extends { nome: string }>(items: T[]) {
+  return [...items].sort((a, b) =>
+    a.nome.localeCompare(b.nome, "pt-BR", {
+      sensitivity: "base",
+      numeric: true,
+    }),
+  );
+}
+
 type AuxiliarListProps = {
   title: string;
   description: string;
   items: CadastroAuxiliarView[];
   placeholder: string;
   statusLabel: string;
+  ordenacaoAutomatica?: boolean;
   onCreate: (nome: string) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
 };
@@ -338,6 +349,7 @@ function AuxiliarList({
   items,
   placeholder,
   statusLabel,
+  ordenacaoAutomatica = false,
   onCreate,
   onDelete,
 }: AuxiliarListProps) {
@@ -403,7 +415,7 @@ function AuxiliarList({
 
       <div className="mt-5 grid gap-3">
         {items.length > 0 ? (
-          items.map((item) => (
+          (ordenacaoAutomatica ? ordenarPorNome(items) : items).map((item) => (
             <div
               key={item.id}
               className="flex flex-col gap-3 rounded-3xl border border-white/[0.08] bg-[#111827]/70 p-4 sm:flex-row sm:items-center sm:justify-between"
@@ -413,7 +425,10 @@ function AuxiliarList({
                   {item.nome}
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  {statusLabel}: {item.status} · Ordem {item.ordem || 0}
+                  {statusLabel}: {item.status}
+                  {ordenacaoAutomatica
+                    ? " · Ordem alfabética automática"
+                    : ` · Ordem ${item.ordem || 0}`}
                 </p>
               </div>
               <button
@@ -477,7 +492,7 @@ function ServicoCardEditor({
   item: ProcedimentoServicoView;
   onExcluir: (id: number) => void;
 }) {
-  const [duracao, setDuracao] = useState(String(item.duracaoPadrao || 60));
+  const [duracao, setDuracao] = useState(formatarDuracao(item.duracaoPadrao || 60));
   const [valor, setValor] = useState(currencyFromNumber(item.valorPadrao));
   const [custo, setCusto] = useState(currencyFromNumber(item.custoPadrao));
   const [salvo, setSalvo] = useState(false);
@@ -497,7 +512,7 @@ function ServicoCardEditor({
         nome: item.nome,
         categoria: item.categoria || undefined,
         descricao: item.descricao || undefined,
-        duracaoPadrao: Number(duracao) || 60,
+        duracaoPadrao: interpretarDuracao(duracao),
         valorPadrao: valorNumero,
         custoPadrao: custoNumero,
         status: item.status,
@@ -533,20 +548,15 @@ function ServicoCardEditor({
           <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             Duração
           </span>
-          <select
+          <input
             value={duracao}
             onChange={(event) => setDuracao(event.target.value)}
+            onBlur={() => setDuracao(formatarDuracao(interpretarDuracao(duracao)))}
+            onFocus={(event) => event.currentTarget.select()}
+            inputMode="decimal"
+            placeholder="Ex: 6 horas"
             className="premium-input w-full"
-          >
-            <option value="30">30 min</option>
-            <option value="45">45 min</option>
-            <option value="60">1h</option>
-            <option value="90">1h30</option>
-            <option value="120">2h</option>
-            <option value="150">2h30</option>
-            <option value="180">3h</option>
-            <option value="240">4h</option>
-          </select>
+          />
         </label>
 
         <label className="space-y-1.5">
@@ -613,14 +623,14 @@ function ServicoCardEditor({
 
 function ServicosList({ items, procedimentosInteresse }: ServicosListProps) {
   const [procedimentoSelecionado, setProcedimentoSelecionado] = useState("");
-  const [duracao, setDuracao] = useState("60");
+  const [duracao, setDuracao] = useState("1 hora");
   const [valor, setValor] = useState("");
   const [custo, setCusto] = useState("");
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const procedimentosAtivos = procedimentosInteresse.filter(
-    (item) => item.status === "Ativo",
+  const procedimentosAtivos = ordenarPorNome(
+    procedimentosInteresse.filter((item) => item.status === "Ativo"),
   );
   const servicoJaExiste = items.some(
     (item) => item.nome.toLowerCase() === procedimentoSelecionado.toLowerCase(),
@@ -633,13 +643,13 @@ function ServicosList({ items, procedimentosInteresse }: ServicosListProps) {
     startTransition(async () => {
       await criarProcedimentoServico({
         nome,
-        duracaoPadrao: Number(duracao) || 60,
+        duracaoPadrao: interpretarDuracao(duracao),
         valorPadrao: parseCurrency(valor),
         custoPadrao: parseCurrency(custo),
         status: "Ativo",
       });
       setProcedimentoSelecionado("");
-      setDuracao("60");
+      setDuracao("1 hora");
       setValor("");
       setCusto("");
     });
@@ -693,20 +703,16 @@ function ServicosList({ items, procedimentosInteresse }: ServicosListProps) {
           ))}
         </select>
 
-        <select
+        <input
           value={duracao}
           onChange={(event) => setDuracao(event.target.value)}
+          onBlur={() => setDuracao(formatarDuracao(interpretarDuracao(duracao)))}
+          onFocus={(event) => event.currentTarget.select()}
+          inputMode="decimal"
+          placeholder="Ex: 6 horas"
+          aria-label="Duração padrão do serviço"
           className="premium-input w-full"
-        >
-          <option value="30">30 min</option>
-          <option value="45">45 min</option>
-          <option value="60">1h</option>
-          <option value="90">1h30</option>
-          <option value="120">2h</option>
-          <option value="150">2h30</option>
-          <option value="180">3h</option>
-          <option value="240">4h</option>
-        </select>
+        />
 
         <div className="flex h-11 items-center overflow-hidden rounded-2xl border border-white/[0.10] bg-white/[0.06]">
           <span className="border-r border-white/[0.10] px-3 text-sm font-semibold text-slate-300">
@@ -756,7 +762,7 @@ function ServicosList({ items, procedimentosInteresse }: ServicosListProps) {
 
       <div className="mt-5 grid gap-3 xl:grid-cols-2">
         {items.length > 0 ? (
-          items.map((item) => (
+          ordenarPorNome(items).map((item) => (
             <ServicoCardEditor key={item.id} item={item} onExcluir={excluir} />
           ))
         ) : (
@@ -1547,6 +1553,7 @@ export default function ConfiguracoesClient({
                   items={procedimentosInteresse}
                   placeholder="Ex: Harmonização facial"
                   statusLabel="Status"
+                  ordenacaoAutomatica
                   onCreate={(nome) =>
                     criarProcedimentoInteresse({ nome, status: "Ativo" })
                   }

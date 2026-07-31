@@ -171,7 +171,7 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
 
     prisma.procedimentoServico.findMany({
       where: { status: "Ativo" },
-      orderBy: [{ ordem: "asc" }, { nome: "asc" }],
+      orderBy: [{ nome: "asc" }, { id: "asc" }],
       select: {
         id: true,
         nome: true,

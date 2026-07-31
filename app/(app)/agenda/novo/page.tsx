@@ -118,7 +118,7 @@ export default async function NovoAgendamentoPage({ searchParams }: Props) {
     prisma.cliente.findMany({ orderBy: { nome: "asc" }, select: { id: true, nome: true, telefone: true, whatsapp: true } }),
     prisma.profissional.findMany({ where: { status: "Ativa" }, orderBy: [{ ordem: "asc" }, { nome: "asc" }] }),
     prisma.origemCliente.findMany({ where: { status: "Ativa" }, orderBy: [{ ordem: "asc" }, { nome: "asc" }] }),
-    prisma.procedimentoServico.findMany({ where: { status: "Ativo" }, orderBy: [{ ordem: "asc" }, { nome: "asc" }] }),
+    prisma.procedimentoServico.findMany({ where: { status: "Ativo" }, orderBy: [{ nome: "asc" }, { id: "asc" }] }),
   ]);
 
   const origemPadrao = origensCliente[0]?.nome || "Indicação";

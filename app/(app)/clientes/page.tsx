@@ -30,7 +30,7 @@ export default async function ClientesPage() {
 
     prisma.procedimentoInteresse.findMany({
       where: { status: "Ativo" },
-      orderBy: [{ ordem: "asc" }, { nome: "asc" }],
+      orderBy: [{ nome: "asc" }, { id: "asc" }],
     }),
 
     prisma.campanhaMarketing.findMany({

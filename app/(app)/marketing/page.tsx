@@ -56,7 +56,7 @@ export default async function MarketingPage() {
         duracaoPadrao: true,
         valorPadrao: true,
       },
-      orderBy: [{ ordem: "asc" }, { nome: "asc" }],
+      orderBy: [{ nome: "asc" }, { id: "asc" }],
     }),
     prisma.cliente.findMany({
       where: { status: { not: "Inativa" } },

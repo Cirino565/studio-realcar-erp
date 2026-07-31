@@ -70,6 +70,46 @@ function normalizarChave(valor: string) {
     .toLowerCase();
 }
 
+async function reordenarProcedimentosComTransacao(
+  tx: Prisma.TransactionClient,
+) {
+  const [servicos, interesses] = await Promise.all([
+    tx.procedimentoServico.findMany({
+      select: { id: true, nome: true, ordem: true },
+    }),
+    tx.procedimentoInteresse.findMany({
+      select: { id: true, nome: true, ordem: true },
+    }),
+  ]);
+
+  const ordenar = <T extends { nome: string }>(items: T[]) =>
+    [...items].sort((a, b) =>
+      a.nome.localeCompare(b.nome, "pt-BR", {
+        sensitivity: "base",
+        numeric: true,
+      }),
+    );
+
+  await Promise.all([
+    ...ordenar(servicos).map((item, index) =>
+      item.ordem === index
+        ? Promise.resolve(item)
+        : tx.procedimentoServico.update({
+            where: { id: item.id },
+            data: { ordem: index },
+          }),
+    ),
+    ...ordenar(interesses).map((item, index) =>
+      item.ordem === index
+        ? Promise.resolve(item)
+        : tx.procedimentoInteresse.update({
+            where: { id: item.id },
+            data: { ordem: index },
+          }),
+    ),
+  ]);
+}
+
 async function exigirAdministrador() {
   const usuario = await requireCurrentUser();
 
@@ -295,6 +335,8 @@ async function sincronizarProcedimentosComTransacao(
       interessesDesativados += 1;
     }
   }
+
+  await reordenarProcedimentosComTransacao(tx);
 
   return {
     criados,

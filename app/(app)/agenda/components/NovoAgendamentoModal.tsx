@@ -28,6 +28,8 @@ import {
   type HorarioDisponivelAgenda,
 } from "@/actions/agendamento.actions";
 
+import { formatarDuracao, interpretarDuracao } from "@/lib/duracao";
+
 import type { NovoHorarioPayload } from "./AgendaCalendar";
 
 type Cliente = {
@@ -215,7 +217,7 @@ export default function NovoAgendamentoModal({
   const [mostrarListaServicos, setMostrarListaServicos] = useState(false);
   const [data, setData] = useState("");
   const [hora, setHora] = useState("09:00");
-  const [duracao, setDuracao] = useState("60");
+  const [duracao, setDuracao] = useState("1 hora");
   const [valor, setValor] = useState("");
   const [status, setStatus] = useState("Agendado");
   const [observacoes, setObservacoes] = useState("");
@@ -285,7 +287,7 @@ export default function NovoAgendamentoModal({
 
     setData(initialPayload?.data || getHojeInput());
     setHora(initialPayload?.hora || "09:00");
-    setDuracao(String(initialPayload?.duracao || 60));
+    setDuracao(formatarDuracao(initialPayload?.duracao || 60));
     setValor(valorParaInput(initialPayload?.valor));
     setStatus(initialPayload?.status || "Agendado");
     setObservacoes(initialPayload?.observacoes || "");
@@ -331,7 +333,7 @@ export default function NovoAgendamentoModal({
         const resultado = await buscarDisponibilidadeAgenda({
           profissionalId: Number(profissionalId),
           data,
-          duracao: Number(duracao) || 60,
+          duracao: interpretarDuracao(duracao),
           ignoreId: modoEdicao ? initialPayload?.agendamentoId : undefined,
           ignoreBloqueioId: modoEdicaoBloqueio ? initialPayload?.bloqueioId : undefined,
         });
@@ -365,15 +367,27 @@ export default function NovoAgendamentoModal({
       return [];
     }
 
+    const buscarPorNome = query.length >= 2;
+    const buscarPorTelefone = digits.length >= 2;
+
     return clientes
       .filter((cliente) => {
-        return (
-          normalizarTexto(cliente.nome).includes(query) ||
-          onlyDigits(cliente.telefone).includes(digits) ||
-          onlyDigits(cliente.whatsapp || "").includes(digits)
-        );
+        const nomeCorresponde =
+          buscarPorNome && normalizarTexto(cliente.nome).includes(query);
+        const telefoneCorresponde =
+          buscarPorTelefone &&
+          (onlyDigits(cliente.telefone).includes(digits) ||
+            onlyDigits(cliente.whatsapp || "").includes(digits));
+
+        return nomeCorresponde || telefoneCorresponde;
       })
-      .slice(0, 6);
+      .sort((a, b) =>
+        a.nome.localeCompare(b.nome, "pt-BR", {
+          sensitivity: "base",
+          numeric: true,
+        }),
+      )
+      .slice(0, 8);
   }, [buscaCliente, clientes]);
 
   const servicosFiltrados = useMemo(() => {
@@ -412,7 +426,7 @@ export default function NovoAgendamentoModal({
     setBuscaServico(servico.nome);
     setProcedimento(servico.nome);
     setMostrarListaServicos(false);
-    setDuracao(String(servico.duracaoPadrao));
+    setDuracao(formatarDuracao(servico.duracaoPadrao));
     setValor(
       servico.valorPadrao > 0
         ? servico.valorPadrao.toFixed(2).replace(".", ",")
@@ -470,7 +484,7 @@ export default function NovoAgendamentoModal({
     }
 
     const dataCompleta = `${data}T${hora}:00`;
-    const duracaoNumerica = Number(duracao) || 60;
+    const duracaoNumerica = interpretarDuracao(duracao);
     const recorrencia = {
       tipo: recorrenciaTipo,
       intervalo: Math.max(1, Number(recorrenciaIntervalo) || 1),
@@ -935,7 +949,7 @@ export default function NovoAgendamentoModal({
                     setBuscaCliente(event.target.value);
                     setErro("");
                   }}
-                  placeholder="Digite para buscar..."
+                  placeholder="Nome, telefone ou WhatsApp"
                   className={`${fieldClassName()} pl-6`}
                 />
 
@@ -1072,7 +1086,7 @@ export default function NovoAgendamentoModal({
                                   {servico.nome}
                                 </strong>
                                 <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
-                                  {servico.categoria || "Sem categoria"} · {servico.duracaoPadrao} min
+                                  {servico.categoria || "Sem categoria"} · {formatarDuracao(servico.duracaoPadrao)}
                                 </span>
                               </span>
 
@@ -1119,27 +1133,23 @@ export default function NovoAgendamentoModal({
                   Duração baseada no procedimento
                 </span>
                 <div className="relative">
-                  <select
+                  <input
                     value={duracao}
                     onChange={(event) => {
                       setDuracao(event.target.value);
                       setErro("");
                     }}
-                    className={`${fieldClassName()} appearance-none pr-7`}
-                  >
-                    <option value="30">30 min</option>
-                    <option value="45">45 min</option>
-                    <option value="60">1 hora</option>
-                    <option value="90">1h30</option>
-                    <option value="120">2 horas</option>
-                    <option value="150">2h30</option>
-                    <option value="180">3 horas</option>
-                  </select>
-                  <ChevronDown
-                    size={16}
-                    className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-500"
+                    onBlur={() => setDuracao(formatarDuracao(interpretarDuracao(duracao)))}
+                    onFocus={(event) => event.currentTarget.select()}
+                    inputMode="decimal"
+                    placeholder="Ex: 6 horas"
+                    aria-label="Duração do atendimento"
+                    className={fieldClassName()}
                   />
                 </div>
+                <span className="mt-1.5 block text-[11px] text-slate-500 dark:text-slate-400">
+                  Preenchida pelo cadastro do procedimento. A alteração vale somente para este atendimento.
+                </span>
               </label>
 
               <label>
@@ -1387,24 +1397,17 @@ export default function NovoAgendamentoModal({
               <label className="mt-4 block">
                 <span className={labelClassName()}>Duração</span>
                 <div className="relative">
-                  <select
+                  <input
                     value={duracao}
                     onChange={(event) => setDuracao(event.target.value)}
-                    className={`${fieldClassName()} appearance-none pr-7`}
-                  >
-                    <option value="30">30 min</option>
-                    <option value="45">45 min</option>
-                    <option value="60">1 hora</option>
-                    <option value="90">1h30</option>
-                    <option value="120">2 horas</option>
-                    <option value="150">2h30</option>
-                    <option value="180">3 horas</option>
-                    <option value="240">4 horas</option>
-                    <option value="480">Dia inteiro</option>
-                  </select>
-                  <ChevronDown
-                    size={16}
-                    className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-500"
+                    onBlur={() =>
+                      setDuracao(formatarDuracao(interpretarDuracao(duracao)))
+                    }
+                    onFocus={(event) => event.currentTarget.select()}
+                    inputMode="decimal"
+                    placeholder="Ex: 2 horas"
+                    aria-label="Duração do bloqueio"
+                    className={fieldClassName()}
                   />
                 </div>
               </label>
