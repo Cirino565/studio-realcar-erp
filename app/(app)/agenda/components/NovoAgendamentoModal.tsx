@@ -199,6 +199,22 @@ function labelClassName() {
   return "mb-1 block text-[11px] font-medium text-slate-500 dark:text-slate-400";
 }
 
+function mensagemErroSeguro(error: unknown, fallback: string) {
+  if (!(error instanceof Error)) return fallback;
+
+  const mensagem = error.message?.trim();
+
+  if (
+    !mensagem ||
+    mensagem.includes("An error occurred in the Server Components render") ||
+    mensagem.includes("A digest property is included")
+  ) {
+    return fallback;
+  }
+
+  return mensagem;
+}
+
 export default function NovoAgendamentoModal({
   open,
   onClose,
@@ -246,10 +262,14 @@ export default function NovoAgendamentoModal({
   >("semanas");
   const [recorrenciaOcorrencias, setRecorrenciaOcorrencias] = useState("4");
   const [erro, setErro] = useState("");
+  const [erroTitulo, setErroTitulo] = useState("Verifique os dados");
+  const [erroAcaoHorario, setErroAcaoHorario] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [mostrarMaisCampos, setMostrarMaisCampos] = useState(false);
   const [horarios, setHorarios] = useState<HorarioDisponivelAgenda[]>([]);
+  const [disponibilidadeVersao, setDisponibilidadeVersao] = useState(0);
   const [isLoadingHorarios, startHorariosTransition] = useTransition();
+  const conteudoScrollRef = useRef<HTMLDivElement>(null);
 
   useLockBodyScroll(open);
 
@@ -290,6 +310,8 @@ export default function NovoAgendamentoModal({
         : "PROCEDIMENTO";
 
     setErro("");
+    setErroTitulo("Verifique os dados");
+    setErroAcaoHorario(false);
     setTipoAtendimento(initialPayload?.tipoAtendimento || (modoEdicaoBloqueio ? "bloqueio" : "agendamento"));
     setNaturezaAtendimento(naturezaInicial);
     setAgendamentoOrigemId(
@@ -429,6 +451,7 @@ export default function NovoAgendamentoModal({
     modoEdicaoBloqueio,
     initialPayload?.agendamentoId,
     initialPayload?.bloqueioId,
+    disponibilidadeVersao,
   ]);
 
   const clienteSelecionado = useMemo(() => {
@@ -593,8 +616,20 @@ export default function NovoAgendamentoModal({
 
   if (!open) return null;
 
+  function direcionarParaOutroHorario() {
+    setHora("");
+    setDisponibilidadeVersao((versao) => versao + 1);
+
+    requestAnimationFrame(() => {
+      conteudoScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+      document.getElementById("novo-agendamento-hora")?.focus();
+    });
+  }
+
   async function salvar() {
     setErro("");
+    setErroTitulo("Verifique os dados");
+    setErroAcaoHorario(false);
 
     if (!profissionalId && profissionais.length > 0) {
       setErro("Selecione a profissional da agenda.");
@@ -603,6 +638,18 @@ export default function NovoAgendamentoModal({
 
     if (!data || !hora) {
       setErro("Preencha data e horário.");
+      return;
+    }
+
+    const horarioSelecionado = horarios.find((item) => item.hora === hora);
+
+    if (horarioSelecionado && !horarioSelecionado.disponivel) {
+      setErroTitulo("Horário indisponível");
+      setErro(
+        `O horário ${hora} está ocupado por ${horarioSelecionado.motivo || "outro compromisso"}. Escolha outro horário disponível.`,
+      );
+      setErroAcaoHorario(true);
+      direcionarParaOutroHorario();
       return;
     }
 
@@ -633,13 +680,25 @@ export default function NovoAgendamentoModal({
           recorrencia: modoEdicaoBloqueio ? { tipo: "nenhuma" as const } : recorrencia,
         };
 
-        if (modoEdicaoBloqueio && initialPayload?.bloqueioId) {
-          await atualizarBloqueioAgenda({
-            id: initialPayload.bloqueioId,
-            ...payloadBloqueio,
-          });
-        } else {
-          await criarBloqueioAgenda(payloadBloqueio);
+        const resultadoBloqueio =
+          modoEdicaoBloqueio && initialPayload?.bloqueioId
+            ? await atualizarBloqueioAgenda({
+                id: initialPayload.bloqueioId,
+                ...payloadBloqueio,
+              })
+            : await criarBloqueioAgenda(payloadBloqueio);
+
+        if (!resultadoBloqueio.ok) {
+          setSalvando(false);
+          setErroTitulo(resultadoBloqueio.titulo);
+          setErro(resultadoBloqueio.mensagem);
+          setErroAcaoHorario(resultadoBloqueio.campo === "hora");
+
+          if (resultadoBloqueio.campo === "hora") {
+            direcionarParaOutroHorario();
+          }
+
+          return;
         }
 
         setSalvando(false);
@@ -647,10 +706,12 @@ export default function NovoAgendamentoModal({
         window.location.reload();
       } catch (error) {
         setSalvando(false);
+        setErroTitulo("Não foi possível salvar o bloqueio");
         setErro(
-          error instanceof Error
-            ? error.message
-            : "Não foi possível salvar o bloqueio.",
+          mensagemErroSeguro(
+            error,
+            "Ocorreu um erro inesperado ao salvar o bloqueio. Revise os dados e tente novamente.",
+          ),
         );
       }
 
@@ -717,13 +778,25 @@ export default function NovoAgendamentoModal({
             : recorrencia,
       };
 
-      if (modoEdicao && initialPayload?.agendamentoId) {
-        await atualizarAgendamento({
-          id: initialPayload.agendamentoId,
-          ...payload,
-        });
-      } else {
-        await criarAgendamento(payload);
+      const resultado =
+        modoEdicao && initialPayload?.agendamentoId
+          ? await atualizarAgendamento({
+              id: initialPayload.agendamentoId,
+              ...payload,
+            })
+          : await criarAgendamento(payload);
+
+      if (!resultado.ok) {
+        setSalvando(false);
+        setErroTitulo(resultado.titulo);
+        setErro(resultado.mensagem);
+        setErroAcaoHorario(resultado.campo === "hora");
+
+        if (resultado.campo === "hora") {
+          direcionarParaOutroHorario();
+        }
+
+        return;
       }
 
       setSalvando(false);
@@ -731,10 +804,13 @@ export default function NovoAgendamentoModal({
       window.location.reload();
     } catch (error) {
       setSalvando(false);
+      setErroTitulo("Não foi possível salvar o agendamento");
+      setErroAcaoHorario(false);
       setErro(
-        error instanceof Error
-          ? error.message
-          : "Não foi possível salvar o agendamento.",
+        mensagemErroSeguro(
+          error,
+          "Ocorreu um erro inesperado ao salvar. Nenhum agendamento foi criado. Revise os dados e tente novamente.",
+        ),
       );
     }
   }
@@ -758,10 +834,12 @@ export default function NovoAgendamentoModal({
       window.location.reload();
     } catch (error) {
       setSalvando(false);
+      setErroTitulo("Não foi possível excluir o bloqueio");
       setErro(
-        error instanceof Error
-          ? error.message
-          : "Não foi possível excluir o bloqueio.",
+        mensagemErroSeguro(
+          error,
+          "Ocorreu um erro inesperado ao excluir o bloqueio.",
+        ),
       );
     }
   }
@@ -868,11 +946,30 @@ export default function NovoAgendamentoModal({
           })}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
+        <div
+          ref={conteudoScrollRef}
+          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-4 sm:px-5"
+        >
           {erro ? (
-            <div className="mb-4 flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-950/30 dark:text-rose-200">
-              <AlertCircle size={16} className="mt-0.5 shrink-0" />
-              <span>{erro}</span>
+            <div
+              role="alert"
+              className="mb-4 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-950/30 dark:text-rose-200"
+            >
+              <AlertCircle size={18} className="mt-0.5 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="font-bold">{erroTitulo}</p>
+                <p className="mt-1 leading-5">{erro}</p>
+                {erroAcaoHorario ? (
+                  <button
+                    type="button"
+                    onClick={direcionarParaOutroHorario}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-bold text-rose-700 transition hover:bg-rose-100 dark:border-rose-500/50 dark:bg-rose-950/30 dark:text-rose-200 dark:hover:bg-rose-900/40"
+                  >
+                    <Clock3 size={14} />
+                    Escolher outro horário
+                  </button>
+                ) : null}
+              </div>
             </div>
           ) : null}
 
@@ -902,16 +999,19 @@ export default function NovoAgendamentoModal({
               <div className="relative">
                 {agendamentoDiretoAgenda ? (
                   <input
+                    id="novo-agendamento-hora"
                     value={hora}
                     readOnly
                     className={`${fieldClassName()} cursor-not-allowed pr-7 opacity-80`}
                   />
                 ) : (
                   <select
+                    id="novo-agendamento-hora"
                     value={hora}
                     onChange={(event) => {
                       setHora(event.target.value);
                       setErro("");
+                      setErroAcaoHorario(false);
                     }}
                     className={`${fieldClassName()} appearance-none pr-7`}
                   >

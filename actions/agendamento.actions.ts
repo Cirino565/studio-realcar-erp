@@ -48,6 +48,31 @@ type NovoAgendamento = {
   recorrencia?: RecorrenciaAgendaInput;
 };
 
+export type ResultadoSalvarAgenda =
+  | {
+      ok: true;
+    }
+  | {
+      ok: false;
+      codigo: "CONFLITO_AGENDAMENTO" | "CONFLITO_BLOQUEIO";
+      titulo: string;
+      mensagem: string;
+      campo: "hora";
+    };
+
+type ErroEsperadoAgendamento = Extract<
+  ResultadoSalvarAgenda,
+  { ok: false }
+>;
+
+type ParametrosConflitoAgenda = {
+  profissionalId?: number;
+  data: Date;
+  duracao: number;
+  ignoreId?: number;
+  ignoreBloqueioId?: number;
+};
+
 function normalizarNaturezaAtendimento(
   value?: NaturezaAtendimentoAgenda,
 ): NaturezaAtendimentoAgenda {
@@ -338,24 +363,21 @@ function formatHourMinute(value: Date) {
   }).format(value);
 }
 
-async function validarConflitoAgenda({
+async function obterConflitoAgenda({
   profissionalId,
   data,
   duracao,
   ignoreId,
   ignoreBloqueioId,
-}: {
-  profissionalId?: number;
-  data: Date;
-  duracao: number;
-  ignoreId?: number;
-  ignoreBloqueioId?: number;
-}) {
-  if (!profissionalId) return;
+}: ParametrosConflitoAgenda): Promise<ErroEsperadoAgendamento | null> {
+  if (!profissionalId) return null;
 
   const inicioNovo = data;
   const fimNovo = addMinutes(inicioNovo, duracao);
   const dataSaoPaulo = formatDateSaoPaulo(data);
+  const dataTexto = dataSaoPaulo.split("-").reverse().join("/");
+  const inicioNovoTexto = formatHourMinute(inicioNovo);
+  const fimNovoTexto = formatHourMinute(fimNovo);
   const inicioDia = parseLocalDateTime(`${dataSaoPaulo}T00:00`);
   const fimDia = addMinutes(inicioDia, 24 * 60);
 
@@ -414,9 +436,13 @@ async function validarConflitoAgenda({
       addMinutes(conflitoAgendamento.data, conflitoAgendamento.duracao),
     );
 
-    throw new Error(
-      `Este horário conflita com ${conflitoAgendamento.cliente.nome}, agendado das ${inicio} às ${fim}. Escolha outro horário ou ajuste a duração.`,
-    );
+    return {
+      ok: false,
+      codigo: "CONFLITO_AGENDAMENTO",
+      titulo: "Horário indisponível",
+      mensagem: `Não foi possível salvar. Em ${dataTexto}, o intervalo escolhido (${inicioNovoTexto} às ${fimNovoTexto}) se sobrepõe ao atendimento de ${conflitoAgendamento.cliente.nome}, marcado das ${inicio} às ${fim}. Escolha outro horário ou ajuste a duração.`,
+      campo: "hora",
+    };
   }
 
   const conflitoBloqueio = bloqueiosDoDia.find((bloqueio) => {
@@ -431,9 +457,25 @@ async function validarConflitoAgenda({
       addMinutes(conflitoBloqueio.data, conflitoBloqueio.duracao),
     );
 
-    throw new Error(
-      `Este horário está bloqueado por "${conflitoBloqueio.motivo}" das ${inicio} às ${fim}. Escolha outro horário ou edite o bloqueio existente.`,
-    );
+    return {
+      ok: false,
+      codigo: "CONFLITO_BLOQUEIO",
+      titulo: "Horário bloqueado",
+      mensagem: `Não foi possível salvar. Em ${dataTexto}, o intervalo escolhido (${inicioNovoTexto} às ${fimNovoTexto}) se sobrepõe ao bloqueio “${conflitoBloqueio.motivo}”, das ${inicio} às ${fim}. Escolha outro horário ou edite o bloqueio existente.`,
+      campo: "hora",
+    };
+  }
+
+  return null;
+}
+
+async function validarConflitoAgenda(
+  parametros: ParametrosConflitoAgenda,
+) {
+  const conflito = await obterConflitoAgenda(parametros);
+
+  if (conflito) {
+    throw new Error(conflito.mensagem);
   }
 }
 
@@ -481,7 +523,9 @@ async function validarDatasNoHorarioFuncionamento(
   }
 }
 
-export async function criarAgendamento(dados: NovoAgendamento) {
+export async function criarAgendamento(
+  dados: NovoAgendamento,
+): Promise<ResultadoSalvarAgenda> {
   const usuarioAtual = await requirePermission("agenda.gerenciar");
   const areaPadrao = obterAreaPadraoAgendamento(
     usuarioAtual.nome,
@@ -516,11 +560,15 @@ export async function criarAgendamento(dados: NovoAgendamento) {
   await validarDatasNoHorarioFuncionamento(datas, duracao);
 
   for (const data of datas) {
-    await validarConflitoAgenda({
+    const conflito = await obterConflitoAgenda({
       profissionalId: dados.profissionalId,
       data,
       duracao,
     });
+
+    if (conflito) {
+      return conflito;
+    }
   }
 
   const serieId = datas.length > 1 ? randomUUID() : null;
@@ -612,12 +660,14 @@ export async function criarAgendamento(dados: NovoAgendamento) {
   revalidatePath("/agenda");
   revalidatePath("/clientes");
   revalidatePath("/");
+
+  return { ok: true };
 }
 
 export async function atualizarAgendamento({
   id,
   ...dados
-}: NovoAgendamento & { id: number }) {
+}: NovoAgendamento & { id: number }): Promise<ResultadoSalvarAgenda> {
   await requirePermission("agenda.gerenciar");
 
   const naturezaAtendimento = normalizarNaturezaAtendimento(
@@ -635,12 +685,16 @@ export async function atualizarAgendamento({
       ? 0
       : Math.max(0, Number(dados.valor) || 0);
 
-  await validarConflitoAgenda({
+  const conflito = await obterConflitoAgenda({
     profissionalId: dados.profissionalId,
     data,
     duracao,
     ignoreId: id,
   });
+
+  if (conflito) {
+    return conflito;
+  }
 
   const clienteId = dados.clienteId || (await resolverCliente(dados));
 
@@ -708,6 +762,8 @@ export async function atualizarAgendamento({
   revalidatePath("/agenda");
   revalidatePath("/clientes");
   revalidatePath("/");
+
+  return { ok: true };
 }
 
 export async function excluirAgendamento(id: number) {
@@ -765,7 +821,9 @@ export async function cancelarSerieAgendamento({
   revalidatePath("/");
 }
 
-export async function criarBloqueioAgenda(dados: NovoBloqueioAgenda) {
+export async function criarBloqueioAgenda(
+  dados: NovoBloqueioAgenda,
+): Promise<ResultadoSalvarAgenda> {
   await requirePermission("agenda.gerenciar");
 
   if (!dados.profissionalId) {
@@ -783,11 +841,15 @@ export async function criarBloqueioAgenda(dados: NovoBloqueioAgenda) {
   await validarDatasNoHorarioFuncionamento(datas, duracao);
 
   for (const data of datas) {
-    await validarConflitoAgenda({
+    const conflito = await obterConflitoAgenda({
       profissionalId: dados.profissionalId,
       data,
       duracao,
     });
+
+    if (conflito) {
+      return conflito;
+    }
   }
 
   const serieId = datas.length > 1 ? randomUUID() : null;
@@ -825,12 +887,14 @@ export async function criarBloqueioAgenda(dados: NovoBloqueioAgenda) {
 
   revalidatePath("/agenda");
   revalidatePath("/");
+
+  return { ok: true };
 }
 
 export async function atualizarBloqueioAgenda({
   id,
   ...dados
-}: NovoBloqueioAgenda & { id: number }) {
+}: NovoBloqueioAgenda & { id: number }): Promise<ResultadoSalvarAgenda> {
   await requirePermission("agenda.gerenciar");
 
   if (!id) {
@@ -848,12 +912,16 @@ export async function atualizarBloqueioAgenda({
   const data = parseLocalDateTime(dados.data);
   const duracao = Math.max(5, dados.duracao || 60);
 
-  await validarConflitoAgenda({
+  const conflito = await obterConflitoAgenda({
     profissionalId: dados.profissionalId,
     data,
     duracao,
     ignoreBloqueioId: id,
   });
+
+  if (conflito) {
+    return conflito;
+  }
 
   await prisma.bloqueioAgenda.update({
     where: { id },
@@ -869,6 +937,8 @@ export async function atualizarBloqueioAgenda({
 
   revalidatePath("/agenda");
   revalidatePath("/");
+
+  return { ok: true };
 }
 
 export async function excluirBloqueioAgenda(id: number) {
