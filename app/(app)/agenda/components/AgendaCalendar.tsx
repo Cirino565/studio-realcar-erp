@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import {
   BadgeCheck,
   Ban,
+  CalendarClock,
   CalendarDays,
   Check,
   ChevronDown,
@@ -1065,6 +1066,12 @@ export default function AgendaCalendar({
                                 >
                                   {appointment.status}
                                 </span>
+                                {appointment.naturezaAtendimento === "RETORNO" ? (
+                                  <span className="inline-flex items-center gap-1 rounded border border-cyan-200 bg-cyan-50 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-cyan-700 shadow-sm dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:text-cyan-200">
+                                    <CalendarClock size={10} />
+                                    Retorno
+                                  </span>
+                                ) : null}
                                 {appointment.sinalPago ? (
                                   <span className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-slate-700 shadow-sm dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100">
                                     <BadgeCheck size={10} className="text-violet-600 dark:text-violet-300" />
@@ -1380,6 +1387,16 @@ export default function AgendaCalendar({
                               </div>
 
                               <div className="flex shrink-0 items-center gap-1">
+                                {appointment.naturezaAtendimento === "RETORNO" ? (
+                                  <span
+                                    className="inline-flex items-center gap-1 rounded-md border border-white/80 bg-white/90 px-1.5 py-1 text-[9px] font-extrabold uppercase tracking-wide text-cyan-700 shadow-sm"
+                                    title="Retorno gratuito"
+                                  >
+                                    <CalendarClock size={11} />
+                                    <span className="hidden xl:inline">Retorno</span>
+                                  </span>
+                                ) : null}
+
                                 {appointment.sinalPago ? (
                                   <span
                                     className="inline-flex items-center gap-1 rounded-md border border-white/80 bg-white/90 px-1.5 py-1 text-[9px] font-extrabold uppercase tracking-wide text-slate-800 shadow-sm"

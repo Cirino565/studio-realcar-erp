@@ -100,6 +100,8 @@ model Agendamento {
   duracao        Int           @default(60)
   valor          Float         @default(0)
   observacoes    String?
+  naturezaAtendimento String        @default("PROCEDIMENTO")
+  agendamentoOrigemId Int?
   sinalPago            Boolean       @default(false)
   status               String        @default("Agendado")
   statusAntesAtendimento String?
@@ -119,8 +121,12 @@ model Agendamento {
   comunicacoes          ComunicacaoRegistro[]
   vendas                Venda[]
   evolucao              ClienteEvolucao?
+  agendamentoOrigem     Agendamento?  @relation("AgendamentoRetornos", fields: [agendamentoOrigemId], references: [id], onDelete: SetNull)
+  retornos              Agendamento[] @relation("AgendamentoRetornos")
 
   @@index([serieId])
+  @@index([naturezaAtendimento, data])
+  @@index([agendamentoOrigemId])
   @@index([evolucaoStatus, evolucaoPendenteDesde])
 }
 

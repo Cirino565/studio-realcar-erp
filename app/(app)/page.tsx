@@ -88,6 +88,15 @@ function primeiroNome(nome: string) {
   return nome.trim().split(/\s+/)[0] || nome;
 }
 
+function formatarProcedimentoAgendamento(agendamento: {
+  procedimento: string;
+  naturezaAtendimento?: string | null;
+}) {
+  return agendamento.naturezaAtendimento === "RETORNO"
+    ? `Retorno, ${agendamento.procedimento}`
+    : agendamento.procedimento;
+}
+
 function renderizarMensagemModelo(
   corpo: string,
   variaveis: Record<string, string | null | undefined>,
@@ -583,7 +592,7 @@ export default async function Home() {
   const confirmacoes = confirmacoesAmanha.map((agendamento) => ({
     id: agendamento.id,
     cliente: agendamento.cliente.nome,
-    procedimento: agendamento.procedimento,
+    procedimento: formatarProcedimentoAgendamento(agendamento),
     horario: formatarHorario(agendamento.data),
     profissional: agendamento.profissional?.nome || null,
     whatsappUrl: buildWhatsAppUrl(
@@ -591,7 +600,7 @@ export default async function Home() {
       buildWhatsAppMessage({
         template: "confirmation",
         clientName: agendamento.cliente.nome,
-        procedure: agendamento.procedimento,
+        procedure: formatarProcedimentoAgendamento(agendamento),
         appointmentDate: agendamento.data,
       }),
     ),
@@ -600,7 +609,7 @@ export default async function Home() {
   const clientesConfirmadosAmanha = confirmadosAmanha.map((agendamento) => ({
     id: agendamento.id,
     cliente: agendamento.cliente.nome,
-    procedimento: agendamento.procedimento,
+    procedimento: formatarProcedimentoAgendamento(agendamento),
     horario: formatarHorario(agendamento.data),
     profissional: agendamento.profissional?.nome || null,
     whatsappUrl: buildWhatsAppUrl(
@@ -608,7 +617,7 @@ export default async function Home() {
       buildWhatsAppMessage({
         template: "reminder",
         clientName: agendamento.cliente.nome,
-        procedure: agendamento.procedimento,
+        procedure: formatarProcedimentoAgendamento(agendamento),
         appointmentDate: agendamento.data,
       }),
     ),
@@ -618,7 +627,7 @@ export default async function Home() {
     id: agendamento.id,
     clienteId: agendamento.clienteId,
     cliente: agendamento.cliente.nome,
-    procedimento: agendamento.procedimento,
+    procedimento: formatarProcedimentoAgendamento(agendamento),
     profissional: agendamento.profissional?.nome || null,
     data: agendamento.data.toISOString(),
     pendenteDesde:
@@ -801,7 +810,7 @@ export default async function Home() {
                       </span>
                     </div>
                     <p className="mt-1 truncate text-sm text-slate-600">
-                      {agendamento.procedimento}
+                      {formatarProcedimentoAgendamento(agendamento)}
                     </p>
                     <p className="mt-0.5 text-xs text-slate-400">
                       {agendamento.profissional?.nome || "Profissional não definida"}
@@ -821,7 +830,7 @@ export default async function Home() {
                         buildWhatsAppMessage({
                           template: "reminder",
                           clientName: agendamento.cliente.nome,
-                          procedure: agendamento.procedimento,
+                          procedure: formatarProcedimentoAgendamento(agendamento),
                           appointmentDate: agendamento.data,
                         }),
                       )}
@@ -1026,7 +1035,9 @@ export default async function Home() {
                       <Link href={`/clientes/${item.cliente.id}`} className="truncate font-bold text-slate-900 hover:text-violet-700">
                         {item.cliente.nome}
                       </Link>
-                      <p className="mt-0.5 truncate text-sm text-slate-500">{item.procedimento}</p>
+                      <p className="mt-0.5 truncate text-sm text-slate-500">
+                        {formatarProcedimentoAgendamento(item)}
+                      </p>
                       <p className="mt-1 text-[11px] font-semibold text-slate-400">
                         {item.profissional?.nome || "Equipe"} · {formatarDataCurta(item.data)}
                       </p>
@@ -1037,7 +1048,7 @@ export default async function Home() {
                         buildWhatsAppMessage({
                           template: "postCare",
                           clientName: item.cliente.nome,
-                          procedure: item.procedimento,
+                          procedure: formatarProcedimentoAgendamento(item),
                           appointmentDate: item.data,
                         }),
                       )}

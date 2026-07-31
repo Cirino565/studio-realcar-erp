@@ -163,11 +163,19 @@ export default function FinalizarAtendimentoModal({
       (item) =>
         normalizarTexto(item.nome) === normalizarTexto(appointment.procedimento),
     );
+    const atendimentoRetornoAtual =
+      appointment.naturezaAtendimento === "RETORNO";
 
     setProcedimentoRealizado(appointment.procedimento || "");
     setProcedimentoServicoId(servico?.id || null);
-    setValorServico(Number(appointment.valor || servico?.valorPadrao || 0));
-    setCustoServico(Number(servico?.custoPadrao || 0));
+    setValorServico(
+      atendimentoRetornoAtual
+        ? 0
+        : Number(appointment.valor ?? servico?.valorPadrao ?? 0),
+    );
+    setCustoServico(
+      atendimentoRetornoAtual ? 0 : Number(servico?.custoPadrao || 0),
+    );
     setItensProdutos([]);
     setItensKits([]);
     setPermitirEstoqueNegativo(false);
@@ -220,6 +228,8 @@ export default function FinalizarAtendimentoModal({
   if (!open || !appointment) return null;
 
   const currentAppointment = appointment;
+  const atendimentoRetorno =
+    currentAppointment.naturezaAtendimento === "RETORNO";
   const procedimentoFinal =
     procedimentoRealizado.trim() || currentAppointment.procedimento || "Atendimento";
 
@@ -240,7 +250,7 @@ export default function FinalizarAtendimentoModal({
 
     if (servico) {
       setProcedimentoServicoId(servico.id);
-      setCustoServico(servico.custoPadrao || 0);
+      setCustoServico(atendimentoRetorno ? 0 : servico.custoPadrao || 0);
     } else {
       setProcedimentoServicoId(null);
     }
@@ -358,10 +368,14 @@ export default function FinalizarAtendimentoModal({
               <div className="min-w-0">
                 <p className="truncate text-[10px] font-bold uppercase tracking-[0.13em] text-slate-400">
                   {etapa === "success"
-                    ? "Atendimento e venda concluídos"
+                    ? atendimentoRetorno
+                      ? "Retorno concluído"
+                      : "Atendimento e venda concluídos"
                     : etapa === "review"
                       ? "Revisão final"
-                      : "Registro clínico e financeiro"}
+                      : atendimentoRetorno
+                        ? "Retorno clínico gratuito"
+                        : "Registro clínico e financeiro"}
                 </p>
                 <h2
                   id="finalizar-atendimento-title"
@@ -370,8 +384,12 @@ export default function FinalizarAtendimentoModal({
                   {etapa === "success"
                     ? "Finalizado com sucesso"
                     : etapa === "review"
-                      ? "Confira a composição da venda"
-                      : "Finalizar atendimento"}
+                      ? atendimentoRetorno
+                        ? "Confira o registro do retorno"
+                        : "Confira a composição da venda"
+                      : atendimentoRetorno
+                        ? "Finalizar retorno"
+                        : "Finalizar atendimento"}
                 </h2>
                 <p className="mt-0.5 truncate text-xs text-slate-500">
                   {currentAppointment.cliente.nome}
@@ -402,10 +420,14 @@ export default function FinalizarAtendimentoModal({
                     </div>
                     <div>
                       <p className="text-sm font-bold text-emerald-900">
-                        Atendimento, venda e estoque atualizados
+                        {atendimentoRetorno
+                          ? "Retorno e histórico clínico atualizados"
+                          : "Atendimento, venda e estoque atualizados"}
                       </p>
                       <p className="mt-1 text-xs leading-5 text-emerald-700">
-                        O histórico preservou preço vendido, custos do momento e produtos adicionados.
+                        {atendimentoRetorno
+                          ? "O retorno permaneceu sem cobrança. Produtos adicionados, quando houver, seguem o fluxo normal de estoque e venda."
+                          : "O histórico preservou preço vendido, custos do momento e produtos adicionados."}
                       </p>
                       {!evolucaoRegistradaNestaFinalizacao ? (
                         <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
@@ -516,8 +538,17 @@ export default function FinalizarAtendimentoModal({
                   <div className="p-4">
                     <div className="mb-3 flex items-center gap-2">
                       <WalletCards size={16} className="text-violet-600" />
-                      <span className="text-xs font-bold text-slate-900">Serviço e custo direto</span>
+                      <span className="text-xs font-bold text-slate-900">
+                        {atendimentoRetorno
+                          ? "Retorno sem cobrança"
+                          : "Serviço e custo direto"}
+                      </span>
                     </div>
+                    {atendimentoRetorno ? (
+                      <div className="mb-3 rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2.5 text-[11px] leading-4 text-cyan-800">
+                        O serviço deste retorno permanece em R$ 0,00 e não gera receita. Produtos ou kits adicionados abaixo continuam sendo registrados normalmente.
+                      </div>
+                    ) : null}
                     <div className="grid gap-3 sm:grid-cols-2">
                       <label>
                         <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">Valor vendido do serviço</span>
@@ -526,8 +557,9 @@ export default function FinalizarAtendimentoModal({
                           min="0"
                           step="0.01"
                           value={valorServico}
+                          disabled={atendimentoRetorno}
                           onChange={(event) => setValorServico(Math.max(0, Number(event.target.value) || 0))}
-                          className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-900 outline-none focus:border-violet-400"
+                          className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-900 outline-none focus:border-violet-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                         />
                       </label>
                       <label>
@@ -537,13 +569,18 @@ export default function FinalizarAtendimentoModal({
                           min="0"
                           step="0.01"
                           value={custoServico}
+                          disabled={atendimentoRetorno}
                           onChange={(event) => setCustoServico(Math.max(0, Number(event.target.value) || 0))}
-                          className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-900 outline-none focus:border-violet-400"
+                          className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-900 outline-none focus:border-violet-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                         />
                       </label>
                     </div>
                     <p className="mt-2 text-[11px] text-slate-500">
-                      Margem do serviço: <strong className={valorServico - custoServico >= 0 ? "text-emerald-700" : "text-rose-700"}>{formatCurrency(valorServico - custoServico)}</strong>. O custo ficará congelado no histórico desta venda.
+                      {atendimentoRetorno ? (
+                        <>O retorno clínico não compõe faturamento nem custo de serviço.</>
+                      ) : (
+                        <>Margem do serviço: <strong className={valorServico - custoServico >= 0 ? "text-emerald-700" : "text-rose-700"}>{formatCurrency(valorServico - custoServico)}</strong>. O custo ficará congelado no histórico desta venda.</>
+                      )}
                     </p>
                   </div>
                 </section>
@@ -680,7 +717,9 @@ export default function FinalizarAtendimentoModal({
                     <div>
                       <p className="text-xs font-bold text-amber-900">Confirmar finalização?</p>
                       <p className="mt-1 text-[11px] leading-4 text-amber-800">
-                        Esta operação conclui o atendimento, a venda, o financeiro e as baixas de estoque em uma única transação.
+                        {atendimentoRetorno
+                          ? "Esta operação conclui o retorno sem gerar receita de serviço. Produtos e kits, quando adicionados, seguem o fluxo normal de venda e estoque."
+                          : "Esta operação conclui o atendimento, a venda, o financeiro e as baixas de estoque em uma única transação."}
                         {!evolucaoRegistradaNestaFinalizacao
                           ? " A evolução será marcada como pendente para preenchimento posterior."
                           : " A evolução será registrada agora."}

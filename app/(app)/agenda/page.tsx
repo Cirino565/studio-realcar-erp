@@ -71,6 +71,12 @@ function normalizarTexto(value?: string | null) {
     .toLowerCase();
 }
 
+function normalizarNaturezaAtendimento(
+  value?: string | null,
+): "PROCEDIMENTO" | "RETORNO" {
+  return value === "RETORNO" ? "RETORNO" : "PROCEDIMENTO";
+}
+
 function encontrarProfissionalDoUsuario<
   T extends {
     id: number;
@@ -315,6 +321,9 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
         clientes={clientes}
         agendamentos={agendamentos.map((agendamento) => ({
           ...agendamento,
+          naturezaAtendimento: normalizarNaturezaAtendimento(
+            agendamento.naturezaAtendimento,
+          ),
           data: agendamento.data.toISOString(),
           evolucaoPendenteDesde:
             agendamento.evolucaoPendenteDesde?.toISOString() || null,

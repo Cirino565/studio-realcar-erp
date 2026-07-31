@@ -28,6 +28,8 @@ export type RecorrenciaAgendaInput = {
   ocorrencias?: number;
 };
 
+export type NaturezaAtendimentoAgenda = "PROCEDIMENTO" | "RETORNO";
+
 type NovoAgendamento = {
   clienteId?: number;
   novoCliente?: ClienteNovoAgendamento;
@@ -39,10 +41,18 @@ type NovoAgendamento = {
   status?: string;
   observacoes?: string;
   sinalPago?: boolean;
+  naturezaAtendimento?: NaturezaAtendimentoAgenda;
+  agendamentoOrigemId?: number;
   areaEstetica?: boolean;
   areaCilios?: boolean;
   recorrencia?: RecorrenciaAgendaInput;
 };
+
+function normalizarNaturezaAtendimento(
+  value?: NaturezaAtendimentoAgenda,
+): NaturezaAtendimentoAgenda {
+  return value === "RETORNO" ? "RETORNO" : "PROCEDIMENTO";
+}
 
 export type NovoBloqueioAgenda = {
   profissionalId: number;
@@ -480,9 +490,28 @@ export async function criarAgendamento(dados: NovoAgendamento) {
   const areaEstetica = Boolean(dados.areaEstetica) || areaPadrao === "estetica";
   const areaCilios = Boolean(dados.areaCilios) || areaPadrao === "cilios";
 
+  const naturezaAtendimento = normalizarNaturezaAtendimento(
+    dados.naturezaAtendimento,
+  );
+
+  if (naturezaAtendimento === "RETORNO" && !dados.clienteId) {
+    throw new Error("O retorno deve ser vinculado a um cliente já cadastrado.");
+  }
+
   const dataBase = parseLocalDateTime(dados.data);
   const duracao = dados.duracao || 60;
-  const { regra, datas } = gerarDatasRecorrencia(dataBase, dados.recorrencia);
+  const recorrenciaAplicada =
+    naturezaAtendimento === "RETORNO"
+      ? ({ tipo: "nenhuma" } as const)
+      : dados.recorrencia;
+  const { regra, datas } = gerarDatasRecorrencia(
+    dataBase,
+    recorrenciaAplicada,
+  );
+  const valorAgendamento =
+    naturezaAtendimento === "RETORNO"
+      ? 0
+      : Math.max(0, Number(dados.valor) || 0);
 
   await validarDatasNoHorarioFuncionamento(datas, duracao);
 
@@ -534,6 +563,27 @@ export async function criarAgendamento(dados: NovoAgendamento) {
       });
     }
 
+    let agendamentoOrigemId: number | null = null;
+
+    if (naturezaAtendimento === "RETORNO" && dados.agendamentoOrigemId) {
+      const agendamentoOrigem = await tx.agendamento.findUnique({
+        where: { id: dados.agendamentoOrigemId },
+        select: { id: true, clienteId: true },
+      });
+
+      if (!agendamentoOrigem) {
+        throw new Error("O atendimento de origem do retorno não foi encontrado.");
+      }
+
+      if (agendamentoOrigem.clienteId !== clienteId) {
+        throw new Error(
+          "O retorno deve pertencer ao mesmo cliente do atendimento de origem.",
+        );
+      }
+
+      agendamentoOrigemId = agendamentoOrigem.id;
+    }
+
     await tx.agendamento.createMany({
       data: datas.map((data, index) => ({
         clienteId: clienteId!,
@@ -541,10 +591,15 @@ export async function criarAgendamento(dados: NovoAgendamento) {
         procedimento: dados.procedimento,
         data,
         duracao,
-        valor: dados.valor || 0,
+        valor: valorAgendamento,
         status: dados.status || "Agendado",
         observacoes: dados.observacoes || null,
-        sinalPago: Boolean(dados.sinalPago),
+        sinalPago:
+          naturezaAtendimento === "RETORNO"
+            ? false
+            : Boolean(dados.sinalPago),
+        naturezaAtendimento,
+        agendamentoOrigemId,
         serieId,
         recorrenciaTipo: serieId ? regra.tipo : null,
         recorrenciaIntervalo: serieId ? regra.intervalo : null,
@@ -565,8 +620,20 @@ export async function atualizarAgendamento({
 }: NovoAgendamento & { id: number }) {
   await requirePermission("agenda.gerenciar");
 
+  const naturezaAtendimento = normalizarNaturezaAtendimento(
+    dados.naturezaAtendimento,
+  );
+
+  if (naturezaAtendimento === "RETORNO" && !dados.clienteId) {
+    throw new Error("O retorno deve ser vinculado a um cliente já cadastrado.");
+  }
+
   const data = parseLocalDateTime(dados.data);
   const duracao = dados.duracao || 60;
+  const valorAgendamento =
+    naturezaAtendimento === "RETORNO"
+      ? 0
+      : Math.max(0, Number(dados.valor) || 0);
 
   await validarConflitoAgenda({
     profissionalId: dados.profissionalId,
@@ -578,6 +645,31 @@ export async function atualizarAgendamento({
   const clienteId = dados.clienteId || (await resolverCliente(dados));
 
   await prisma.$transaction(async (tx) => {
+    let agendamentoOrigemId: number | null = null;
+
+    if (naturezaAtendimento === "RETORNO" && dados.agendamentoOrigemId) {
+      if (dados.agendamentoOrigemId === id) {
+        throw new Error("Um retorno não pode ser vinculado a ele mesmo.");
+      }
+
+      const agendamentoOrigem = await tx.agendamento.findUnique({
+        where: { id: dados.agendamentoOrigemId },
+        select: { id: true, clienteId: true },
+      });
+
+      if (!agendamentoOrigem) {
+        throw new Error("O atendimento de origem do retorno não foi encontrado.");
+      }
+
+      if (agendamentoOrigem.clienteId !== clienteId) {
+        throw new Error(
+          "O retorno deve pertencer ao mesmo cliente do atendimento de origem.",
+        );
+      }
+
+      agendamentoOrigemId = agendamentoOrigem.id;
+    }
+
     if (dados.areaEstetica || dados.areaCilios) {
       await tx.cliente.update({
         where: { id: clienteId },
@@ -598,10 +690,15 @@ export async function atualizarAgendamento({
         procedimento: dados.procedimento,
         data,
         duracao,
-        valor: dados.valor || 0,
+        valor: valorAgendamento,
         status: dados.status || "Agendado",
         observacoes: dados.observacoes || null,
-        sinalPago: Boolean(dados.sinalPago),
+        sinalPago:
+          naturezaAtendimento === "RETORNO"
+            ? false
+            : Boolean(dados.sinalPago),
+        naturezaAtendimento,
+        agendamentoOrigemId,
         statusAntesAtendimento:
           dados.status === "Em atendimento" ? undefined : null,
       },
@@ -996,7 +1093,7 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
     throw new Error("Informe o procedimento realizado.");
   }
 
-  const valorCobrado = Number.isFinite(Number(dados.valorCobrado))
+  const valorCobradoInformado = Number.isFinite(Number(dados.valorCobrado))
     ? Math.max(0, Number(dados.valorCobrado))
     : 0;
 
@@ -1027,6 +1124,10 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
     throw new Error("Este atendimento já foi finalizado.");
   }
 
+  const atendimentoRetorno =
+    agendamento.naturezaAtendimento === "RETORNO";
+  const valorCobrado = atendimentoRetorno ? 0 : valorCobradoInformado;
+
   const profissional =
     dados.profissional?.trim() ||
     agendamento.profissional?.nome ||
@@ -1046,9 +1147,11 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
         select: { id: true, custoPadrao: true },
       });
 
-  const custoServico = Number.isFinite(Number(dados.custoServico))
-    ? Math.max(0, Number(dados.custoServico))
-    : Math.max(0, servicoBase?.custoPadrao || 0);
+  const custoServico = atendimentoRetorno
+    ? 0
+    : Number.isFinite(Number(dados.custoServico))
+      ? Math.max(0, Number(dados.custoServico))
+      : Math.max(0, servicoBase?.custoPadrao || 0);
 
   const produtos = (dados.produtos || []).filter(
     (item) => item.produtoId > 0 && item.quantidade > 0,
@@ -1070,7 +1173,7 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
         nome: procedimentoRealizado,
         profissional,
         valor: valorCobrado,
-        status: "Realizado",
+        status: atendimentoRetorno ? "Retorno" : "Realizado",
         dataProcedimento: dataAtendimento,
         observacoes,
       },
@@ -1095,7 +1198,7 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
       data: dataAtendimento,
       formaPagamento,
       statusPagamento,
-      origem: "Agenda",
+      origem: atendimentoRetorno ? "Agenda - Retorno" : "Agenda",
       observacoes,
       servico: {
         procedimentoServicoId: servicoBase?.id || null,
@@ -1160,13 +1263,17 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
     await tx.auditoria.create({
       data: {
         modulo: "Agenda",
-        acao: evolucaoClinica
-          ? "Finalizou atendimento, registrou evolução e venda"
-          : "Finalizou atendimento com evolução pendente e registrou venda",
+        acao: atendimentoRetorno
+          ? evolucaoClinica
+            ? "Finalizou retorno e registrou evolução"
+            : "Finalizou retorno com evolução pendente"
+          : evolucaoClinica
+            ? "Finalizou atendimento, registrou evolução e venda"
+            : "Finalizou atendimento com evolução pendente e registrou venda",
         entidade: "Venda",
         entidadeId: String(venda.vendaId),
         usuario: profissional,
-        detalhes: `Atendimento finalizado para ${agendamento.cliente.nome}. Evolução: ${evolucaoClinica ? "registrada" : "pendente"}. Serviço: R$ ${venda.totalServicos.toFixed(2)}. Produtos e kits: R$ ${venda.totalProdutos.toFixed(2)}. Total: R$ ${venda.valorTotal.toFixed(2)}. Custo direto: R$ ${venda.custoTotal.toFixed(2)}. Pagamento: ${statusPagamento}.${venda.estoqueNegativoAutorizado ? ` Estoque negativo autorizado por ${usuarioAtual.email}.` : ""}`,
+        detalhes: `${atendimentoRetorno ? "Retorno" : "Atendimento"} finalizado para ${agendamento.cliente.nome}. Evolução: ${evolucaoClinica ? "registrada" : "pendente"}. Serviço: R$ ${venda.totalServicos.toFixed(2)}. Produtos e kits: R$ ${venda.totalProdutos.toFixed(2)}. Total: R$ ${venda.valorTotal.toFixed(2)}. Custo direto: R$ ${venda.custoTotal.toFixed(2)}. Pagamento: ${statusPagamento}.${venda.estoqueNegativoAutorizado ? ` Estoque negativo autorizado por ${usuarioAtual.email}.` : ""}`,
       },
     });
   });

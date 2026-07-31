@@ -67,6 +67,8 @@ export type AppointmentDetails = {
   valor: number;
   observacoes: string | null;
   sinalPago: boolean;
+  naturezaAtendimento?: "PROCEDIMENTO" | "RETORNO";
+  agendamentoOrigemId?: number | null;
   status: string;
   statusAntesAtendimento?: string | null;
   evolucaoStatus?: string | null;
@@ -373,6 +375,11 @@ export default function AppointmentDetailsModal({
                   <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusClass(currentAppointment.status)}`}>
                     {currentAppointment.status}
                   </span>
+                  {currentAppointment.naturezaAtendimento === "RETORNO" ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-cyan-50 px-2 py-0.5 text-[10px] font-bold text-cyan-700">
+                      <CalendarClock size={11} /> Retorno
+                    </span>
+                  ) : null}
                   {currentAppointment.sinalPago ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700">
                       <BadgeCheck size={11} /> Sinal pago
@@ -521,9 +528,17 @@ export default function AppointmentDetailsModal({
                   <p className="mt-0.5 text-xs text-slate-500">{formatTime(currentAppointment.data)} até {formatTime(endDate)}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Procedimento</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                    {currentAppointment.naturezaAtendimento === "RETORNO"
+                      ? "Retorno do procedimento"
+                      : "Procedimento"}
+                  </p>
                   <p className="mt-1 text-sm font-bold text-slate-900">{currentAppointment.procedimento}</p>
-                  <p className="mt-0.5 text-xs font-bold text-violet-700">{formatCurrency(currentAppointment.valor)}</p>
+                  <p className="mt-0.5 text-xs font-bold text-violet-700">
+                    {currentAppointment.naturezaAtendimento === "RETORNO"
+                      ? "Sem cobrança"
+                      : formatCurrency(currentAppointment.valor)}
+                  </p>
                 </div>
               </div>
               <div className="mt-3 flex items-center gap-3 border-t border-slate-100 pt-3">

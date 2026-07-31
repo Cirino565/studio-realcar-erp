@@ -10,6 +10,7 @@ import {
   ChevronDown,
   Clock3,
   Repeat2,
+  RotateCcw,
   Search,
   Trash2,
   UserPlus,
@@ -79,6 +80,8 @@ type NovoAgendamentoPayload = NovoHorarioPayload & {
   status?: string;
   observacoes?: string;
   sinalPago?: boolean;
+  naturezaAtendimento?: "PROCEDIMENTO" | "RETORNO";
+  agendamentoOrigemId?: number | null;
 };
 
 type Props = {
@@ -207,6 +210,10 @@ export default function NovoAgendamentoModal({
   initialPayload,
 }: Props) {
   const [tipoAtendimento, setTipoAtendimento] = useState<"agendamento" | "bloqueio">("agendamento");
+  const [naturezaAtendimento, setNaturezaAtendimento] = useState<
+    "PROCEDIMENTO" | "RETORNO"
+  >("PROCEDIMENTO");
+  const [agendamentoOrigemId, setAgendamentoOrigemId] = useState("");
   const [tipoCliente, setTipoCliente] = useState<"existente" | "novo">("existente");
   const [clienteId, setClienteId] = useState("");
   const [clienteBloqueado, setClienteBloqueado] = useState(false);
@@ -255,8 +262,8 @@ export default function NovoAgendamentoModal({
   );
 
   const modoRetorno = Boolean(
-    !modoEdicao &&
-      (initialPayload?.modo === "retorno" || initialPayload?.clienteId),
+    initialPayload?.modo === "retorno" ||
+      initialPayload?.naturezaAtendimento === "RETORNO",
   );
 
   const areaAutomaticaAtiva =
@@ -276,9 +283,20 @@ export default function NovoAgendamentoModal({
 
     const temClientePreSelecionado = Boolean(initialPayload?.clienteId);
     const deveBloquearCliente = Boolean(temClientePreSelecionado && !modoEdicao);
+    const naturezaInicial =
+      initialPayload?.naturezaAtendimento === "RETORNO" ||
+      initialPayload?.modo === "retorno"
+        ? "RETORNO"
+        : "PROCEDIMENTO";
 
     setErro("");
     setTipoAtendimento(initialPayload?.tipoAtendimento || (modoEdicaoBloqueio ? "bloqueio" : "agendamento"));
+    setNaturezaAtendimento(naturezaInicial);
+    setAgendamentoOrigemId(
+      initialPayload?.agendamentoOrigemId
+        ? String(initialPayload.agendamentoOrigemId)
+        : "",
+    );
     setTipoCliente("existente");
     setClienteBloqueado(deveBloquearCliente);
     setClienteId(initialPayload?.clienteId ? String(initialPayload.clienteId) : "");
@@ -310,10 +328,18 @@ export default function NovoAgendamentoModal({
     setData(initialPayload?.data || getHojeInput());
     setHora(initialPayload?.hora || "09:00");
     setDuracao(formatarDuracao(initialPayload?.duracao || 60));
-    setValor(valorParaInput(initialPayload?.valor));
+    setValor(
+      naturezaInicial === "RETORNO"
+        ? ""
+        : valorParaInput(initialPayload?.valor),
+    );
     setStatus(initialPayload?.status || "Agendado");
     setObservacoes(initialPayload?.observacoes || "");
-    setSinalPago(Boolean(initialPayload?.sinalPago));
+    setSinalPago(
+      naturezaInicial === "RETORNO"
+        ? false
+        : Boolean(initialPayload?.sinalPago),
+    );
     setMotivoBloqueio(initialPayload?.motivoBloqueio || "Almoço");
     setRecorrenciaTipo("nenhuma");
     setRecorrenciaIntervalo("1");
@@ -481,9 +507,11 @@ export default function NovoAgendamentoModal({
     setMostrarListaServicos(false);
     setDuracao(formatarDuracao(servico.duracaoPadrao));
     setValor(
-      servico.valorPadrao > 0
-        ? servico.valorPadrao.toFixed(2).replace(".", ",")
-        : "",
+      naturezaAtendimento === "RETORNO"
+        ? ""
+        : servico.valorPadrao > 0
+          ? servico.valorPadrao.toFixed(2).replace(".", ",")
+          : "",
     );
     setErro("");
   }
@@ -500,6 +528,28 @@ export default function NovoAgendamentoModal({
       setServicoSelecionadoId("");
       setProcedimento("");
     }
+  }
+
+  function alterarNaturezaAtendimento(
+    novaNatureza: "PROCEDIMENTO" | "RETORNO",
+  ) {
+    setNaturezaAtendimento(novaNatureza);
+    setErro("");
+
+    if (novaNatureza === "RETORNO") {
+      setTipoCliente("existente");
+      setValor("");
+      setSinalPago(false);
+      setRecorrenciaTipo("nenhuma");
+      return;
+    }
+
+    setAgendamentoOrigemId("");
+    setValor(
+      servicoSelecionado && servicoSelecionado.valorPadrao > 0
+        ? servicoSelecionado.valorPadrao.toFixed(2).replace(".", ",")
+        : "",
+    );
   }
 
   function aplicarAreasPadrao() {
@@ -612,6 +662,11 @@ export default function NovoAgendamentoModal({
       return;
     }
 
+    if (naturezaAtendimento === "RETORNO" && tipoCliente !== "existente") {
+      setErro("O retorno deve ser vinculado a um cliente já cadastrado.");
+      return;
+    }
+
     if (tipoCliente === "existente" && !clienteId) {
       setErro("Selecione um cliente cadastrado ou adicione um novo cliente.");
       return;
@@ -641,13 +696,25 @@ export default function NovoAgendamentoModal({
         procedimento,
         data: dataCompleta,
         duracao: duracaoNumerica,
-        valor: parseCurrency(valor),
+        valor:
+          naturezaAtendimento === "RETORNO"
+            ? 0
+            : parseCurrency(valor),
         status,
         observacoes,
-        sinalPago,
+        sinalPago:
+          naturezaAtendimento === "RETORNO" ? false : sinalPago,
+        naturezaAtendimento,
+        agendamentoOrigemId:
+          naturezaAtendimento === "RETORNO" && agendamentoOrigemId
+            ? Number(agendamentoOrigemId)
+            : undefined,
         areaEstetica,
         areaCilios,
-        recorrencia: modoEdicao ? { tipo: "nenhuma" as const } : recorrencia,
+        recorrencia:
+          modoEdicao || naturezaAtendimento === "RETORNO"
+            ? { tipo: "nenhuma" as const }
+            : recorrencia,
       };
 
       if (modoEdicao && initialPayload?.agendamentoId) {
@@ -749,7 +816,7 @@ export default function NovoAgendamentoModal({
                   ? "Criando Bloqueio"
                   : modoEdicao
                     ? "Editando Atendimento"
-                    : modoRetorno
+                    : naturezaAtendimento === "RETORNO" || modoRetorno
                       ? "Criando Retorno"
                       : "Criando Atendimento"}
             </h2>
@@ -892,11 +959,49 @@ export default function NovoAgendamentoModal({
 
           {tipoAtendimento === "agendamento" ? (
             <>
+          <section className="mt-5 rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-800/40">
+            <span className={labelClassName()}>Tipo do atendimento</span>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => alterarNaturezaAtendimento("PROCEDIMENTO")}
+                className={`flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-bold transition ${
+                  naturezaAtendimento === "PROCEDIMENTO"
+                    ? "border-violet-500 bg-violet-600 text-white"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-violet-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                }`}
+              >
+                <CalendarDays size={16} />
+                Procedimento
+              </button>
+              <button
+                type="button"
+                onClick={() => alterarNaturezaAtendimento("RETORNO")}
+                className={`flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-bold transition ${
+                  naturezaAtendimento === "RETORNO"
+                    ? "border-cyan-500 bg-cyan-600 text-white"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-cyan-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                }`}
+              >
+                <RotateCcw size={16} />
+                Retorno
+              </button>
+            </div>
+            {naturezaAtendimento === "RETORNO" ? (
+              <p className="mt-2.5 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs leading-5 text-cyan-800 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:text-cyan-200">
+                Use o procedimento original. O retorno será salvo separadamente, com valor zero, sem sinal e sem receita de serviço.
+              </p>
+            ) : null}
+          </section>
+
           <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-700">
             <div className="flex items-center justify-between gap-3">
               <span className={labelClassName()}>Cliente</span>
 
-              {!clienteBloqueado && tipoCliente === "existente" && !clienteSelecionado ? (
+              {!clienteBloqueado &&
+              naturezaAtendimento === "PROCEDIMENTO" &&
+              tipoCliente === "existente" &&
+              !clienteSelecionado ? (
                 <button
                   type="button"
                   onClick={iniciarNovoCliente}
@@ -1052,28 +1157,36 @@ export default function NovoAgendamentoModal({
                           </button>
                         ))}
 
-                        <button
-                          type="button"
-                          onClick={iniciarNovoCliente}
-                          className="flex w-full items-center justify-center gap-2 bg-emerald-600 px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-white transition hover:bg-emerald-700"
-                        >
-                          <UserPlus size={14} />
-                          Adicionar novo cliente
-                        </button>
+                        {naturezaAtendimento === "PROCEDIMENTO" ? (
+                          <button
+                            type="button"
+                            onClick={iniciarNovoCliente}
+                            className="flex w-full items-center justify-center gap-2 bg-emerald-600 px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-white transition hover:bg-emerald-700"
+                          >
+                            <UserPlus size={14} />
+                            Adicionar novo cliente
+                          </button>
+                        ) : null}
                       </>
                     ) : (
                       <div className="p-3">
                         <p className="mb-2 text-center text-xs text-slate-500">
                           Nenhum cliente encontrado.
                         </p>
-                        <button
-                          type="button"
-                          onClick={iniciarNovoCliente}
-                          className="flex w-full items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-white hover:bg-emerald-700"
-                        >
-                          <UserPlus size={14} />
-                          Adicionar cliente
-                        </button>
+                        {naturezaAtendimento === "PROCEDIMENTO" ? (
+                          <button
+                            type="button"
+                            onClick={iniciarNovoCliente}
+                            className="flex w-full items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-white hover:bg-emerald-700"
+                          >
+                            <UserPlus size={14} />
+                            Adicionar cliente
+                          </button>
+                        ) : (
+                          <p className="text-center text-[11px] font-medium text-cyan-700 dark:text-cyan-300">
+                            O retorno precisa de um cliente já cadastrado.
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1262,36 +1375,48 @@ export default function NovoAgendamentoModal({
               </label>
 
               <label>
-                <span className={labelClassName()}>Valor previsto</span>
+                <span className={labelClassName()}>
+                  {naturezaAtendimento === "RETORNO"
+                    ? "Valor do retorno"
+                    : "Valor previsto"}
+                </span>
                 <input
                   value={valor}
+                  disabled={naturezaAtendimento === "RETORNO"}
                   onChange={(event) =>
                     setValor(formatCurrencyInput(event.target.value))
                   }
                   placeholder="0,00"
-                  className={fieldClassName()}
+                  className={`${fieldClassName()} disabled:cursor-not-allowed disabled:opacity-70`}
                 />
+                {naturezaAtendimento === "RETORNO" ? (
+                  <span className="mt-1.5 block text-[11px] font-medium text-cyan-700 dark:text-cyan-300">
+                    R$ 0,00, não gera receita de serviço.
+                  </span>
+                ) : null}
               </label>
             </div>
 
-            <label className="mt-4 flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 dark:border-emerald-500/30 dark:bg-emerald-500/10">
-              <span>
-                <span className="block text-sm font-bold text-emerald-800 dark:text-emerald-200">
-                  Pagou sinal
+            {naturezaAtendimento === "PROCEDIMENTO" ? (
+              <label className="mt-4 flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+                <span>
+                  <span className="block text-sm font-bold text-emerald-800 dark:text-emerald-200">
+                    Pagou sinal
+                  </span>
+                  <span className="mt-0.5 block text-xs text-emerald-700/80 dark:text-emerald-300/80">
+                    Exibe um marcador visível diretamente na agenda.
+                  </span>
                 </span>
-                <span className="mt-0.5 block text-xs text-emerald-700/80 dark:text-emerald-300/80">
-                  Exibe um marcador visível diretamente na agenda.
-                </span>
-              </span>
-              <input
-                type="checkbox"
-                checked={sinalPago}
-                onChange={(event) => setSinalPago(event.target.checked)}
-                className="size-5 shrink-0 accent-emerald-600"
-              />
-            </label>
+                <input
+                  type="checkbox"
+                  checked={sinalPago}
+                  onChange={(event) => setSinalPago(event.target.checked)}
+                  className="size-5 shrink-0 accent-emerald-600"
+                />
+              </label>
+            ) : null}
 
-            {!modoEdicao ? (
+            {!modoEdicao && naturezaAtendimento === "PROCEDIMENTO" ? (
               <div className="mt-4 rounded-md border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-800/40">
                 <div className="flex items-center gap-2">
                   <Repeat2 size={16} className="text-violet-600 dark:text-violet-300" />

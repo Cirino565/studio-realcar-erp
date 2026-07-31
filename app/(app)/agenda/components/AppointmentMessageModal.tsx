@@ -22,6 +22,7 @@ import {
 type AppointmentForMessage = {
   id: number;
   procedimento: string;
+  naturezaAtendimento?: "PROCEDIMENTO" | "RETORNO";
   data: Date | string;
   cliente: {
     nome: string;
@@ -50,7 +51,10 @@ function gerarMensagem(
   return buildWhatsAppMessage({
     template,
     clientName: appointment.cliente.nome,
-    procedure: appointment.procedimento,
+    procedure:
+      appointment.naturezaAtendimento === "RETORNO"
+        ? `Retorno, ${appointment.procedimento}`
+        : appointment.procedimento,
     appointmentDate: appointment.data,
   });
 }
@@ -165,7 +169,11 @@ function AppointmentMessageContent({
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5 dark:border-white/10 dark:bg-white/[0.035]">
-              <p className="text-xs font-semibold text-slate-500">Procedimento</p>
+              <p className="text-xs font-semibold text-slate-500">
+                {appointment.naturezaAtendimento === "RETORNO"
+                  ? "Retorno"
+                  : "Procedimento"}
+              </p>
               <p className="mt-1 truncate text-sm font-bold text-slate-900 dark:text-white">
                 {appointment.procedimento}
               </p>
