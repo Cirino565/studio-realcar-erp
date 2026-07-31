@@ -32,6 +32,8 @@ model Cliente {
   status       String   @default("Ativa")
   areaEstetica Boolean  @default(false)
   areaCilios   Boolean  @default(false)
+  campanhaAquisicaoId Int?
+  campanhaAquisicao CampanhaMarketing? @relation(fields: [campanhaAquisicaoId], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -45,6 +47,8 @@ model Cliente {
   leads          Lead[]
   comunicacoes   ComunicacaoRegistro[]
   vendas          Venda[]
+
+  @@index([campanhaAquisicaoId])
 }
 
 model OrigemCliente {
@@ -159,22 +163,36 @@ model BloqueioAgenda {
 }
 
 model Lancamento {
-  id              Int      @id @default(autoincrement())
-  descricao       String
-  valor           Float
-  tipo            String
-  categoria       String?
-  observacoes     String?
-  data            DateTime
-  formaPagamento  String?
-  statusPagamento String   @default("Pago")
-  origem          String?
-  agendamentoId   Int?
-  clienteId       Int?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                       Int      @id @default(autoincrement())
+  descricao                String
+  valor                    Float
+  valorLiquido             Float?
+  taxaPagamento            Float    @default(0)
+  taxaPercentualAplicada   Float    @default(0)
+  taxaFixaAplicada         Float    @default(0)
+  tipo                     String
+  categoria                String?
+  observacoes              String?
+  data                     DateTime
+  formaPagamento           String?
+  statusPagamento          String   @default("Pago")
+  origem                   String?
+  agendamentoId            Int?
+  clienteId                Int?
+  contaFinanceiraId        Int?
+  contaFinanceira          ContaFinanceira? @relation(fields: [contaFinanceiraId], references: [id], onDelete: SetNull)
+  formaPagamentoConfigId   Int?
+  formaPagamentoConfig     FormaPagamentoConfig? @relation(fields: [formaPagamentoConfigId], references: [id], onDelete: SetNull)
+  campanhaId               Int?
+  campanha                 CampanhaMarketing? @relation(fields: [campanhaId], references: [id], onDelete: SetNull)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 
-  venda           Venda?
+  venda                    Venda?
+
+  @@index([contaFinanceiraId, data])
+  @@index([campanhaId, data])
+  @@index([formaPagamentoConfigId])
 }
 
 model Fornecedor {
@@ -278,7 +296,17 @@ model Venda {
   custoProdutos       Float     @default(0)
   valorTotal          Float     @default(0)
   custoTotal          Float     @default(0)
+  taxaPagamento       Float     @default(0)
+  taxaPercentualAplicada Float  @default(0)
+  taxaFixaAplicada    Float     @default(0)
+  valorLiquido        Float?
   formaPagamento      String?
+  formaPagamentoConfigId Int?
+  formaPagamentoConfig FormaPagamentoConfig? @relation(fields: [formaPagamentoConfigId], references: [id], onDelete: SetNull)
+  contaFinanceiraId   Int?
+  contaFinanceira     ContaFinanceira? @relation(fields: [contaFinanceiraId], references: [id], onDelete: SetNull)
+  campanhaId          Int?
+  campanha            CampanhaMarketing? @relation(fields: [campanhaId], references: [id], onDelete: SetNull)
   statusPagamento     String    @default("Pago")
   situacao            String    @default("ATIVA")
   canceladaEm         DateTime?
@@ -297,6 +325,9 @@ model Venda {
   @@index([data])
   @@index([statusPagamento, data])
   @@index([situacao, data])
+  @@index([contaFinanceiraId, data])
+  @@index([campanhaId, data])
+  @@index([formaPagamentoConfigId])
 }
 
 model VendaItem {
@@ -407,9 +438,53 @@ model CampanhaMarketing {
   status            String   @default("Ativa")
   inicio            DateTime?
   fim               DateTime?
+  observacoes       String?
   leadsRelacionados Lead[]
+  clientesAquisicao Cliente[]
+  vendas            Venda[]
+  lancamentos       Lancamento[]
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+
+  @@index([status, inicio])
+}
+
+
+model ContaFinanceira {
+  id            Int      @id @default(autoincrement())
+  nome          String
+  banco         String?
+  tipo          String   @default("Conta corrente")
+  saldoInicial         Float    @default(0)
+  saldoBancoInformado  Float?
+  conciliadoEm         DateTime?
+  principal            Boolean  @default(false)
+  status        String   @default("Ativa")
+  observacoes   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  lancamentos   Lancamento[]
+  vendas        Venda[]
+
+  @@index([principal, status])
+}
+
+model FormaPagamentoConfig {
+  id              Int      @id @default(autoincrement())
+  nome            String   @unique
+  taxaPercentual  Float    @default(0)
+  taxaFixa        Float    @default(0)
+  prazoDias       Int      @default(0)
+  status          String   @default("Ativa")
+  ordem           Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  lancamentos     Lancamento[]
+  vendas          Venda[]
+
+  @@index([status, ordem, nome])
 }
 
 model Usuario {

@@ -31,6 +31,7 @@ export type CriarCampanhaInput = {
   status: string;
   inicio?: string;
   fim?: string;
+  observacoes?: string;
 };
 
 export type AgendarAvaliacaoLeadInput = {
@@ -173,12 +174,20 @@ async function converterLeadInterno(id: number) {
           procedimento: limparTexto(lead.interesse),
           valorGasto: 0,
           status: "Ativa",
+          campanhaAquisicaoId: lead.campanhaId,
           observacoes: lead.observacoes
             ? `Convertido do CRM. Origem: ${lead.origem || "não informada"}. Observações: ${lead.observacoes}`
             : `Convertido do CRM. Origem: ${lead.origem || "não informada"}.`,
         },
       });
       clienteId = cliente.id;
+    }
+
+    if (clienteId && lead.campanhaId) {
+      await tx.cliente.updateMany({
+        where: { id: clienteId, campanhaAquisicaoId: null },
+        data: { campanhaAquisicaoId: lead.campanhaId },
+      });
     }
 
     const atualizado = await tx.lead.update({
@@ -603,10 +612,18 @@ export async function agendarAvaliacaoLead(dados: AgendarAvaliacaoLeadInput) {
           procedimentoInteresse: limparTexto(lead.interesse) || procedimento,
           valorGasto: 0,
           status: "Ativa",
+          campanhaAquisicaoId: lead.campanhaId,
           observacoes: `Cliente criado automaticamente a partir do CRM para agendamento de ${procedimento}.`,
         },
       });
       clienteId = cliente.id;
+    }
+
+    if (clienteId && lead.campanhaId) {
+      await tx.cliente.updateMany({
+        where: { id: clienteId, campanhaAquisicaoId: null },
+        data: { campanhaAquisicaoId: lead.campanhaId },
+      });
     }
 
     const dadosAgendamento = {
@@ -707,6 +724,7 @@ export async function criarCampanha(dados: CriarCampanhaInput) {
       status: dados.status || "Ativa",
       inicio: dados.inicio ? new Date(`${dados.inicio}T12:00:00-03:00`) : null,
       fim: dados.fim ? new Date(`${dados.fim}T12:00:00-03:00`) : null,
+      observacoes: limparTexto(dados.observacoes),
     },
   });
 
@@ -724,8 +742,232 @@ export async function criarCampanha(dados: CriarCampanhaInput) {
   revalidatePath("/marketing");
 }
 
+export async function vincularClienteCampanha(dados: {
+  clienteId: number;
+  campanhaId: number;
+  vincularReceitasExistentes?: boolean;
+}) {
+  const usuario = await requirePermission("marketing.gerenciar");
+  const clienteId = Math.trunc(Number(dados.clienteId));
+  const campanhaId = Math.trunc(Number(dados.campanhaId));
+
+  const [cliente, campanha] = await Promise.all([
+    prisma.cliente.findUnique({ where: { id: clienteId }, select: { id: true, nome: true } }),
+    prisma.campanhaMarketing.findUnique({ where: { id: campanhaId }, select: { id: true, nome: true } }),
+  ]);
+  if (!cliente) throw new Error("Cliente não encontrada.");
+  if (!campanha) throw new Error("Campanha não encontrada.");
+
+  const resultado = await prisma.$transaction(async (tx) => {
+    await tx.cliente.update({
+      where: { id: cliente.id },
+      data: { campanhaAquisicaoId: campanha.id },
+    });
+
+    let vendas = 0;
+    let lancamentos = 0;
+    if (dados.vincularReceitasExistentes) {
+      vendas = (
+        await tx.venda.updateMany({
+          where: {
+            clienteId: cliente.id,
+            situacao: { not: "CANCELADA" },
+            campanhaId: null,
+          },
+          data: { campanhaId: campanha.id },
+        })
+      ).count;
+
+      lancamentos = (
+        await tx.lancamento.updateMany({
+          where: {
+            clienteId: cliente.id,
+            tipo: "ENTRADA",
+            statusPagamento: { not: "Cancelado" },
+            campanhaId: null,
+          },
+          data: { campanhaId: campanha.id },
+        })
+      ).count;
+    }
+
+    await tx.auditoria.create({
+      data: {
+        modulo: "Marketing",
+        acao: "Vinculou cliente à campanha",
+        entidade: "Cliente",
+        entidadeId: String(cliente.id),
+        usuario: usuario.email,
+        detalhes: `${cliente.nome} -> ${campanha.nome}. Receitas retroativas: ${dados.vincularReceitasExistentes ? "sim" : "não"}. Vendas: ${vendas}. Lançamentos: ${lancamentos}.`,
+      },
+    });
+
+    return { vendas, lancamentos };
+  });
+
+  revalidatePath("/marketing");
+  revalidatePath("/clientes");
+  revalidatePath(`/clientes/${cliente.id}`);
+  revalidatePath("/vendas");
+  revalidatePath("/financeiro");
+  revalidatePath("/");
+
+  return { ok: true, ...resultado };
+}
+
+export async function vincularReceitaCampanha(dados: {
+  lancamentoId: number;
+  campanhaId: number;
+}) {
+  const usuario = await requirePermission("marketing.gerenciar");
+  const lancamentoId = Math.trunc(Number(dados.lancamentoId));
+  const campanhaId = Math.trunc(Number(dados.campanhaId));
+
+  const [lancamento, campanha] = await Promise.all([
+    prisma.lancamento.findUnique({
+      where: { id: lancamentoId },
+      select: {
+        id: true,
+        descricao: true,
+        valor: true,
+        tipo: true,
+        statusPagamento: true,
+        campanhaId: true,
+        venda: { select: { id: true } },
+      },
+    }),
+    prisma.campanhaMarketing.findUnique({
+      where: { id: campanhaId },
+      select: { id: true, nome: true },
+    }),
+  ]);
+
+  if (!lancamento) throw new Error("Receita não encontrada.");
+  if (!campanha) throw new Error("Campanha não encontrada.");
+  if (lancamento.tipo !== "ENTRADA") throw new Error("Somente receitas podem ser vinculadas à campanha.");
+  if (lancamento.statusPagamento.toLowerCase() === "cancelado") {
+    throw new Error("Uma receita cancelada não pode ser vinculada.");
+  }
+  if (lancamento.campanhaId && lancamento.campanhaId !== campanha.id) {
+    throw new Error("Esta receita já pertence a outra campanha.");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.lancamento.update({
+      where: { id: lancamento.id },
+      data: { campanhaId: campanha.id },
+    });
+
+    if (lancamento.venda) {
+      await tx.venda.updateMany({
+        where: { id: lancamento.venda.id, situacao: { not: "CANCELADA" } },
+        data: { campanhaId: campanha.id },
+      });
+    }
+
+    await tx.auditoria.create({
+      data: {
+        modulo: "Marketing",
+        acao: "Vinculou receita à campanha",
+        entidade: "Lancamento",
+        entidadeId: String(lancamento.id),
+        usuario: usuario.email,
+        detalhes: `${lancamento.descricao} · R$ ${lancamento.valor.toFixed(2)} -> ${campanha.nome}.`,
+      },
+    });
+  });
+
+  revalidatePath("/marketing");
+  revalidatePath("/financeiro");
+  revalidatePath("/vendas");
+  revalidatePath("/gestao");
+  revalidatePath("/");
+
+  return { ok: true };
+}
+
+export async function registrarCustoCampanha(dados: {
+  campanhaId: number;
+  descricao: string;
+  valor: number;
+  data: string;
+  contaFinanceiraId?: number | null;
+  observacoes?: string;
+}) {
+  const usuario = await requirePermission("marketing.gerenciar");
+  await requirePermission("financeiro.gerenciar");
+
+  const campanhaId = Math.trunc(Number(dados.campanhaId));
+  const valor = Math.round(Math.max(0, Number(dados.valor) || 0) * 100) / 100;
+  if (valor <= 0) throw new Error("Informe um custo maior que zero.");
+  if (!dados.descricao.trim()) throw new Error("Informe a descrição do custo.");
+
+  const campanha = await prisma.campanhaMarketing.findUnique({
+    where: { id: campanhaId },
+    select: { id: true, nome: true },
+  });
+  if (!campanha) throw new Error("Campanha não encontrada.");
+
+  const contaId =
+    dados.contaFinanceiraId ||
+    (
+      await prisma.contaFinanceira.findFirst({
+        where: { principal: true, status: "Ativa" },
+        select: { id: true },
+      })
+    )?.id ||
+    null;
+
+  if (!contaId) {
+    throw new Error("Cadastre e selecione uma conta financeira antes de lançar o custo da campanha.");
+  }
+
+  const lancamento = await prisma.lancamento.create({
+    data: {
+      descricao: dados.descricao.trim(),
+      valor,
+      valorLiquido: valor,
+      tipo: "SAIDA",
+      categoria: "Marketing",
+      observacoes: limparTexto(dados.observacoes),
+      data: new Date(`${dados.data}T12:00:00-03:00`),
+      statusPagamento: "Pago",
+      origem: "Marketing",
+      campanhaId: campanha.id,
+      contaFinanceiraId: contaId,
+    },
+  });
+
+  await prisma.auditoria.create({
+    data: {
+      modulo: "Marketing",
+      acao: "Lançou custo de campanha",
+      entidade: "Lancamento",
+      entidadeId: String(lancamento.id),
+      usuario: usuario.email,
+      detalhes: `${campanha.nome}. R$ ${valor.toFixed(2)}.`,
+    },
+  });
+
+  revalidatePath("/marketing");
+  revalidatePath("/financeiro");
+  revalidatePath("/gestao");
+  revalidatePath("/");
+
+  return { ok: true, lancamentoId: lancamento.id };
+}
+
 export async function excluirCampanha(id: number) {
   await requirePermission("marketing.gerenciar");
+  const [clientes, leads, vendas, lancamentos] = await Promise.all([
+    prisma.cliente.count({ where: { campanhaAquisicaoId: id } }),
+    prisma.lead.count({ where: { campanhaId: id } }),
+    prisma.venda.count({ where: { campanhaId: id } }),
+    prisma.lancamento.count({ where: { campanhaId: id } }),
+  ]);
+  if (clientes + leads + vendas + lancamentos > 0) {
+    throw new Error("A campanha possui clientes, leads, vendas ou custos vinculados. Pause ou finalize a campanha em vez de excluí-la.");
+  }
   const campanha = await prisma.campanhaMarketing.delete({ where: { id } });
 
   await prisma.auditoria.create({

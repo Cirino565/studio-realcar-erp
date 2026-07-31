@@ -37,6 +37,8 @@ export async function GET() {
     leads,
     leadInteracoes,
     campanhas,
+    contasFinanceiras,
+    formasPagamento,
     usuarios,
     perfis,
     permissoes,
@@ -76,6 +78,8 @@ export async function GET() {
     prisma.lead.findMany(),
     prisma.leadInteracao.findMany(),
     prisma.campanhaMarketing.findMany(),
+    prisma.contaFinanceira.findMany(),
+    prisma.formaPagamentoConfig.findMany(),
     prisma.usuario.findMany({
       select: {
         id: true,
@@ -134,6 +138,8 @@ export async function GET() {
     leads,
     leadInteracoes,
     campanhas,
+    contasFinanceiras,
+    formasPagamento,
     usuarios,
     perfis,
     permissoes,
@@ -172,7 +178,7 @@ export async function GET() {
   return NextResponse.json(
     {
       generatedAt,
-      version: "studio-realcar-erp-deploy-ready-1.6",
+      version: "studio-realcar-erp-deploy-ready-1.7",
       type: "logical-snapshot",
       totalRegistros,
       data,

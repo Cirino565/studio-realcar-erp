@@ -5,7 +5,7 @@ import VendasClient from "./components/VendasClient";
 export default async function VendasPage() {
   const usuario = await requirePagePermission("financeiro.visualizar");
 
-  const [clientes, produtos, kits, vendas] = await Promise.all([
+  const [clientes, produtos, kits, vendas, formasPagamento] = await Promise.all([
     prisma.cliente.findMany({
       where: { status: { not: "Inativa" } },
       orderBy: { nome: "asc" },
@@ -14,6 +14,7 @@ export default async function VendasPage() {
         nome: true,
         telefone: true,
         whatsapp: true,
+        campanhaAquisicaoId: true,
       },
     }),
     prisma.produto.findMany({
@@ -86,6 +87,11 @@ export default async function VendasPage() {
         },
       },
     }),
+    prisma.formaPagamentoConfig.findMany({
+      where: { status: "Ativa" },
+      orderBy: [{ ordem: "asc" }, { nome: "asc" }],
+      select: { id: true, nome: true, taxaPercentual: true, taxaFixa: true, prazoDias: true, status: true },
+    }),
   ]);
 
   return (
@@ -93,6 +99,7 @@ export default async function VendasPage() {
       clientes={clientes}
       produtos={produtos}
       kits={kits}
+      formasPagamento={formasPagamento}
       vendas={vendas.map((venda) => ({
         ...venda,
         data: venda.data.toISOString(),

@@ -71,11 +71,19 @@ export default function FinanceiroResumo({ resumo }: Props) {
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <FinanceiroResumoCard
-        titulo="Entradas recebidas"
+        titulo="Receita bruta recebida"
         valor={formatarMoeda(resumo.entradas)}
-        detalhe={`${resumo.quantidadeEntradas} lançamento(s) pago(s) de receita`}
+        detalhe={`${resumo.quantidadeEntradas} entrada(s), ticket médio ${formatarMoeda(resumo.ticketMedioEntrada)}`}
         icon={ArrowUpRight}
         tone="green"
+      />
+
+      <FinanceiroResumoCard
+        titulo="Taxas de recebimento"
+        valor={formatarMoeda(resumo.taxasPagamento)}
+        detalhe={`Receita líquida: ${formatarMoeda(resumo.entradasLiquidas)}`}
+        icon={ReceiptText}
+        tone="violet"
       />
 
       <FinanceiroResumoCard
@@ -87,51 +95,26 @@ export default function FinanceiroResumo({ resumo }: Props) {
       />
 
       <FinanceiroResumoCard
-        titulo="Saldo realizado"
+        titulo="Saldo operacional líquido"
         valor={formatarMoeda(resumo.saldo)}
-        detalhe="Somente valores efetivamente pagos no filtro"
+        detalhe="Entradas líquidas menos despesas no filtro"
         icon={Banknote}
         tone="cyan"
-      />
-
-      <FinanceiroResumoCard
-        titulo="Ticket médio"
-        valor={formatarMoeda(resumo.ticketMedioEntrada)}
-        detalhe="Média das entradas efetivamente recebidas"
-        icon={CircleDollarSign}
-        tone="violet"
       />
 
       <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-900/[0.04] dark:border-white/10 dark:bg-white/[0.035] dark:shadow-black/10 md:col-span-2 xl:col-span-4">
         <div className="grid gap-4 md:grid-cols-3">
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-black/20">
-            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-              <ReceiptText className="size-4 text-slate-400" />
-              Lançamentos ativos no filtro
-            </div>
-            <p className="mt-2 text-xl font-semibold text-slate-950 dark:text-white">
-              {resumo.totalLancamentos}
-            </p>
+            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"><ReceiptText className="size-4 text-slate-400" />Lançamentos ativos no filtro</div>
+            <p className="mt-2 text-xl font-semibold text-slate-950 dark:text-white">{resumo.totalLancamentos}</p>
           </div>
-
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-black/20">
-            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-              <TrendingUp className="size-4 text-emerald-600 dark:text-emerald-400" />
-              Maior entrada
-            </div>
-            <p className="mt-2 text-xl font-semibold text-emerald-700 dark:text-emerald-300">
-              {formatarMoeda(resumo.maiorEntrada)}
-            </p>
+            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"><TrendingUp className="size-4 text-emerald-600 dark:text-emerald-400" />Maior entrada</div>
+            <p className="mt-2 text-xl font-semibold text-emerald-700 dark:text-emerald-300">{formatarMoeda(resumo.maiorEntrada)}</p>
           </div>
-
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-black/20">
-            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-              <ArrowDownLeft className="size-4 text-rose-600 dark:text-rose-400" />
-              Maior saída
-            </div>
-            <p className="mt-2 text-xl font-semibold text-rose-700 dark:text-rose-300">
-              {formatarMoeda(resumo.maiorSaida)}
-            </p>
+            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"><ArrowDownLeft className="size-4 text-rose-600 dark:text-rose-400" />Maior saída</div>
+            <p className="mt-2 text-xl font-semibold text-rose-700 dark:text-rose-300">{formatarMoeda(resumo.maiorSaida)}</p>
           </div>
         </div>
       </div>

@@ -33,6 +33,7 @@ async function salvarNovoCliente(formData: FormData) {
     observacoes: getString(formData, "observacoes"),
     areaEstetica: formData.get("areaEstetica") === "on",
     areaCilios: formData.get("areaCilios") === "on",
+    campanhaAquisicaoId: Number(getString(formData, "campanhaAquisicaoId")) || null,
   });
 
   redirect("/clientes");
@@ -41,7 +42,7 @@ async function salvarNovoCliente(formData: FormData) {
 export default async function NovoClientePage() {
   await requirePagePermission("clientes.gerenciar");
 
-  const [origens, procedimentosInteresse] = await Promise.all([
+  const [origens, procedimentosInteresse, campanhas] = await Promise.all([
     prisma.origemCliente.findMany({
       where: { status: "Ativa" },
       orderBy: [{ ordem: "asc" }, { nome: "asc" }],
@@ -49,6 +50,9 @@ export default async function NovoClientePage() {
     prisma.procedimentoInteresse.findMany({
       where: { status: "Ativo" },
       orderBy: [{ ordem: "asc" }, { nome: "asc" }],
+    }),
+    prisma.campanhaMarketing.findMany({
+      orderBy: [{ status: "asc" }, { inicio: "desc" }, { nome: "asc" }],
     }),
   ]);
 
@@ -62,6 +66,7 @@ export default async function NovoClientePage() {
           descricao="Cadastro direto por página, compatível com celular e sem depender de modal."
           origens={origens}
           procedimentosInteresse={procedimentosInteresse}
+          campanhas={campanhas}
           action={salvarNovoCliente}
         />
       </div>

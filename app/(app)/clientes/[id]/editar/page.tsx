@@ -21,7 +21,7 @@ export default async function EditarClientePage({ params }: EditarClientePagePro
     return <h1>Cliente inválido</h1>;
   }
 
-  const [cliente, origens, procedimentosInteresse] = await Promise.all([
+  const [cliente, origens, procedimentosInteresse, campanhas] = await Promise.all([
     prisma.cliente.findUnique({ where: { id: clienteId } }),
     prisma.origemCliente.findMany({
       where: { status: "Ativa" },
@@ -30,6 +30,9 @@ export default async function EditarClientePage({ params }: EditarClientePagePro
     prisma.procedimentoInteresse.findMany({
       where: { status: "Ativo" },
       orderBy: [{ ordem: "asc" }, { nome: "asc" }],
+    }),
+    prisma.campanhaMarketing.findMany({
+      orderBy: [{ status: "asc" }, { inicio: "desc" }, { nome: "asc" }],
     }),
   ]);
 
@@ -68,6 +71,8 @@ export default async function EditarClientePage({ params }: EditarClientePagePro
       observacoes: (formData.get("observacoes") as string) || "",
       areaEstetica: formData.get("areaEstetica") === "on",
       areaCilios: formData.get("areaCilios") === "on",
+      campanhaAquisicaoId:
+        Number((formData.get("campanhaAquisicaoId") as string) || 0) || null,
     });
 
     redirect(`/clientes/${clienteId}`);
@@ -80,6 +85,7 @@ export default async function EditarClientePage({ params }: EditarClientePagePro
       cliente={cliente}
       origens={origens}
       procedimentosInteresse={procedimentosInteresse}
+      campanhas={campanhas}
       action={salvarEdicaoCliente}
     />
   );

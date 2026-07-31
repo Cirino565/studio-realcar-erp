@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { Plus, UsersRound } from "lucide-react";
 import { useRouter } from "next/navigation";
-import type { OrigemCliente, ProcedimentoInteresse } from "@prisma/client";
+import type { CampanhaMarketing, OrigemCliente, ProcedimentoInteresse } from "@prisma/client";
 
 import {
   atualizarCliente,
@@ -34,6 +34,7 @@ type Props = {
   clientes: ClienteComHistorico[];
   origens: OrigemCliente[];
   procedimentosInteresse: ProcedimentoInteresse[];
+  campanhas: CampanhaMarketing[];
 };
 
 type ClienteFormData = {
@@ -55,12 +56,14 @@ type ClienteFormData = {
   observacoes: string;
   areaEstetica: boolean;
   areaCilios: boolean;
+  campanhaAquisicaoId: number | null;
 };
 
 export default function ClientesClient({
   clientes,
   origens,
   procedimentosInteresse,
+  campanhas,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -303,6 +306,7 @@ export default function ClientesClient({
         onSalvar={salvarCliente}
         origens={origens}
         procedimentosInteresse={procedimentosInteresse}
+        campanhas={campanhas}
       />
 
       <ClienteQuickMessageModal

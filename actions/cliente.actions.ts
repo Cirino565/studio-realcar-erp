@@ -41,6 +41,7 @@ export type ClienteForm = {
   observacoes?: string;
   areaEstetica?: boolean;
   areaCilios?: boolean;
+  campanhaAquisicaoId?: number | null;
 };
 
 export async function listarClientes() {
@@ -76,10 +77,15 @@ export async function criarCliente(dados: ClienteForm) {
       observacoes: textoOpcional(dados.observacoes),
       areaEstetica: Boolean(dados.areaEstetica),
       areaCilios: Boolean(dados.areaCilios),
+      campanhaAquisicaoId:
+        dados.campanhaAquisicaoId && dados.campanhaAquisicaoId > 0
+          ? Math.trunc(dados.campanhaAquisicaoId)
+          : null,
     },
   });
 
   revalidatePath("/clientes");
+  revalidatePath("/marketing");
 }
 
 export async function atualizarCliente(dados: ClienteForm) {
@@ -111,10 +117,15 @@ export async function atualizarCliente(dados: ClienteForm) {
       observacoes: textoOpcional(dados.observacoes),
       areaEstetica: Boolean(dados.areaEstetica),
       areaCilios: Boolean(dados.areaCilios),
+      campanhaAquisicaoId:
+        dados.campanhaAquisicaoId && dados.campanhaAquisicaoId > 0
+          ? Math.trunc(dados.campanhaAquisicaoId)
+          : null,
     },
   });
 
   revalidatePath("/clientes");
+  revalidatePath("/marketing");
 }
 
 export async function excluirCliente(id: number) {

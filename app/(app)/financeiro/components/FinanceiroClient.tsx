@@ -19,17 +19,24 @@ import {
 import { Button } from "@/components/ui/button";
 import { formatarMoeda } from "@/lib/format";
 
+import FinanceiroConfiguracoes from "./FinanceiroConfiguracoes";
 import FinanceiroResumo from "./FinanceiroResumo";
 import LancamentosTable from "./LancamentosTable";
 import NovoLancamentoModal from "./NovoLancamentoModal";
 import type {
+  CampanhaFinanceiroOption,
+  ContaFinanceiraData,
   FinanceiroResumoData,
+  FormaPagamentoConfigData,
   LancamentoFinanceiro,
   PeriodoFinanceiro,
 } from "../types";
 
 type Props = {
   lancamentos: LancamentoFinanceiro[];
+  contas: ContaFinanceiraData[];
+  formasPagamento: FormaPagamentoConfigData[];
+  campanhas: CampanhaFinanceiroOption[];
 };
 
 type SituacaoFiltro = "ativos" | "cancelados" | "todos";
@@ -93,6 +100,11 @@ function calcularResumo(lancamentos: LancamentoFinanceiro[]): FinanceiroResumoDa
   const saidas = realizados.filter((item) => item.tipo === "SAIDA");
 
   const totalEntradas = entradas.reduce((acc, item) => acc + item.valor, 0);
+  const taxasPagamento = entradas.reduce((acc, item) => acc + Number(item.taxaPagamento || 0), 0);
+  const entradasLiquidas = entradas.reduce(
+    (acc, item) => acc + (item.valorLiquido ?? item.valor - Number(item.taxaPagamento || 0)),
+    0,
+  );
   const totalSaidas = saidas.reduce((acc, item) => acc + item.valor, 0);
   const maiorEntrada = entradas.reduce(
     (max, item) => Math.max(max, item.valor),
@@ -105,8 +117,10 @@ function calcularResumo(lancamentos: LancamentoFinanceiro[]): FinanceiroResumoDa
 
   return {
     entradas: totalEntradas,
+    entradasLiquidas,
+    taxasPagamento,
     saidas: totalSaidas,
-    saldo: totalEntradas - totalSaidas,
+    saldo: entradasLiquidas - totalSaidas,
     quantidadeEntradas: entradas.length,
     quantidadeSaidas: saidas.length,
     totalLancamentos: ativos.length,
@@ -129,7 +143,11 @@ function gerarCsv(lancamentos: LancamentoFinanceiro[]) {
     "Tipo",
     "Categoria original",
     "Descrição",
-    "Valor",
+    "Valor bruto",
+    "Taxa",
+    "Valor líquido",
+    "Conta",
+    "Campanha",
     "Forma",
     "Status",
     "Origem",
@@ -141,6 +159,10 @@ function gerarCsv(lancamentos: LancamentoFinanceiro[]) {
     item.categoria || "",
     item.descricao,
     String(item.valor).replace(".", ","),
+    String(item.taxaPagamento || 0).replace(".", ","),
+    String(item.valorLiquido ?? item.valor - Number(item.taxaPagamento || 0)).replace(".", ","),
+    item.contaFinanceira?.nome || "",
+    item.campanha?.nome || "",
     item.formaPagamento || "",
     isCancelado(item) ? "Cancelado, não contabilizado" : item.statusPagamento || "",
     item.origem || "",
@@ -172,7 +194,7 @@ function baixarCsv(
   URL.revokeObjectURL(url);
 }
 
-export default function FinanceiroClient({ lancamentos }: Props) {
+export default function FinanceiroClient({ lancamentos, contas, formasPagamento, campanhas }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [modalAberto, setModalAberto] = useState(false);
@@ -220,7 +242,7 @@ export default function FinanceiroClient({ lancamentos }: Props) {
       const matchesCategoria =
         categoria === "todas" || item.categoria === categoria;
       const textoBusca = normalizarTexto(
-        `${item.descricao} ${item.categoria || ""} ${item.formaPagamento || ""} ${item.statusPagamento || ""} ${item.origem || ""} ${item.observacoes || ""}`,
+        `${item.descricao} ${item.categoria || ""} ${item.formaPagamento || ""} ${item.statusPagamento || ""} ${item.origem || ""} ${item.contaFinanceira?.nome || ""} ${item.campanha?.nome || ""} ${item.observacoes || ""}`,
       );
       const matchesBusca = !termo || textoBusca.includes(termo);
 
@@ -297,6 +319,8 @@ export default function FinanceiroClient({ lancamentos }: Props) {
           </div>
         </div>
       </section>
+
+      <FinanceiroConfiguracoes contas={contas} formasPagamento={formasPagamento} />
 
       <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-xl shadow-slate-900/[0.05] dark:border-white/10 dark:bg-slate-950/70 dark:shadow-black/20 md:p-5">
         <div className="mb-4 flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -461,6 +485,9 @@ export default function FinanceiroClient({ lancamentos }: Props) {
 
       <NovoLancamentoModal
         open={modalAberto}
+        contas={contas}
+        formasPagamento={formasPagamento}
+        campanhas={campanhas}
         onClose={() => setModalAberto(false)}
         onSaved={() => router.refresh()}
       />

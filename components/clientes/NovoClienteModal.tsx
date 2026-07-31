@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, Save, UserRound, X } from "lucide-react";
-import type { OrigemCliente, ProcedimentoInteresse } from "@prisma/client";
+import type { CampanhaMarketing, OrigemCliente, ProcedimentoInteresse } from "@prisma/client";
 
 import EnderecoClienteFields, {
   type EnderecoClienteValues,
@@ -85,6 +85,7 @@ type FormData = {
   observacoes: string;
   areaEstetica: boolean;
   areaCilios: boolean;
+  campanhaAquisicaoId: number | null;
 };
 
 type Props = {
@@ -93,6 +94,7 @@ type Props = {
   cliente: Cliente | null;
   origens: OrigemCliente[];
   procedimentosInteresse: ProcedimentoInteresse[];
+  campanhas: CampanhaMarketing[];
   onSalvar: (dados: FormData) => void;
 };
 
@@ -183,6 +185,7 @@ function montarFormulario(
       observacoes: "",
       areaEstetica: false,
       areaCilios: false,
+      campanhaAquisicaoId: null,
     };
   }
 
@@ -208,6 +211,7 @@ function montarFormulario(
     observacoes: cliente.observacoes ?? "",
     areaEstetica: cliente.areaEstetica ?? false,
     areaCilios: cliente.areaCilios ?? false,
+    campanhaAquisicaoId: cliente.campanhaAquisicaoId ?? null,
   };
 }
 
@@ -225,6 +229,7 @@ function NovoClienteForm({
   onSalvar,
   origens,
   procedimentosInteresse,
+  campanhas,
 }: Omit<Props, "open">) {
   const origensDisponiveis = useMemo(
     () => (origens.length > 0 ? origens.map((origem) => origem.nome) : ORIGENS_FALLBACK),
@@ -419,6 +424,28 @@ function NovoClienteForm({
             </select>
           </label>
 
+          <label>
+            <Label>Campanha de aquisição</Label>
+            <select
+              name="campanhaAquisicaoId"
+              value={form.campanhaAquisicaoId ?? ""}
+              onChange={(event) =>
+                alterarCampo(
+                  "campanhaAquisicaoId",
+                  event.target.value ? Number(event.target.value) : null,
+                )
+              }
+              className="premium-input w-full min-w-0 max-w-full text-base sm:text-sm"
+            >
+              <option value="">Sem campanha vinculada</option>
+              {campanhas.map((campanha) => (
+                <option key={campanha.id} value={campanha.id}>
+                  {campanha.nome} · {campanha.canal} · {campanha.status}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <div className="sm:col-span-2">
             <Label>Procedimento de interesse</Label>
             <ProcedimentoSearchSelect
@@ -513,6 +540,7 @@ export default function NovoClienteModal({
   onSalvar,
   origens,
   procedimentosInteresse,
+  campanhas,
 }: Props) {
   useLockBodyScroll(open);
 
@@ -530,6 +558,7 @@ export default function NovoClienteModal({
         onSalvar={onSalvar}
         origens={origens}
         procedimentosInteresse={procedimentosInteresse}
+        campanhas={campanhas}
       />
     </div>
   );

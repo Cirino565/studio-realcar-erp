@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { isAdminUser, requirePermission } from "@/lib/auth";
+import { calcularTaxaRecebimento } from "@/lib/financeiro";
 import { prisma } from "@/lib/prisma";
 import {
   criarVendaNoTx,
@@ -16,6 +17,9 @@ export type CriarVendaProdutosInput = {
   kits?: VendaKitInput[];
   permitirEstoqueNegativo?: boolean;
   formaPagamento?: string;
+  formaPagamentoConfigId?: number | null;
+  contaFinanceiraId?: number | null;
+  campanhaId?: number | null;
   statusPagamento?: string;
   observacoes?: string;
 };
@@ -86,6 +90,9 @@ export async function criarVendaProdutos(dados: CriarVendaProdutosInput) {
       clienteId: cliente.id,
       data: new Date(),
       formaPagamento: dados.formaPagamento,
+      formaPagamentoConfigId: dados.formaPagamentoConfigId,
+      contaFinanceiraId: dados.contaFinanceiraId,
+      campanhaId: dados.campanhaId,
       statusPagamento: dados.statusPagamento,
       origem: "Vendas",
       observacoes: dados.observacoes,
@@ -156,6 +163,10 @@ export async function editarVendaAdministrativa(
       situacao: true,
       totalServicos: true,
       totalProdutos: true,
+      valorTotal: true,
+      formaPagamentoConfigId: true,
+      contaFinanceiraId: true,
+      campanhaId: true,
       formaPagamento: true,
       statusPagamento: true,
       observacoes: true,
@@ -181,6 +192,24 @@ export async function editarVendaAdministrativa(
           : "Procedimentos";
 
   await prisma.$transaction(async (tx) => {
+    const formaConfig = await tx.formaPagamentoConfig.findFirst({
+      where: { nome: formaPagamento, status: "Ativa" },
+    });
+    const calculoTaxa = calcularTaxaRecebimento(
+      venda.valorTotal,
+      formaConfig?.taxaPercentual || 0,
+      formaConfig?.taxaFixa || 0,
+    );
+    const contaFinanceiraId =
+      venda.contaFinanceiraId ||
+      (
+        await tx.contaFinanceira.findFirst({
+          where: { principal: true, status: "Ativa" },
+          select: { id: true },
+        })
+      )?.id ||
+      null;
+
     const vendaAtualizada = await tx.venda.updateMany({
       where: {
         id: venda.id,
@@ -188,6 +217,12 @@ export async function editarVendaAdministrativa(
       },
       data: {
         formaPagamento,
+        formaPagamentoConfigId: formaConfig?.id || null,
+        contaFinanceiraId,
+        taxaPagamento: calculoTaxa.taxaPagamento,
+        taxaPercentualAplicada: calculoTaxa.taxaPercentual,
+        taxaFixaAplicada: calculoTaxa.taxaFixa,
+        valorLiquido: calculoTaxa.valorLiquido,
         statusPagamento,
         observacoes,
         data,
@@ -208,6 +243,12 @@ export async function editarVendaAdministrativa(
         },
         data: {
           formaPagamento,
+          formaPagamentoConfigId: formaConfig?.id || null,
+          contaFinanceiraId,
+          taxaPagamento: calculoTaxa.taxaPagamento,
+          taxaPercentualAplicada: calculoTaxa.taxaPercentual,
+          taxaFixaAplicada: calculoTaxa.taxaFixa,
+          valorLiquido: calculoTaxa.valorLiquido,
           statusPagamento,
           categoria: categoriaLancamento,
           data,
@@ -235,7 +276,7 @@ export async function editarVendaAdministrativa(
         entidade: "Venda",
         entidadeId: String(venda.id),
         usuario: usuario.email,
-        detalhes: `Pagamento: ${venda.statusPagamento} -> ${statusPagamento}. Forma: ${venda.formaPagamento || "não informada"} -> ${formaPagamento}. Data anterior: ${venda.data.toISOString()}.`,
+        detalhes: `Pagamento: ${venda.statusPagamento} -> ${statusPagamento}. Forma: ${venda.formaPagamento || "não informada"} -> ${formaPagamento}. Taxa atual: R$ ${calculoTaxa.taxaPagamento.toFixed(2)}. Data anterior: ${venda.data.toISOString()}.`,
       },
     });
   });

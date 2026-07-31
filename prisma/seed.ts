@@ -25,6 +25,15 @@ const permissoesPadrao = [
   { modulo: "Automações", nome: "Gerenciar automações", chave: "automacoes.gerenciar" },
 ];
 
+const formasPagamentoPadrao = [
+  { nome: "Pix", taxaPercentual: 0, taxaFixa: 0, prazoDias: 0, ordem: 10 },
+  { nome: "Dinheiro", taxaPercentual: 0, taxaFixa: 0, prazoDias: 0, ordem: 20 },
+  { nome: "Cartão de débito", taxaPercentual: 0, taxaFixa: 0, prazoDias: 1, ordem: 30 },
+  { nome: "Cartão de crédito", taxaPercentual: 0, taxaFixa: 0, prazoDias: 30, ordem: 40 },
+  { nome: "Transferência", taxaPercentual: 0, taxaFixa: 0, prazoDias: 0, ordem: 50 },
+  { nome: "Outro", taxaPercentual: 0, taxaFixa: 0, prazoDias: 0, ordem: 60 },
+];
+
 // 🔥 FIX RAILWAY SAFE (SEM VALIDAR SENHA NO BUILD)
 function getSeedPassword(envName: string, fallback: string) {
   const password = process.env[envName]?.trim();
@@ -176,6 +185,18 @@ async function main() {
       perfilId: perfilOperacional.id,
     },
   });
+
+
+  for (const forma of formasPagamentoPadrao) {
+    await prisma.formaPagamentoConfig.upsert({
+      where: { nome: forma.nome },
+      update: {},
+      create: {
+        ...forma,
+        status: "Ativa",
+      },
+    });
+  }
 
   console.log("Seed concluído com sucesso 🚀");
 }

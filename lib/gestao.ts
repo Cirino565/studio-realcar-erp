@@ -34,6 +34,8 @@ export type GestaoData = {
   };
   financeiro: {
     receitaRecebida: number;
+    taxasRecebimento: number;
+    receitaLiquidaRecebida: number;
     despesasPagas: number;
     saldoRealizado: number;
     comprasEstoqueInsumosPagas: number;
@@ -443,6 +445,8 @@ export async function obterDadosGestao(
       select: {
         id: true,
         valor: true,
+        valorLiquido: true,
+        taxaPagamento: true,
         tipo: true,
         statusPagamento: true,
         agendamentoId: true,
@@ -619,6 +623,17 @@ export async function obterDadosGestao(
     lancamentosPagos.filter((item) => item.tipo === "ENTRADA"),
     (item) => item.valor,
   );
+  const entradasPagas = lancamentosPagos.filter(
+    (item) => item.tipo === "ENTRADA",
+  );
+  const taxasRecebimento = somarValores(
+    entradasPagas,
+    (item) => item.taxaPagamento,
+  );
+  const receitaLiquidaRecebida = somarValores(
+    entradasPagas,
+    (item) => item.valorLiquido ?? item.valor - item.taxaPagamento,
+  );
   const despesasPagas = somarValores(
     lancamentosPagos.filter((item) => item.tipo === "SAIDA"),
     (item) => item.valor,
@@ -672,11 +687,11 @@ export async function obterDadosGestao(
     (item) => item.valor,
   );
 
-  const margemDireta = receitaRecebida - custoDiretoTotal;
+  const margemDireta = receitaLiquidaRecebida - custoDiretoTotal;
   const margemDiretaPercentual =
     receitaRecebida > 0 ? (margemDireta / receitaRecebida) * 100 : 0;
   const resultadoGerencial =
-    receitaRecebida - custoDiretoTotal - despesasOperacionaisPagas;
+    receitaLiquidaRecebida - custoDiretoTotal - despesasOperacionaisPagas;
   const resultadoGerencialPercentual =
     receitaRecebida > 0 ? (resultadoGerencial / receitaRecebida) * 100 : 0;
 
@@ -1036,8 +1051,10 @@ export async function obterDadosGestao(
     },
     financeiro: {
       receitaRecebida,
+      taxasRecebimento,
+      receitaLiquidaRecebida,
       despesasPagas,
-      saldoRealizado: receitaRecebida - despesasPagas,
+      saldoRealizado: receitaLiquidaRecebida - despesasPagas,
       comprasEstoqueInsumosPagas,
       despesasOperacionaisPagas,
       receitaServicos,

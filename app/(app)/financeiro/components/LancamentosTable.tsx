@@ -227,9 +227,9 @@ export default function LancamentosTable({
                       ) : (
                         <p className="text-xs text-slate-500 dark:text-slate-400">
                           {lancamento.origem || "Manual"} • {lancamento.statusPagamento || "Pago"}
-                          {lancamento.formaPagamento
-                            ? ` • ${lancamento.formaPagamento}`
-                            : ""}
+                          {lancamento.formaPagamento ? ` • ${lancamento.formaPagamento}` : ""}
+                          {lancamento.contaFinanceira ? ` • ${lancamento.contaFinanceira.nome}` : ""}
+                          {lancamento.campanha ? ` • ${lancamento.campanha.nome}` : ""}
                         </p>
                       )}
                     </div>
@@ -249,6 +249,9 @@ export default function LancamentosTable({
                   >
                     {lancamento.tipo === "SAIDA" ? "- " : "+ "}
                     {formatarMoeda(lancamento.valor)}
+                    {lancamento.tipo === "ENTRADA" && Number(lancamento.taxaPagamento || 0) > 0 ? (
+                      <span className="mt-1 block text-[10px] font-normal text-slate-500 no-underline">Taxa {formatarMoeda(Number(lancamento.taxaPagamento || 0))} · líquido {formatarMoeda(lancamento.valorLiquido ?? lancamento.valor - Number(lancamento.taxaPagamento || 0))}</span>
+                    ) : null}
                   </td>
                   <td className="px-5 py-4 text-right">
                     <AcoesLancamento
@@ -301,9 +304,9 @@ export default function LancamentosTable({
                     ) : (
                       <p className="text-xs text-slate-500 dark:text-slate-400">
                         {lancamento.origem || "Manual"} • {lancamento.statusPagamento || "Pago"}
-                        {lancamento.formaPagamento
-                          ? ` • ${lancamento.formaPagamento}`
-                          : ""}
+                        {lancamento.formaPagamento ? ` • ${lancamento.formaPagamento}` : ""}
+                        {lancamento.contaFinanceira ? ` • ${lancamento.contaFinanceira.nome}` : ""}
+                        {lancamento.campanha ? ` • ${lancamento.campanha.nome}` : ""}
                       </p>
                     )}
                   </div>

@@ -44,8 +44,11 @@ import {
   excluirLead,
   marcarLeadPerdido,
   registrarContatoLead,
+  registrarCustoCampanha,
   registrarObservacaoLead,
   verificarTelefoneLead,
+  vincularClienteCampanha,
+  vincularReceitaCampanha,
 } from "@/actions/marketing.actions";
 import { Button } from "@/components/ui/button";
 import { WhatsAppLink } from "@/components/ui/whatsapp-link";
@@ -61,8 +64,11 @@ import type {
   LeadEtapa,
   LeadFormData,
   MarketingCampanha,
+  MarketingClienteOption,
+  MarketingContaOption,
   MarketingLead,
   MarketingProfissional,
+  MarketingReceitaOption,
   MarketingResumo,
   MarketingServico,
 } from "../types";
@@ -71,6 +77,9 @@ import { CAMPANHA_CANAIS, CAMPANHA_STATUS, LEAD_ETAPAS } from "../types";
 type Props = {
   leads: MarketingLead[];
   campanhas: MarketingCampanha[];
+  clientes: MarketingClienteOption[];
+  contas: MarketingContaOption[];
+  receitasSemCampanha: MarketingReceitaOption[];
   profissionais: MarketingProfissional[];
   servicos: MarketingServico[];
   podeGerenciarMarketing: boolean;
@@ -135,8 +144,10 @@ function calcularResumo(leads: MarketingLead[], campanhas: MarketingCampanha[]):
     .filter((lead) => lead.etapa !== "Perdido" && lead.etapa !== "Convertido")
     .reduce((acc, lead) => acc + lead.valorPrevisto, 0);
   const investimentoTotal = campanhas.reduce((acc, campanha) => acc + campanha.investimento, 0);
-  const leadsAtribuidos = leads.filter((lead) => lead.campanhaId).length;
-  const receitaRastreada = leads.reduce((acc, lead) => acc + lead.receitaRastreada, 0);
+  const custoRealTotal = campanhas.reduce((acc, campanha) => acc + campanha.metricas.custoReal, 0);
+  const clientesAtribuidos = campanhas.reduce((acc, campanha) => acc + campanha.metricas.clientes, 0);
+  const receitaRastreada = campanhas.reduce((acc, campanha) => acc + campanha.metricas.receitaBruta, 0);
+  const receitaLiquida = campanhas.reduce((acc, campanha) => acc + campanha.metricas.receitaLiquida, 0);
 
   return {
     totalLeads: leads.length,
@@ -149,9 +160,12 @@ function calcularResumo(leads: MarketingLead[], campanhas: MarketingCampanha[]):
     ticketMedioPrevisto: leads.length > 0 ? pipelineTotal / leads.length : 0,
     campanhasAtivas: campanhas.filter((campanha) => campanha.status === "Ativa").length,
     investimentoTotal,
-    custoPorLead: leadsAtribuidos > 0 ? investimentoTotal / leadsAtribuidos : 0,
+    custoRealTotal,
+    custoPorCliente: clientesAtribuidos > 0 ? custoRealTotal / clientesAtribuidos : 0,
     taxaConversao: leads.length > 0 ? (leadsConvertidos / leads.length) * 100 : 0,
     receitaRastreada,
+    receitaLiquida,
+    resultadoMarketing: receitaLiquida - custoRealTotal,
   };
 }
 
@@ -223,6 +237,9 @@ function baixarCsv(leads: MarketingLead[]) {
 export default function MarketingClient({
   leads,
   campanhas,
+  clientes,
+  contas,
+  receitasSemCampanha,
   profissionais,
   servicos,
   podeGerenciarMarketing,
@@ -390,7 +407,7 @@ export default function MarketingClient({
   }
 
   function removerCampanha(id: number) {
-    if (!window.confirm("Deseja excluir esta campanha? Os leads permanecerão no CRM, apenas sem vínculo com a campanha.")) return;
+    if (!window.confirm("Excluir esta campanha sem vínculos? Campanhas com clientes, leads, receitas ou custos devem ser pausadas ou finalizadas.")) return;
     executar(async () => {
       await excluirCampanha(id);
     });
@@ -437,7 +454,7 @@ export default function MarketingClient({
           <ResumoCard title="Leads ativos" value={String(resumo.leadsAtivos)} detail={`${resumo.totalLeads} oportunidade(s) no total`} icon={UsersRound} />
           <ResumoCard title="Avaliações vinculadas" value={String(resumo.avaliacoesAgendadas)} detail="Agendamentos originados pelo CRM" icon={CalendarClock} />
           <ResumoCard title="Convertidos" value={String(resumo.leadsConvertidos)} detail={`${resumo.leadsPerdidos} perdido(s)`} icon={UserCheck} />
-          <ResumoCard title="Campanhas ativas" value={String(resumo.campanhasAtivas)} detail={`Investimento: ${formatarMoeda(resumo.investimentoTotal)}`} icon={Megaphone} />
+          <ResumoCard title="Campanhas ativas" value={String(resumo.campanhasAtivas)} detail={`Custo real: ${formatarMoeda(resumo.custoRealTotal)}`} icon={Megaphone} />
         </section>
 
         <section className="premium-card-soft p-4 md:p-5">
@@ -515,7 +532,7 @@ export default function MarketingClient({
         ) : null}
 
         {tab === "campanhas" ? (
-          <CampanhasView campanhas={campanhas} leads={leads} onDelete={removerCampanha} isPending={isPending} podeGerenciar={podeGerenciarMarketing} />
+          <CampanhasView campanhas={campanhas} leads={leads} clientes={clientes} contas={contas} receitasSemCampanha={receitasSemCampanha} onDelete={removerCampanha} isPending={isPending} podeGerenciar={podeGerenciarMarketing} />
         ) : null}
 
         {tab === "mensagens" ? <TemplatesView /> : null}
@@ -738,68 +755,244 @@ function LeadCard({
 function CampanhasView({
   campanhas,
   leads,
+  clientes,
+  contas,
+  receitasSemCampanha,
   onDelete,
   isPending,
   podeGerenciar,
 }: {
   campanhas: MarketingCampanha[];
   leads: MarketingLead[];
+  clientes: MarketingClienteOption[];
+  contas: MarketingContaOption[];
+  receitasSemCampanha: MarketingReceitaOption[];
   onDelete: (id: number) => void;
   isPending: boolean;
   podeGerenciar: boolean;
 }) {
-  const totalLeads = leads.filter((lead) => lead.campanhaId).length;
-  const investimento = campanhas.reduce((acc, campanha) => acc + campanha.investimento, 0);
-  const receita = leads.reduce((acc, lead) => acc + lead.receitaRastreada, 0);
+  const router = useRouter();
+  const [vincular, setVincular] = useState<MarketingCampanha | null>(null);
+  const [custo, setCusto] = useState<MarketingCampanha | null>(null);
+  const [receita, setReceita] = useState<MarketingCampanha | null>(null);
+  const [erroLocal, setErroLocal] = useState<string | null>(null);
+  const [pendingLocal, startLocalTransition] = useTransition();
+  const totalClientes = campanhas.reduce((acc, campanha) => acc + campanha.metricas.clientes, 0);
+  const custoReal = campanhas.reduce((acc, campanha) => acc + campanha.metricas.custoReal, 0);
+  const receitaLiquida = campanhas.reduce((acc, campanha) => acc + campanha.metricas.receitaLiquida, 0);
+
+  function executarLocal(tarefa: () => Promise<void>) {
+    setErroLocal(null);
+    startLocalTransition(async () => {
+      try {
+        await tarefa();
+        router.refresh();
+      } catch (error) {
+        setErroLocal(error instanceof Error ? error.message : "Não foi possível concluir a operação.");
+      }
+    });
+  }
 
   return (
-    <section className="grid gap-6 xl:grid-cols-[0.75fr_1.25fr]">
-      <div className="premium-card-soft p-5">
-        <h2 className="text-lg font-semibold text-white">Performance comercial</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-400">Os indicadores abaixo usam vínculos reais entre lead e campanha. A receita rastreada considera pagamentos dos agendamentos diretamente vinculados ao lead.</p>
-        <div className="mt-5 grid gap-3">
-          <CampaignInsight label="Campanhas cadastradas" value={String(campanhas.length)} />
-          <CampaignInsight label="Leads atribuídos" value={String(totalLeads)} />
-          <CampaignInsight label="Investimento total" value={formatarMoeda(investimento)} />
-          <CampaignInsight label="Receita rastreada" value={formatarMoeda(receita)} />
-          <CampaignInsight label="Custo médio por lead" value={formatarMoeda(totalLeads > 0 ? investimento / totalLeads : 0)} />
-        </div>
+    <section className="grid gap-6">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <CampaignInsight label="Campanhas cadastradas" value={String(campanhas.length)} />
+        <CampaignInsight label="Clientes atribuídos" value={String(totalClientes)} />
+        <CampaignInsight label="Custo real em Ads" value={formatarMoeda(custoReal)} />
+        <CampaignInsight label="Receita líquida atribuída" value={formatarMoeda(receitaLiquida)} />
       </div>
 
+      {erroLocal ? <div className="rounded-2xl border border-rose-300/20 bg-rose-400/10 p-3 text-sm text-rose-100">{erroLocal}</div> : null}
+
       <div className="premium-table overflow-x-auto">
-        <table className="w-full min-w-[900px] text-left text-sm">
+        <table className="w-full min-w-[1180px] text-left text-sm">
           <thead className="border-b border-white/[0.10] bg-white/[0.045] text-xs uppercase tracking-[0.18em] text-slate-500">
             <tr>
-              <th className="px-5 py-4">Campanha</th><th className="px-5 py-4">Canal</th><th className="px-5 py-4">Leads</th><th className="px-5 py-4">Convertidos</th><th className="px-5 py-4">Conversão</th><th className="px-5 py-4">Investimento</th><th className="px-5 py-4">Receita rastreada</th><th className="px-5 py-4 text-right">Ações</th>
+              <th className="px-5 py-4">Campanha</th>
+              <th className="px-5 py-4">Clientes</th>
+              <th className="px-5 py-4">Leads</th>
+              <th className="px-5 py-4">Orçamento</th>
+              <th className="px-5 py-4">Custo real</th>
+              <th className="px-5 py-4">Receita bruta</th>
+              <th className="px-5 py-4">Taxas</th>
+              <th className="px-5 py-4">Resultado</th>
+              <th className="px-5 py-4">ROAS</th>
+              <th className="px-5 py-4 text-right">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/[0.08]">
-            {campanhas.length === 0 ? <tr><td colSpan={8} className="px-5 py-10 text-center text-slate-500">Nenhuma campanha cadastrada.</td></tr> : campanhas.map((campanha) => {
+            {campanhas.length === 0 ? (
+              <tr><td colSpan={10} className="px-5 py-10 text-center text-slate-500">Nenhuma campanha cadastrada.</td></tr>
+            ) : campanhas.map((campanha) => {
               const vinculados = leads.filter((lead) => lead.campanhaId === campanha.id);
-              const convertidos = vinculados.filter((lead) => lead.etapa === "Convertido").length;
-              const receitaCampanha = vinculados.reduce((acc, lead) => acc + lead.receitaRastreada, 0);
               return (
                 <tr key={campanha.id} className="text-slate-300 hover:bg-white/[0.035]">
-                  <td className="px-5 py-4"><p className="font-semibold text-white">{campanha.nome}</p><p className="mt-1 text-xs text-slate-500">{campanha.status}</p></td>
-                  <td className="px-5 py-4">{campanha.canal}</td>
+                  <td className="px-5 py-4"><p className="font-semibold text-white">{campanha.nome}</p><p className="mt-1 text-xs text-slate-500">{campanha.canal} · {campanha.status}</p></td>
+                  <td className="px-5 py-4">{campanha.metricas.clientes}</td>
                   <td className="px-5 py-4">{vinculados.length}</td>
-                  <td className="px-5 py-4">{convertidos}</td>
-                  <td className="px-5 py-4">{vinculados.length ? `${((convertidos / vinculados.length) * 100).toFixed(1)}%` : "0,0%"}</td>
                   <td className="px-5 py-4">{formatarMoeda(campanha.investimento)}</td>
-                  <td className="px-5 py-4 text-emerald-300">{formatarMoeda(receitaCampanha)}</td>
-                  <td className="px-5 py-4 text-right">{podeGerenciar ? <button type="button" onClick={() => onDelete(campanha.id)} disabled={isPending} className="inline-flex items-center gap-2 rounded-2xl border border-rose-300/15 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-200 hover:bg-rose-400/15 disabled:opacity-50"><Trash2 className="size-3.5" />Excluir</button> : null}</td>
+                  <td className="px-5 py-4 text-rose-200">{formatarMoeda(campanha.metricas.custoReal)}</td>
+                  <td className="px-5 py-4 text-emerald-200">{formatarMoeda(campanha.metricas.receitaBruta)}</td>
+                  <td className="px-5 py-4">{formatarMoeda(campanha.metricas.taxasPagamento)}</td>
+                  <td className={`px-5 py-4 font-semibold ${campanha.metricas.resultado >= 0 ? "text-emerald-300" : "text-rose-300"}`}>{formatarMoeda(campanha.metricas.resultado)}</td>
+                  <td className="px-5 py-4">{campanha.metricas.roas === null ? "Sem custo" : `${campanha.metricas.roas.toFixed(2)}x`}</td>
+                  <td className="px-5 py-4 text-right">
+                    {podeGerenciar ? <div className="flex justify-end gap-2">
+                      <button type="button" onClick={() => setVincular(campanha)} disabled={isPending || pendingLocal} className="rounded-xl border border-cyan-300/15 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100">Vincular cliente</button>
+                      <button type="button" onClick={() => setCusto(campanha)} disabled={isPending || pendingLocal} className="rounded-xl border border-amber-300/15 bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-100">Lançar custo</button>
+                      <button type="button" onClick={() => setReceita(campanha)} disabled={isPending || pendingLocal} className="rounded-xl border border-emerald-300/15 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-100">Vincular receita</button>
+                      <button type="button" onClick={() => onDelete(campanha.id)} disabled={isPending || pendingLocal} className="inline-flex items-center gap-2 rounded-xl border border-rose-300/15 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-200"><Trash2 className="size-3.5" />Excluir</button>
+                    </div> : null}
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
+
+      <VincularClienteCampanhaModal
+        campanha={vincular}
+        clientes={clientes}
+        disabled={pendingLocal}
+        onClose={() => setVincular(null)}
+        onSubmit={(clienteId, vincularReceitasExistentes) => executarLocal(async () => {
+          if (!vincular) return;
+          await vincularClienteCampanha({ campanhaId: vincular.id, clienteId, vincularReceitasExistentes });
+          setVincular(null);
+        })}
+      />
+      <ReceitaCampanhaModal
+        campanha={receita}
+        receitas={receitasSemCampanha}
+        disabled={pendingLocal}
+        onClose={() => setReceita(null)}
+        onSubmit={(lancamentoId) => executarLocal(async () => {
+          if (!receita) return;
+          await vincularReceitaCampanha({ campanhaId: receita.id, lancamentoId });
+          setReceita(null);
+        })}
+      />
+      <CustoCampanhaModal
+        campanha={custo}
+        contas={contas}
+        disabled={pendingLocal}
+        onClose={() => setCusto(null)}
+        onSubmit={(dados) => executarLocal(async () => {
+          if (!custo) return;
+          await registrarCustoCampanha({ campanhaId: custo.id, ...dados });
+          setCusto(null);
+        })}
+      />
     </section>
   );
 }
 
 function CampaignInsight({ label, value }: { label: string; value: string }) {
   return <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/[0.10] bg-white/[0.055] px-4 py-3"><span className="text-sm text-slate-400">{label}</span><strong className="text-sm text-white">{value}</strong></div>;
+}
+
+function VincularClienteCampanhaModal({ campanha, clientes, disabled, onClose, onSubmit }: {
+  campanha: MarketingCampanha | null;
+  clientes: MarketingClienteOption[];
+  disabled: boolean;
+  onClose: () => void;
+  onSubmit: (clienteId: number, vincularReceitasExistentes: boolean) => void;
+}) {
+  const [busca, setBusca] = useState("");
+  const [clienteId, setClienteId] = useState("");
+  const [retroativo, setRetroativo] = useState(true);
+  useEffect(() => { if (campanha) { setBusca(""); setClienteId(""); setRetroativo(true); } }, [campanha]);
+  if (!campanha) return null;
+  const termo = normalizarTexto(busca);
+  const filtrados = clientes.filter((cliente) => normalizarTexto(`${cliente.nome} ${cliente.telefone} ${cliente.whatsapp || ""}`).includes(termo)).slice(0, 80);
+  return (
+    <Modal title="Vincular cliente à campanha" description={campanha.nome} onClose={onClose}>
+      <div className="grid gap-4">
+        <Input label="Buscar cliente" value={busca} onChange={setBusca} placeholder="Nome, telefone ou WhatsApp" />
+        <label className="grid gap-2 text-sm font-medium text-slate-300">Cliente<select value={clienteId} onChange={(event) => setClienteId(event.target.value)} className="premium-input w-full bg-[#1d2437]"><option value="">Selecione</option>{filtrados.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nome}{cliente.campanhaAquisicaoId ? " · já possui campanha" : ""}</option>)}</select></label>
+        <label className="flex items-start gap-3 rounded-2xl border border-cyan-300/15 bg-cyan-400/8 p-4 text-sm text-cyan-100"><input type="checkbox" checked={retroativo} onChange={(event) => setRetroativo(event.target.checked)} className="mt-1" /><span><strong className="block">Vincular receitas existentes sem campanha</strong><span className="mt-1 block text-xs leading-5 text-cyan-100/70">Use para os três clientes já cadastrados. O sistema atribui vendas e entradas existentes que ainda não possuem campanha, sem criar nova receita.</span></span></label>
+        <div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={onClose}>Cancelar</Button><Button type="button" disabled={disabled || !clienteId} onClick={() => onSubmit(Number(clienteId), retroativo)}>{disabled ? "Vinculando..." : "Confirmar vínculo"}</Button></div>
+      </div>
+    </Modal>
+  );
+}
+
+function ReceitaCampanhaModal({ campanha, receitas, disabled, onClose, onSubmit }: {
+  campanha: MarketingCampanha | null;
+  receitas: MarketingReceitaOption[];
+  disabled: boolean;
+  onClose: () => void;
+  onSubmit: (lancamentoId: number) => void;
+}) {
+  const [busca, setBusca] = useState("");
+  const [lancamentoId, setLancamentoId] = useState("");
+  useEffect(() => {
+    if (campanha) {
+      setBusca("");
+      setLancamentoId("");
+    }
+  }, [campanha]);
+  if (!campanha) return null;
+  const termo = normalizarTexto(busca);
+  const filtradas = receitas
+    .filter((item) =>
+      normalizarTexto(`${item.descricao} ${item.clienteNome || ""} ${item.valor}`).includes(termo),
+    )
+    .slice(0, 100);
+
+  return (
+    <Modal title="Vincular receita existente" description={campanha.nome} onClose={onClose}>
+      <div className="grid gap-4">
+        <Input label="Buscar receita" value={busca} onChange={setBusca} placeholder="Cliente, descrição ou valor" />
+        <label className="grid gap-2 text-sm font-medium text-slate-300">
+          Receita sem campanha
+          <select value={lancamentoId} onChange={(event) => setLancamentoId(event.target.value)} className="premium-input w-full bg-[#1d2437]">
+            <option value="">Selecione</option>
+            {filtradas.map((item) => (
+              <option key={item.id} value={item.id}>
+                {formatarData(item.data)} · {item.clienteNome || "Sem cliente vinculado"} · {item.descricao} · {formatarMoeda(item.valor)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="rounded-2xl border border-emerald-300/15 bg-emerald-400/8 p-3 text-xs leading-5 text-emerald-100">O vínculo apenas atribui a receita já existente. Nenhum lançamento novo será criado.</div>
+        <div className="flex justify-end gap-3">
+          <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button type="button" disabled={disabled || !lancamentoId} onClick={() => onSubmit(Number(lancamentoId))}>{disabled ? "Vinculando..." : "Vincular receita"}</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function CustoCampanhaModal({ campanha, contas, disabled, onClose, onSubmit }: {
+  campanha: MarketingCampanha | null;
+  contas: MarketingContaOption[];
+  disabled: boolean;
+  onClose: () => void;
+  onSubmit: (dados: { descricao: string; valor: number; data: string; contaFinanceiraId: number | null; observacoes?: string }) => void;
+}) {
+  const [descricao, setDescricao] = useState("");
+  const [valor, setValor] = useState("");
+  const [data, setData] = useState(hojeInput());
+  const [contaId, setContaId] = useState("");
+  const [observacoes, setObservacoes] = useState("");
+  useEffect(() => { if (campanha) { setDescricao(`Investimento em Ads · ${campanha.nome}`); setValor(""); setData(hojeInput()); setContaId(contas.find((item) => item.principal)?.id ? String(contas.find((item) => item.principal)?.id) : ""); setObservacoes(""); } }, [campanha, contas]);
+  if (!campanha) return null;
+  return (
+    <Modal title="Lançar custo da campanha" description="O valor será registrado como saída de Marketing no financeiro." onClose={onClose}>
+      <div className="grid gap-4">
+        <Input label="Descrição" value={descricao} onChange={setDescricao} />
+        <div className="grid gap-4 sm:grid-cols-2"><Input label="Valor pago" type="number" min="0.01" step="0.01" value={valor} onChange={setValor} /><Input label="Data" type="date" value={data} onChange={setData} /></div>
+        <label className="grid gap-2 text-sm font-medium text-slate-300">Conta financeira<select value={contaId} onChange={(event) => setContaId(event.target.value)} className="premium-input w-full bg-[#1d2437]"><option value="">Selecione a conta</option>{contas.map((conta) => <option key={conta.id} value={conta.id}>{conta.nome}{conta.banco ? ` · ${conta.banco}` : ""}{conta.principal ? " · principal" : ""}</option>)}</select></label>
+        <Textarea label="Observações" value={observacoes} onChange={setObservacoes} />
+        {contas.length === 0 ? <div className="rounded-2xl border border-rose-300/15 bg-rose-400/8 p-3 text-xs leading-5 text-rose-100">Cadastre primeiro a conta corrente na área Financeiro.</div> : null}
+        <div className="rounded-2xl border border-amber-300/15 bg-amber-400/8 p-3 text-xs leading-5 text-amber-100">O orçamento previsto da campanha não substitui o custo real. Registre cada cobrança do Ads apenas uma vez.</div>
+        <div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={onClose}>Cancelar</Button><Button type="button" disabled={disabled || !descricao.trim() || Number(valor) <= 0 || !contaId} onClick={() => onSubmit({ descricao, valor: Number(valor), data, contaFinanceiraId: contaId ? Number(contaId) : null, observacoes })}>{disabled ? "Salvando..." : "Lançar custo"}</Button></div>
+      </div>
+    </Modal>
+  );
 }
 
 function TemplatesView() {
@@ -962,8 +1155,8 @@ function TelefoneDuplicadoModal({
 }
 
 function CampanhaModal({ open, onClose, onSubmit, disabled }: { open: boolean; onClose: () => void; onSubmit: (dados: CampanhaFormData) => void; disabled: boolean }) {
-  const [form, setForm] = useState<CampanhaFormData>({ nome: "", canal: "Instagram", investimento: 0, leads: 0, status: "Ativa", inicio: "", fim: "" });
-  useEffect(() => { if (open) setForm({ nome: "", canal: "Instagram", investimento: 0, leads: 0, status: "Ativa", inicio: "", fim: "" }); }, [open]);
+  const [form, setForm] = useState<CampanhaFormData>({ nome: "", canal: "Instagram", investimento: 0, leads: 0, status: "Ativa", inicio: "", fim: "", observacoes: "" });
+  useEffect(() => { if (open) setForm({ nome: "", canal: "Instagram", investimento: 0, leads: 0, status: "Ativa", inicio: "", fim: "", observacoes: "" }); }, [open]);
   if (!open) return null;
 
   return (
@@ -971,8 +1164,9 @@ function CampanhaModal({ open, onClose, onSubmit, disabled }: { open: boolean; o
       <form onSubmit={(event) => { event.preventDefault(); onSubmit(form); }} className="grid gap-4">
         <Input label="Nome da campanha" value={form.nome} onChange={(value) => setForm((prev) => ({ ...prev, nome: value }))} required />
         <div className="grid gap-4 sm:grid-cols-2"><Select label="Canal" value={form.canal} onChange={(value) => setForm((prev) => ({ ...prev, canal: value }))} options={CAMPANHA_CANAIS.map((item) => item)} /><Select label="Status" value={form.status} onChange={(value) => setForm((prev) => ({ ...prev, status: value }))} options={CAMPANHA_STATUS.map((item) => item)} /></div>
-        <Input label="Investimento" type="number" step="0.01" value={String(form.investimento)} onChange={(value) => setForm((prev) => ({ ...prev, investimento: Number(value || 0) }))} />
+        <Input label="Orçamento previsto" type="number" step="0.01" value={String(form.investimento)} onChange={(value) => setForm((prev) => ({ ...prev, investimento: Number(value || 0) }))} />
         <div className="grid gap-4 sm:grid-cols-2"><Input label="Início" type="date" value={form.inicio} onChange={(value) => setForm((prev) => ({ ...prev, inicio: value }))} /><Input label="Fim" type="date" value={form.fim} onChange={(value) => setForm((prev) => ({ ...prev, fim: value }))} /></div>
+        <Textarea label="Observações" value={form.observacoes} onChange={(value) => setForm((prev) => ({ ...prev, observacoes: value }))} />
         <p className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-3 text-xs leading-5 text-slate-400">A quantidade de leads e a conversão deixam de ser digitadas manualmente. O sistema calcula pelos leads realmente vinculados à campanha.</p>
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><Button type="button" variant="outline" onClick={onClose}>Cancelar</Button><Button type="submit" disabled={disabled}>{disabled ? "Salvando..." : "Salvar campanha"}</Button></div>
       </form>

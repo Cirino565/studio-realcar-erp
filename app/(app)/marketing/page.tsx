@@ -5,7 +5,7 @@ import MarketingClient from "./components/MarketingClient";
 export default async function MarketingPage() {
   const usuario = await requirePagePermission("marketing.visualizar");
 
-  const [leadsBase, campanhas, profissionais, servicos] = await Promise.all([
+  const [leadsBase, campanhasBase, profissionais, servicos, clientes, contas, vendasCampanha, lancamentosCampanha, receitasSemCampanhaBase] = await Promise.all([
     prisma.lead.findMany({
       include: {
         cliente: {
@@ -58,6 +58,72 @@ export default async function MarketingPage() {
       },
       orderBy: [{ ordem: "asc" }, { nome: "asc" }],
     }),
+    prisma.cliente.findMany({
+      where: { status: { not: "Inativa" } },
+      select: {
+        id: true,
+        nome: true,
+        telefone: true,
+        whatsapp: true,
+        campanhaAquisicaoId: true,
+      },
+      orderBy: { nome: "asc" },
+    }),
+    prisma.contaFinanceira.findMany({
+      where: { status: "Ativa" },
+      select: { id: true, nome: true, banco: true, principal: true },
+      orderBy: [{ principal: "desc" }, { nome: "asc" }],
+    }),
+    prisma.venda.findMany({
+      where: {
+        campanhaId: { not: null },
+        situacao: { not: "CANCELADA" },
+        statusPagamento: "Pago",
+      },
+      select: {
+        campanhaId: true,
+        valorTotal: true,
+        taxaPagamento: true,
+        valorLiquido: true,
+      },
+    }),
+    prisma.lancamento.findMany({
+      where: {
+        campanhaId: { not: null },
+        statusPagamento: "Pago",
+      },
+      select: {
+        campanhaId: true,
+        tipo: true,
+        categoria: true,
+        valor: true,
+        valorLiquido: true,
+        taxaPagamento: true,
+        venda: { select: { id: true } },
+      },
+    }),
+    prisma.lancamento.findMany({
+      where: {
+        tipo: "ENTRADA",
+        campanhaId: null,
+        statusPagamento: "Pago",
+      },
+      orderBy: [{ data: "desc" }, { id: "desc" }],
+      take: 200,
+      select: {
+        id: true,
+        descricao: true,
+        valor: true,
+        data: true,
+        clienteId: true,
+        venda: {
+          select: {
+            id: true,
+            cliente: { select: { id: true, nome: true } },
+          },
+        },
+      },
+    }),
   ]);
 
   const agendamentoIds = leadsBase
@@ -94,10 +160,74 @@ export default async function MarketingPage() {
       : 0,
   }));
 
+  const nomeClientePorId = new Map(clientes.map((cliente) => [cliente.id, cliente.nome]));
+  const receitasSemCampanha = receitasSemCampanhaBase.map((receita) => ({
+    id: receita.id,
+    descricao: receita.descricao,
+    valor: receita.valor,
+    data: receita.data,
+    clienteId: receita.clienteId || receita.venda?.cliente?.id || null,
+    clienteNome:
+      receita.venda?.cliente?.nome ||
+      (receita.clienteId ? nomeClientePorId.get(receita.clienteId) || null : null),
+    vendaId: receita.venda?.id || null,
+  }));
+
+  const campanhas = campanhasBase.map((campanha) => {
+    const leadsCampanha = leads.filter((lead) => lead.campanhaId === campanha.id);
+    const clientesCampanha = clientes.filter((cliente) => cliente.campanhaAquisicaoId === campanha.id);
+    const vendas = vendasCampanha.filter((venda) => venda.campanhaId === campanha.id);
+    const lancamentosManuais = lancamentosCampanha.filter(
+      (lancamento) =>
+        lancamento.campanhaId === campanha.id &&
+        lancamento.tipo === "ENTRADA" &&
+        !lancamento.venda,
+    );
+    const custos = lancamentosCampanha.filter(
+      (lancamento) =>
+        lancamento.campanhaId === campanha.id && lancamento.tipo === "SAIDA",
+    );
+
+    const receitaBrutaVendas = vendas.reduce((total, venda) => total + venda.valorTotal, 0);
+    const taxasVendas = vendas.reduce((total, venda) => total + venda.taxaPagamento, 0);
+    const receitaLiquidaVendas = vendas.reduce(
+      (total, venda) => total + (venda.valorLiquido ?? venda.valorTotal - venda.taxaPagamento),
+      0,
+    );
+    const receitaBrutaManual = lancamentosManuais.reduce((total, item) => total + item.valor, 0);
+    const taxasManuais = lancamentosManuais.reduce((total, item) => total + item.taxaPagamento, 0);
+    const receitaLiquidaManual = lancamentosManuais.reduce(
+      (total, item) => total + (item.valorLiquido ?? item.valor - item.taxaPagamento),
+      0,
+    );
+    const custoReal = custos.reduce((total, item) => total + item.valor, 0);
+    const receitaBruta = receitaBrutaVendas + receitaBrutaManual;
+    const taxasPagamento = taxasVendas + taxasManuais;
+    const receitaLiquida = receitaLiquidaVendas + receitaLiquidaManual;
+
+    return {
+      ...campanha,
+      metricas: {
+        leads: leadsCampanha.length,
+        convertidos: leadsCampanha.filter((lead) => lead.etapa === "Convertido").length,
+        clientes: clientesCampanha.length,
+        receitaBruta,
+        taxasPagamento,
+        receitaLiquida,
+        custoReal,
+        resultado: receitaLiquida - custoReal,
+        roas: custoReal > 0 ? receitaBruta / custoReal : null,
+      },
+    };
+  });
+
   return (
     <MarketingClient
       leads={leads}
       campanhas={campanhas}
+      clientes={clientes}
+      contas={contas}
+      receitasSemCampanha={receitasSemCampanha}
       profissionais={profissionais}
       servicos={servicos}
       podeGerenciarMarketing={canAccess(usuario, "marketing.gerenciar")}

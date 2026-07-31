@@ -320,7 +320,7 @@ export default function GestaoDashboard({ data }: Props) {
         <MetricCard
           title="Receita recebida"
           value={formatarMoeda(data.financeiro.receitaRecebida)}
-          detail="Somente entradas com pagamento marcado como Pago."
+          detail={`Líquido após taxas: ${formatarMoeda(data.financeiro.receitaLiquidaRecebida)}. Taxas: ${formatarMoeda(data.financeiro.taxasRecebimento)}.`}
           icon={CircleDollarSign}
           tone="emerald"
           variation={data.financeiro.variacaoReceita}
@@ -328,21 +328,21 @@ export default function GestaoDashboard({ data }: Props) {
         <MetricCard
           title="Resultado gerencial"
           value={formatarMoeda(data.financeiro.resultadoGerencial)}
-          detail={`Receita menos custos diretos e ${formatarMoeda(data.financeiro.despesasOperacionaisPagas)} em despesas operacionais pagas.`}
+          detail={`Receita líquida menos custos diretos e ${formatarMoeda(data.financeiro.despesasOperacionaisPagas)} em despesas operacionais pagas.`}
           icon={TrendingUp}
           tone={resultadoPositivo ? "violet" : "rose"}
         />
         <MetricCard
           title="Margem após custos diretos"
           value={formatarPercentual(data.financeiro.margemDiretaPercentual)}
-          detail={`${formatarMoeda(data.financeiro.custoDiretoTotal)} de custos históricos reconhecidos nas vendas pagas.`}
+          detail={`${formatarMoeda(data.financeiro.taxasRecebimento)} em taxas e ${formatarMoeda(data.financeiro.custoDiretoTotal)} em custos diretos.`}
           icon={Gauge}
           tone="cyan"
         />
         <MetricCard
           title="Saldo de caixa realizado"
           value={formatarMoeda(data.financeiro.saldoRealizado)}
-          detail={`${formatarMoeda(data.financeiro.despesasPagas)} em todas as saídas pagas, inclusive compras de estoque e insumos.`}
+          detail={`Receita líquida recebida menos ${formatarMoeda(data.financeiro.despesasPagas)} em todas as saídas pagas.`}
           icon={WalletCards}
           tone={saldoPositivo ? "blue" : "rose"}
         />
@@ -388,6 +388,12 @@ export default function GestaoDashboard({ data }: Props) {
               tone="amber"
             />
             <LeituraFinanceiraCard
+              label="Taxas de recebimento"
+              value={data.financeiro.taxasRecebimento}
+              detail={`Receita líquida recebida: ${formatarMoeda(data.financeiro.receitaLiquidaRecebida)}.`}
+              tone="rose"
+            />
+            <LeituraFinanceiraCard
               label="Despesas operacionais pagas"
               value={data.financeiro.despesasOperacionaisPagas}
               detail="Aluguel, marketing, salários, impostos e demais saídas, exceto compras de estoque/insumos."
@@ -404,7 +410,7 @@ export default function GestaoDashboard({ data }: Props) {
                 {formatarMoeda(data.financeiro.resultadoGerencial)}
               </p>
               <p className="mt-1 text-xs leading-5 text-slate-500">
-                {formatarPercentual(data.financeiro.resultadoGerencialPercentual)} da receita recebida, após custos diretos e despesas operacionais.
+                {formatarPercentual(data.financeiro.resultadoGerencialPercentual)} da receita bruta recebida, após taxas, custos diretos e despesas operacionais.
               </p>
             </div>
 

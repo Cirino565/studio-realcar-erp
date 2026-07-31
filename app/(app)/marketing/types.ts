@@ -26,7 +26,45 @@ export type MarketingLead = Lead & {
   receitaRastreada: number;
 };
 
-export type MarketingCampanha = CampanhaMarketing;
+export type MarketingCampanha = CampanhaMarketing & {
+  metricas: {
+    leads: number;
+    convertidos: number;
+    clientes: number;
+    receitaBruta: number;
+    taxasPagamento: number;
+    receitaLiquida: number;
+    custoReal: number;
+    resultado: number;
+    roas: number | null;
+  };
+};
+
+export type MarketingClienteOption = {
+  id: number;
+  nome: string;
+  telefone: string;
+  whatsapp: string | null;
+  campanhaAquisicaoId: number | null;
+};
+
+
+export type MarketingReceitaOption = {
+  id: number;
+  descricao: string;
+  valor: number;
+  data: Date;
+  clienteId: number | null;
+  clienteNome: string | null;
+  vendaId: number | null;
+};
+
+export type MarketingContaOption = {
+  id: number;
+  nome: string;
+  banco: string | null;
+  principal: boolean;
+};
 
 export type MarketingProfissional = {
   id: number;
@@ -59,6 +97,7 @@ export type CampanhaFormData = {
   status: string;
   inicio: string;
   fim: string;
+  observacoes: string;
 };
 
 export type MarketingResumo = {
@@ -72,9 +111,12 @@ export type MarketingResumo = {
   ticketMedioPrevisto: number;
   campanhasAtivas: number;
   investimentoTotal: number;
-  custoPorLead: number;
+  custoRealTotal: number;
+  custoPorCliente: number;
   taxaConversao: number;
   receitaRastreada: number;
+  receitaLiquida: number;
+  resultadoMarketing: number;
 };
 
 export const LEAD_ETAPAS: { value: LeadEtapa; label: string; description: string }[] = [

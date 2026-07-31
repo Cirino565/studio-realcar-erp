@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
+import { resolverContextoFinanceiroVenda } from "@/lib/financeiro";
 
 export type VendaServicoInput = {
   procedimentoServicoId?: number | null;
@@ -28,6 +29,9 @@ export type CriarVendaNoTxInput = {
   agendamentoId?: number | null;
   data: Date;
   formaPagamento?: string | null;
+  formaPagamentoConfigId?: number | null;
+  contaFinanceiraId?: number | null;
+  campanhaId?: number | null;
   statusPagamento?: string | null;
   origem: string;
   observacoes?: string | null;
@@ -376,6 +380,14 @@ export async function criarVendaNoTx(
   const custoProdutos = custoProdutosAvulsos + custoKits;
   const valorTotal = totalServicos + totalProdutos;
   const custoTotal = custoServicos + custoProdutos;
+  const contextoFinanceiro = await resolverContextoFinanceiroVenda(tx, {
+    clienteId: dados.clienteId,
+    formaPagamento,
+    formaPagamentoConfigId: dados.formaPagamentoConfigId,
+    contaFinanceiraId: dados.contaFinanceiraId,
+    campanhaId: dados.campanhaId,
+    valorBruto: valorTotal,
+  });
 
   const observacaoEstoqueNegativo =
     insuficientes.length > 0 && dados.permitirEstoqueNegativo
@@ -394,7 +406,14 @@ export async function criarVendaNoTx(
       custoProdutos,
       valorTotal,
       custoTotal,
-      formaPagamento,
+      taxaPagamento: contextoFinanceiro.taxaPagamento,
+      taxaPercentualAplicada: contextoFinanceiro.taxaPercentual,
+      taxaFixaAplicada: contextoFinanceiro.taxaFixa,
+      valorLiquido: contextoFinanceiro.valorLiquido,
+      formaPagamento: contextoFinanceiro.formaPagamento,
+      formaPagamentoConfigId: contextoFinanceiro.formaPagamentoConfigId,
+      contaFinanceiraId: contextoFinanceiro.contaFinanceiraId,
+      campanhaId: contextoFinanceiro.campanhaId,
       statusPagamento,
       origem: dados.origem,
       observacoes: [dados.observacoes?.trim() || null, observacaoEstoqueNegativo]
@@ -562,7 +581,9 @@ export async function criarVendaNoTx(
           dados.agendamentoId ? `Agendamento #${dados.agendamentoId}.` : null,
           `Serviços: R$ ${totalServicos.toFixed(2)}.`,
           `Produtos e kits: R$ ${totalProdutos.toFixed(2)}.`,
-          `Forma de pagamento: ${formaPagamento}.`,
+          `Forma de pagamento: ${contextoFinanceiro.formaPagamento}.`,
+          `Taxa de recebimento: R$ ${contextoFinanceiro.taxaPagamento.toFixed(2)}.`,
+          `Valor líquido previsto: R$ ${contextoFinanceiro.valorLiquido.toFixed(2)}.`,
           `Status do pagamento: ${statusPagamento}.`,
           dados.observacoes?.trim() || null,
           observacaoEstoqueNegativo,
@@ -570,7 +591,14 @@ export async function criarVendaNoTx(
           .filter(Boolean)
           .join("\n"),
         data: dados.data,
-        formaPagamento,
+        formaPagamento: contextoFinanceiro.formaPagamento,
+        formaPagamentoConfigId: contextoFinanceiro.formaPagamentoConfigId,
+        contaFinanceiraId: contextoFinanceiro.contaFinanceiraId,
+        campanhaId: contextoFinanceiro.campanhaId,
+        taxaPagamento: contextoFinanceiro.taxaPagamento,
+        taxaPercentualAplicada: contextoFinanceiro.taxaPercentual,
+        taxaFixaAplicada: contextoFinanceiro.taxaFixa,
+        valorLiquido: contextoFinanceiro.valorLiquido,
         statusPagamento,
         origem: dados.origem,
         agendamentoId: dados.agendamentoId || null,
@@ -597,8 +625,10 @@ export async function criarVendaNoTx(
     custoServicos,
     custoProdutos,
     valorTotal,
+    valorLiquido: contextoFinanceiro.valorLiquido,
+    taxaPagamento: contextoFinanceiro.taxaPagamento,
     custoTotal,
-    margem: valorTotal - custoTotal,
+    margem: valorTotal - custoTotal - contextoFinanceiro.taxaPagamento,
     estoqueNegativoAutorizado: insuficientes.length > 0 && Boolean(dados.permitirEstoqueNegativo),
   };
 }

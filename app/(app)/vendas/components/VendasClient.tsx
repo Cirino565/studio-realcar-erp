@@ -35,12 +35,13 @@ import {
   necessidadesEstoqueVenda,
   valorUnitarioKit,
 } from "@/lib/vendas.types";
-import type { ClienteVendaOption, VendaHistoricoItem } from "../types";
+import type { ClienteVendaOption, FormaPagamentoVendaOption, VendaHistoricoItem } from "../types";
 
 type Props = {
   clientes: ClienteVendaOption[];
   produtos: ProdutoVendaOption[];
   kits: KitVendaOption[];
+  formasPagamento: FormaPagamentoVendaOption[];
   vendas: VendaHistoricoItem[];
   podeGerenciar: boolean;
   podeAutorizarEstoqueNegativo: boolean;
@@ -60,14 +61,6 @@ type CancelarVendaState = {
   motivo: string;
 };
 
-const FORMAS_PAGAMENTO = [
-  "Pix",
-  "Dinheiro",
-  "Cartão de débito",
-  "Cartão de crédito",
-  "Transferência",
-  "Outro",
-];
 
 function moeda(value: number) {
   return Number(value || 0).toLocaleString("pt-BR", {
@@ -98,6 +91,7 @@ export default function VendasClient({
   clientes,
   produtos,
   kits,
+  formasPagamento,
   vendas,
   podeGerenciar,
   podeAutorizarEstoqueNegativo,
@@ -108,7 +102,8 @@ export default function VendasClient({
   const [itens, setItens] = useState<ItemProdutoVendaDraft[]>([]);
   const [itensKits, setItensKits] = useState<ItemKitVendaDraft[]>([]);
   const [permitirEstoqueNegativo, setPermitirEstoqueNegativo] = useState(false);
-  const [formaPagamento, setFormaPagamento] = useState("Pix");
+  const formaPadrao = formasPagamento.find((item) => item.nome === "Pix") || formasPagamento[0];
+  const [formaPagamento, setFormaPagamento] = useState(formaPadrao?.nome || "Pix");
   const [statusPagamento, setStatusPagamento] = useState("Pago");
   const [observacoes, setObservacoes] = useState("");
   const [erro, setErro] = useState("");
@@ -145,6 +140,14 @@ export default function VendasClient({
     };
   }, [itens, itensKits]);
 
+  const formaConfig = formasPagamento.find((item) => item.nome === formaPagamento);
+  const taxaPrevista = Math.min(
+    resumo.receita,
+    resumo.receita * ((formaConfig?.taxaPercentual || 0) / 100) + (formaConfig?.taxaFixa || 0),
+  );
+  const valorLiquidoPrevisto = Math.max(0, resumo.receita - taxaPrevista);
+  const margemLiquidaPrevista = valorLiquidoPrevisto - resumo.custo;
+
   const estoqueInsuficiente = useMemo(
     () => necessidadesEstoqueVenda(itens, itensKits),
     [itens, itensKits],
@@ -159,7 +162,10 @@ export default function VendasClient({
     0,
   );
   const margemRecente = vendasPagas.reduce(
-    (total, venda) => total + venda.valorTotal - venda.custoTotal,
+    (total, venda) =>
+      total +
+      (venda.valorLiquido ?? venda.valorTotal - venda.taxaPagamento) -
+      venda.custoTotal,
     0,
   );
 
@@ -168,7 +174,7 @@ export default function VendasClient({
     setItens([]);
     setItensKits([]);
     setPermitirEstoqueNegativo(false);
-    setFormaPagamento("Pix");
+    setFormaPagamento(formaPadrao?.nome || "Pix");
     setStatusPagamento("Pago");
     setObservacoes("");
     setErro("");
@@ -215,12 +221,13 @@ export default function VendasClient({
           })),
           permitirEstoqueNegativo,
           formaPagamento,
+          formaPagamentoConfigId: formaConfig?.id || null,
           statusPagamento,
           observacoes,
         });
 
         setSucesso(
-          `Venda #${resultado.vendaId} registrada em ${moeda(resultado.valorTotal)}.`,
+          `Venda #${resultado.vendaId} registrada. Bruto ${moeda(resultado.valorTotal)}, taxa ${moeda(resultado.taxaPagamento)}, líquido ${moeda(resultado.valorLiquido)}.`,
         );
         limpar();
         router.refresh();
@@ -558,10 +565,11 @@ export default function VendasClient({
                   onChange={(event) => setFormaPagamento(event.target.value)}
                   className="premium-input w-full"
                 >
-                  {FORMAS_PAGAMENTO.map((item) => (
-                    <option key={item}>{item}</option>
+                  {formasPagamento.map((item) => (
+                    <option key={item.id} value={item.nome}>{item.nome}</option>
                   ))}
                 </select>
+                {formaConfig ? <p className="mt-1 text-[11px] text-slate-500">Taxa: {formaConfig.taxaPercentual.toFixed(2).replace(".", ",")}% + {moeda(formaConfig.taxaFixa)} · prazo {formaConfig.prazoDias} dia(s)</p> : null}
               </label>
               <label>
                 <span className="mb-1.5 block text-xs font-bold text-slate-600 dark:text-slate-300">
@@ -590,18 +598,12 @@ export default function VendasClient({
               />
             </label>
 
-            <div className="grid gap-3 sm:grid-cols-4">
-              <ValorCard label="Receita" value={resumo.receita} />
+            <div className="grid gap-3 sm:grid-cols-5">
+              <ValorCard label="Bruto" value={resumo.receita} />
+              <ValorCard label="Taxa" value={taxaPrevista} />
+              <ValorCard label="Líquido" value={valorLiquidoPrevisto} />
               <ValorCard label="Custo" value={resumo.custo} />
-              <ValorCard label="Margem" value={resumo.margem} />
-              <div className="rounded-2xl border border-violet-200 bg-violet-50 p-3 dark:border-violet-400/20 dark:bg-violet-400/10">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-violet-600 dark:text-violet-300">
-                  Margem %
-                </p>
-                <p className="mt-1 text-xl font-black text-violet-950 dark:text-white">
-                  {resumo.margemPercentual.toFixed(1).replace(".", ",")}%
-                </p>
-              </div>
+              <ValorCard label="Margem líquida" value={margemLiquidaPrevista} />
             </div>
 
             <div className="flex justify-end">
@@ -704,8 +706,14 @@ export default function VendasClient({
                     }
                     className="premium-input w-full"
                   >
-                    {[...FORMAS_PAGAMENTO, "Não informado"].map((item) => (
-                      <option key={item}>{item}</option>
+                    {Array.from(
+                      new Set([
+                        ...formasPagamento.map((item) => item.nome),
+                        editarVenda.formaPagamento,
+                        "Não informado",
+                      ]),
+                    ).map((item) => (
+                      <option key={item} value={item}>{item}</option>
                     ))}
                   </select>
                 </label>
@@ -895,7 +903,7 @@ function VendaRow({
   onRefazer: () => void;
 }) {
   const cancelada = venda.situacao === "CANCELADA";
-  const margem = venda.valorTotal - venda.custoTotal;
+  const margem = (venda.valorLiquido ?? venda.valorTotal - venda.taxaPagamento) - venda.custoTotal;
 
   return (
     <div className={`p-4 sm:p-5 ${cancelada ? "bg-rose-50/50 opacity-80 dark:bg-rose-500/[0.03]" : ""}`}>
@@ -966,9 +974,9 @@ function VendaRow({
             {moeda(venda.valorTotal)}
           </p>
           <p className={`text-xs font-semibold ${cancelada ? "text-slate-400" : "text-emerald-600 dark:text-emerald-300"}`}>
-            Margem direta {moeda(margem)}
+            Margem líquida {moeda(margem)}
           </p>
-          <p className="text-[10px] text-slate-400">Custo {moeda(venda.custoTotal)}</p>
+          <p className="text-[10px] text-slate-400">Taxa {moeda(venda.taxaPagamento)} · líquido {moeda(venda.valorLiquido ?? venda.valorTotal - venda.taxaPagamento)} · custo {moeda(venda.custoTotal)}</p>
           {podeAdministrar ? (
             <div className="mt-3 flex flex-wrap justify-start gap-1.5 sm:justify-end">
               {!cancelada ? (

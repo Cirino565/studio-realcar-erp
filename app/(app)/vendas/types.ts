@@ -5,6 +5,7 @@ export type ClienteVendaOption = {
   nome: string;
   telefone: string;
   whatsapp: string | null;
+  campanhaAquisicaoId: number | null;
 };
 
 export type VendaHistoricoItem = {
@@ -18,6 +19,11 @@ export type VendaHistoricoItem = {
   custoProdutos: number;
   valorTotal: number;
   custoTotal: number;
+  taxaPagamento: number;
+  valorLiquido: number | null;
+  formaPagamentoConfigId: number | null;
+  contaFinanceiraId: number | null;
+  campanhaId: number | null;
   formaPagamento: string | null;
   statusPagamento: string;
   situacao: string;
@@ -48,8 +54,18 @@ export type VendasPageData = {
   clientes: ClienteVendaOption[];
   produtos: ProdutoVendaOption[];
   kits: KitVendaOption[];
+  formasPagamento: FormaPagamentoVendaOption[];
   vendas: VendaHistoricoItem[];
   podeGerenciar: boolean;
   podeAutorizarEstoqueNegativo: boolean;
   podeAdministrarVendas: boolean;
+};
+
+export type FormaPagamentoVendaOption = {
+  id: number;
+  nome: string;
+  taxaPercentual: number;
+  taxaFixa: number;
+  prazoDias: number;
+  status: string;
 };

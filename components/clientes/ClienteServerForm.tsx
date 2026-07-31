@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { Cliente, OrigemCliente, ProcedimentoInteresse } from "@prisma/client";
+import type { CampanhaMarketing, Cliente, OrigemCliente, ProcedimentoInteresse } from "@prisma/client";
 
 import EnderecoClienteFields from "@/components/clientes/EnderecoClienteFields";
 import ProcedimentoSearchSelect from "@/components/clientes/ProcedimentoSearchSelect";
@@ -11,6 +11,7 @@ type Props = {
   cliente?: Cliente | null;
   origens: OrigemCliente[];
   procedimentosInteresse: ProcedimentoInteresse[];
+  campanhas: CampanhaMarketing[];
   action: (formData: FormData) => Promise<void>;
 };
 
@@ -82,6 +83,7 @@ export default function ClienteServerForm({
   cliente,
   origens,
   procedimentosInteresse,
+  campanhas,
   action,
 }: Props) {
   const origensDisponiveis =
@@ -180,6 +182,25 @@ export default function ClienteServerForm({
                 {origensDisponiveis.map((origem) => (
                   <option key={origem} value={origem}>
                     {origem}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="min-w-0 space-y-2">
+              <span className="block break-words text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                Campanha de aquisição
+              </span>
+
+              <select
+                name="campanhaAquisicaoId"
+                defaultValue={cliente?.campanhaAquisicaoId ?? ""}
+                className="premium-input min-h-12 w-full min-w-0 max-w-full"
+              >
+                <option value="">Sem campanha vinculada</option>
+                {campanhas.map((campanha) => (
+                  <option key={campanha.id} value={campanha.id}>
+                    {campanha.nome} · {campanha.canal} · {campanha.status}
                   </option>
                 ))}
               </select>
