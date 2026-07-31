@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { Activity, AlertCircle, CheckCircle2, X } from "lucide-react";
 
 import { registrarEvolucaoPendente } from "@/actions/agendamento.actions";
@@ -44,14 +45,34 @@ export default function RegistrarEvolucaoPendenteModal({
 }: Props) {
   const [descricao, setDescricao] = useState("");
   const [erro, setErro] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     setDescricao("");
     setErro(null);
   }, [open, item?.id]);
 
-  if (!open || !item) return null;
+  useEffect(() => {
+    if (!open) return;
+
+    const bodyOverflow = document.body.style.overflow;
+    const htmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = bodyOverflow;
+      document.documentElement.style.overflow = htmlOverflow;
+    };
+  }, [open]);
+
+  if (!mounted || !open || !item) return null;
 
   function salvar() {
     if (!item) return;
@@ -83,8 +104,8 @@ export default function RegistrarEvolucaoPendenteModal({
     });
   }
 
-  return (
-    <div className="fixed inset-0 z-[150] h-[100dvh] overflow-hidden">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] h-[100dvh] overflow-hidden">
       <button
         type="button"
         aria-label="Fechar evolução pendente"
@@ -92,7 +113,12 @@ export default function RegistrarEvolucaoPendenteModal({
         className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
       />
 
-      <div className="absolute inset-0 flex h-[100dvh] min-h-0 w-full flex-col overflow-hidden bg-slate-50 shadow-2xl sm:inset-auto sm:left-1/2 sm:top-1/2 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:w-[calc(100%-2rem)] sm:max-w-[620px] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl sm:border sm:border-slate-200">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="titulo-evolucao-pendente"
+        className="absolute inset-0 z-10 flex h-[100dvh] min-h-0 w-full flex-col overflow-hidden bg-slate-50 shadow-2xl sm:inset-auto sm:left-1/2 sm:top-1/2 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:w-[calc(100%-2rem)] sm:max-w-[620px] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl sm:border sm:border-slate-200"
+      >
         <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-3 sm:px-5">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
@@ -103,7 +129,10 @@ export default function RegistrarEvolucaoPendenteModal({
                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-700">
                   Evolução pendente
                 </p>
-                <h2 className="truncate text-base font-bold text-slate-950">
+                <h2
+                  id="titulo-evolucao-pendente"
+                  className="truncate text-base font-bold text-slate-950"
+                >
                   {item.cliente}
                 </h2>
               </div>
@@ -199,6 +228,7 @@ export default function RegistrarEvolucaoPendenteModal({
           </button>
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

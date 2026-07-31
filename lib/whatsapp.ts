@@ -1,3 +1,5 @@
+const APPOINTMENT_TIMEZONE = "America/Sao_Paulo";
+
 export type WhatsAppTemplateType =
   | "reminder"
   | "confirmation"
@@ -152,6 +154,7 @@ function formatAppointmentDate(value: Date | string) {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
+    timeZone: APPOINTMENT_TIMEZONE,
   }).format(date);
 }
 
@@ -161,6 +164,8 @@ function formatAppointmentTime(value: Date | string) {
   return new Intl.DateTimeFormat("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
+    timeZone: APPOINTMENT_TIMEZONE,
   }).format(date);
 }
 
