@@ -264,6 +264,7 @@ export default function NovoAgendamentoModal({
   const [erro, setErro] = useState("");
   const [erroTitulo, setErroTitulo] = useState("Verifique os dados");
   const [erroAcaoHorario, setErroAcaoHorario] = useState(false);
+  const [edicaoHorarioLiberada, setEdicaoHorarioLiberada] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [mostrarMaisCampos, setMostrarMaisCampos] = useState(false);
   const [horarios, setHorarios] = useState<HorarioDisponivelAgenda[]>([]);
@@ -312,6 +313,7 @@ export default function NovoAgendamentoModal({
     setErro("");
     setErroTitulo("Verifique os dados");
     setErroAcaoHorario(false);
+    setEdicaoHorarioLiberada(false);
     setTipoAtendimento(initialPayload?.tipoAtendimento || (modoEdicaoBloqueio ? "bloqueio" : "agendamento"));
     setNaturezaAtendimento(naturezaInicial);
     setAgendamentoOrigemId(
@@ -617,6 +619,7 @@ export default function NovoAgendamentoModal({
   if (!open) return null;
 
   function direcionarParaOutroHorario() {
+    setEdicaoHorarioLiberada(true);
     setHora("");
     setDisponibilidadeVersao((versao) => versao + 1);
 
@@ -980,10 +983,12 @@ export default function NovoAgendamentoModal({
                 <input
                   type="date"
                   value={data}
-                  disabled={agendamentoDiretoAgenda}
+                  disabled={agendamentoDiretoAgenda && !edicaoHorarioLiberada}
                   onChange={(event) => {
                     setData(event.target.value);
+                    setHora("");
                     setErro("");
+                    setErroAcaoHorario(false);
                   }}
                   className={`${fieldClassName()} pr-7 disabled:cursor-not-allowed disabled:opacity-70`}
                 />
@@ -997,7 +1002,7 @@ export default function NovoAgendamentoModal({
             <label className="min-w-0">
               <span className={labelClassName()}>Hora início</span>
               <div className="relative">
-                {agendamentoDiretoAgenda ? (
+                {agendamentoDiretoAgenda && !edicaoHorarioLiberada ? (
                   <input
                     id="novo-agendamento-hora"
                     value={hora}
@@ -1617,7 +1622,8 @@ export default function NovoAgendamentoModal({
               </div>
             ) : null}
 
-            {!agendamentoDiretoAgenda && horariosOcupados.length > 0 ? (
+            {(!agendamentoDiretoAgenda || edicaoHorarioLiberada) &&
+            horariosOcupados.length > 0 ? (
               <details className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/50">
                 <summary className="cursor-pointer text-xs font-semibold text-slate-600 dark:text-slate-300">
                   Ver horários ocupados
