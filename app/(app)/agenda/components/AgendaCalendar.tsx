@@ -842,10 +842,10 @@ export default function AgendaCalendar({
       <div className="border-b border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-900">
         <div className="flex min-h-14 flex-col gap-2 px-2 py-2 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center lg:gap-4 lg:px-3">
           <div className="flex min-w-0 items-center gap-1.5">
-            <div className="hidden overflow-hidden rounded-md border border-violet-300 bg-white sm:flex dark:border-violet-500/50 dark:bg-slate-950">
+            <div className="flex shrink-0 overflow-hidden rounded-lg border border-violet-300 bg-white dark:border-violet-500/50 dark:bg-slate-950">
               <a
                 href={agendaHref(selectedDate, profissionalFiltro, "day")}
-                className={`flex h-9 items-center px-3 text-xs font-extrabold uppercase tracking-wide transition ${
+                className={`flex h-9 items-center px-2.5 text-[0.68rem] font-extrabold uppercase tracking-wide transition sm:px-3 sm:text-xs ${
                   viewMode === "day"
                     ? "bg-violet-700 text-white"
                     : "text-violet-700 hover:bg-violet-50 dark:text-violet-200 dark:hover:bg-violet-500/10"
@@ -855,7 +855,7 @@ export default function AgendaCalendar({
               </a>
               <a
                 href={agendaHref(selectedDate, profissionalFiltro, "week")}
-                className={`flex h-9 items-center border-l border-violet-200 px-3 text-xs font-extrabold uppercase tracking-wide transition dark:border-violet-500/40 ${
+                className={`flex h-9 items-center border-l border-violet-200 px-2.5 text-[0.68rem] font-extrabold uppercase tracking-wide transition sm:px-3 sm:text-xs dark:border-violet-500/40 ${
                   viewMode === "week"
                     ? "bg-violet-700 text-white"
                     : "text-violet-700 hover:bg-violet-50 dark:text-violet-200 dark:hover:bg-violet-500/10"
@@ -905,39 +905,58 @@ export default function AgendaCalendar({
           </div>
 
           <div className="order-3 min-w-0 lg:order-none">
-            <p
-              className="mb-1 text-center text-[0.68rem] font-extrabold tracking-wide text-slate-500 dark:text-slate-300"
-              aria-live="polite"
-            >
-              {formatMonthYear(dateStripVisibleMonth)}
-            </p>
+            <div className="mb-1 flex items-center justify-between gap-3 px-1">
+              <p
+                className="truncate text-[0.7rem] font-extrabold capitalize tracking-wide text-slate-600 dark:text-slate-200 sm:text-xs"
+                aria-live="polite"
+              >
+                {formatMonthYear(dateStripVisibleMonth)}
+              </p>
+              <span className="hidden text-[0.65rem] font-medium text-slate-400 sm:inline dark:text-slate-500">
+                Deslize para navegar
+              </span>
+            </div>
 
             <div
               ref={dateStripRef}
               onScroll={handleDateStripScroll}
-              className="touch-scroll-x scrollbar-premium min-w-0 overflow-x-auto pb-1"
+              className="touch-scroll-x min-w-0 snap-x snap-mandatory overflow-x-auto overscroll-x-contain px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:scrollbar-premium sm:[scrollbar-width:auto]"
               aria-label="Navegação contínua por datas"
             >
-              <div className="flex w-max min-w-full items-center gap-1 px-1">
+              <div className="flex w-max min-w-full items-center gap-1.5">
                 {dateStripDays.map((day) => {
                   const active = isSameDay(day, selectedDate);
                   const todayItem = isSameDay(day, today);
+                  const weekend = day.getDay() === 0 || day.getDay() === 6;
 
                   return (
                     <a
                       key={formatDateInput(day)}
                       data-agenda-date={formatDateInput(day)}
                       href={agendaHref(day, profissionalFiltro, viewMode)}
-                      className={`flex h-9 w-[82px] flex-none items-center justify-center gap-1 rounded-md border px-2 text-center text-xs font-semibold transition ${
+                      aria-current={active ? "date" : undefined}
+                      aria-label={`${formatWeekday(day)}, ${formatDateCompact(day)}${todayItem ? ", hoje" : ""}`}
+                      title={formatDateCompact(day)}
+                      className={`relative flex h-[52px] w-11 snap-center flex-none flex-col items-center justify-center rounded-xl border text-center transition sm:h-12 sm:w-16 ${
                         active
-                          ? "border-violet-700 bg-violet-700 text-white shadow-sm"
+                          ? "border-violet-700 bg-violet-700 text-white shadow-[0_5px_14px_rgba(109,40,217,0.22)]"
                           : todayItem
-                            ? "border-violet-300 bg-violet-50 text-violet-800 hover:bg-violet-100 dark:border-violet-500/50 dark:bg-violet-500/10 dark:text-violet-100"
-                            : "border-violet-200 bg-white text-violet-700 hover:border-violet-300 hover:bg-violet-50 dark:border-violet-500/40 dark:bg-slate-950 dark:text-violet-200 dark:hover:bg-violet-500/10"
+                            ? "border-violet-400 bg-violet-50 text-violet-800 ring-1 ring-violet-200 hover:bg-violet-100 dark:border-violet-400/70 dark:bg-violet-500/10 dark:text-violet-100 dark:ring-violet-500/30"
+                            : weekend
+                              ? "border-transparent bg-slate-100/80 text-slate-600 hover:bg-violet-50 hover:text-violet-700 dark:bg-slate-800/70 dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:text-violet-100"
+                              : "border-transparent bg-transparent text-slate-600 hover:bg-violet-50 hover:text-violet-700 dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:text-violet-100"
                       }`}
                     >
-                      <span className="capitalize">{formatWeekday(day)}</span>
-                      <span className="font-extrabold">
+                      {todayItem && !active ? (
+                        <span
+                          className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-violet-600 dark:bg-violet-300"
+                          aria-hidden="true"
+                        />
+                      ) : null}
+                      <span className="text-[0.58rem] font-extrabold uppercase tracking-[0.08em] opacity-80 sm:text-[0.62rem]">
+                        {formatWeekday(day)}
+                      </span>
+                      <span className="mt-0.5 text-base font-black leading-none sm:text-sm">
                         {String(day.getDate()).padStart(2, "0")}
                       </span>
                     </a>
