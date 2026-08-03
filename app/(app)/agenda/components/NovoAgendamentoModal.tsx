@@ -264,7 +264,6 @@ export default function NovoAgendamentoModal({
   const [erro, setErro] = useState("");
   const [erroTitulo, setErroTitulo] = useState("Verifique os dados");
   const [erroAcaoHorario, setErroAcaoHorario] = useState(false);
-  const [edicaoHorarioLiberada, setEdicaoHorarioLiberada] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [mostrarMaisCampos, setMostrarMaisCampos] = useState(false);
   const [horarios, setHorarios] = useState<HorarioDisponivelAgenda[]>([]);
@@ -290,15 +289,6 @@ export default function NovoAgendamentoModal({
   const areaAutomaticaAtiva =
     !modoEdicao && !modoEdicaoBloqueio ? areaPadraoAgendamento : null;
 
-  const agendamentoDiretoAgenda = Boolean(
-    !modoEdicao &&
-      !modoEdicaoBloqueio &&
-      initialPayload?.modo !== "retorno" &&
-      initialPayload?.profissionalId &&
-      initialPayload?.data &&
-      initialPayload?.hora,
-  );
-
   useEffect(() => {
     if (!open) return;
 
@@ -313,7 +303,6 @@ export default function NovoAgendamentoModal({
     setErro("");
     setErroTitulo("Verifique os dados");
     setErroAcaoHorario(false);
-    setEdicaoHorarioLiberada(false);
     setTipoAtendimento(initialPayload?.tipoAtendimento || (modoEdicaoBloqueio ? "bloqueio" : "agendamento"));
     setNaturezaAtendimento(naturezaInicial);
     setAgendamentoOrigemId(
@@ -523,6 +512,12 @@ export default function NovoAgendamentoModal({
 
   const horariosDisponiveis = horarios.filter((item) => item.disponivel);
   const horariosOcupados = horarios.filter((item) => !item.disponivel).slice(0, 5);
+  const horarioSelecionadoNaDisponibilidade = hora
+    ? horarios.find((item) => item.hora === hora)
+    : undefined;
+  const horarioSelecionadoForaDaLista = Boolean(
+    hora && !horariosDisponiveis.some((item) => item.hora === hora),
+  );
   const total = parseCurrency(valor);
 
   function selecionarServico(servico: ServicoAgenda) {
@@ -619,7 +614,6 @@ export default function NovoAgendamentoModal({
   if (!open) return null;
 
   function direcionarParaOutroHorario() {
-    setEdicaoHorarioLiberada(true);
     setHora("");
     setDisponibilidadeVersao((versao) => versao + 1);
 
@@ -983,14 +977,13 @@ export default function NovoAgendamentoModal({
                 <input
                   type="date"
                   value={data}
-                  disabled={agendamentoDiretoAgenda && !edicaoHorarioLiberada}
                   onChange={(event) => {
                     setData(event.target.value);
                     setHora("");
                     setErro("");
                     setErroAcaoHorario(false);
                   }}
-                  className={`${fieldClassName()} pr-7 disabled:cursor-not-allowed disabled:opacity-70`}
+                  className={`${fieldClassName()} pr-7`}
                 />
                 <CalendarDays
                   size={17}
@@ -1002,32 +995,45 @@ export default function NovoAgendamentoModal({
             <label className="min-w-0">
               <span className={labelClassName()}>Hora início</span>
               <div className="relative">
-                {agendamentoDiretoAgenda && !edicaoHorarioLiberada ? (
-                  <input
-                    id="novo-agendamento-hora"
-                    value={hora}
-                    readOnly
-                    className={`${fieldClassName()} cursor-not-allowed pr-7 opacity-80`}
-                  />
-                ) : (
-                  <select
-                    id="novo-agendamento-hora"
-                    value={hora}
-                    onChange={(event) => {
-                      setHora(event.target.value);
-                      setErro("");
-                      setErroAcaoHorario(false);
-                    }}
-                    className={`${fieldClassName()} appearance-none pr-7`}
-                  >
-                    <option value="">Selecione</option>
-                    {horariosDisponiveis.map((item) => (
-                      <option key={item.hora} value={item.hora}>
-                        {item.hora}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                <select
+                  id="novo-agendamento-hora"
+                  value={hora}
+                  onChange={(event) => {
+                    setHora(event.target.value);
+                    setErro("");
+                    setErroAcaoHorario(false);
+                  }}
+                  className={`${fieldClassName()} appearance-none pr-7`}
+                  aria-busy={isLoadingHorarios}
+                >
+                  <option value="">
+                    {isLoadingHorarios
+                      ? "Carregando horários..."
+                      : horariosDisponiveis.length > 0
+                        ? "Selecione"
+                        : "Nenhum horário livre"}
+                  </option>
+                  {horarioSelecionadoForaDaLista ? (
+                    <option
+                      value={hora}
+                      disabled={Boolean(
+                        horarioSelecionadoNaDisponibilidade &&
+                          !horarioSelecionadoNaDisponibilidade.disponivel,
+                      )}
+                    >
+                      {hora}
+                      {horarioSelecionadoNaDisponibilidade &&
+                      !horarioSelecionadoNaDisponibilidade.disponivel
+                        ? " · indisponível"
+                        : " · horário selecionado"}
+                    </option>
+                  ) : null}
+                  {horariosDisponiveis.map((item) => (
+                    <option key={item.hora} value={item.hora}>
+                      {item.hora}
+                    </option>
+                  ))}
+                </select>
                 <Clock3
                   size={18}
                   className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-500"
@@ -1040,12 +1046,13 @@ export default function NovoAgendamentoModal({
               <div className="relative">
                 <select
                   value={profissionalId}
-                  disabled={agendamentoDiretoAgenda}
                   onChange={(event) => {
                     setProfissionalId(event.target.value);
+                    setHora("");
                     setErro("");
+                    setErroAcaoHorario(false);
                   }}
-                  className={`${fieldClassName()} appearance-none pr-7 disabled:cursor-not-allowed disabled:opacity-70`}
+                  className={`${fieldClassName()} appearance-none pr-7`}
                 >
                   <option value="">Selecione</option>
                   {profissionais.map((profissional) => (
@@ -1061,6 +1068,13 @@ export default function NovoAgendamentoModal({
               </div>
             </label>
           </div>
+
+          {initialPayload?.hora && !modoEdicao && !modoEdicaoBloqueio ? (
+            <p className="mt-2 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+              O horário clicado foi preenchido como sugestão. Você pode alterar
+              a data, o horário e a profissional antes de salvar.
+            </p>
+          ) : null}
 
           {tipoAtendimento === "agendamento" ? (
             <>
@@ -1622,8 +1636,7 @@ export default function NovoAgendamentoModal({
               </div>
             ) : null}
 
-            {(!agendamentoDiretoAgenda || edicaoHorarioLiberada) &&
-            horariosOcupados.length > 0 ? (
+            {horariosOcupados.length > 0 ? (
               <details className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/50">
                 <summary className="cursor-pointer text-xs font-semibold text-slate-600 dark:text-slate-300">
                   Ver horários ocupados

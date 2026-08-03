@@ -685,6 +685,8 @@ export async function atualizarAgendamento({
       ? 0
       : Math.max(0, Number(dados.valor) || 0);
 
+  await validarDatasNoHorarioFuncionamento([data], duracao);
+
   const conflito = await obterConflitoAgenda({
     profissionalId: dados.profissionalId,
     data,
@@ -911,6 +913,8 @@ export async function atualizarBloqueioAgenda({
 
   const data = parseLocalDateTime(dados.data);
   const duracao = Math.max(5, dados.duracao || 60);
+
+  await validarDatasNoHorarioFuncionamento([data], duracao);
 
   const conflito = await obterConflitoAgenda({
     profissionalId: dados.profissionalId,
