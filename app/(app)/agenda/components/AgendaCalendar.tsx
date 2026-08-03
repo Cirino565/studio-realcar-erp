@@ -80,7 +80,7 @@ type Props = {
   viewMode: "day" | "week";
 };
 
-const START_HOUR = 9;
+const DEFAULT_START_TIME = "09:00";
 const SLOT_MINUTES = 30;
 const MINUTE_HEIGHT = 1.5;
 const SAO_PAULO_TIMEZONE = "America/Sao_Paulo";
@@ -101,6 +101,67 @@ const ALMOCO_VISUAL_PADRAO: AlmocoVisualConfig = {
   fim: "13:00",
   dias: [1, 2, 3, 4, 5, 6],
 };
+
+type HorarioFuncionamento = {
+  abertura: string;
+  fechamento: string;
+} | null;
+
+type HorariosFuncionamentoConfig = {
+  semana: HorarioFuncionamento;
+  sabado: HorarioFuncionamento;
+  domingo: HorarioFuncionamento;
+};
+
+const HORARIOS_FUNCIONAMENTO_PADRAO: HorariosFuncionamentoConfig = {
+  semana: { abertura: "09:00", fechamento: "19:00" },
+  sabado: { abertura: "09:00", fechamento: "17:00" },
+  domingo: null,
+};
+
+function parseHorariosFuncionamento(
+  value?: string | null,
+): HorariosFuncionamentoConfig {
+  if (!value) return HORARIOS_FUNCIONAMENTO_PADRAO;
+
+  const semana = value.match(/SEG-SEX=(\d{2}:\d{2})-(\d{2}:\d{2})/i);
+  const sabado = value.match(
+    /SAB=(FECHADO|(\d{2}:\d{2})-(\d{2}:\d{2}))/i,
+  );
+  const domingo = value.match(
+    /DOM=(FECHADO|(\d{2}:\d{2})-(\d{2}:\d{2}))/i,
+  );
+
+  return {
+    semana: semana
+      ? { abertura: semana[1], fechamento: semana[2] }
+      : HORARIOS_FUNCIONAMENTO_PADRAO.semana,
+    sabado:
+      sabado?.[1]?.toUpperCase() === "FECHADO"
+        ? null
+        : sabado?.[2] && sabado?.[3]
+          ? { abertura: sabado[2], fechamento: sabado[3] }
+          : HORARIOS_FUNCIONAMENTO_PADRAO.sabado,
+    domingo:
+      domingo?.[1]?.toUpperCase() === "FECHADO"
+        ? null
+        : domingo?.[2] && domingo?.[3]
+          ? { abertura: domingo[2], fechamento: domingo[3] }
+          : HORARIOS_FUNCIONAMENTO_PADRAO.domingo,
+  };
+}
+
+function getFuncionamentoDia(
+  value: string | null | undefined,
+  date: Date,
+): HorarioFuncionamento {
+  const configuracao = parseHorariosFuncionamento(value);
+  const diaSemana = date.getDay();
+
+  if (diaSemana === 0) return configuracao.domingo;
+  if (diaSemana === 6) return configuracao.sabado;
+  return configuracao.semana;
+}
 
 function parseAlmocoVisual(value?: string | null): AlmocoVisualConfig {
   if (!value) return { ...ALMOCO_VISUAL_PADRAO, dias: [...ALMOCO_VISUAL_PADRAO.dias] };
@@ -228,11 +289,6 @@ function blockEnd(bloqueio: BloqueioAgenda) {
   return addMinutes(new Date(bloqueio.data), bloqueio.duracao);
 }
 
-function getEndHour(date: Date) {
-  if (date.getDay() === 6) return 17;
-  return 19;
-}
-
 function createPalette(solid: string, gradientEnd: string) {
   const middle = mixHexColors(solid, gradientEnd, 0.5);
   const text = getReadableTextColor(middle);
@@ -349,10 +405,19 @@ export default function AgendaCalendar({
 }: Props) {
   const today = new Date();
   const selectedDateInput = formatDateInput(selectedDate);
-  const endHour = getEndHour(selectedDate);
-  const totalMinutes = Math.max(0, (endHour - START_HOUR) * 60);
+  const funcionamentoDia = useMemo(
+    () => getFuncionamentoDia(horarioAtendimento, selectedDate),
+    [horarioAtendimento, selectedDate],
+  );
+  const isClosedDay = funcionamentoDia === null;
+  const agendaStartMinutes = funcionamentoDia
+    ? minutosHorario(funcionamentoDia.abertura)
+    : minutosHorario(DEFAULT_START_TIME);
+  const agendaEndMinutes = funcionamentoDia
+    ? minutosHorario(funcionamentoDia.fechamento)
+    : agendaStartMinutes;
+  const totalMinutes = Math.max(0, agendaEndMinutes - agendaStartMinutes);
   const gridHeight = totalMinutes * MINUTE_HEIGHT;
-  const isSunday = selectedDate.getDay() === 0;
   const almocoVisual = useMemo(
     () => parseAlmocoVisual(horarioAtendimento),
     [horarioAtendimento],
@@ -361,15 +426,15 @@ export default function AgendaCalendar({
     const diaSemana = selectedDate.getDay();
 
     if (
-      isSunday ||
+      isClosedDay ||
       !almocoVisual.ativo ||
       !almocoVisual.dias.includes(diaSemana)
     ) {
       return null;
     }
 
-    const inicio = minutosHorario(almocoVisual.inicio) - START_HOUR * 60;
-    const fim = minutosHorario(almocoVisual.fim) - START_HOUR * 60;
+    const inicio = minutosHorario(almocoVisual.inicio) - agendaStartMinutes;
+    const fim = minutosHorario(almocoVisual.fim) - agendaStartMinutes;
     const visibleStart = Math.max(0, inicio);
     const visibleEnd = Math.min(totalMinutes, fim);
 
@@ -379,7 +444,7 @@ export default function AgendaCalendar({
       top: visibleStart * MINUTE_HEIGHT,
       height: (visibleEnd - visibleStart) * MINUTE_HEIGHT,
     };
-  }, [almocoVisual, isSunday, selectedDate, totalMinutes]);
+  }, [agendaStartMinutes, almocoVisual, isClosedDay, selectedDate, totalMinutes]);
 
   const [hiddenProfessionalIds, setHiddenProfessionalIds] = useState<number[]>([]);
   const [showVisibilityPanel, setShowVisibilityPanel] = useState(false);
@@ -546,22 +611,27 @@ export default function AgendaCalendar({
   }, []);
 
   const slots = useMemo(() => {
-    if (isSunday) return [];
+    if (isClosedDay || totalMinutes <= 0) return [];
 
-    return Array.from(
-      { length: totalMinutes / SLOT_MINUTES + 1 },
-      (_, index) => {
-        const total = START_HOUR * 60 + index * SLOT_MINUTES;
-        const hour = Math.floor(total / 60);
-        const minute = total % 60;
+    const offsets: number[] = [];
 
-        return {
-          label: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
-          offset: index * SLOT_MINUTES * MINUTE_HEIGHT,
-        };
-      },
-    );
-  }, [isSunday, totalMinutes]);
+    for (let offset = 0; offset < totalMinutes; offset += SLOT_MINUTES) {
+      offsets.push(offset);
+    }
+
+    offsets.push(totalMinutes);
+
+    return offsets.map((offset) => {
+      const total = agendaStartMinutes + offset;
+      const hour = Math.floor(total / 60);
+      const minute = total % 60;
+
+      return {
+        label: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
+        offset: offset * MINUTE_HEIGHT,
+      };
+    });
+  }, [agendaStartMinutes, isClosedDay, totalMinutes]);
 
   const visibleProfessionals = useMemo(() => {
     const result = profissionais.filter(
@@ -596,7 +666,7 @@ export default function AgendaCalendar({
 
   function minutesFromStart(value: Date | string) {
     const { hour, minute } = getSaoPauloTimeParts(value);
-    return hour * 60 + minute - START_HOUR * 60;
+    return hour * 60 + minute - agendaStartMinutes;
   }
 
   function goToDate(date: Date) {
@@ -627,7 +697,12 @@ export default function AgendaCalendar({
     goToDate(next);
   }
 
-  function abrirNovo(profissionalId: number, hora = "09:00") {
+  function abrirNovo(
+    profissionalId: number,
+    hora = funcionamentoDia?.abertura || DEFAULT_START_TIME,
+  ) {
+    if (isClosedDay) return;
+
     onNovoHorario({
       data: selectedDateInput,
       hora,
@@ -636,6 +711,8 @@ export default function AgendaCalendar({
   }
 
   function abrirNovoPadrao() {
+    if (isClosedDay) return;
+
     const profissional = visibleProfessionals[0] || profissionais[0];
     if (profissional) abrirNovo(profissional.id);
   }
@@ -664,6 +741,7 @@ export default function AgendaCalendar({
 
     return weekDays.map((day) => {
       const dateKey = formatDateInput(day);
+      const funcionamento = getFuncionamentoDia(horarioAtendimento, day);
       const items: Array<
         | { kind: "appointment"; minute: number; appointment: AgendamentoAgenda }
         | { kind: "block"; minute: number; bloqueio: BloqueioAgenda }
@@ -700,7 +778,7 @@ export default function AgendaCalendar({
       });
 
       if (
-        day.getDay() !== 0 &&
+        funcionamento &&
         almocoVisual.ativo &&
         almocoVisual.dias.includes(day.getDay())
       ) {
@@ -712,25 +790,26 @@ export default function AgendaCalendar({
 
       items.sort((a, b) => a.minute - b.minute);
 
-      return { day, dateKey, items };
+      return { day, dateKey, items, funcionamento };
     });
   }, [
     agendamentos,
     almocoVisual,
     bloqueios,
+    horarioAtendimento,
     visibleProfessionals,
     weekDays,
   ]);
 
   const currentTimeLine = useMemo(() => {
-    if (!isSameDay(selectedDate, today) || isSunday) return null;
+    if (!isSameDay(selectedDate, today) || isClosedDay) return null;
 
-    const current = new Date();
-    const minutes = current.getHours() * 60 + current.getMinutes() - START_HOUR * 60;
+    const current = getSaoPauloTimeParts(new Date());
+    const minutes = current.hour * 60 + current.minute - agendaStartMinutes;
 
     if (minutes < 0 || minutes > totalMinutes) return null;
     return minutes * MINUTE_HEIGHT;
-  }, [isSunday, selectedDate, today, totalMinutes]);
+  }, [agendaStartMinutes, isClosedDay, selectedDate, today, totalMinutes]);
 
   return (
     <>
@@ -919,7 +998,7 @@ export default function AgendaCalendar({
             <button
               type="button"
               onClick={abrirNovoPadrao}
-              disabled={!visibleProfessionals[0] && !profissionais[0]}
+              disabled={isClosedDay || (!visibleProfessionals[0] && !profissionais[0])}
               className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-700 text-white shadow-md shadow-violet-700/25 transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50 sm:h-11 sm:w-11"
               title="Novo agendamento"
             >
@@ -933,8 +1012,8 @@ export default function AgendaCalendar({
       {viewMode === "week" ? (
         <div className="w-full overflow-x-auto border-t border-slate-300 dark:border-slate-700">
           <div className="grid min-w-[1180px] grid-cols-7 bg-slate-200 dark:bg-slate-800">
-            {weeklyOverview.map(({ day, dateKey, items }) => {
-              const sunday = day.getDay() === 0;
+            {weeklyOverview.map(({ day, dateKey, items, funcionamento }) => {
+              const closed = funcionamento === null;
               const active = isSameDay(day, selectedDate);
               const appointmentCount = items.filter(
                 (item) => item.kind === "appointment",
@@ -961,7 +1040,7 @@ export default function AgendaCalendar({
                         {String(day.getDate()).padStart(2, "0")}
                       </p>
                     </div>
-                    {!sunday ? (
+                    {!closed ? (
                       <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
                         {appointmentCount}
                       </span>
@@ -969,7 +1048,7 @@ export default function AgendaCalendar({
                   </a>
 
                   <div className="space-y-2 p-2">
-                    {sunday ? (
+                    {closed ? (
                       <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-6 text-center text-xs font-semibold text-slate-400 dark:border-slate-700 dark:bg-slate-900">
                         Fechado
                       </div>
@@ -1115,7 +1194,7 @@ export default function AgendaCalendar({
                             if (!profissional) return;
                             onNovoHorario({
                               data: dateKey,
-                              hora: "09:00",
+                              hora: funcionamento?.abertura || DEFAULT_START_TIME,
                               profissionalId: profissional.id,
                             });
                           }}
@@ -1132,17 +1211,17 @@ export default function AgendaCalendar({
             })}
           </div>
         </div>
-      ) : isSunday ? (
+      ) : isClosedDay ? (
         <div className="flex min-h-[360px] items-center justify-center p-6">
           <div className="max-w-md text-center">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
               <CalendarDays size={22} />
             </div>
             <h3 className="mt-4 text-base font-bold text-slate-900 dark:text-white">
-              Domingo sem atendimento
+              Dia sem atendimento
             </h3>
             <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-              Selecione outro dia no calendário para visualizar ou criar agendamentos.
+              Este dia está marcado como fechado nas configurações da agenda.
             </p>
           </div>
         </div>
@@ -1228,7 +1307,7 @@ export default function AgendaCalendar({
                     className="relative border-r border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950"
                     style={{ height: gridHeight }}
                   >
-                    {slots.slice(0, -1).map((slot) => (
+                    {slots.slice(0, -1).map((slot, slotIndex) => (
                       <button
                         key={`${profissional.id}-${slot.label}`}
                         type="button"
@@ -1236,7 +1315,7 @@ export default function AgendaCalendar({
                         className="absolute left-0 right-0 z-0 border-t border-slate-200 transition hover:bg-violet-50/80 dark:border-slate-800 dark:hover:bg-violet-500/10"
                         style={{
                           top: slot.offset,
-                          height: SLOT_MINUTES * MINUTE_HEIGHT,
+                          height: slots[slotIndex + 1].offset - slot.offset,
                         }}
                         title={`Criar agendamento às ${slot.label}`}
                       >

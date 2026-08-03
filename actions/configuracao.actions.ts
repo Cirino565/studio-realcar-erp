@@ -105,5 +105,6 @@ export async function salvarConfiguracaoClinica(dados: SalvarConfiguracaoInput) 
   });
 
   revalidatePath("/configuracoes");
+  revalidatePath("/agenda");
   revalidatePath("/");
 }
