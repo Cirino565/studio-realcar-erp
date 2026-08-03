@@ -1100,7 +1100,7 @@ export default function ConfiguracoesClient({
                       Horários de atendimento
                     </p>
                     <p className="mt-1 text-xs leading-5 text-slate-400">
-                      Estes horários controlam os períodos disponíveis na agenda.
+                      Defina o primeiro e o último horário em que um atendimento pode começar.
                     </p>
                   </div>
 
@@ -1130,7 +1130,7 @@ export default function ConfiguracoesClient({
                     </label>
 
                     <label className="grid gap-2 text-sm text-slate-300">
-                      <span className="font-medium">Fechamento</span>
+                      <span className="font-medium">Último início</span>
                       <input
                         type="time"
                         value={horariosAgenda.semanaFechamento}
@@ -1187,7 +1187,7 @@ export default function ConfiguracoesClient({
                     </label>
 
                     <label className="grid gap-2 text-sm text-slate-300">
-                      <span className="font-medium">Fechamento</span>
+                      <span className="font-medium">Último início</span>
                       <input
                         type="time"
                         value={horariosAgenda.sabadoFechamento}
@@ -1297,8 +1297,8 @@ export default function ConfiguracoesClient({
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-xs text-slate-400">
-                    Domingo permanece fechado. Padrão atual: segunda a sexta, 09h às 19h; sábado, 09h às 17h.
+                  <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-xs leading-5 text-slate-400">
+                    O último horário representa o início do atendimento. Um procedimento iniciado nesse horário pode terminar depois. Domingo permanece fechado.
                   </div>
                 </div>
                 <Field

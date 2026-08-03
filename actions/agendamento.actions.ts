@@ -479,10 +479,7 @@ async function validarConflitoAgenda(
   }
 }
 
-async function validarDatasNoHorarioFuncionamento(
-  datas: Date[],
-  duracao: number,
-) {
+async function validarDatasNoHorarioFuncionamento(datas: Date[]) {
   const configuracaoClinica = await prisma.configuracaoClinica.findFirst({
     select: {
       horarioAtendimento: true,
@@ -513,11 +510,11 @@ async function validarDatasNoHorarioFuncionamento(
 
     const inicio = minutosDoHorario(formatHourMinute(data));
     const abertura = minutosDoHorario(funcionamento.abertura);
-    const fechamento = minutosDoHorario(funcionamento.fechamento);
+    const ultimoInicio = minutosDoHorario(funcionamento.fechamento);
 
-    if (inicio < abertura || inicio + duracao > fechamento) {
+    if (inicio < abertura || inicio > ultimoInicio) {
       throw new Error(
-        `O horário de ${dataTexto} fica fora do expediente (${funcionamento.abertura} às ${funcionamento.fechamento}). Ajuste a série antes de salvar.`,
+        `O horário de ${dataTexto} fica fora da faixa permitida para iniciar atendimentos (${funcionamento.abertura} às ${funcionamento.fechamento}). Ajuste a série antes de salvar.`,
       );
     }
   }
@@ -557,7 +554,7 @@ export async function criarAgendamento(
       ? 0
       : Math.max(0, Number(dados.valor) || 0);
 
-  await validarDatasNoHorarioFuncionamento(datas, duracao);
+  await validarDatasNoHorarioFuncionamento(datas);
 
   for (const data of datas) {
     const conflito = await obterConflitoAgenda({
@@ -685,7 +682,7 @@ export async function atualizarAgendamento({
       ? 0
       : Math.max(0, Number(dados.valor) || 0);
 
-  await validarDatasNoHorarioFuncionamento([data], duracao);
+  await validarDatasNoHorarioFuncionamento([data]);
 
   const conflito = await obterConflitoAgenda({
     profissionalId: dados.profissionalId,
@@ -840,7 +837,7 @@ export async function criarBloqueioAgenda(
   const duracao = Math.max(5, dados.duracao || 60);
   const { regra, datas } = gerarDatasRecorrencia(dataBase, dados.recorrencia);
 
-  await validarDatasNoHorarioFuncionamento(datas, duracao);
+  await validarDatasNoHorarioFuncionamento(datas);
 
   for (const data of datas) {
     const conflito = await obterConflitoAgenda({
@@ -914,7 +911,7 @@ export async function atualizarBloqueioAgenda({
   const data = parseLocalDateTime(dados.data);
   const duracao = Math.max(5, dados.duracao || 60);
 
-  await validarDatasNoHorarioFuncionamento([data], duracao);
+  await validarDatasNoHorarioFuncionamento([data]);
 
   const conflito = await obterConflitoAgenda({
     profissionalId: dados.profissionalId,
@@ -1547,7 +1544,6 @@ function minutosDoHorario(value: string) {
 function gerarSlotsDisponibilidade(
   funcionamento: HorarioFuncionamento,
   intervalo: number,
-  duracao: number,
 ) {
   if (!funcionamento) {
     return [];
@@ -1555,11 +1551,11 @@ function gerarSlotsDisponibilidade(
 
   const slots: string[] = [];
   const abertura = minutosDoHorario(funcionamento.abertura);
-  const fechamento = minutosDoHorario(funcionamento.fechamento);
+  const ultimoInicio = minutosDoHorario(funcionamento.fechamento);
 
   for (
     let minutos = abertura;
-    minutos + duracao <= fechamento;
+    minutos <= ultimoInicio;
     minutos += intervalo
   ) {
     const hour = Math.floor(minutos / 60);
@@ -1615,7 +1611,6 @@ export async function buscarDisponibilidadeAgenda({
   const slots = gerarSlotsDisponibilidade(
     funcionamento,
     configuracaoHorario.intervalo,
-    duracao,
   );
 
   if (slots.length === 0) {

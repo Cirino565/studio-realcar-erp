@@ -413,10 +413,34 @@ export default function AgendaCalendar({
   const agendaStartMinutes = funcionamentoDia
     ? minutosHorario(funcionamentoDia.abertura)
     : minutosHorario(DEFAULT_START_TIME);
-  const agendaEndMinutes = funcionamentoDia
+  const agendaLastStartMinutes = funcionamentoDia
     ? minutosHorario(funcionamentoDia.fechamento)
     : agendaStartMinutes;
-  const totalMinutes = Math.max(0, agendaEndMinutes - agendaStartMinutes);
+  const latestScheduledEndMinutes = useMemo(() => {
+    let latest = agendaLastStartMinutes + SLOT_MINUTES;
+
+    agendamentos.forEach((appointment) => {
+      if (formatSaoPauloDateKey(appointment.data) !== selectedDateInput) return;
+      const end = getSaoPauloTimeParts(appointmentEnd(appointment));
+      latest = Math.max(latest, end.hour * 60 + end.minute);
+    });
+
+    bloqueios.forEach((bloqueio) => {
+      if (formatSaoPauloDateKey(bloqueio.data) !== selectedDateInput) return;
+      const end = getSaoPauloTimeParts(blockEnd(bloqueio));
+      latest = Math.max(latest, end.hour * 60 + end.minute);
+    });
+
+    return latest;
+  }, [agendaLastStartMinutes, agendamentos, bloqueios, selectedDateInput]);
+  const agendaVisualEndMinutes = Math.max(
+    agendaLastStartMinutes + SLOT_MINUTES,
+    latestScheduledEndMinutes,
+  );
+  const totalMinutes = Math.max(
+    0,
+    agendaVisualEndMinutes - agendaStartMinutes,
+  );
   const gridHeight = totalMinutes * MINUTE_HEIGHT;
   const almocoVisual = useMemo(
     () => parseAlmocoVisual(horarioAtendimento),
@@ -629,9 +653,10 @@ export default function AgendaCalendar({
       return {
         label: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
         offset: offset * MINUTE_HEIGHT,
+        startAllowed: total <= agendaLastStartMinutes,
       };
     });
-  }, [agendaStartMinutes, isClosedDay, totalMinutes]);
+  }, [agendaLastStartMinutes, agendaStartMinutes, isClosedDay, totalMinutes]);
 
   const visibleProfessionals = useMemo(() => {
     const result = profissionais.filter(
@@ -1311,15 +1336,24 @@ export default function AgendaCalendar({
                       <button
                         key={`${profissional.id}-${slot.label}`}
                         type="button"
+                        disabled={!slot.startAllowed}
                         onClick={() => abrirNovo(profissional.id, slot.label)}
-                        className="absolute left-0 right-0 z-0 border-t border-slate-200 transition hover:bg-violet-50/80 dark:border-slate-800 dark:hover:bg-violet-500/10"
+                        className="absolute left-0 right-0 z-0 border-t border-slate-200 transition enabled:hover:bg-violet-50/80 disabled:cursor-default dark:border-slate-800 dark:enabled:hover:bg-violet-500/10"
                         style={{
                           top: slot.offset,
                           height: slots[slotIndex + 1].offset - slot.offset,
                         }}
-                        title={`Criar agendamento às ${slot.label}`}
+                        title={
+                          slot.startAllowed
+                            ? `Criar agendamento às ${slot.label}`
+                            : "Continuação de atendimento iniciado dentro do horário permitido"
+                        }
                       >
-                        <span className="sr-only">Criar agendamento às {slot.label}</span>
+                        <span className="sr-only">
+                          {slot.startAllowed
+                            ? `Criar agendamento às ${slot.label}`
+                            : `Horário ${slot.label} reservado para continuidade de atendimentos`}
+                        </span>
                       </button>
                     ))}
 
