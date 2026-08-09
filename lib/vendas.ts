@@ -56,6 +56,10 @@ function quantidadeSegura(value: unknown) {
   return Math.max(0, numero);
 }
 
+function adicionarDias(data: Date, dias: number) {
+  return new Date(data.getTime() + Math.max(0, dias) * 86_400_000);
+}
+
 function calcularDescontoKit(
   valorBruto: number,
   tipo: string,
@@ -388,6 +392,10 @@ export async function criarVendaNoTx(
     campanhaId: dados.campanhaId,
     valorBruto: valorTotal,
   });
+  const recebimentoPrevistoEm =
+    valorTotal > 0
+      ? adicionarDias(dados.data, contextoFinanceiro.prazoRecebimentoDias)
+      : null;
 
   const observacaoEstoqueNegativo =
     insuficientes.length > 0 && dados.permitirEstoqueNegativo
@@ -410,6 +418,8 @@ export async function criarVendaNoTx(
       taxaPercentualAplicada: contextoFinanceiro.taxaPercentual,
       taxaFixaAplicada: contextoFinanceiro.taxaFixa,
       valorLiquido: contextoFinanceiro.valorLiquido,
+      prazoRecebimentoDias: contextoFinanceiro.prazoRecebimentoDias,
+      recebimentoPrevistoEm,
       formaPagamento: contextoFinanceiro.formaPagamento,
       formaPagamentoConfigId: contextoFinanceiro.formaPagamentoConfigId,
       contaFinanceiraId: contextoFinanceiro.contaFinanceiraId,
@@ -599,6 +609,8 @@ export async function criarVendaNoTx(
         taxaPercentualAplicada: contextoFinanceiro.taxaPercentual,
         taxaFixaAplicada: contextoFinanceiro.taxaFixa,
         valorLiquido: contextoFinanceiro.valorLiquido,
+        prazoRecebimentoDias: contextoFinanceiro.prazoRecebimentoDias,
+        recebimentoPrevistoEm,
         statusPagamento,
         origem: dados.origem,
         agendamentoId: dados.agendamentoId || null,
@@ -627,6 +639,9 @@ export async function criarVendaNoTx(
     valorTotal,
     valorLiquido: contextoFinanceiro.valorLiquido,
     taxaPagamento: contextoFinanceiro.taxaPagamento,
+    formaPagamento: contextoFinanceiro.formaPagamento,
+    prazoRecebimentoDias: contextoFinanceiro.prazoRecebimentoDias,
+    recebimentoPrevistoEm: recebimentoPrevistoEm?.toISOString() || null,
     custoTotal,
     margem: valorTotal - custoTotal - contextoFinanceiro.taxaPagamento,
     estoqueNegativoAutorizado: insuficientes.length > 0 && Boolean(dados.permitirEstoqueNegativo),

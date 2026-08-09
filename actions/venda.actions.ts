@@ -200,6 +200,10 @@ export async function editarVendaAdministrativa(
       formaConfig?.taxaPercentual || 0,
       formaConfig?.taxaFixa || 0,
     );
+    const prazoRecebimentoDias = Math.max(0, Math.trunc(formaConfig?.prazoDias || 0));
+    const recebimentoPrevistoEm = new Date(
+      data.getTime() + prazoRecebimentoDias * 86_400_000,
+    );
     const contaFinanceiraId =
       venda.contaFinanceiraId ||
       (
@@ -223,6 +227,8 @@ export async function editarVendaAdministrativa(
         taxaPercentualAplicada: calculoTaxa.taxaPercentual,
         taxaFixaAplicada: calculoTaxa.taxaFixa,
         valorLiquido: calculoTaxa.valorLiquido,
+        prazoRecebimentoDias,
+        recebimentoPrevistoEm,
         statusPagamento,
         observacoes,
         data,
@@ -249,6 +255,8 @@ export async function editarVendaAdministrativa(
           taxaPercentualAplicada: calculoTaxa.taxaPercentual,
           taxaFixaAplicada: calculoTaxa.taxaFixa,
           valorLiquido: calculoTaxa.valorLiquido,
+          prazoRecebimentoDias,
+          recebimentoPrevistoEm,
           statusPagamento,
           categoria: categoriaLancamento,
           data,

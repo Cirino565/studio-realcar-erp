@@ -49,14 +49,25 @@ export async function resolverContextoFinanceiroVenda(
       })
     : null;
 
-  const formaPagamento = dados.formaPagamento?.trim() || "Não informado";
+  const formaPagamentoInformada = dados.formaPagamento?.trim() || null;
   const formaConfig = dados.formaPagamentoConfigId
-    ? await tx.formaPagamentoConfig.findUnique({
-        where: { id: dados.formaPagamentoConfigId },
+    ? await tx.formaPagamentoConfig.findFirst({
+        where: { id: dados.formaPagamentoConfigId, status: "Ativa" },
       })
-    : await tx.formaPagamentoConfig.findFirst({
-        where: { nome: formaPagamento, status: "Ativa" },
-      });
+    : formaPagamentoInformada
+      ? await tx.formaPagamentoConfig.findFirst({
+          where: { nome: formaPagamentoInformada, status: "Ativa" },
+        })
+      : null;
+
+  if (dados.formaPagamentoConfigId && !formaConfig) {
+    throw new Error(
+      "A forma de pagamento selecionada não existe mais ou está inativa. Atualize a página e escolha outra opção.",
+    );
+  }
+
+  const formaPagamento =
+    formaConfig?.nome || formaPagamentoInformada || "Não informado";
 
   const conta = dados.contaFinanceiraId
     ? await tx.contaFinanceira.findFirst({
@@ -80,6 +91,7 @@ export async function resolverContextoFinanceiroVenda(
     formaPagamentoConfigId: formaConfig?.id || null,
     contaFinanceiraId: conta?.id || null,
     campanhaId: dados.campanhaId || cliente?.campanhaAquisicaoId || null,
+    prazoRecebimentoDias: Math.max(0, Math.trunc(formaConfig?.prazoDias || 0)),
     ...calculo,
   };
 }

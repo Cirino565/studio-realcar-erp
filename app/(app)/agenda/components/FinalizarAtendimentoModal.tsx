@@ -43,6 +43,14 @@ type ServicoFinalizacao = {
   custoPadrao: number;
 };
 
+export type FormaPagamentoFinalizacao = {
+  id: number;
+  nome: string;
+  taxaPercentual: number;
+  taxaFixa: number;
+  prazoDias: number;
+};
+
 export type AtendimentoFinalizadoPayload = {
   agendamentoId: number;
   procedimento: string;
@@ -58,19 +66,11 @@ type Props = {
   servicos: ServicoFinalizacao[];
   produtos: ProdutoVendaOption[];
   kits: KitVendaOption[];
+  formasPagamento: FormaPagamentoFinalizacao[];
   podeAutorizarEstoqueNegativo: boolean;
   onAgendarRetorno?: (appointment: AppointmentDetails) => void;
   onFinalizado?: (payload: AtendimentoFinalizadoPayload) => void;
 };
-
-const FORMAS_PAGAMENTO = [
-  "Pix",
-  "Dinheiro",
-  "Cartão de débito",
-  "Cartão de crédito",
-  "Transferência",
-  "Outro",
-];
 
 function useLockBodyScroll(open: boolean) {
   useEffect(() => {
@@ -102,6 +102,10 @@ function formatCurrency(value: number) {
     style: "currency",
     currency: "BRL",
   });
+}
+
+function arredondarMoeda(value: number) {
+  return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 }
 
 function normalizarTexto(value?: string | null) {
@@ -144,6 +148,7 @@ export default function FinalizarAtendimentoModal({
   servicos,
   produtos,
   kits,
+  formasPagamento,
   podeAutorizarEstoqueNegativo,
   onAgendarRetorno,
   onFinalizado,
@@ -158,12 +163,27 @@ export default function FinalizarAtendimentoModal({
   const [itensProdutos, setItensProdutos] = useState<ItemProdutoVendaDraft[]>([]);
   const [itensKits, setItensKits] = useState<ItemKitVendaDraft[]>([]);
   const [permitirEstoqueNegativo, setPermitirEstoqueNegativo] = useState(false);
-  const [formaPagamento, setFormaPagamento] = useState("Pix");
+  const [formaPagamentoConfigId, setFormaPagamentoConfigId] = useState<number | null>(null);
   const [statusPagamento, setStatusPagamento] = useState("Pago");
   const [confirmando, setConfirmando] = useState(false);
   const [finalizado, setFinalizado] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const formaPadrao = useMemo(
+    () =>
+      formasPagamento.find((item) => normalizarTexto(item.nome) === "pix") ||
+      formasPagamento[0] ||
+      null,
+    [formasPagamento],
+  );
+
+  const formaConfig = useMemo(
+    () =>
+      formasPagamento.find((item) => item.id === formaPagamentoConfigId) ||
+      null,
+    [formasPagamento, formaPagamentoConfigId],
+  );
 
   useLockBodyScroll(open);
 
@@ -177,7 +197,7 @@ export default function FinalizarAtendimentoModal({
       setItensProdutos([]);
       setItensKits([]);
       setPermitirEstoqueNegativo(false);
-      setFormaPagamento("Pix");
+      setFormaPagamentoConfigId(formaPadrao?.id || null);
       setStatusPagamento("Pago");
       setConfirmando(false);
       setFinalizado(false);
@@ -205,13 +225,13 @@ export default function FinalizarAtendimentoModal({
     setItensProdutos([]);
     setItensKits([]);
     setPermitirEstoqueNegativo(false);
-    setFormaPagamento("Pix");
+    setFormaPagamentoConfigId(formaPadrao?.id || null);
     setStatusPagamento("Pago");
     setEvolucao("");
     setConfirmando(false);
     setFinalizado(false);
     setError(null);
-  }, [open, appointment, servicos]);
+  }, [open, appointment, servicos, formaPadrao]);
 
   const totais = useMemo(() => {
     const totalProdutosAvulsos = itensProdutos.reduce(
@@ -245,6 +265,29 @@ export default function FinalizarAtendimentoModal({
       margemPercentual: total > 0 ? (margem / total) * 100 : 0,
     };
   }, [itensProdutos, itensKits, valorServico, custoServico]);
+
+  const pagamentoPrevisto = useMemo(() => {
+    const valorBruto = Math.max(0, arredondarMoeda(totais.total));
+    const taxaPercentual = Math.max(0, Number(formaConfig?.taxaPercentual || 0));
+    const taxaFixa = Math.max(0, arredondarMoeda(formaConfig?.taxaFixa || 0));
+    const taxaPagamento = Math.min(
+      valorBruto,
+      arredondarMoeda(valorBruto * (taxaPercentual / 100) + taxaFixa),
+    );
+    const valorLiquido = arredondarMoeda(valorBruto - taxaPagamento);
+    const margemLiquida = arredondarMoeda(valorLiquido - totais.custo);
+
+    return {
+      valorBruto,
+      taxaPercentual,
+      taxaFixa,
+      taxaPagamento,
+      valorLiquido,
+      margemLiquida,
+      margemLiquidaPercentual:
+        valorBruto > 0 ? (margemLiquida / valorBruto) * 100 : 0,
+    };
+  }, [formaConfig, totais.custo, totais.total]);
 
   const estoqueInsuficiente = useMemo(
     () => necessidadesEstoqueVenda(itensProdutos, itensKits),
@@ -297,6 +340,13 @@ export default function FinalizarAtendimentoModal({
       return;
     }
 
+    if (totais.total > 0 && !formaConfig) {
+      setError(
+        "Cadastre ou selecione uma forma de pagamento ativa no Financeiro antes de finalizar uma venda com cobrança.",
+      );
+      return;
+    }
+
     setConfirmando(true);
   }
 
@@ -331,7 +381,8 @@ export default function FinalizarAtendimentoModal({
                 : undefined,
           })),
           permitirEstoqueNegativo,
-          formaPagamento,
+          formaPagamento: formaConfig?.nome || "Não informado",
+          formaPagamentoConfigId: formaConfig?.id || null,
           statusPagamento,
           evolucao: evolucaoClinica,
         });
@@ -691,11 +742,24 @@ export default function FinalizarAtendimentoModal({
                     <label>
                       <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">Forma de pagamento</span>
                       <select
-                        value={formaPagamento}
-                        onChange={(event) => setFormaPagamento(event.target.value)}
-                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-violet-400"
+                        value={formaPagamentoConfigId ? String(formaPagamentoConfigId) : ""}
+                        onChange={(event) =>
+                          setFormaPagamentoConfigId(
+                            event.target.value ? Number(event.target.value) : null,
+                          )
+                        }
+                        disabled={formasPagamento.length === 0}
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-violet-400 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {FORMAS_PAGAMENTO.map((item) => <option key={item} value={item}>{item}</option>)}
+                        {formasPagamento.length === 0 ? (
+                          <option value="">Nenhuma forma ativa cadastrada</option>
+                        ) : (
+                          formasPagamento.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.nome}
+                            </option>
+                          ))
+                        )}
                       </select>
                     </label>
                     <label>
@@ -717,8 +781,32 @@ export default function FinalizarAtendimentoModal({
                     <ResumoValor label="Custo direto" value={totais.custo} />
                     <ResumoValor label="Total da venda" value={totais.total} destaque />
                   </div>
+                  {totais.total > 0 && formaConfig ? (
+                    <div className="mt-3 rounded-xl border border-violet-100 bg-violet-50/70 p-3">
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-[11px] sm:grid-cols-4">
+                        <ResumoPagamento label="Taxa" value={formatCurrency(pagamentoPrevisto.taxaPagamento)} />
+                        <ResumoPagamento label="Líquido" value={formatCurrency(pagamentoPrevisto.valorLiquido)} />
+                        <ResumoPagamento
+                          label="Prazo"
+                          value={formaConfig.prazoDias > 0 ? `D+${formaConfig.prazoDias}` : "Mesmo dia"}
+                        />
+                        <ResumoPagamento
+                          label="Margem após taxa"
+                          value={`${formatCurrency(pagamentoPrevisto.margemLiquida)} · ${pagamentoPrevisto.margemLiquidaPercentual.toFixed(1).replace(".", ",")}%`}
+                          negativo={pagamentoPrevisto.margemLiquida < 0}
+                        />
+                      </div>
+                      <p className="mt-2 text-[10px] leading-4 text-violet-700">
+                        Taxa configurada: {pagamentoPrevisto.taxaPercentual.toFixed(2).replace(".", ",")}% + {formatCurrency(pagamentoPrevisto.taxaFixa)} por transação.
+                      </p>
+                    </div>
+                  ) : totais.total > 0 ? (
+                    <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800">
+                      Nenhuma forma de pagamento ativa está disponível. Cadastre uma no Financeiro antes de concluir a cobrança.
+                    </p>
+                  ) : null}
                   <p className="mt-3 text-right text-xs text-slate-500">
-                    Margem direta estimada: <strong className={totais.margem >= 0 ? "text-emerald-700" : "text-rose-700"}>{formatCurrency(totais.margem)} ({totais.margemPercentual.toFixed(1).replace(".", ",")}%)</strong>
+                    Margem direta antes das taxas: <strong className={totais.margem >= 0 ? "text-emerald-700" : "text-rose-700"}>{formatCurrency(totais.margem)} ({totais.margemPercentual.toFixed(1).replace(".", ",")}%)</strong>
                   </p>
                 </section>
               </div>
@@ -769,7 +857,20 @@ export default function FinalizarAtendimentoModal({
                   <ResumoLinha label="Total" value={formatCurrency(totais.total)} forte />
                   <ResumoLinha label="Custo direto histórico" value={formatCurrency(totais.custo)} />
                   <ResumoLinha label="Margem direta" value={`${formatCurrency(totais.margem)} · ${totais.margemPercentual.toFixed(1).replace(".", ",")}%`} />
-                  <ResumoLinha label="Pagamento" value={`${formaPagamento} · ${statusPagamento}`} />
+                  <ResumoLinha
+                    label="Pagamento"
+                    value={`${formaConfig?.nome || "Sem forma configurada"} · ${statusPagamento}`}
+                  />
+                  {totais.total > 0 && formaConfig ? (
+                    <>
+                      <ResumoLinha label="Taxa prevista" value={formatCurrency(pagamentoPrevisto.taxaPagamento)} />
+                      <ResumoLinha label="Valor líquido" value={formatCurrency(pagamentoPrevisto.valorLiquido)} forte />
+                      <ResumoLinha
+                        label="Prazo configurado"
+                        value={formaConfig.prazoDias > 0 ? `D+${formaConfig.prazoDias}` : "Mesmo dia"}
+                      />
+                    </>
+                  ) : null}
                   <ResumoLinha
                     label="Evolução"
                     value={
@@ -864,6 +965,25 @@ export default function FinalizarAtendimentoModal({
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function ResumoPagamento({
+  label,
+  value,
+  negativo = false,
+}: {
+  label: string;
+  value: string;
+  negativo?: boolean;
+}) {
+  return (
+    <div>
+      <p className="font-semibold uppercase tracking-wide text-violet-500">{label}</p>
+      <p className={`mt-0.5 font-bold ${negativo ? "text-rose-700" : "text-slate-900"}`}>
+        {value}
+      </p>
     </div>
   );
 }

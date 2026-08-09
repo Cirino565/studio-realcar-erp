@@ -1147,6 +1147,7 @@ export type FinalizarAtendimentoInput = {
   kits?: VendaKitInput[];
   permitirEstoqueNegativo?: boolean;
   formaPagamento: string;
+  formaPagamentoConfigId?: number | null;
   statusPagamento: string;
   evolucao?: string;
   observacoes?: string;
@@ -1268,6 +1269,7 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
       agendamentoId: agendamento.id,
       data: dataAtendimento,
       formaPagamento,
+      formaPagamentoConfigId: dados.formaPagamentoConfigId,
       statusPagamento,
       origem: atendimentoRetorno ? "Agenda - Retorno" : "Agenda",
       observacoes,
@@ -1344,7 +1346,7 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
         entidade: "Venda",
         entidadeId: String(venda.vendaId),
         usuario: profissional,
-        detalhes: `${atendimentoRetorno ? "Retorno" : "Atendimento"} finalizado para ${agendamento.cliente.nome}. Evolução: ${evolucaoClinica ? "registrada" : "pendente"}. Serviço: R$ ${venda.totalServicos.toFixed(2)}. Produtos e kits: R$ ${venda.totalProdutos.toFixed(2)}. Total: R$ ${venda.valorTotal.toFixed(2)}. Custo direto: R$ ${venda.custoTotal.toFixed(2)}. Pagamento: ${statusPagamento}.${venda.estoqueNegativoAutorizado ? ` Estoque negativo autorizado por ${usuarioAtual.email}.` : ""}`,
+        detalhes: `${atendimentoRetorno ? "Retorno" : "Atendimento"} finalizado para ${agendamento.cliente.nome}. Evolução: ${evolucaoClinica ? "registrada" : "pendente"}. Serviço: R$ ${venda.totalServicos.toFixed(2)}. Produtos e kits: R$ ${venda.totalProdutos.toFixed(2)}. Total bruto: R$ ${venda.valorTotal.toFixed(2)}. Taxa: R$ ${venda.taxaPagamento.toFixed(2)}. Líquido: R$ ${venda.valorLiquido.toFixed(2)}. Custo direto: R$ ${venda.custoTotal.toFixed(2)}. Forma: ${venda.formaPagamento}. Pagamento: ${statusPagamento}.${venda.estoqueNegativoAutorizado ? ` Estoque negativo autorizado por ${usuarioAtual.email}.` : ""}`,
       },
     });
   });
