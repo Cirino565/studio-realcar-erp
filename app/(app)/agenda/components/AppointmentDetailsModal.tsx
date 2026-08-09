@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import {
   Activity,
   AlertCircle,
@@ -14,9 +14,7 @@ import {
   MessageCircle,
   Pencil,
   Phone,
-  PlayCircle,
   Repeat2,
-  RotateCcw,
   Trash2,
   UserRound,
   X,
@@ -24,9 +22,7 @@ import {
 
 import {
   cancelarSerieAgendamento,
-  desfazerInicioAtendimento,
   excluirAgendamento,
-  iniciarAtendimento,
 } from "@/actions/agendamento.actions";
 import RegistrarEvolucaoPendenteModal from "@/components/atendimento/RegistrarEvolucaoPendenteModal";
 import { Button } from "@/components/ui/button";
@@ -205,7 +201,6 @@ export default function AppointmentDetailsModal({
   onEvolucaoRegistrada,
 }: Props) {
   const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isManagingSeries, setIsManagingSeries] = useState(false);
   const [editandoCliente, setEditandoCliente] = useState(false);
@@ -244,56 +239,6 @@ export default function AppointmentDetailsModal({
   const pendenciasCadastro = cadastroPendente(currentAppointment.cliente);
   const podeGerenciarAgendamento = !atendimentoFinalizado && !atendimentoEmAndamento;
 
-  function handleIniciar() {
-    setError(null);
-
-    if (atendimentoFinalizado) {
-      setError("Este atendimento já foi finalizado.");
-      return;
-    }
-
-    if (atendimentoCancelado) {
-      setError("Não é possível iniciar um atendimento cancelado.");
-      return;
-    }
-
-    startTransition(async () => {
-      try {
-        await iniciarAtendimento(currentAppointment.id);
-        window.location.reload();
-      } catch (error) {
-        setError(
-          error instanceof Error
-            ? error.message
-            : "Não foi possível iniciar o atendimento.",
-        );
-      }
-    });
-  }
-
-  function handleDesfazerInicio() {
-    setError(null);
-
-    if (!atendimentoEmAndamento) {
-      setError("Este atendimento não está em andamento.");
-      return;
-    }
-
-    if (!window.confirm("Voltar o atendimento para o status anterior?")) return;
-
-    startTransition(async () => {
-      try {
-        await desfazerInicioAtendimento(currentAppointment.id);
-        window.location.reload();
-      } catch (error) {
-        setError(
-          error instanceof Error
-            ? error.message
-            : "Não foi possível voltar o atendimento ao status anterior.",
-        );
-      }
-    });
-  }
 
   async function handleExcluir() {
     setError(null);
@@ -457,37 +402,15 @@ export default function AppointmentDetailsModal({
                   <span className="text-[10px] font-semibold text-violet-600">abre sobre o atendimento</span>
                 </button>
 
-                {!atendimentoEmAndamento && !atendimentoFinalizado ? (
+                {!atendimentoFinalizado && !atendimentoCancelado ? (
                   <button
                     type="button"
-                    onClick={handleIniciar}
-                    disabled={isPending || atendimentoCancelado}
-                    className="flex min-h-11 items-center justify-between gap-3 rounded-xl bg-cyan-600 px-3 py-2.5 text-sm font-bold text-white hover:bg-cyan-700 disabled:opacity-50"
+                    onClick={() => onFinalizar(currentAppointment)}
+                    className="flex min-h-11 items-center justify-between gap-3 rounded-xl bg-emerald-600 px-3 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
                   >
-                    <span className="flex items-center gap-2"><PlayCircle size={17} />3. Iniciar atendimento</span>
+                    <span className="flex items-center gap-2"><CheckCircle2 size={17} />3. Finalizar atendimento</span>
                     <ChevronRight size={16} />
                   </button>
-                ) : null}
-
-                {atendimentoEmAndamento ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => onFinalizar(currentAppointment)}
-                      className="flex min-h-11 items-center justify-between gap-3 rounded-xl bg-emerald-600 px-3 py-2.5 text-sm font-bold text-white hover:bg-emerald-700"
-                    >
-                      <span className="flex items-center gap-2"><CheckCircle2 size={17} />4. Finalizar atendimento</span>
-                      <ChevronRight size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleDesfazerInicio}
-                      disabled={isPending}
-                      className="flex min-h-10 items-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-bold text-cyan-800 hover:bg-cyan-100 disabled:opacity-50"
-                    >
-                      <RotateCcw size={15} /> Voltar ao status anterior
-                    </button>
-                  </>
                 ) : null}
 
                 {atendimentoFinalizado ? (
@@ -495,7 +418,7 @@ export default function AppointmentDetailsModal({
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className={`text-xs font-bold ${evolucaoPendente ? "text-amber-900" : "text-emerald-900"}`}>
-                          4. Evolução clínica
+                          3. Evolução clínica
                         </p>
                         <p className={`mt-1 text-[11px] ${evolucaoPendente ? "text-amber-700" : "text-emerald-700"}`}>
                           {evolucaoPendente

@@ -12,7 +12,9 @@ import AppointmentDetailsModal, {
   type ClienteAtendimentoDetalhes,
 } from "./AppointmentDetailsModal";
 import AppointmentMessageModal from "./AppointmentMessageModal";
-import FinalizarAtendimentoModal from "./FinalizarAtendimentoModal";
+import FinalizarAtendimentoModal, {
+  type AtendimentoFinalizadoPayload,
+} from "./FinalizarAtendimentoModal";
 import NovoAgendamentoModal from "./NovoAgendamentoModal";
 
 type ClienteAgenda = {
@@ -367,6 +369,41 @@ export default function AgendaClient({
     );
   }
 
+  function marcarAtendimentoFinalizado(payload: AtendimentoFinalizadoPayload) {
+    const atualizado = {
+      status: "Atendido",
+      statusAntesAtendimento: null,
+      procedimento: payload.procedimento,
+      valor: payload.valor,
+      evolucaoStatus: payload.evolucaoRegistrada ? "CONCLUIDA" : "PENDENTE",
+      evolucaoPendenteDesde: payload.evolucaoRegistrada
+        ? null
+        : payload.dataAtendimento,
+      evolucaoRegistradaEm: payload.evolucaoRegistrada
+        ? payload.dataAtendimento
+        : null,
+      updatedAt: payload.dataAtendimento,
+    };
+
+    setAgendamentosAtuais((atuais) =>
+      atuais.map((item) =>
+        item.id === payload.agendamentoId ? { ...item, ...atualizado } : item,
+      ),
+    );
+
+    setSelectedAppointment((atual) =>
+      atual?.id === payload.agendamentoId
+        ? { ...atual, ...atualizado }
+        : atual,
+    );
+
+    setFinishAppointment((atual) =>
+      atual?.id === payload.agendamentoId
+        ? { ...atual, ...atualizado }
+        : atual,
+    );
+  }
+
   return (
     <div className="w-full max-w-full overflow-x-hidden pb-6 lg:overflow-visible lg:pb-0">
       <div className="w-full max-w-full min-w-0">
@@ -457,6 +494,7 @@ export default function AgendaClient({
         podeAutorizarEstoqueNegativo={podeAutorizarEstoqueNegativo}
         onClose={() => setFinishAppointment(null)}
         onAgendarRetorno={abrirReagendamento}
+        onFinalizado={marcarAtendimentoFinalizado}
       />
     </div>
   );

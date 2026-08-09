@@ -43,6 +43,14 @@ type ServicoFinalizacao = {
   custoPadrao: number;
 };
 
+export type AtendimentoFinalizadoPayload = {
+  agendamentoId: number;
+  procedimento: string;
+  valor: number;
+  evolucaoRegistrada: boolean;
+  dataAtendimento: string;
+};
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -52,6 +60,7 @@ type Props = {
   kits: KitVendaOption[];
   podeAutorizarEstoqueNegativo: boolean;
   onAgendarRetorno?: (appointment: AppointmentDetails) => void;
+  onFinalizado?: (payload: AtendimentoFinalizadoPayload) => void;
 };
 
 const FORMAS_PAGAMENTO = [
@@ -112,6 +121,22 @@ function getInitials(name: string) {
     .join("");
 }
 
+function mensagemErroSeguro(error: unknown, fallback: string) {
+  if (!(error instanceof Error)) return fallback;
+
+  const mensagem = error.message?.trim();
+
+  if (
+    !mensagem ||
+    mensagem.includes("An error occurred in the Server Components render") ||
+    mensagem.includes("A digest property is included")
+  ) {
+    return fallback;
+  }
+
+  return mensagem;
+}
+
 export default function FinalizarAtendimentoModal({
   open,
   onClose,
@@ -121,6 +146,7 @@ export default function FinalizarAtendimentoModal({
   kits,
   podeAutorizarEstoqueNegativo,
   onAgendarRetorno,
+  onFinalizado,
 }: Props) {
   const [procedimentoRealizado, setProcedimentoRealizado] = useState("");
   const [procedimentoServicoId, setProcedimentoServicoId] = useState<
@@ -281,7 +307,7 @@ export default function FinalizarAtendimentoModal({
 
     startTransition(async () => {
       try {
-        await finalizarAtendimento({
+        const resultado = await finalizarAtendimento({
           agendamentoId: currentAppointment.id,
           procedimentoRealizado: procedimentoFinal,
           procedimentoServicoId,
@@ -310,13 +336,22 @@ export default function FinalizarAtendimentoModal({
           evolucao: evolucaoClinica,
         });
 
+        onFinalizado?.({
+          agendamentoId: resultado.agendamentoId,
+          procedimento: resultado.procedimento,
+          valor: resultado.valor,
+          evolucaoRegistrada: resultado.evolucaoStatus === "CONCLUIDA",
+          dataAtendimento: resultado.dataAtendimento,
+        });
+
         setFinalizado(true);
         setConfirmando(false);
       } catch (error) {
         setError(
-          error instanceof Error
-            ? error.message
-            : "Não foi possível finalizar o atendimento.",
+          mensagemErroSeguro(
+            error,
+            "Não foi possível confirmar a finalização. Confira o status na agenda antes de tentar novamente.",
+          ),
         );
         setConfirmando(false);
       }
@@ -324,17 +359,15 @@ export default function FinalizarAtendimentoModal({
   }
 
   function concluirSemRetorno() {
-    window.location.reload();
+    onClose();
   }
 
   function agendarRetornoAgora() {
-    if (!onAgendarRetorno) {
-      window.location.reload();
-      return;
-    }
-
     onClose();
-    onAgendarRetorno(currentAppointment);
+
+    if (onAgendarRetorno) {
+      onAgendarRetorno(currentAppointment);
+    }
   }
 
   const evolucaoRegistradaNestaFinalizacao = Boolean(evolucao.trim());

@@ -1349,7 +1349,6 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
     });
   });
 
-  revalidatePath("/agenda");
   revalidatePath("/vendas");
   revalidatePath("/estoque");
   revalidatePath("/financeiro");
@@ -1359,6 +1358,18 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
   revalidatePath("/relatorios");
   revalidatePath("/marketing");
   revalidatePath("/");
+
+  return {
+    ok: true,
+    agendamentoId: agendamento.id,
+    status: "Atendido" as const,
+    procedimento: procedimentoRealizado,
+    valor: valorCobrado,
+    dataAtendimento: dataAtendimento.toISOString(),
+    evolucaoStatus: evolucaoClinica
+      ? ("CONCLUIDA" as const)
+      : ("PENDENTE" as const),
+  };
 }
 
 export type RegistrarEvolucaoPendenteInput = {
