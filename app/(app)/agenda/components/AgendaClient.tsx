@@ -400,11 +400,6 @@ export default function AgendaClient({
         : atual,
     );
 
-    setFinishAppointment((atual) =>
-      atual?.id === payload.agendamentoId
-        ? { ...atual, ...atualizado }
-        : atual,
-    );
   }
 
   return (
