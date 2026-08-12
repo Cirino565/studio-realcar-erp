@@ -403,8 +403,10 @@ export default function AgendaCalendar({
   horarioAtendimento,
   viewMode,
 }: Props) {
-  const today = new Date();
+  const [now, setNow] = useState(() => new Date());
+  const today = now;
   const selectedDateInput = formatDateInput(selectedDate);
+  const selectedDateIsToday = selectedDateInput === formatSaoPauloDateKey(now);
   const funcionamentoDia = useMemo(
     () => getFuncionamentoDia(horarioAtendimento, selectedDate),
     [horarioAtendimento, selectedDate],
@@ -491,6 +493,16 @@ export default function AgendaCalendar({
   const extendingDateStripRef = useRef(false);
   const centeredDateStripRef = useRef(false);
   const dateStripScrollFrameRef = useRef<number | null>(null);
+  const agendaScrollRef = useRef<HTMLDivElement | null>(null);
+  const autoScrolledAgendaKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const updateNow = () => setNow(new Date());
+    updateNow();
+
+    const interval = window.setInterval(updateNow, 30_000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   const weekDays = useMemo(() => {
     const weekStart = startOfWeek(selectedDate);
@@ -826,15 +838,98 @@ export default function AgendaCalendar({
     weekDays,
   ]);
 
-  const currentTimeLine = useMemo(() => {
-    if (!isSameDay(selectedDate, today) || isClosedDay) return null;
+  const currentTimeOffsetMinutes = useMemo(() => {
+    if (!selectedDateIsToday || isClosedDay) return null;
 
-    const current = getSaoPauloTimeParts(new Date());
-    const minutes = current.hour * 60 + current.minute - agendaStartMinutes;
+    const current = getSaoPauloTimeParts(now);
+    return current.hour * 60 + current.minute - agendaStartMinutes;
+  }, [agendaStartMinutes, isClosedDay, now, selectedDateIsToday]);
 
-    if (minutes < 0 || minutes > totalMinutes) return null;
-    return minutes * MINUTE_HEIGHT;
-  }, [agendaStartMinutes, isClosedDay, selectedDate, today, totalMinutes]);
+  const currentTimeLine =
+    currentTimeOffsetMinutes !== null &&
+    currentTimeOffsetMinutes >= 0 &&
+    currentTimeOffsetMinutes <= totalMinutes
+      ? currentTimeOffsetMinutes * MINUTE_HEIGHT
+      : null;
+
+  const currentTimeLabel = formatTime(now);
+
+  const nextAppointmentIds = useMemo(() => {
+    const nextIds = new Set<number>();
+    if (!selectedDateIsToday) return nextIds;
+
+    const nowTimestamp = now.getTime();
+
+    visibleProfessionals.forEach((profissional) => {
+      const nextAppointment = agendamentos
+        .filter((appointment) => {
+          const normalizedStatus = (appointment.status || "").toLowerCase();
+
+          return (
+            appointment.profissionalId === profissional.id &&
+            formatSaoPauloDateKey(appointment.data) === selectedDateInput &&
+            new Date(appointment.data).getTime() >= nowTimestamp &&
+            !["atendido", "cancelado", "faltou"].includes(normalizedStatus)
+          );
+        })
+        .sort(
+          (first, second) =>
+            new Date(first.data).getTime() - new Date(second.data).getTime(),
+        )[0];
+
+      if (nextAppointment) {
+        nextIds.add(nextAppointment.id);
+      }
+    });
+
+    return nextIds;
+  }, [
+    agendamentos,
+    now,
+    selectedDateInput,
+    selectedDateIsToday,
+    visibleProfessionals,
+  ]);
+
+  useEffect(() => {
+    if (viewMode !== "day" || isClosedDay || !selectedDateIsToday) return;
+
+    const container = agendaScrollRef.current;
+    const autoScrollKey = `${selectedDateInput}-${viewMode}`;
+
+    if (!container || autoScrolledAgendaKeyRef.current === autoScrollKey) return;
+
+    const current = getSaoPauloTimeParts(now);
+    const currentMinutes = current.hour * 60 + current.minute - agendaStartMinutes;
+    const clampedMinutes = Math.min(Math.max(currentMinutes, 0), totalMinutes);
+    const markerTop = clampedMinutes * MINUTE_HEIGHT;
+
+    const frame = window.requestAnimationFrame(() => {
+      const breathingRoom = Math.min(140, container.clientHeight * 0.28);
+      const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+      const targetScrollTop = Math.min(
+        maxScrollTop,
+        Math.max(0, markerTop - breathingRoom),
+      );
+
+      container.scrollTo({
+        top: targetScrollTop,
+        behavior: "auto",
+      });
+
+      autoScrolledAgendaKeyRef.current = autoScrollKey;
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [
+    agendaStartMinutes,
+    isClosedDay,
+    now,
+    selectedDateInput,
+    selectedDateIsToday,
+    totalMinutes,
+    viewMode,
+  ]);
 
   return (
     <>
@@ -1302,10 +1397,11 @@ export default function AgendaCalendar({
         </div>
       ) : (
         <div
+          ref={agendaScrollRef}
           className={
             shouldEnableHorizontalScroll
-              ? "w-full max-w-full overflow-x-auto overflow-y-hidden"
-              : "w-full max-w-full overflow-hidden"
+              ? "max-h-[calc(100dvh-205px)] w-full max-w-full overflow-auto overscroll-contain"
+              : "max-h-[calc(100dvh-205px)] w-full max-w-full overflow-y-auto overflow-x-hidden overscroll-contain"
           }
         >
           <div
@@ -1319,7 +1415,7 @@ export default function AgendaCalendar({
               )}, minmax(0, 1fr))`,
             }}
           >
-            <div className="sticky left-0 z-30 flex h-11 items-center justify-center border-b border-r border-slate-300 bg-white text-violet-700 dark:border-slate-700 dark:bg-slate-900 dark:text-violet-200">
+            <div className="sticky left-0 top-0 z-50 flex h-11 items-center justify-center border-b border-r border-slate-300 bg-white text-violet-700 shadow-[0_2px_5px_rgba(15,23,42,0.08)] dark:border-slate-700 dark:bg-slate-900 dark:text-violet-200">
               <UsersRound size={17} />
             </div>
 
@@ -1329,7 +1425,7 @@ export default function AgendaCalendar({
               return (
                 <div
                   key={profissional.id}
-                  className="h-11 border-b border-r border-slate-300 bg-white px-2 dark:border-slate-700 dark:bg-slate-900"
+                  className="sticky top-0 z-40 h-11 border-b border-r border-slate-300 bg-white px-2 shadow-[0_2px_5px_rgba(15,23,42,0.08)] dark:border-slate-700 dark:bg-slate-900"
                 >
                   <div className="flex h-full min-w-0 items-center justify-center gap-2">
                     <span
@@ -1370,6 +1466,19 @@ export default function AgendaCalendar({
                   {slot.label}
                 </div>
               ))}
+
+              {currentTimeLine !== null ? (
+                <div
+                  className="pointer-events-none absolute left-1 right-0 z-30 flex -translate-y-1/2 items-center"
+                  style={{ top: currentTimeLine }}
+                  aria-label={`Horário atual: ${currentTimeLabel}`}
+                >
+                  <span className="rounded-md bg-rose-500 px-1.5 py-0.5 text-[0.56rem] font-black leading-none text-white shadow-sm">
+                    {currentTimeLabel}
+                  </span>
+                  <span className="h-px min-w-1 flex-1 bg-rose-500" />
+                </div>
+              ) : null}
             </div>
 
             {appointmentsByProfessional.map(
@@ -1424,8 +1533,8 @@ export default function AgendaCalendar({
                         className="pointer-events-none absolute left-0 right-0 z-20 flex items-center"
                         style={{ top: currentTimeLine }}
                       >
-                        <span className="h-2 w-2 -translate-x-1 rounded-full bg-rose-500" />
-                        <span className="h-px flex-1 bg-rose-500" />
+                        <span className="h-2.5 w-2.5 -translate-x-1.5 rounded-full border-2 border-white bg-rose-500 shadow-sm dark:border-slate-950" />
+                        <span className="h-0.5 flex-1 bg-rose-500/90" />
                       </div>
                     ) : null}
 
@@ -1511,6 +1620,7 @@ export default function AgendaCalendar({
                       const note = getAppointmentNote(appointment);
                       const statusPalette = getStatusPalette(appointment.status);
                       const isCompactAppointment = height < 70;
+                      const isNextAppointment = nextAppointmentIds.has(appointment.id);
 
                       return (
                         <article
@@ -1540,14 +1650,35 @@ export default function AgendaCalendar({
                           >
                             <div className="flex min-w-0 items-start justify-between gap-2">
                               <div className="min-w-0">
+                                <div className="flex min-w-0 items-center gap-1.5">
+                                  <p
+                                    className="shrink-0 text-[0.66rem] font-black leading-tight tracking-[0.01em] sm:text-[0.72rem]"
+                                    style={{ color: statusPalette.text }}
+                                  >
+                                    {formatTime(appointment.data)}–{formatTime(appointmentEnd(appointment))}
+                                  </p>
+
+                                  {isNextAppointment ? (
+                                    <span
+                                      className={`inline-flex shrink-0 items-center gap-1 rounded-full border border-white/80 bg-white/90 font-black uppercase tracking-wide text-violet-700 shadow-sm ${
+                                        isCompactAppointment
+                                          ? "h-2.5 w-2.5 p-0"
+                                          : "px-1.5 py-0.5 text-[0.48rem]"
+                                      }`}
+                                      title="Próximo atendimento"
+                                      aria-label="Próximo atendimento"
+                                    >
+                                      <span
+                                        className={`rounded-full bg-violet-600 ${
+                                          isCompactAppointment ? "h-2.5 w-2.5" : "h-1.5 w-1.5"
+                                        }`}
+                                      />
+                                      {!isCompactAppointment ? <span>Próximo</span> : null}
+                                    </span>
+                                  ) : null}
+                                </div>
                                 <p
-                                  className="text-[0.64rem] font-extrabold leading-tight sm:text-[0.7rem]"
-                                  style={{ color: statusPalette.mutedText }}
-                                >
-                                  {formatTime(appointment.data)} - {formatTime(appointmentEnd(appointment))}
-                                </p>
-                                <p
-                                  className="mt-0.5 truncate text-[0.72rem] font-extrabold uppercase leading-tight sm:text-xs"
+                                  className="mt-0.5 truncate text-[0.78rem] font-black leading-[1.05] sm:text-[0.84rem]"
                                   style={{ color: statusPalette.text }}
                                 >
                                   {appointment.cliente.nome}
@@ -1615,7 +1746,7 @@ export default function AgendaCalendar({
                               <p
                                 className={`${
                                   isCompactAppointment ? "mt-0.5" : "mt-1"
-                                } line-clamp-1 text-[0.66rem] font-semibold leading-tight sm:text-[0.72rem]`}
+                                } line-clamp-1 text-[0.64rem] font-semibold leading-tight sm:text-[0.7rem]`}
                                 style={{ color: statusPalette.mutedText }}
                               >
                                 {appointment.procedimento}
@@ -1624,7 +1755,7 @@ export default function AgendaCalendar({
 
                             {height >= 82 ? (
                               <p
-                                className="mt-1 line-clamp-1 text-[0.62rem] font-medium"
+                                className="mt-1 line-clamp-1 text-[0.59rem] font-medium opacity-90"
                                 style={{ color: statusPalette.mutedText }}
                               >
                                 {appointment.status}
