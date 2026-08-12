@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   AlertCircle,
   AlertTriangle,
@@ -9,6 +9,7 @@ import {
   Check,
   CheckCircle2,
   ClipboardCheck,
+  LoaderCircle,
   Package,
   RotateCcw,
   Sparkles,
@@ -169,6 +170,8 @@ export default function FinalizarAtendimentoModal({
   const [finalizado, setFinalizado] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const inicializadoParaAgendamentoRef = useRef<number | null>(null);
+  const finalizacaoEmAndamentoRef = useRef(false);
 
   const formaPadrao = useMemo(
     () =>
@@ -189,6 +192,8 @@ export default function FinalizarAtendimentoModal({
 
   useEffect(() => {
     if (!open || !appointment) {
+      inicializadoParaAgendamentoRef.current = null;
+      finalizacaoEmAndamentoRef.current = false;
       setProcedimentoRealizado("");
       setProcedimentoServicoId(null);
       setEvolucao("");
@@ -204,6 +209,13 @@ export default function FinalizarAtendimentoModal({
       setError(null);
       return;
     }
+
+    if (inicializadoParaAgendamentoRef.current === appointment.id) {
+      return;
+    }
+
+    inicializadoParaAgendamentoRef.current = appointment.id;
+    finalizacaoEmAndamentoRef.current = false;
 
     const servico = servicos.find(
       (item) =>
@@ -351,8 +363,13 @@ export default function FinalizarAtendimentoModal({
   }
 
   function handleFinalizarConfirmado() {
+    if (finalizacaoEmAndamentoRef.current) {
+      return;
+    }
+
     const evolucaoClinica = evolucao.trim() || undefined;
 
+    finalizacaoEmAndamentoRef.current = true;
     setError(null);
 
     startTransition(async () => {
@@ -398,10 +415,11 @@ export default function FinalizarAtendimentoModal({
         setFinalizado(true);
         setConfirmando(false);
       } catch (error) {
+        finalizacaoEmAndamentoRef.current = false;
         setError(
           mensagemErroSeguro(
             error,
-            "Não foi possível confirmar a finalização. Confira o status na agenda antes de tentar novamente.",
+            "Não foi possível confirmar a finalização. Nada será reenviado automaticamente. Confira a mensagem e tente novamente.",
           ),
         );
         setConfirmando(false);
@@ -422,7 +440,7 @@ export default function FinalizarAtendimentoModal({
   }
 
   const evolucaoRegistradaNestaFinalizacao = Boolean(evolucao.trim());
-  const etapa = finalizado ? "success" : confirmando ? "review" : "form";
+  const etapa = finalizado ? "success" : isPending ? "saving" : confirmando ? "review" : "form";
 
   return (
     <div className="fixed inset-0 z-[110] h-[100dvh] overflow-hidden">
@@ -430,7 +448,8 @@ export default function FinalizarAtendimentoModal({
         type="button"
         aria-label="Fechar finalização do atendimento"
         onClick={finalizado ? concluirSemRetorno : limparEFechar}
-        className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
+        disabled={isPending}
+        className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm disabled:cursor-wait"
       />
 
       <div
@@ -447,7 +466,13 @@ export default function FinalizarAtendimentoModal({
                   finalizado ? "bg-emerald-600" : "bg-violet-600"
                 }`}
               >
-                {finalizado ? <CheckCircle2 size={19} /> : <ClipboardCheck size={19} />}
+                {finalizado ? (
+                  <CheckCircle2 size={19} />
+                ) : isPending ? (
+                  <LoaderCircle size={19} className="animate-spin" />
+                ) : (
+                  <ClipboardCheck size={19} />
+                )}
               </div>
               <div className="min-w-0">
                 <p className="truncate text-[10px] font-bold uppercase tracking-[0.13em] text-slate-400">
@@ -455,11 +480,13 @@ export default function FinalizarAtendimentoModal({
                     ? atendimentoRetorno
                       ? "Retorno concluído"
                       : "Atendimento e venda concluídos"
-                    : etapa === "review"
-                      ? "Revisão final"
-                      : atendimentoRetorno
-                        ? "Retorno clínico gratuito"
-                        : "Registro clínico e financeiro"}
+                    : etapa === "saving"
+                      ? "Salvando com segurança"
+                      : etapa === "review"
+                        ? "Revisão final"
+                        : atendimentoRetorno
+                          ? "Retorno clínico gratuito"
+                          : "Registro clínico e financeiro"}
                 </p>
                 <h2
                   id="finalizar-atendimento-title"
@@ -467,13 +494,15 @@ export default function FinalizarAtendimentoModal({
                 >
                   {etapa === "success"
                     ? "Finalizado com sucesso"
-                    : etapa === "review"
-                      ? atendimentoRetorno
-                        ? "Confira o registro do retorno"
-                        : "Confira a composição da venda"
-                      : atendimentoRetorno
-                        ? "Finalizar retorno"
-                        : "Finalizar atendimento"}
+                    : etapa === "saving"
+                      ? "Finalizando atendimento..."
+                      : etapa === "review"
+                        ? atendimentoRetorno
+                          ? "Confira o registro do retorno"
+                          : "Confira a composição da venda"
+                        : atendimentoRetorno
+                          ? "Finalizar retorno"
+                          : "Finalizar atendimento"}
                 </h2>
                 <p className="mt-0.5 truncate text-xs text-slate-500">
                   {currentAppointment.cliente.nome}
@@ -560,6 +589,41 @@ export default function FinalizarAtendimentoModal({
                   <CalendarPlus size={15} />
                   Agendar retorno
                 </button>
+              </div>
+            </footer>
+          </>
+
+        ) : etapa === "saving" ? (
+          <>
+            <main
+              className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-5"
+              aria-live="polite"
+              aria-busy="true"
+            >
+              <div className="flex min-h-full items-center justify-center py-6">
+                <section className="w-full max-w-md rounded-3xl border border-violet-200 bg-white p-6 text-center shadow-sm">
+                  <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-violet-100 text-violet-700">
+                    <LoaderCircle size={30} className="animate-spin" />
+                  </div>
+                  <h3 className="mt-5 text-lg font-black text-slate-950">
+                    Finalizando atendimento...
+                  </h3>
+                  <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-600">
+                    Estamos salvando o atendimento e conferindo os registros de venda,
+                    financeiro e estoque. Aguarde a confirmação antes de sair desta tela.
+                  </p>
+                  <div className="mt-5 rounded-2xl border border-violet-100 bg-violet-50 px-4 py-3 text-xs font-semibold leading-5 text-violet-800">
+                    Não toque novamente em finalizar. Assim que o servidor confirmar,
+                    esta tela mudará automaticamente para “Finalizado com sucesso”.
+                  </div>
+                </section>
+              </div>
+            </main>
+
+            <footer className="shrink-0 border-t border-slate-200 bg-white p-3 sm:p-4">
+              <div className="flex h-10 items-center justify-center gap-2 rounded-xl bg-violet-50 px-3 text-xs font-bold text-violet-800">
+                <LoaderCircle size={16} className="animate-spin" />
+                Salvando e conferindo os registros...
               </div>
             </footer>
           </>

@@ -1239,6 +1239,32 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
   }
 
   await prisma.$transaction(async (tx) => {
+    const reservaFinalizacao = await tx.agendamento.updateMany({
+      where: {
+        id: agendamento.id,
+        status: { notIn: ["Atendido", "Cancelado"] },
+      },
+      data: {
+        status: "Atendido",
+        statusAntesAtendimento: null,
+        evolucaoStatus: evolucaoClinica ? "CONCLUIDA" : "PENDENTE",
+        evolucaoPendenteDesde: evolucaoClinica ? null : dataAtendimento,
+        evolucaoRegistradaEm: evolucaoClinica ? dataAtendimento : null,
+        evolucaoRegistradaPor: evolucaoClinica ? profissional : null,
+        procedimento: procedimentoRealizado,
+        valor: valorCobrado,
+        observacoes: [agendamento.observacoes, observacoes]
+          .filter(Boolean)
+          .join("\n\nFinalização: "),
+      },
+    });
+
+    if (reservaFinalizacao.count !== 1) {
+      throw new Error(
+        "Este atendimento já foi finalizado ou está sendo finalizado em outra sessão. Atualize a agenda antes de tentar novamente.",
+      );
+    }
+
     await tx.clienteProcedimento.create({
       data: {
         clienteId: agendamento.clienteId,
@@ -1285,23 +1311,6 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
       estoqueNegativoAutorizadoPor: permitirEstoqueNegativo
         ? usuarioAtual.email
         : null,
-    });
-
-    await tx.agendamento.update({
-      where: { id: agendamento.id },
-      data: {
-        status: "Atendido",
-        statusAntesAtendimento: null,
-        evolucaoStatus: evolucaoClinica ? "CONCLUIDA" : "PENDENTE",
-        evolucaoPendenteDesde: evolucaoClinica ? null : dataAtendimento,
-        evolucaoRegistradaEm: evolucaoClinica ? dataAtendimento : null,
-        evolucaoRegistradaPor: evolucaoClinica ? profissional : null,
-        procedimento: procedimentoRealizado,
-        valor: valorCobrado,
-        observacoes: [agendamento.observacoes, observacoes]
-          .filter(Boolean)
-          .join("\n\nFinalização: "),
-      },
     });
 
     await tx.cliente.update({
@@ -1351,6 +1360,7 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
     });
   });
 
+  revalidatePath("/agenda");
   revalidatePath("/vendas");
   revalidatePath("/estoque");
   revalidatePath("/financeiro");
