@@ -927,7 +927,9 @@ export default function AgendaCalendar({
                 {dateStripDays.map((day) => {
                   const active = isSameDay(day, selectedDate);
                   const todayItem = isSameDay(day, today);
-                  const weekend = day.getDay() === 0 || day.getDay() === 6;
+                  const dayOfWeek = day.getDay();
+                  const saturday = dayOfWeek === 6;
+                  const sunday = dayOfWeek === 0;
 
                   return (
                     <a
@@ -941,10 +943,12 @@ export default function AgendaCalendar({
                         active
                           ? "border-violet-700 bg-violet-700 text-white shadow-[0_5px_14px_rgba(109,40,217,0.22)]"
                           : todayItem
-                            ? "border-violet-400 bg-violet-50 text-violet-800 ring-1 ring-violet-200 hover:bg-violet-100 dark:border-violet-400/70 dark:bg-violet-500/10 dark:text-violet-100 dark:ring-violet-500/30"
-                            : weekend
-                              ? "border-transparent bg-slate-100/80 text-slate-600 hover:bg-violet-50 hover:text-violet-700 dark:bg-slate-800/70 dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:text-violet-100"
-                              : "border-transparent bg-transparent text-slate-600 hover:bg-violet-50 hover:text-violet-700 dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:text-violet-100"
+                            ? "border-violet-400 bg-white text-violet-800 ring-1 ring-violet-200 hover:bg-violet-50 dark:border-violet-400/70 dark:bg-slate-950 dark:text-violet-100 dark:ring-violet-500/30"
+                            : saturday
+                              ? "border-violet-100 bg-violet-50/90 text-violet-700 hover:border-violet-200 hover:bg-violet-100 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-200 dark:hover:bg-violet-500/15"
+                              : sunday
+                                ? "border-rose-100 bg-rose-50/90 text-rose-700 hover:border-rose-200 hover:bg-rose-100 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/15"
+                                : "border-transparent bg-transparent text-slate-600 hover:bg-violet-50 hover:text-violet-700 dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:text-violet-100"
                       }`}
                     >
                       {todayItem && !active ? (
@@ -953,7 +957,11 @@ export default function AgendaCalendar({
                           aria-hidden="true"
                         />
                       ) : null}
-                      <span className="text-[0.58rem] font-extrabold uppercase tracking-[0.08em] opacity-80 sm:text-[0.62rem]">
+                      <span
+                        className={`text-[0.58rem] font-extrabold uppercase tracking-[0.08em] sm:text-[0.62rem] ${
+                          active || todayItem || saturday || sunday ? "opacity-100" : "opacity-80"
+                        }`}
+                      >
                         {formatWeekday(day)}
                       </span>
                       <span className="mt-0.5 text-base font-black leading-none sm:text-sm">
@@ -1059,6 +1067,9 @@ export default function AgendaCalendar({
             {weeklyOverview.map(({ day, dateKey, items, funcionamento }) => {
               const closed = funcionamento === null;
               const active = isSameDay(day, selectedDate);
+              const dayOfWeek = day.getDay();
+              const saturday = dayOfWeek === 6;
+              const sunday = dayOfWeek === 0;
               const appointmentCount = items.filter(
                 (item) => item.kind === "appointment",
               ).length;
@@ -1066,18 +1077,38 @@ export default function AgendaCalendar({
               return (
                 <section
                   key={dateKey}
-                  className="min-h-[560px] border-r border-slate-300 bg-white last:border-r-0 dark:border-slate-700 dark:bg-slate-950"
+                  className={`min-h-[560px] border-r border-slate-300 last:border-r-0 dark:border-slate-700 ${
+                    saturday
+                      ? "bg-violet-50/35 dark:bg-violet-500/[0.035]"
+                      : sunday
+                        ? "bg-rose-50/45 dark:bg-rose-500/[0.035]"
+                        : "bg-white dark:bg-slate-950"
+                  }`}
                 >
                   <a
                     href={agendaHref(day, profissionalFiltro, "day")}
                     className={`flex h-16 items-center justify-between border-b px-3 transition ${
                       active
                         ? "border-violet-300 bg-violet-50 dark:border-violet-500/40 dark:bg-violet-500/10"
-                        : "border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-900"
+                        : saturday
+                          ? "border-violet-200 bg-violet-50/90 hover:bg-violet-100 dark:border-violet-500/25 dark:bg-violet-500/10 dark:hover:bg-violet-500/15"
+                          : sunday
+                            ? "border-rose-200 bg-rose-50/90 hover:bg-rose-100 dark:border-rose-500/25 dark:bg-rose-500/10 dark:hover:bg-rose-500/15"
+                            : "border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-900"
                     }`}
                   >
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                      <p
+                        className={`text-[10px] font-bold uppercase tracking-[0.16em] ${
+                          active
+                            ? "text-violet-700 dark:text-violet-200"
+                            : saturday
+                              ? "text-violet-600 dark:text-violet-300"
+                              : sunday
+                                ? "text-rose-600 dark:text-rose-300"
+                                : "text-slate-400"
+                        }`}
+                      >
                         {formatWeekday(day)}
                       </p>
                       <p className="mt-0.5 text-lg font-extrabold text-slate-900 dark:text-white">
