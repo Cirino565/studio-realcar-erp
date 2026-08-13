@@ -24,8 +24,11 @@ export type GestaoCampanhaResultado = {
   investimento: number;
   receitaBruta: number;
   receitaLiquida: number;
+  receitaServico: number;
+  receitaProduto: number;
   resultado: number;
   roas: number | null;
+  roasServico: number | null;
 };
 
 export type GestaoInsight = {
@@ -102,8 +105,12 @@ export type GestaoData = {
     investimentoRealizado: number;
     receitaBrutaAtribuida: number;
     receitaLiquidaAtribuida: number;
+    receitaServicoAtribuida: number;
+    receitaProdutoAtribuida: number;
+    receitaAtribuidaSemClassificacao: number;
     resultado: number;
     roas: number | null;
+    roasServico: number | null;
     campanhasComMovimento: number;
     clientesAdquiridos: number;
     custoPorClienteAdquirido: number | null;
@@ -619,6 +626,7 @@ export async function obterDadosGestao(
         valorTotal: true,
         custoTotal: true,
         statusPagamento: true,
+        campanhaId: true,
         itens: {
           select: {
             tipo: true,
@@ -1117,6 +1125,29 @@ export async function obterDadosGestao(
     (item) => item.valor,
   );
 
+  // Separacao entre servico e produto. A venda ja guarda os dois valores
+  // congelados, entao basta filtrar as vendas pagas que tem campanha.
+  const vendasCampanhaPagas = vendasPagas.filter(
+    (venda) => typeof venda.campanhaId === "number",
+  );
+
+  const receitaServicoAtribuida = somarValores(
+    vendasCampanhaPagas,
+    (venda) => venda.totalServicos,
+  );
+
+  const receitaProdutoAtribuida = somarValores(
+    vendasCampanhaPagas,
+    (venda) => venda.totalProdutos,
+  );
+
+  // Entrada vinculada a campanha que nao veio de uma venda estruturada
+  // (lancamento manual) nao tem como ser dividida entre servico e produto.
+  const receitaAtribuidaSemClassificacao = Math.max(
+    0,
+    receitaBrutaAtribuida - (receitaServicoAtribuida + receitaProdutoAtribuida),
+  );
+
   const mapaCampanhas = new Map<number, GestaoCampanhaResultado>();
 
   for (const item of lancamentosCampanhaPagos) {
@@ -1129,8 +1160,11 @@ export async function obterDadosGestao(
       investimento: 0,
       receitaBruta: 0,
       receitaLiquida: 0,
+      receitaServico: 0,
+      receitaProduto: 0,
       resultado: 0,
       roas: null,
+      roasServico: null,
     };
 
     if (item.tipo === "SAIDA") {
@@ -1144,6 +1178,14 @@ export async function obterDadosGestao(
     mapaCampanhas.set(campanhaId, atual);
   }
 
+  for (const venda of vendasCampanhaPagas) {
+    const atual = mapaCampanhas.get(venda.campanhaId as number);
+    if (!atual) continue;
+
+    atual.receitaServico += venda.totalServicos;
+    atual.receitaProduto += venda.totalProdutos;
+  }
+
   const campanhasResultado = Array.from(mapaCampanhas.values())
     .map((campanha) => ({
       ...campanha,
@@ -1151,6 +1193,10 @@ export async function obterDadosGestao(
       roas:
         campanha.investimento > 0
           ? campanha.receitaBruta / campanha.investimento
+          : null,
+      roasServico:
+        campanha.investimento > 0
+          ? campanha.receitaServico / campanha.investimento
           : null,
     }))
     .sort((a, b) => b.resultado - a.resultado)
@@ -1241,10 +1287,17 @@ export async function obterDadosGestao(
       investimentoRealizado,
       receitaBrutaAtribuida,
       receitaLiquidaAtribuida,
+      receitaServicoAtribuida,
+      receitaProdutoAtribuida,
+      receitaAtribuidaSemClassificacao,
       resultado: receitaLiquidaAtribuida - investimentoRealizado,
       roas:
         investimentoRealizado > 0
           ? receitaBrutaAtribuida / investimentoRealizado
+          : null,
+      roasServico:
+        investimentoRealizado > 0
+          ? receitaServicoAtribuida / investimentoRealizado
           : null,
       campanhasComMovimento: mapaCampanhas.size,
       clientesAdquiridos: clientesAdquiridosCampanha,

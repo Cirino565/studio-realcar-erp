@@ -174,7 +174,7 @@ function CampanhaLinha({ campanha }: { campanha: GestaoCampanhaResultado }) {
         </span>
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
         <div>
           <p className="font-semibold uppercase tracking-[0.08em] text-slate-400">
             Investido
@@ -193,10 +193,24 @@ function CampanhaLinha({ campanha }: { campanha: GestaoCampanhaResultado }) {
         </div>
         <div>
           <p className="font-semibold uppercase tracking-[0.08em] text-slate-400">
+            Só serviço
+          </p>
+          <p className="mt-0.5 font-bold text-slate-700">
+            {formatarMoeda(campanha.receitaServico)}
+          </p>
+        </div>
+        <div>
+          <p className="font-semibold uppercase tracking-[0.08em] text-slate-400">
             ROAS
           </p>
           <p className="mt-0.5 font-bold text-slate-700">
             {formatarRoas(campanha.roas)}
+            {campanha.roasServico !== null &&
+            campanha.receitaProduto > 0 ? (
+              <span className="ml-1 font-semibold text-slate-500">
+                (serv. {formatarRoas(campanha.roasServico)})
+              </span>
+            ) : null}
           </p>
         </div>
       </div>
@@ -713,8 +727,10 @@ export default function GestaoDashboard({ data }: Props) {
           <MetricCard
             title="Receita atribuída"
             value={formatarMoeda(data.marketing.receitaBrutaAtribuida)}
-            detail={`Líquida de taxas: ${formatarMoeda(
-              data.marketing.receitaLiquidaAtribuida,
+            detail={`Serviço ${formatarMoeda(
+              data.marketing.receitaServicoAtribuida,
+            )} · Produto ${formatarMoeda(
+              data.marketing.receitaProdutoAtribuida,
             )}.`}
             icon={CircleDollarSign}
             tone="blue"
@@ -729,20 +745,42 @@ export default function GestaoDashboard({ data }: Props) {
           <MetricCard
             title="Retorno por real investido"
             value={formatarRoas(data.marketing.roas)}
-            detail={
+            detail={`Só com serviço: ${formatarRoas(
+              data.marketing.roasServico,
+            )}. ${
               data.marketing.custoPorClienteAdquirido === null
-                ? "Nenhuma cliente nova com campanha de aquisição no período."
+                ? "Nenhuma cliente nova com campanha no período."
                 : `Custo por cliente nova: ${formatarMoeda(
                     data.marketing.custoPorClienteAdquirido,
                   )} em ${data.marketing.clientesAdquiridos} cliente(s).`
-            }
+            }`}
             icon={Target}
             tone="amber"
           />
         </div>
 
         <div className="premium-card mt-4 p-4 sm:p-5">
-          <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-4">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+              Como ler os dois retornos
+            </p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              O retorno cheio inclui produto vendido junto com o atendimento. O
+              retorno só de serviço ignora esse extra e mostra o que a campanha
+              traz de forma repetível. Quando os dois estão longe um do outro,
+              boa parte do resultado veio de venda avulsa, que nem sempre se
+              repete no mês seguinte.
+            </p>
+            {data.marketing.receitaAtribuidaSemClassificacao > 0 ? (
+              <p className="mt-2 text-xs leading-5 text-amber-700">
+              {formatarMoeda(data.marketing.receitaAtribuidaSemClassificacao)} de
+              receita atribuída veio de lançamento manual, sem separação entre
+              serviço e produto.
+              </p>
+            ) : null}
+          </div>
+
+          <div className="mt-4 flex items-start justify-between gap-3 border-b border-slate-200 pb-4">
             <div>
               <h3 className="font-bold text-slate-950">Campanha por campanha</h3>
               <p className="mt-1 text-xs leading-5 text-slate-500">
