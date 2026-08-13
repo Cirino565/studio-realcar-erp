@@ -13,8 +13,24 @@ function securityHeaders(response: NextResponse) {
 
 export async function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
+
   const isLoginPage = pathname.startsWith("/login");
   const isApiRoute = pathname.startsWith("/api");
+
+  // Rota usada pelo agendador externo.
+  // Ela não depende da sessão do sistema porque possui sua própria
+  // autenticação através do BACKUP_CRON_SECRET.
+  //
+  // IMPORTANTE:
+  // liberar somente este caminho exato.
+  const isBackupAutomatico = pathname === "/api/backup/automatico";
+
+  // O middleware não exige cookie de sessão nesta rota específica.
+  // A validação do segredo continua sendo feita dentro da própria rota.
+  if (isBackupAutomatico) {
+    return securityHeaders(NextResponse.next());
+  }
+
   const token = req.cookies.get(SESSION_COOKIE_NAME)?.value;
 
   let session: Awaited<ReturnType<typeof verifySessionToken>> = null;
@@ -38,11 +54,15 @@ export async function middleware(req: NextRequest) {
   }
 
   if (!session && !isLoginPage) {
-    return securityHeaders(NextResponse.redirect(new URL("/login", req.url)));
+    return securityHeaders(
+      NextResponse.redirect(new URL("/login", req.url)),
+    );
   }
 
   if (session && isLoginPage) {
-    return securityHeaders(NextResponse.redirect(new URL("/", req.url)));
+    return securityHeaders(
+      NextResponse.redirect(new URL("/", req.url)),
+    );
   }
 
   return securityHeaders(NextResponse.next());
