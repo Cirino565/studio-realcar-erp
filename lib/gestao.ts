@@ -17,6 +17,17 @@ export type GestaoRankingItem = {
   detalhe?: string;
 };
 
+export type GestaoCampanhaResultado = {
+  id: number;
+  nome: string;
+  canal: string | null;
+  investimento: number;
+  receitaBruta: number;
+  receitaLiquida: number;
+  resultado: number;
+  roas: number | null;
+};
+
 export type GestaoInsight = {
   titulo: string;
   descricao: string;
@@ -86,6 +97,18 @@ export type GestaoData = {
     perdidosDaCoorte: number;
     followUpsVencidos: number;
     variacaoLeads: number | null;
+  };
+  marketing: {
+    investimentoRealizado: number;
+    receitaBrutaAtribuida: number;
+    receitaLiquidaAtribuida: number;
+    resultado: number;
+    roas: number | null;
+    campanhasComMovimento: number;
+    clientesAdquiridos: number;
+    custoPorClienteAdquirido: number | null;
+    variacaoInvestimento: number | null;
+    campanhas: GestaoCampanhaResultado[];
   };
   comunicacao: {
     abertasNoPeriodo: number;
@@ -439,6 +462,7 @@ export async function obterDadosGestao(
     vendas,
     clientesReativacao,
     followUpsVencidos,
+    clientesAdquiridosCampanha,
   ] = await Promise.all([
     prisma.lancamento.findMany({
       where: { data: { gte: periodo.inicio, lt: periodo.fim } },
@@ -453,6 +477,14 @@ export async function obterDadosGestao(
         clienteId: true,
         categoria: true,
         data: true,
+        campanhaId: true,
+        campanha: {
+          select: {
+            id: true,
+            nome: true,
+            canal: true,
+          },
+        },
       },
     }),
     prisma.lancamento.findMany({
@@ -463,6 +495,7 @@ export async function obterDadosGestao(
         valor: true,
         tipo: true,
         statusPagamento: true,
+        campanhaId: true,
       },
     }),
     prisma.agendamento.findMany({
@@ -612,6 +645,12 @@ export async function obterDadosGestao(
       where: {
         proximoContatoEm: { lt: inicioHoje },
         etapa: { notIn: ["Convertido", "Perdido"] },
+      },
+    }),
+    prisma.cliente.count({
+      where: {
+        createdAt: { gte: periodo.inicio, lt: periodo.fim },
+        campanhaAquisicaoId: { not: null },
       },
     }),
   ]);
@@ -1041,6 +1080,87 @@ export async function obterDadosGestao(
     });
   }
 
+  // Retorno das campanhas.
+  // Ancorado no financeiro realizado (data do lancamento pago), igual ao resto
+  // do painel, para nao divergir dos numeros das outras secoes. A venda ja grava
+  // a campanha no proprio lancamento, entao nao ha risco de contar duas vezes.
+  const lancamentosCampanhaPagos = lancamentosPagos.filter(
+    (item) => typeof item.campanhaId === "number",
+  );
+
+  const investimentoRealizado = somarValores(
+    lancamentosCampanhaPagos.filter((item) => item.tipo === "SAIDA"),
+    (item) => item.valor,
+  );
+
+  const entradasCampanha = lancamentosCampanhaPagos.filter(
+    (item) => item.tipo === "ENTRADA",
+  );
+
+  const receitaBrutaAtribuida = somarValores(
+    entradasCampanha,
+    (item) => item.valor,
+  );
+
+  const receitaLiquidaAtribuida = somarValores(
+    entradasCampanha,
+    (item) => item.valorLiquido ?? item.valor - item.taxaPagamento,
+  );
+
+  const investimentoAnterior = somarValores(
+    lancamentosAnteriores.filter(
+      (item) =>
+        typeof item.campanhaId === "number" &&
+        item.tipo === "SAIDA" &&
+        isPago(item.statusPagamento),
+    ),
+    (item) => item.valor,
+  );
+
+  const mapaCampanhas = new Map<number, GestaoCampanhaResultado>();
+
+  for (const item of lancamentosCampanhaPagos) {
+    const campanhaId = item.campanhaId as number;
+
+    const atual: GestaoCampanhaResultado = mapaCampanhas.get(campanhaId) ?? {
+      id: campanhaId,
+      nome: item.campanha?.nome?.trim() || `Campanha #${campanhaId}`,
+      canal: item.campanha?.canal?.trim() || null,
+      investimento: 0,
+      receitaBruta: 0,
+      receitaLiquida: 0,
+      resultado: 0,
+      roas: null,
+    };
+
+    if (item.tipo === "SAIDA") {
+      atual.investimento += item.valor;
+    } else if (item.tipo === "ENTRADA") {
+      atual.receitaBruta += item.valor;
+      atual.receitaLiquida +=
+        item.valorLiquido ?? item.valor - item.taxaPagamento;
+    }
+
+    mapaCampanhas.set(campanhaId, atual);
+  }
+
+  const campanhasResultado = Array.from(mapaCampanhas.values())
+    .map((campanha) => ({
+      ...campanha,
+      resultado: campanha.receitaLiquida - campanha.investimento,
+      roas:
+        campanha.investimento > 0
+          ? campanha.receitaBruta / campanha.investimento
+          : null,
+    }))
+    .sort((a, b) => b.resultado - a.resultado)
+    .slice(0, 8);
+
+  const custoPorClienteAdquirido =
+    clientesAdquiridosCampanha > 0
+      ? investimentoRealizado / clientesAdquiridosCampanha
+      : null;
+
   return {
     periodo: {
       chave: periodo.chave,
@@ -1116,6 +1236,24 @@ export async function obterDadosGestao(
         leadsCriados.length,
         leadsCriadosAnteriores.length,
       ),
+    },
+    marketing: {
+      investimentoRealizado,
+      receitaBrutaAtribuida,
+      receitaLiquidaAtribuida,
+      resultado: receitaLiquidaAtribuida - investimentoRealizado,
+      roas:
+        investimentoRealizado > 0
+          ? receitaBrutaAtribuida / investimentoRealizado
+          : null,
+      campanhasComMovimento: mapaCampanhas.size,
+      clientesAdquiridos: clientesAdquiridosCampanha,
+      custoPorClienteAdquirido,
+      variacaoInvestimento: variacaoPercentual(
+        investimentoRealizado,
+        investimentoAnterior,
+      ),
+      campanhas: campanhasResultado,
     },
     comunicacao: {
       abertasNoPeriodo: comunicacoesAbertas,

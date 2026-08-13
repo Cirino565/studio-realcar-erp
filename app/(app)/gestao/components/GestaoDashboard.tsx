@@ -20,6 +20,7 @@ import {
 
 import { formatarMoeda } from "@/lib/format";
 import type {
+  GestaoCampanhaResultado,
   GestaoData,
   GestaoInsight,
   GestaoRankingItem,
@@ -140,6 +141,66 @@ function MetricCard({
       <p className="mt-1 text-sm font-bold text-slate-800">{title}</p>
       <p className="mt-1.5 text-xs leading-5 text-slate-500">{detail}</p>
     </article>
+  );
+}
+
+function formatarRoas(valor: number | null) {
+  if (valor === null) return "—";
+  return `${valor.toFixed(2).replace(".", ",")}x`;
+}
+
+function CampanhaLinha({ campanha }: { campanha: GestaoCampanhaResultado }) {
+  const positivo = campanha.resultado >= 0;
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-bold text-slate-900">
+            {campanha.nome}
+          </p>
+          {campanha.canal ? (
+            <p className="mt-0.5 text-xs text-slate-500">{campanha.canal}</p>
+          ) : null}
+        </div>
+        <span
+          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${
+            positivo
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-rose-50 text-rose-700"
+          }`}
+        >
+          {formatarMoeda(campanha.resultado)}
+        </span>
+      </div>
+
+      <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+        <div>
+          <p className="font-semibold uppercase tracking-[0.08em] text-slate-400">
+            Investido
+          </p>
+          <p className="mt-0.5 font-bold text-slate-700">
+            {formatarMoeda(campanha.investimento)}
+          </p>
+        </div>
+        <div>
+          <p className="font-semibold uppercase tracking-[0.08em] text-slate-400">
+            Receita
+          </p>
+          <p className="mt-0.5 font-bold text-slate-700">
+            {formatarMoeda(campanha.receitaBruta)}
+          </p>
+        </div>
+        <div>
+          <p className="font-semibold uppercase tracking-[0.08em] text-slate-400">
+            ROAS
+          </p>
+          <p className="mt-0.5 font-bold text-slate-700">
+            {formatarRoas(campanha.roas)}
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -619,6 +680,106 @@ export default function GestaoDashboard({ data }: Props) {
         </div>
       </section>
 
+
+      <section>
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-slate-950">
+              Retorno das campanhas
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Investimento pago e receita paga vinculados a campanhas no período.
+              Lançamento sem campanha registrada não entra nesta conta.
+            </p>
+          </div>
+          <Link
+            href="/marketing"
+            className="hidden shrink-0 items-center gap-1 text-xs font-bold text-violet-700 hover:text-violet-800 sm:inline-flex"
+          >
+            Abrir marketing
+            <ArrowUpRight className="size-3.5" />
+          </Link>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard
+            title="Investimento em campanhas"
+            value={formatarMoeda(data.marketing.investimentoRealizado)}
+            detail="Saídas pagas vinculadas a alguma campanha no período."
+            icon={Megaphone}
+            tone="violet"
+            variation={data.marketing.variacaoInvestimento}
+          />
+          <MetricCard
+            title="Receita atribuída"
+            value={formatarMoeda(data.marketing.receitaBrutaAtribuida)}
+            detail={`Líquida de taxas: ${formatarMoeda(
+              data.marketing.receitaLiquidaAtribuida,
+            )}.`}
+            icon={CircleDollarSign}
+            tone="blue"
+          />
+          <MetricCard
+            title="Resultado das campanhas"
+            value={formatarMoeda(data.marketing.resultado)}
+            detail="Receita líquida atribuída menos o investimento pago."
+            icon={data.marketing.resultado >= 0 ? TrendingUp : TrendingDown}
+            tone={data.marketing.resultado >= 0 ? "emerald" : "rose"}
+          />
+          <MetricCard
+            title="Retorno por real investido"
+            value={formatarRoas(data.marketing.roas)}
+            detail={
+              data.marketing.custoPorClienteAdquirido === null
+                ? "Nenhuma cliente nova com campanha de aquisição no período."
+                : `Custo por cliente nova: ${formatarMoeda(
+                    data.marketing.custoPorClienteAdquirido,
+                  )} em ${data.marketing.clientesAdquiridos} cliente(s).`
+            }
+            icon={Target}
+            tone="amber"
+          />
+        </div>
+
+        <div className="premium-card mt-4 p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-4">
+            <div>
+              <h3 className="font-bold text-slate-950">Campanha por campanha</h3>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Ordenado pelo resultado. Só aparece aqui a campanha que tem
+                investimento ou receita paga registrada no período.
+              </p>
+            </div>
+            <BarChart3 className="size-5 shrink-0 text-violet-500" />
+          </div>
+
+          {data.marketing.campanhas.length > 0 ? (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {data.marketing.campanhas.map((campanha) => (
+                <CampanhaLinha key={campanha.id} campanha={campanha} />
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
+              <p className="text-sm font-bold text-slate-700">
+                Ainda não há campanha com movimento no período.
+              </p>
+              <p className="mt-1.5 text-xs leading-5 text-slate-500">
+                Para o retorno aparecer aqui, cadastre a campanha em Marketing,
+                registre o gasto do anúncio como uma saída vinculada a ela e
+                vincule a campanha na venda ou no lançamento de entrada.
+              </p>
+              <Link
+                href="/marketing"
+                className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-violet-700 hover:text-violet-800"
+              >
+                Ir para marketing
+                <ArrowUpRight className="size-3.5" />
+              </Link>
+            </div>
+          )}
+        </div>
+      </section>
       <section>
         <div className="mb-3 flex items-end justify-between gap-3">
           <div>
