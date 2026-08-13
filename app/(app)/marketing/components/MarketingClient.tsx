@@ -117,6 +117,74 @@ function normalizarTexto(value: string) {
     .toLowerCase();
 }
 
+function somenteDigitos(value: string) {
+  return value.replace(/\D/g, "");
+}
+
+// Busca tolerante: casa por texto (sem acento, sem caixa) e tambem por
+// telefone ignorando pontuacao, para "(11) 94641-3388" e "11946413388"
+// darem o mesmo resultado.
+function filtrarPorBusca<T>(
+  itens: T[],
+  busca: string,
+  obterTexto: (item: T) => string,
+  obterTelefones: (item: T) => string = () => "",
+) {
+  const termo = normalizarTexto(busca).trim();
+  const termoDigitos = somenteDigitos(busca);
+
+  if (!termo && !termoDigitos) return itens;
+
+  return itens.filter((item) => {
+    if (termo && normalizarTexto(obterTexto(item)).includes(termo)) {
+      return true;
+    }
+
+    if (termoDigitos.length >= 3) {
+      const digitos = somenteDigitos(obterTelefones(item));
+      if (digitos && digitos.includes(termoDigitos)) return true;
+    }
+
+    return false;
+  });
+}
+
+function AvisoBusca({
+  encontrados,
+  exibidos,
+  total,
+  rotulo,
+}: {
+  encontrados: number;
+  exibidos: number;
+  total: number;
+  rotulo: string;
+}) {
+  if (encontrados === 0) {
+    return (
+      <p className="text-xs leading-5 text-amber-200">
+        Nenhum {rotulo} encontrado com esse termo. Tente parte do nome ou
+        apenas os numeros do telefone.
+      </p>
+    );
+  }
+
+  if (encontrados > exibidos) {
+    return (
+      <p className="text-xs leading-5 text-slate-400">
+        Mostrando {exibidos} de {encontrados} resultados. Digite mais letras
+        para refinar.
+      </p>
+    );
+  }
+
+  return (
+    <p className="text-xs leading-5 text-slate-400">
+      {encontrados} de {total} exibidos.
+    </p>
+  );
+}
+
 function hojeInput() {
   const now = new Date();
   const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
@@ -904,13 +972,18 @@ function VincularClienteCampanhaModal({ campanha, clientes, disabled, onClose, o
   const [retroativo, setRetroativo] = useState(true);
   useEffect(() => { if (campanha) { setBusca(""); setClienteId(""); setRetroativo(true); } }, [campanha]);
   if (!campanha) return null;
-  const termo = normalizarTexto(busca);
-  const filtrados = clientes.filter((cliente) => normalizarTexto(`${cliente.nome} ${cliente.telefone} ${cliente.whatsapp || ""}`).includes(termo)).slice(0, 80);
+  const encontrados = filtrarPorBusca(
+    clientes,
+    busca,
+    (cliente) => `${cliente.nome} ${cliente.telefone} ${cliente.whatsapp || ""}`,
+    (cliente) => `${cliente.telefone} ${cliente.whatsapp || ""}`,
+  );
+  const filtrados = encontrados.slice(0, 300);
   return (
     <Modal title="Vincular cliente à campanha" description={campanha.nome} onClose={onClose}>
       <div className="grid gap-4">
         <Input label="Buscar cliente" value={busca} onChange={setBusca} placeholder="Nome, telefone ou WhatsApp" />
-        <label className="grid gap-2 text-sm font-medium text-slate-300">Cliente<select value={clienteId} onChange={(event) => setClienteId(event.target.value)} className="premium-input w-full bg-[#1d2437]"><option value="">Selecione</option>{filtrados.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nome}{cliente.campanhaAquisicaoId ? " · já possui campanha" : ""}</option>)}</select></label>
+        <label className="grid gap-2 text-sm font-medium text-slate-300">Cliente<select value={clienteId} onChange={(event) => setClienteId(event.target.value)} className="premium-input w-full bg-[#1d2437]"><option value="">Selecione</option>{filtrados.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nome}{cliente.campanhaAquisicaoId ? " · já possui campanha" : ""}</option>)}</select><AvisoBusca encontrados={encontrados.length} exibidos={filtrados.length} total={clientes.length} rotulo="cliente" /></label>
         <label className="flex items-start gap-3 rounded-2xl border border-cyan-300/15 bg-cyan-400/8 p-4 text-sm text-cyan-100"><input type="checkbox" checked={retroativo} onChange={(event) => setRetroativo(event.target.checked)} className="mt-1" /><span><strong className="block">Vincular receitas existentes sem campanha</strong><span className="mt-1 block text-xs leading-5 text-cyan-100/70">Use para os três clientes já cadastrados. O sistema atribui vendas e entradas existentes que ainda não possuem campanha, sem criar nova receita.</span></span></label>
         <div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={onClose}>Cancelar</Button><Button type="button" disabled={disabled || !clienteId} onClick={() => onSubmit(Number(clienteId), retroativo)}>{disabled ? "Vinculando..." : "Confirmar vínculo"}</Button></div>
       </div>
@@ -934,12 +1007,12 @@ function ReceitaCampanhaModal({ campanha, receitas, disabled, onClose, onSubmit 
     }
   }, [campanha]);
   if (!campanha) return null;
-  const termo = normalizarTexto(busca);
-  const filtradas = receitas
-    .filter((item) =>
-      normalizarTexto(`${item.descricao} ${item.clienteNome || ""} ${item.valor}`).includes(termo),
-    )
-    .slice(0, 100);
+  const encontradas = filtrarPorBusca(
+    receitas,
+    busca,
+    (item) => `${item.descricao} ${item.clienteNome || ""} ${item.valor}`,
+  );
+  const filtradas = encontradas.slice(0, 300);
 
   return (
     <Modal title="Vincular receita existente" description={campanha.nome} onClose={onClose}>
@@ -955,6 +1028,12 @@ function ReceitaCampanhaModal({ campanha, receitas, disabled, onClose, onSubmit 
               </option>
             ))}
           </select>
+          <AvisoBusca
+            encontrados={encontradas.length}
+            exibidos={filtradas.length}
+            total={receitas.length}
+            rotulo="lançamento"
+          />
         </label>
         <div className="rounded-2xl border border-emerald-300/15 bg-emerald-400/8 p-3 text-xs leading-5 text-emerald-100">O vínculo apenas atribui a receita já existente. Nenhum lançamento novo será criado.</div>
         <div className="flex justify-end gap-3">
