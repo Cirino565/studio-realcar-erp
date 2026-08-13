@@ -1,0 +1,44 @@
+name: Backup automático Studio Realçar
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+      timezone: "America/Sao_Paulo"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-automatico-studio-realcar
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Enviar backup para Google Drive
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Executar backup automático
+        env:
+          BACKUP_TOKEN: ${{ secrets.BACKUP_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+
+          echo "Iniciando backup automático do Studio Realçar..."
+
+          resposta=$(curl \
+            --fail-with-body \
+            --silent \
+            --show-error \
+            --request POST \
+            --header "Authorization: Bearer ${BACKUP_TOKEN}" \
+            --header "Content-Type: application/json" \
+            --data '{}' \
+            "https://app.studiorealcar.com.br/api/backup/automatico")
+
+          echo "Resposta do servidor:"
+          echo "${resposta}"
+
+          echo "Backup automático finalizado."
