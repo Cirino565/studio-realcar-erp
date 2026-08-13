@@ -326,3 +326,123 @@ export async function moveDriveFileToTrash(fileId: string) {
 export async function restoreDriveFile(fileId: string) {
   await setDriveFileTrashed(fileId, false);
 }
+
+/* ==========================================================================
+   Backup automático do sistema
+   --------------------------------------------------------------------------
+   Guarda os arquivos JSON de backup em uma pasta separada, dentro da mesma
+   pasta raiz já usada pelas fotos clínicas. Nada aqui altera o funcionamento
+   das fotos.
+   ========================================================================== */
+
+const BACKUP_FOLDER_NAME = "Backups do Sistema";
+
+type BackupDriveUploadInput = {
+  nomeArquivo: string;
+  conteudo: Buffer;
+  mimeType?: string;
+};
+
+async function getOrCreateBackupFolder() {
+  const rootFolderId = await getOrCreateRootFolder();
+
+  const existing = await findFolder([
+    `'${escapeDriveQueryValue(rootFolderId)}' in parents`,
+    "appProperties has { key='tipoRegistro' and value='backup-sistema' }",
+  ]);
+
+  if (existing) return existing.id;
+
+  const folder = await createFolder(BACKUP_FOLDER_NAME, rootFolderId, {
+    sistema: "studio-realcar",
+    tipoRegistro: "backup-sistema",
+  });
+
+  return folder.id;
+}
+
+export async function uploadBackupDrive(input: BackupDriveUploadInput) {
+  const backupFolderId = await getOrCreateBackupFolder();
+  const mimeType = input.mimeType ?? "application/json";
+
+  const boundary = `studio_realcar_${randomUUID()}`;
+  const metadata = {
+    name: input.nomeArquivo,
+    parents: [backupFolderId],
+    appProperties: {
+      sistema: "studio-realcar",
+      tipoRegistro: "backup-sistema-arquivo",
+      geradoEm: new Date().toISOString(),
+    },
+  };
+
+  const prefix = Buffer.from(
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(
+      metadata,
+    )}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`,
+    "utf8",
+  );
+  const suffix = Buffer.from(`\r\n--${boundary}--\r\n`, "utf8");
+  const body = Buffer.concat([prefix, input.conteudo, suffix]);
+
+  const url = new URL(`${DRIVE_UPLOAD_BASE}/files`);
+  url.searchParams.set("uploadType", "multipart");
+  url.searchParams.set("fields", "id,name,mimeType,size,createdTime");
+
+  const response = await driveFetch(url.toString(), {
+    method: "POST",
+    headers: {
+      "Content-Type": `multipart/related; boundary=${boundary}`,
+    },
+    body: body as unknown as BodyInit,
+  });
+
+  await assertDriveResponse(response, "Falha ao enviar backup ao Google Drive");
+  return (await response.json()) as DriveFileMetadata;
+}
+
+export async function listarBackupsDrive() {
+  const backupFolderId = await getOrCreateBackupFolder();
+
+  const q = [
+    `'${escapeDriveQueryValue(backupFolderId)}' in parents`,
+    `mimeType != '${DRIVE_FOLDER_MIME}'`,
+    "trashed = false",
+  ].join(" and ");
+
+  const url = new URL(`${DRIVE_API_BASE}/files`);
+  url.searchParams.set("q", q);
+  url.searchParams.set("fields", "files(id,name,size,createdTime)");
+  url.searchParams.set("orderBy", "createdTime desc");
+  url.searchParams.set("pageSize", "200");
+  url.searchParams.set("spaces", "drive");
+
+  const response = await driveFetch(url.toString());
+  await assertDriveResponse(response, "Falha ao listar backups no Google Drive");
+
+  const payload = (await response.json()) as { files?: DriveFileMetadata[] };
+  return payload.files ?? [];
+}
+
+export async function limparBackupsAntigosDrive(manter: number) {
+  const quantidadeMinima = Math.max(1, manter);
+  const arquivos = await listarBackupsDrive();
+
+  if (arquivos.length <= quantidadeMinima) {
+    return { removidos: 0, mantidos: arquivos.length };
+  }
+
+  const excedentes = arquivos.slice(quantidadeMinima);
+  let removidos = 0;
+
+  for (const arquivo of excedentes) {
+    try {
+      await moveDriveFileToTrash(arquivo.id);
+      removidos++;
+    } catch {
+      // Um arquivo antigo que falhou ao ser removido não pode derrubar o backup do dia.
+    }
+  }
+
+  return { removidos, mantidos: arquivos.length - removidos };
+}
