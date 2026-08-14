@@ -420,6 +420,7 @@ model Lead {
   campanhaId       Int?
   campanha         CampanhaMarketing? @relation(fields: [campanhaId], references: [id], onDelete: SetNull)
   codigoAtendimento String?
+  gclid            String?
   interacoes       LeadInteracao[]
   comunicacoes      ComunicacaoRegistro[]
   createdAt        DateTime  @default(now())

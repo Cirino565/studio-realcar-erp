@@ -25,9 +25,17 @@ export async function middleware(req: NextRequest) {
   // liberar somente este caminho exato.
   const isBackupAutomatico = pathname === "/api/backup/automatico";
 
-  // O middleware não exige cookie de sessão nesta rota específica.
-  // A validação do segredo continua sendo feita dentro da própria rota.
-  if (isBackupAutomatico) {
+  // Rota usada pelo Apps Script da landing page para criar o lead no
+  // instante do clique no WhatsApp. Também não depende da sessão do
+  // sistema - tem sua própria autenticação via LEAD_WEBHOOK_SECRET.
+  //
+  // IMPORTANTE:
+  // liberar somente este caminho exato.
+  const isCapturaClique = pathname === "/api/marketing/captura-clique";
+
+  // O middleware não exige cookie de sessão nestas rotas específicas.
+  // A validação do segredo continua sendo feita dentro de cada rota.
+  if (isBackupAutomatico || isCapturaClique) {
     return securityHeaders(NextResponse.next());
   }
 
