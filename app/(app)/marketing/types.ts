@@ -87,6 +87,7 @@ export type LeadFormData = {
   valorPrevisto: number;
   observacoes: string;
   campanhaId: number | null;
+  codigoAtendimento: string;
 };
 
 export type CampanhaFormData = {

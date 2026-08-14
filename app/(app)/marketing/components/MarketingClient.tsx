@@ -355,7 +355,7 @@ export default function MarketingClient({
 
     return leads.filter((lead) => {
       const textoBusca = normalizarTexto(
-        `${lead.nome} ${lead.telefone || ""} ${lead.origem || ""} ${lead.interesse || ""} ${lead.campanha?.nome || ""} ${lead.observacoes || ""}`,
+        `${lead.nome} ${lead.telefone || ""} ${lead.origem || ""} ${lead.interesse || ""} ${lead.campanha?.nome || ""} ${lead.observacoes || ""} ${lead.codigoAtendimento || ""}`,
       );
       const matchesBusca = !termo || textoBusca.includes(termo);
       const matchesEtapa = etapaFiltro === "todas" || lead.etapa === etapaFiltro;
@@ -1104,7 +1104,7 @@ function LeadModal({
   onSubmit: (dados: LeadFormData) => void;
   disabled: boolean;
 }) {
-  const [form, setForm] = useState<LeadFormData>({ nome: "", telefone: "", origem: "Instagram", interesse: "", etapa: "Novo", valorPrevisto: 0, observacoes: "", campanhaId: null });
+  const [form, setForm] = useState<LeadFormData>({ nome: "", telefone: "", origem: "Instagram", interesse: "", etapa: "Novo", valorPrevisto: 0, observacoes: "", campanhaId: null, codigoAtendimento: "" });
 
   useEffect(() => {
     if (!open) return;
@@ -1117,7 +1117,8 @@ function LeadModal({
       valorPrevisto: lead.valorPrevisto,
       observacoes: lead.observacoes || "",
       campanhaId: lead.campanhaId || null,
-    } : { nome: "", telefone: "", origem: "Instagram", interesse: "", etapa: "Novo", valorPrevisto: 0, observacoes: "", campanhaId: null });
+      codigoAtendimento: lead.codigoAtendimento || "",
+    } : { nome: "", telefone: "", origem: "Instagram", interesse: "", etapa: "Novo", valorPrevisto: 0, observacoes: "", campanhaId: null, codigoAtendimento: "" });
   }, [open, lead]);
 
   if (!open) return null;
@@ -1137,6 +1138,7 @@ function LeadModal({
             {campanhas.map((campanha) => <option key={campanha.id} value={campanha.id}>{campanha.nome} · {campanha.canal}</option>)}
           </select>
         </label>
+        <Input label="Código de atendimento" value={form.codigoAtendimento} onChange={(value) => setForm((prev) => ({ ...prev, codigoAtendimento: value }))} placeholder="Ex: SR-LIM-GPTPJ" />
         <Input label="Interesse" value={form.interesse} onChange={(value) => setForm((prev) => ({ ...prev, interesse: value }))} placeholder="Ex: Limpeza de pele, avaliação, pacote" />
         <div className="grid gap-4 sm:grid-cols-2">
           {!lead ? <Select label="Etapa inicial" value={form.etapa} onChange={(value) => setForm((prev) => ({ ...prev, etapa: value as LeadEtapa }))} options={LEAD_ETAPAS.filter((item) => ["Novo", "Contato"].includes(item.value)).map((item) => item.value)} /> : <div />}
@@ -1394,6 +1396,7 @@ function LeadDetailsModal({
               <Detail label="Telefone" value={lead.telefone || "Não informado"} />
               <Detail label="Origem" value={getOrigemLabel(lead.origem)} />
               <Detail label="Campanha" value={lead.campanha?.nome || "Sem campanha"} />
+              <Detail label="Código de atendimento" value={lead.codigoAtendimento || "Não informado"} />
               <Detail label="Valor previsto" value={formatarMoeda(lead.valorPrevisto)} />
               <Detail label="Último contato" value={lead.ultimoContatoEm ? formatarDataHora(lead.ultimoContatoEm) : "Ainda não registrado"} />
               <Detail label="Próximo contato" value={lead.proximoContatoEm ? formatarData(lead.proximoContatoEm) : "Não programado"} />

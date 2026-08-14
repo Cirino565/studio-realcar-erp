@@ -6,6 +6,14 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import type { LeadEtapa } from "@/app/(app)/marketing/types";
 
+// O codigo de atendimento vem do clique no botao de WhatsApp da landing page
+// (ex.: SR-LIM-GPTPJ). Guardamos sempre em maiusculo e sem espacos para que a
+// busca funcione independente de como foi digitado.
+function normalizarCodigoAtendimento(valor?: string) {
+  const limpo = (valor || "").trim().toUpperCase();
+  return limpo || null;
+}
+
 export type CriarLeadInput = {
   nome: string;
   telefone?: string;
@@ -15,6 +23,7 @@ export type CriarLeadInput = {
   valorPrevisto: number;
   observacoes?: string;
   campanhaId?: number | null;
+  codigoAtendimento?: string;
   resolucaoTelefone?: "vincular" | "pessoa_diferente";
   clienteIdVinculo?: number | null;
 };
@@ -279,6 +288,7 @@ export async function criarLead(dados: CriarLeadInput) {
         valorPrevisto: limparNumero(dados.valorPrevisto),
         observacoes: limparTexto(dados.observacoes),
         campanhaId: dados.campanhaId || null,
+        codigoAtendimento: normalizarCodigoAtendimento(dados.codigoAtendimento),
         clienteId,
         ignorarVinculoTelefone,
       },
@@ -344,6 +354,7 @@ export async function atualizarLead(dados: AtualizarLeadInput) {
         valorPrevisto: limparNumero(dados.valorPrevisto),
         observacoes: limparTexto(dados.observacoes),
         campanhaId: dados.campanhaId || null,
+        codigoAtendimento: normalizarCodigoAtendimento(dados.codigoAtendimento),
       },
     });
 

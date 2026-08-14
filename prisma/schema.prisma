@@ -419,6 +419,7 @@ model Lead {
   agendamento      Agendamento? @relation(fields: [agendamentoId], references: [id], onDelete: SetNull)
   campanhaId       Int?
   campanha         CampanhaMarketing? @relation(fields: [campanhaId], references: [id], onDelete: SetNull)
+  codigoAtendimento String?
   interacoes       LeadInteracao[]
   comunicacoes      ComunicacaoRegistro[]
   createdAt        DateTime  @default(now())
@@ -428,6 +429,7 @@ model Lead {
   @@index([campanhaId])
   @@index([etapa])
   @@index([proximoContatoEm])
+  @@index([codigoAtendimento])
 }
 
 model LeadInteracao {
