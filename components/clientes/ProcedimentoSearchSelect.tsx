@@ -67,14 +67,18 @@ export default function ProcedimentoSearchSelect({
     }
   }, [controlled, open, value]);
 
+  // Sem busca digitada, mostra uma amostra curta para nao abrir uma lista
+  // gigante. Com busca digitada, a pessoa ja filtrou o que queria - mostrar
+  // poucos resultados ali e o que fazia a lista "parecer que faltava opcao"
+  // quando na verdade so estava sendo cortada.
   const filteredOptions = useMemo(() => {
     const query = normalizarTexto(search);
 
-    if (!query) return uniqueOptions.slice(0, 10);
+    if (!query) return uniqueOptions.slice(0, 12);
 
     return uniqueOptions
       .filter((option) => normalizarTexto(option).includes(query))
-      .slice(0, 10);
+      .slice(0, 200);
   }, [search, uniqueOptions]);
 
   function commitValue(nextValue: string) {
