@@ -67,18 +67,17 @@ export default function ProcedimentoSearchSelect({
     }
   }, [controlled, open, value]);
 
-  // Sem busca digitada, mostra uma amostra curta para nao abrir uma lista
-  // gigante. Com busca digitada, a pessoa ja filtrou o que queria - mostrar
-  // poucos resultados ali e o que fazia a lista "parecer que faltava opcao"
-  // quando na verdade so estava sendo cortada.
+  // A lista inteira aparece ao abrir (a pessoa pode so rolar para achar),
+  // e tambem filtra conforme digita. O limite de 200 e so uma trava de
+  // seguranca para catalogos muito grandes - nao deve aparecer na pratica.
   const filteredOptions = useMemo(() => {
     const query = normalizarTexto(search);
 
-    if (!query) return uniqueOptions.slice(0, 12);
+    const base = query
+      ? uniqueOptions.filter((option) => normalizarTexto(option).includes(query))
+      : uniqueOptions;
 
-    return uniqueOptions
-      .filter((option) => normalizarTexto(option).includes(query))
-      .slice(0, 200);
+    return base.slice(0, 200);
   }, [search, uniqueOptions]);
 
   function commitValue(nextValue: string) {
