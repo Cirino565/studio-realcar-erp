@@ -5,7 +5,7 @@ import MarketingClient from "./components/MarketingClient";
 export default async function MarketingPage() {
   const usuario = await requirePagePermission("marketing.visualizar");
 
-  const [leadsBase, campanhasBase, profissionais, servicos, clientes, contas, vendasCampanha, lancamentosCampanha, receitasSemCampanhaBase] = await Promise.all([
+  const [leadsBase, campanhasBase, profissionais, servicos, procedimentosInteresseBase, clientes, contas, vendasCampanha, lancamentosCampanha, receitasSemCampanhaBase] = await Promise.all([
     prisma.lead.findMany({
       include: {
         cliente: {
@@ -57,6 +57,11 @@ export default async function MarketingPage() {
         valorPadrao: true,
       },
       orderBy: [{ nome: "asc" }, { id: "asc" }],
+    }),
+    prisma.procedimentoInteresse.findMany({
+      where: { status: "Ativo" },
+      select: { nome: true },
+      orderBy: [{ ordem: "asc" }, { nome: "asc" }],
     }),
     prisma.cliente.findMany({
       where: { status: { not: "Inativa" } },
@@ -221,10 +226,13 @@ export default async function MarketingPage() {
     };
   });
 
+  const procedimentosInteresse = procedimentosInteresseBase.map((item) => item.nome);
+
   return (
     <MarketingClient
       leads={leads}
       campanhas={campanhas}
+      procedimentosInteresse={procedimentosInteresse}
       clientes={clientes}
       contas={contas}
       receitasSemCampanha={receitasSemCampanha}

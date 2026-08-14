@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+
+import ProcedimentoSearchSelect from "@/components/clientes/ProcedimentoSearchSelect";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -77,6 +79,7 @@ import { CAMPANHA_CANAIS, CAMPANHA_STATUS, LEAD_ETAPAS } from "../types";
 type Props = {
   leads: MarketingLead[];
   campanhas: MarketingCampanha[];
+  procedimentosInteresse: string[];
   clientes: MarketingClienteOption[];
   contas: MarketingContaOption[];
   receitasSemCampanha: MarketingReceitaOption[];
@@ -119,6 +122,64 @@ function normalizarTexto(value: string) {
 
 function somenteDigitos(value: string) {
   return value.replace(/\D/g, "");
+}
+
+// Formata o telefone enquanto a pessoa digita: "11991234567" vira
+// "(11) 99123-4567". Segue o mesmo padrao ja usado na importacao de
+// clientes, so que de forma progressiva a cada tecla.
+function formatarTelefoneDigitado(valorDigitado: string) {
+  const digitos = somenteDigitos(valorDigitado).slice(0, 11);
+
+  if (digitos.length === 0) return "";
+  if (digitos.length <= 2) return `(${digitos}`;
+  if (digitos.length <= 6) return `(${digitos.slice(0, 2)}) ${digitos.slice(2)}`;
+  if (digitos.length <= 10) {
+    return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 6)}-${digitos.slice(6)}`;
+  }
+  return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 7)}-${digitos.slice(7)}`;
+}
+
+// Mascara de valor em reais: os digitos digitados sao sempre lidos como
+// centavos, entao "15000" vira "150,00" - o mesmo padrao de aplicativo de
+// banco. Funciona bem mesmo colando um valor, sem depender da posicao do
+// cursor.
+function digitosParaReais(valorDigitado: string) {
+  const digitos = somenteDigitos(valorDigitado).slice(0, 9);
+  return Number(digitos || "0") / 100;
+}
+
+function formatarReaisExibicao(valor: number) {
+  return (valor || 0).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function ValorInput({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="grid gap-2 text-sm font-medium text-slate-300">
+      {label}
+      <div className="relative">
+        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500">
+          R$
+        </span>
+        <input
+          inputMode="numeric"
+          value={formatarReaisExibicao(value)}
+          onChange={(event) => onChange(digitosParaReais(event.target.value))}
+          className="premium-input w-full pl-10"
+        />
+      </div>
+    </label>
+  );
 }
 
 // Busca tolerante: casa por texto (sem acento, sem caixa) e tambem por
@@ -305,6 +366,7 @@ function baixarCsv(leads: MarketingLead[]) {
 export default function MarketingClient({
   leads,
   campanhas,
+  procedimentosInteresse,
   clientes,
   contas,
   receitasSemCampanha,
@@ -610,6 +672,7 @@ export default function MarketingClient({
         open={leadModal}
         lead={leadEditando}
         campanhas={campanhas}
+        procedimentosInteresse={procedimentosInteresse}
         onClose={() => { setLeadModal(false); setLeadEditando(null); }}
         onSubmit={salvarLead}
         disabled={isPending}
@@ -1093,6 +1156,7 @@ function LeadModal({
   open,
   lead,
   campanhas,
+  procedimentosInteresse,
   onClose,
   onSubmit,
   disabled,
@@ -1100,6 +1164,7 @@ function LeadModal({
   open: boolean;
   lead: MarketingLead | null;
   campanhas: MarketingCampanha[];
+  procedimentosInteresse: string[];
   onClose: () => void;
   onSubmit: (dados: LeadFormData) => void;
   disabled: boolean;
@@ -1128,7 +1193,7 @@ function LeadModal({
       <form onSubmit={(event) => { event.preventDefault(); onSubmit(form); }} className="grid gap-4">
         <Input label="Nome" value={form.nome} onChange={(value) => setForm((prev) => ({ ...prev, nome: value }))} required />
         <div className="grid gap-4 sm:grid-cols-2">
-          <Input label="Telefone / WhatsApp" value={form.telefone} onChange={(value) => setForm((prev) => ({ ...prev, telefone: value }))} />
+          <Input label="Telefone / WhatsApp" value={form.telefone} onChange={(value) => setForm((prev) => ({ ...prev, telefone: formatarTelefoneDigitado(value) }))} placeholder="(11) 91234-5678" />
           <Select label="Origem" value={form.origem} onChange={(value) => setForm((prev) => ({ ...prev, origem: value }))} options={CAMPANHA_CANAIS.map((item) => item)} />
         </div>
         <label className="grid gap-2 text-sm font-medium text-slate-300">
@@ -1139,10 +1204,20 @@ function LeadModal({
           </select>
         </label>
         <Input label="Código de atendimento" value={form.codigoAtendimento} onChange={(value) => setForm((prev) => ({ ...prev, codigoAtendimento: value }))} placeholder="Ex: SR-LIM-GPTPJ" />
-        <Input label="Interesse" value={form.interesse} onChange={(value) => setForm((prev) => ({ ...prev, interesse: value }))} placeholder="Ex: Limpeza de pele, avaliação, pacote" />
+        <div className="grid gap-2 text-sm font-medium text-slate-300">
+          Interesse
+          <ProcedimentoSearchSelect
+            name="interesse"
+            options={procedimentosInteresse}
+            value={form.interesse}
+            onChange={(value) => setForm((prev) => ({ ...prev, interesse: value }))}
+            placeholder="Digite para buscar um procedimento"
+            inputClassName="premium-input w-full min-h-12"
+          />
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           {!lead ? <Select label="Etapa inicial" value={form.etapa} onChange={(value) => setForm((prev) => ({ ...prev, etapa: value as LeadEtapa }))} options={LEAD_ETAPAS.filter((item) => ["Novo", "Contato"].includes(item.value)).map((item) => item.value)} /> : <div />}
-          <Input label="Valor previsto" type="number" step="0.01" value={String(form.valorPrevisto)} onChange={(value) => setForm((prev) => ({ ...prev, valorPrevisto: Number(value || 0) }))} />
+          <ValorInput label="Valor previsto" value={form.valorPrevisto} onChange={(value) => setForm((prev) => ({ ...prev, valorPrevisto: value }))} />
         </div>
         <Textarea label="Observações" value={form.observacoes} onChange={(value) => setForm((prev) => ({ ...prev, observacoes: value }))} />
         <div className="rounded-2xl border border-cyan-300/15 bg-cyan-400/8 p-3 text-xs leading-5 text-cyan-100">O CRM compara o telefone com leads ativos e clientes existentes para reduzir cadastros duplicados.</div>
