@@ -52,6 +52,9 @@ export type ClienteAtendimentoDetalhes = {
   cidade: string | null;
   estado: string | null;
   enderecoOriginal: string | null;
+  responsavelNome: string | null;
+  responsavelTelefone: string | null;
+  responsavelParentesco: string | null;
   observacoes: string | null;
 };
 

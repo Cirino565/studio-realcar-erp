@@ -24,6 +24,9 @@ type ClienteAtendimento = {
   cidade: string | null;
   estado: string | null;
   enderecoOriginal: string | null;
+  responsavelNome: string | null;
+  responsavelTelefone: string | null;
+  responsavelParentesco: string | null;
   observacoes: string | null;
 };
 
@@ -34,8 +37,33 @@ type Props = {
   onSaved: (cliente: ClienteAtendimento) => void;
 };
 
+/**
+ * Menor de idade pela data de nascimento informada. Sem data preenchida
+ * devolve false - nao da para afirmar, entao a secao do responsavel fica
+ * disponivel mas fechada, em vez de sumir.
+ */
+function ehMenorDeIdade(nascimento: string) {
+  if (!nascimento) return false;
+
+  const data = new Date(`${nascimento}T12:00:00`);
+  if (Number.isNaN(data.getTime())) return false;
+
+  const hoje = new Date();
+  let idade = hoje.getFullYear() - data.getFullYear();
+  const mes = hoje.getMonth() - data.getMonth();
+
+  if (mes < 0 || (mes === 0 && hoje.getDate() < data.getDate())) {
+    idade--;
+  }
+
+  return idade >= 0 && idade < 18;
+}
+
 type FormState = {
   nome: string;
+  responsavelNome: string;
+  responsavelTelefone: string;
+  responsavelParentesco: string;
   telefone: string;
   whatsapp: string;
   cpf: string;
@@ -53,6 +81,9 @@ function dataInput(value?: string | null) {
 function montarForm(cliente: ClienteAtendimento): FormState {
   return {
     nome: cliente.nome || "",
+    responsavelNome: cliente.responsavelNome || "",
+    responsavelTelefone: cliente.responsavelTelefone || "",
+    responsavelParentesco: cliente.responsavelParentesco || "",
     telefone: cliente.telefone || "",
     whatsapp: cliente.whatsapp || "",
     cpf: cliente.cpf || "",
@@ -120,6 +151,9 @@ export default function ClienteQuickEditModal({
         const atualizado = await atualizarClienteNoAtendimento({
           id: clienteAtual.id,
           nome: formAtual.nome,
+          responsavelNome: formAtual.responsavelNome,
+          responsavelTelefone: formAtual.responsavelTelefone,
+          responsavelParentesco: formAtual.responsavelParentesco,
           telefone: formAtual.telefone,
           whatsapp: formAtual.whatsapp,
           cpf: formAtual.cpf,
@@ -264,6 +298,68 @@ export default function ClienteQuickEditModal({
                   />
                 </label>
               </div>
+
+              <details
+                open={ehMenorDeIdade(form.nascimento)}
+                className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3"
+              >
+                <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                  Responsável legal
+                  {ehMenorDeIdade(form.nascimento)
+                    ? " · cliente menor de idade"
+                    : " · opcional"}
+                </summary>
+
+                <div className="mt-3 grid gap-4 sm:grid-cols-3">
+                  <label>
+                    <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                      Nome
+                    </span>
+                    <input
+                      value={form.responsavelNome}
+                      onChange={(event) =>
+                        atualizar("responsavelNome", event.target.value)
+                      }
+                      className="premium-input w-full"
+                    />
+                  </label>
+
+                  <label>
+                    <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                      Telefone
+                    </span>
+                    <input
+                      value={form.responsavelTelefone}
+                      onChange={(event) =>
+                        atualizar("responsavelTelefone", event.target.value)
+                      }
+                      className="premium-input w-full"
+                      inputMode="tel"
+                    />
+                  </label>
+
+                  <label>
+                    <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                      Vínculo
+                    </span>
+                    <select
+                      value={form.responsavelParentesco}
+                      onChange={(event) =>
+                        atualizar("responsavelParentesco", event.target.value)
+                      }
+                      className="premium-input w-full"
+                    >
+                      <option value="">Selecione</option>
+                      <option value="Mãe">Mãe</option>
+                      <option value="Pai">Pai</option>
+                      <option value="Avó">Avó</option>
+                      <option value="Avô">Avô</option>
+                      <option value="Tutor(a) legal">Tutor(a) legal</option>
+                      <option value="Outro">Outro</option>
+                    </select>
+                  </label>
+                </div>
+              </details>
             </section>
 
             <EnderecoClienteFields

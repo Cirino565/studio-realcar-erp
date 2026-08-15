@@ -172,6 +172,9 @@ export type ClienteAtendimentoForm = {
   cidade?: string;
   estado?: string;
   enderecoOriginal?: string;
+  responsavelNome?: string;
+  responsavelTelefone?: string;
+  responsavelParentesco?: string;
   observacoes?: string;
 };
 
@@ -211,6 +214,9 @@ export async function atualizarClienteNoAtendimento(
     where: { id: dados.id },
     data: {
       ...(nome ? { nome } : {}),
+      responsavelNome: textoOpcional(dados.responsavelNome),
+      responsavelTelefone: textoOpcional(dados.responsavelTelefone),
+      responsavelParentesco: textoOpcional(dados.responsavelParentesco),
       telefone: telefone || whatsapp || "",
       whatsapp,
       cpf: textoOpcional(dados.cpf),

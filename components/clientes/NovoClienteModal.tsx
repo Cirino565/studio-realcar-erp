@@ -126,6 +126,27 @@ const PROCEDIMENTOS_FALLBACK = [
   "Outro",
 ];
 
+/**
+ * Menor de idade pela data de nascimento informada. Sem data preenchida
+ * devolve false - a secao continua disponivel, so nao abre sozinha.
+ */
+function ehMenorDeIdade(nascimento: string) {
+  if (!nascimento) return false;
+
+  const data = new Date(`${nascimento}T12:00:00`);
+  if (Number.isNaN(data.getTime())) return false;
+
+  const hoje = new Date();
+  let idade = hoje.getFullYear() - data.getFullYear();
+  const mes = hoje.getMonth() - data.getMonth();
+
+  if (mes < 0 || (mes === 0 && hoje.getDate() < data.getDate())) {
+    idade--;
+  }
+
+  return idade >= 0 && idade < 18;
+}
+
 function somenteNumeros(value: string) {
   return value.replace(/\D/g, "");
 }
@@ -420,10 +441,16 @@ function NovoClienteForm({
             />
           </label>
 
-          <div className="min-w-0 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-              Responsável legal (se o cliente for menor de idade)
-            </p>
+          <details
+            open={ehMenorDeIdade(form.nascimento)}
+            className="min-w-0 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2"
+          >
+            <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              Responsável legal
+              {ehMenorDeIdade(form.nascimento)
+                ? " · cliente menor de idade"
+                : " · opcional"}
+            </summary>
 
             <div className="grid gap-4 sm:grid-cols-3">
               <label className="min-w-0">
@@ -481,7 +508,7 @@ function NovoClienteForm({
               Preencha quando quem assina a anamnese e autoriza o atendimento for
               diferente de quem recebe o atendimento.
             </p>
-          </div>
+          </details>
 
           <label>
             <Label>Origem</Label>
