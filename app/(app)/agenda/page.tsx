@@ -1,5 +1,6 @@
 import { canAccess, isAdminUser, requirePagePermission } from "@/lib/auth";
 import { obterAreaPadraoAgendamento } from "@/lib/area-cliente";
+import { isGoogleDriveConfigured } from "@/lib/google-drive";
 import { prisma } from "@/lib/prisma";
 
 import AgendaClient from "./components/AgendaClient";
@@ -378,6 +379,7 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
         horarioAtendimento={configuracaoClinica?.horarioAtendimento || null}
         podeEditarCliente={podeEditarCliente}
         podeRegistrarEvolucao={podeRegistrarEvolucao}
+        driveConfigurado={isGoogleDriveConfigured()}
       />
     </div>
   );

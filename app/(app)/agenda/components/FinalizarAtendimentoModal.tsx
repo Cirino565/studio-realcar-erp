@@ -2,15 +2,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import Link from "next/link";
 import {
   AlertCircle,
   AlertTriangle,
   CalendarPlus,
   Check,
+  Camera,
   CheckCircle2,
   ClipboardCheck,
-  ImageIcon,
   LoaderCircle,
   Package,
   RotateCcw,
@@ -35,6 +34,7 @@ import {
   valorUnitarioKit,
 } from "@/lib/vendas.types";
 
+import { ClienteFotoUploadForm } from "@/app/(app)/clientes/components/ClienteFotoUploadForm";
 import type { AppointmentDetails } from "./AppointmentDetailsModal";
 
 type ServicoFinalizacao = {
@@ -66,6 +66,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   appointment: AppointmentDetails | null;
+  driveConfigurado?: boolean;
   servicos: ServicoFinalizacao[];
   produtos: ProdutoVendaOption[];
   kits: KitVendaOption[];
@@ -148,6 +149,7 @@ export default function FinalizarAtendimentoModal({
   open,
   onClose,
   appointment,
+  driveConfigurado,
   servicos,
   produtos,
   kits,
@@ -685,23 +687,23 @@ export default function FinalizarAtendimentoModal({
                     </p>
                   </label>
 
-                  {/* As fotos costumam ser anexadas junto com a evolucao.
-                      Abre em outra aba para nao perder nada ja preenchido
-                      aqui no meio da finalizacao. */}
-                  <div className="border-b border-slate-100 px-4 pb-4">
-                    <Link
-                      href={`/clientes/${currentAppointment.clienteId}?aba=fotos`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 text-sm font-bold text-violet-800 hover:bg-violet-100"
-                    >
-                      <ImageIcon size={17} />
-                      Adicionar fotos desta cliente
-                    </Link>
-                    <p className="mt-2 text-[11px] leading-4 text-slate-500">
-                      Abre em outra aba. O que você já preencheu aqui não se perde.
-                    </p>
-                  </div>
+                  {/* Envio de fotos direto aqui dentro: as fotos sao
+                      anexadas junto com a evolucao, e sair da tela no meio
+                      da finalizacao faria perder o que ja foi preenchido.
+                      Vem fechado para nao poluir quem nao vai usar. */}
+                  <details className="border-b border-slate-100 px-4 pb-4">
+                    <summary className="flex cursor-pointer items-center gap-2 py-3 text-xs font-bold text-slate-900">
+                      <Camera size={16} className="text-violet-600" />
+                      Fotos da cliente, opcional agora
+                    </summary>
+
+                    <div className="pt-1">
+                      <ClienteFotoUploadForm
+                        clienteId={currentAppointment.clienteId}
+                        driveConfigurado={driveConfigurado ?? false}
+                      />
+                    </div>
+                  </details>
 
                   <div className="p-4">
                     <div className="mb-3 flex items-center gap-2">

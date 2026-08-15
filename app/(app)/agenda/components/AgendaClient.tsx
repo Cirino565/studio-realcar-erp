@@ -109,6 +109,7 @@ type Props = {
   horarioAtendimento?: string | null;
   podeEditarCliente: boolean;
   podeRegistrarEvolucao: boolean;
+  driveConfigurado?: boolean;
 };
 
 function parseLocalDate(value: string) {
@@ -188,6 +189,7 @@ export default function AgendaClient({
   horarioAtendimento,
   podeEditarCliente,
   podeRegistrarEvolucao,
+  driveConfigurado,
 }: Props) {
   const [selectedDate, setSelectedDate] = useState(() =>
     parseLocalDate(initialDate),
@@ -491,6 +493,7 @@ export default function AgendaClient({
         kits={kits}
         formasPagamento={formasPagamento}
         podeAutorizarEstoqueNegativo={podeAutorizarEstoqueNegativo}
+        driveConfigurado={driveConfigurado}
         onClose={() => setFinishAppointment(null)}
         onAgendarRetorno={abrirReagendamento}
         onFinalizado={marcarAtendimentoFinalizado}
