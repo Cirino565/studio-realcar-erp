@@ -692,11 +692,22 @@ export default function AnamneseMobileForm({
             type="button"
             className="mt-4 w-full sm:w-auto"
             disabled={isPending}
-            onClick={() =>
+            onClick={() => {
+              // Sem esta confirmacao, cada clique criava uma versao nova na
+              // hora e sem aviso - o que gerava varias versoes duplicadas
+              // quando a pessoa clicava de novo achando que nao funcionou.
+              const confirmado = window.confirm(
+                `Esta ficha ja esta assinada (versao ${fichaAtual?.versao ?? "atual"}).\n\n` +
+                  "Criar uma NOVA versao em branco para preencher de novo?\n\n" +
+                  "A versao assinada continua guardada no historico. Se voce so quer consultar ou baixar a ficha atual, cancele.",
+              );
+
+              if (!confirmado) return;
+
               startTransition(async () => {
                 await criarNovaRevisaoAnamnese(clienteId, procedimento);
-              })
-            }
+              });
+            }}
           >
             {isPending ? <Loader2 className="animate-spin" /> : <FileSignature />}
             Iniciar nova versão
