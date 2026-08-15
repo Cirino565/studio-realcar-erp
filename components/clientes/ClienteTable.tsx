@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  CalendarClock,
   CalendarDays,
   Eye,
   MessageCircle,
@@ -12,8 +13,60 @@ import { Button } from "@/components/ui/button";
 import { formatarData, formatarMoeda } from "@/lib/format";
 import type { Cliente } from "@/lib/types";
 
+type ClienteAgendamentoResumo = {
+  id: number;
+  procedimento: string;
+  data: string | Date;
+  status: string;
+};
+
+type ClienteComAgenda = Cliente & {
+  agendamentos?: ClienteAgendamentoResumo[];
+};
+
+/**
+ * Proximo agendamento futuro da cliente, ignorando os cancelados.
+ * Devolve null quando nao ha nada marcado daqui pra frente.
+ */
+function proximoAgendamento(cliente: ClienteComAgenda) {
+  const agora = new Date();
+
+  const futuros = (cliente.agendamentos ?? [])
+    .filter(
+      (agendamento) =>
+        agendamento.status !== "Cancelado" &&
+        new Date(agendamento.data).getTime() > agora.getTime(),
+    )
+    .sort(
+      (a, b) => new Date(a.data).getTime() - new Date(b.data).getTime(),
+    );
+
+  return futuros[0] ?? null;
+}
+
+function ProximoAgendamento({ cliente }: { cliente: ClienteComAgenda }) {
+  const proximo = proximoAgendamento(cliente);
+
+  if (!proximo) {
+    return (
+      <span className="text-slate-400 dark:text-slate-500">Sem agendamento</span>
+    );
+  }
+
+  return (
+    <span className="inline-flex flex-col">
+      <span className="font-bold text-violet-700 dark:text-violet-300">
+        {formatarData(proximo.data)}
+      </span>
+      <span className="truncate text-xs text-slate-500">
+        {proximo.procedimento}
+      </span>
+    </span>
+  );
+}
+
 type Props = {
-  clientes: Cliente[];
+  clientes: ClienteComAgenda[];
   onExcluir: (id: number) => void;
   onEditar: (cliente: Cliente) => void;
   onMensagem: (cliente: Cliente) => void;
@@ -118,6 +171,7 @@ export default function ClienteTable({
               <th className="px-5 py-4 text-left font-bold">Áreas</th>
               <th className="px-5 py-4 text-left font-bold">Valor gasto</th>
               <th className="px-5 py-4 text-left font-bold">Última visita</th>
+              <th className="px-5 py-4 text-left font-bold">Próximo agendamento</th>
               <th className="px-5 py-4 text-left font-bold">Status</th>
               <th className="px-5 py-4 text-right font-bold">Ações</th>
             </tr>
@@ -181,6 +235,13 @@ export default function ClienteTable({
                   <div className="flex items-center gap-2">
                     <CalendarDays size={15} className="shrink-0 text-slate-400" />
                     {formatarData(cliente.ultimaVisita)}
+                  </div>
+                </td>
+
+                <td className="px-5 py-4 text-slate-700 dark:text-slate-300">
+                  <div className="flex items-center gap-2">
+                    <CalendarClock size={15} className="shrink-0 text-slate-400" />
+                    <ProximoAgendamento cliente={cliente} />
                   </div>
                 </td>
 
@@ -289,6 +350,15 @@ export default function ClienteTable({
                 <p className="text-xs font-semibold text-slate-500">Última visita</p>
                 <p className="mt-1 text-slate-800 dark:text-slate-200">
                   {formatarData(cliente.ultimaVisita)}
+                </p>
+              </div>
+
+              <div className="col-span-2">
+                <p className="text-xs font-semibold text-slate-500">
+                  Próximo agendamento
+                </p>
+                <p className="mt-1 text-slate-800 dark:text-slate-200">
+                  <ProximoAgendamento cliente={cliente} />
                 </p>
               </div>
             </div>
