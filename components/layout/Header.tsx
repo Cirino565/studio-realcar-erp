@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, CalendarDays, LogOut, Search } from "lucide-react";
+import { Bell, CalendarDays, LogOut } from "lucide-react";
 
 import { logout } from "@/actions/auth.actions";
 import ThemeToggle from "@/components/layout/ThemeToggle";
@@ -28,15 +28,6 @@ export default function Header() {
           </span>
         </div>
       </div>
-
-      <label className="relative hidden w-full max-w-md md:block">
-        <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-        <input
-          type="search"
-          placeholder="Buscar clientes e agendamentos..."
-          className="app-header-search h-10 w-full rounded-xl border pl-10 pr-4 text-sm outline-none transition placeholder:text-slate-400 focus:ring-4"
-        />
-      </label>
 
       <div className="flex shrink-0 items-center gap-2">
         <ThemeToggle />

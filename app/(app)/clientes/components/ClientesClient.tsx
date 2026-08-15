@@ -19,6 +19,22 @@ import type { Cliente } from "@/lib/types";
 
 import ClienteQuickMessageModal from "./ClienteQuickMessageModal";
 
+
+// Busca tolerante: ignora acento e maiuscula/minuscula, para que "joao"
+// encontre "Joao" e "Joao" encontre "Joao". Para telefone, compara so os
+// digitos, ignorando parenteses, traco e espaco.
+function normalizarBusca(valor?: string | null) {
+  return (valor ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function somenteDigitos(valor?: string | null) {
+  return (valor ?? "").replace(/\D/g, "");
+}
+
 type ClienteAgendamentoResumo = {
   id: number;
   procedimento: string;
@@ -98,22 +114,28 @@ export default function ClientesClient({
   }, [clientes]);
 
   const clientesFiltrados = useMemo(() => {
-    const texto = busca.trim().toLowerCase();
+    const texto = normalizarBusca(busca);
+    const textoDigitos = somenteDigitos(busca);
+    const temDigitos = textoDigitos.length >= 3;
 
     const filtrados = clientes.filter((cliente) => {
       const atendeTexto =
         !texto ||
-        cliente.nome.toLowerCase().includes(texto) ||
-        cliente.telefone.toLowerCase().includes(texto) ||
-        (cliente.cpf ?? "").toLowerCase().includes(texto) ||
-        (cliente.whatsapp ?? "").toLowerCase().includes(texto) ||
-        (cliente.cep ?? "").toLowerCase().includes(texto) ||
-        (cliente.logradouro ?? "").toLowerCase().includes(texto) ||
-        (cliente.bairro ?? "").toLowerCase().includes(texto) ||
-        (cliente.cidade ?? "").toLowerCase().includes(texto) ||
-        (cliente.enderecoOriginal ?? "").toLowerCase().includes(texto) ||
-        (cliente.origem ?? "").toLowerCase().includes(texto) ||
-        (cliente.procedimentoInteresse ?? "").toLowerCase().includes(texto);
+        normalizarBusca(cliente.nome).includes(texto) ||
+        normalizarBusca(cliente.telefone).includes(texto) ||
+        normalizarBusca(cliente.cpf).includes(texto) ||
+        normalizarBusca(cliente.whatsapp).includes(texto) ||
+        (temDigitos &&
+          (somenteDigitos(cliente.telefone).includes(textoDigitos) ||
+            somenteDigitos(cliente.whatsapp).includes(textoDigitos) ||
+            somenteDigitos(cliente.cpf).includes(textoDigitos))) ||
+        normalizarBusca(cliente.cep).includes(texto) ||
+        normalizarBusca(cliente.logradouro).includes(texto) ||
+        normalizarBusca(cliente.bairro).includes(texto) ||
+        normalizarBusca(cliente.cidade).includes(texto) ||
+        normalizarBusca(cliente.enderecoOriginal).includes(texto) ||
+        normalizarBusca(cliente.origem).includes(texto) ||
+        normalizarBusca(cliente.procedimentoInteresse).includes(texto);
 
       const atendeStatus = status === "todos" || cliente.status === status;
 
