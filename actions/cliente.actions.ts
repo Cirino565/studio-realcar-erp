@@ -38,6 +38,9 @@ export type ClienteForm = {
   origem?: string;
   procedimentoInteresse?: string;
   nascimento?: string;
+  responsavelNome?: string;
+  responsavelTelefone?: string;
+  responsavelParentesco?: string;
   observacoes?: string;
   areaEstetica?: boolean;
   areaCilios?: boolean;
@@ -74,6 +77,9 @@ export async function criarCliente(dados: ClienteForm) {
       nascimento: dados.nascimento
         ? new Date(dados.nascimento)
         : null,
+      responsavelNome: textoOpcional(dados.responsavelNome),
+      responsavelTelefone: textoOpcional(dados.responsavelTelefone),
+      responsavelParentesco: textoOpcional(dados.responsavelParentesco),
       observacoes: textoOpcional(dados.observacoes),
       areaEstetica: Boolean(dados.areaEstetica),
       areaCilios: Boolean(dados.areaCilios),
@@ -114,6 +120,9 @@ export async function atualizarCliente(dados: ClienteForm) {
       nascimento: dados.nascimento
         ? new Date(dados.nascimento)
         : null,
+      responsavelNome: textoOpcional(dados.responsavelNome),
+      responsavelTelefone: textoOpcional(dados.responsavelTelefone),
+      responsavelParentesco: textoOpcional(dados.responsavelParentesco),
       observacoes: textoOpcional(dados.observacoes),
       areaEstetica: Boolean(dados.areaEstetica),
       areaCilios: Boolean(dados.areaCilios),
@@ -150,6 +159,7 @@ export async function buscarCliente(id: number) {
 
 export type ClienteAtendimentoForm = {
   id: number;
+  nome?: string;
   telefone: string;
   whatsapp?: string;
   cpf?: string;
@@ -181,6 +191,14 @@ export async function atualizarClienteNoAtendimento(
     throw new Error("Informe pelo menos o telefone ou o WhatsApp da cliente.");
   }
 
+  // O nome so e alterado quando vier preenchido. Assim, se a tela nao mandar
+  // esse campo, o cadastro continua com o nome que ja tinha.
+  const nome = dados.nome?.trim();
+
+  if (dados.nome !== undefined && !nome) {
+    throw new Error("O nome da cliente nao pode ficar em branco.");
+  }
+
   const nascimento = dados.nascimento
     ? new Date(`${dados.nascimento}T12:00:00.000Z`)
     : null;
@@ -192,6 +210,7 @@ export async function atualizarClienteNoAtendimento(
   const cliente = await prisma.cliente.update({
     where: { id: dados.id },
     data: {
+      ...(nome ? { nome } : {}),
       telefone: telefone || whatsapp || "",
       whatsapp,
       cpf: textoOpcional(dados.cpf),

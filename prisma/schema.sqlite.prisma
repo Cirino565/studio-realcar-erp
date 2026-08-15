@@ -25,6 +25,9 @@ model Cliente {
   origem       String?
   procedimentoInteresse String?
   nascimento   DateTime?
+  responsavelNome        String?
+  responsavelTelefone    String?
+  responsavelParentesco  String?
   observacoes  String?
   procedimento String?
   valorGasto   Float    @default(0)

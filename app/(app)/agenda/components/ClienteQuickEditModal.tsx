@@ -35,6 +35,7 @@ type Props = {
 };
 
 type FormState = {
+  nome: string;
   telefone: string;
   whatsapp: string;
   cpf: string;
@@ -51,6 +52,7 @@ function dataInput(value?: string | null) {
 
 function montarForm(cliente: ClienteAtendimento): FormState {
   return {
+    nome: cliente.nome || "",
     telefone: cliente.telefone || "",
     whatsapp: cliente.whatsapp || "",
     cpf: cliente.cpf || "",
@@ -103,6 +105,11 @@ export default function ClienteQuickEditModal({
 
     setErro(null);
 
+    if (!formAtual.nome.trim()) {
+      setErro("Informe o nome da cliente.");
+      return;
+    }
+
     if (!formAtual.telefone.trim() && !formAtual.whatsapp.trim()) {
       setErro("Informe pelo menos o telefone ou o WhatsApp da cliente.");
       return;
@@ -112,6 +119,7 @@ export default function ClienteQuickEditModal({
       try {
         const atualizado = await atualizarClienteNoAtendimento({
           id: clienteAtual.id,
+          nome: formAtual.nome,
           telefone: formAtual.telefone,
           whatsapp: formAtual.whatsapp,
           cpf: formAtual.cpf,
@@ -194,6 +202,18 @@ export default function ClienteQuickEditModal({
 
             <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="grid gap-4 sm:grid-cols-2">
+                <label className="sm:col-span-2">
+                  <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                    Nome
+                  </span>
+                  <input
+                    value={form.nome}
+                    onChange={(event) => atualizar("nome", event.target.value)}
+                    className="premium-input w-full"
+                    autoComplete="name"
+                  />
+                </label>
+
                 <label>
                   <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
                     Telefone

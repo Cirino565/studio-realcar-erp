@@ -68,6 +68,9 @@ export default async function EditarClientePage({ params }: EditarClientePagePro
       procedimentoInteresse:
         (formData.get("procedimentoInteresse") as string) || "",
       nascimento: (formData.get("nascimento") as string) || "",
+      responsavelNome: (formData.get("responsavelNome") as string) || "",
+      responsavelTelefone: (formData.get("responsavelTelefone") as string) || "",
+      responsavelParentesco: (formData.get("responsavelParentesco") as string) || "",
       observacoes: (formData.get("observacoes") as string) || "",
       areaEstetica: formData.get("areaEstetica") === "on",
       areaCilios: formData.get("areaCilios") === "on",

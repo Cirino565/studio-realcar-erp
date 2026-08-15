@@ -225,6 +225,52 @@ export default function ClienteServerForm({
               defaultValue={dateValue(cliente?.nascimento)}
             />
 
+            <div className="min-w-0 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                Responsável legal (se o cliente for menor de idade)
+              </p>
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field
+                  label="Nome do responsável"
+                  name="responsavelNome"
+                  defaultValue={cliente?.responsavelNome ?? ""}
+                  placeholder="Ex: nome da mãe ou responsável"
+                />
+
+                <Field
+                  label="Telefone do responsável"
+                  name="responsavelTelefone"
+                  defaultValue={cliente?.responsavelTelefone ?? ""}
+                  placeholder="(11) 91234-5678"
+                />
+
+                <label className="min-w-0 space-y-2">
+                  <span className="block break-words text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Vínculo
+                  </span>
+                  <select
+                    name="responsavelParentesco"
+                    defaultValue={cliente?.responsavelParentesco ?? ""}
+                    className="premium-input min-h-12 w-full min-w-0 max-w-full"
+                  >
+                    <option value="">Selecione</option>
+                    <option value="Mãe">Mãe</option>
+                    <option value="Pai">Pai</option>
+                    <option value="Avó">Avó</option>
+                    <option value="Avô">Avô</option>
+                    <option value="Tutor(a) legal">Tutor(a) legal</option>
+                    <option value="Outro">Outro</option>
+                  </select>
+                </label>
+              </div>
+
+              <p className="text-xs leading-5 text-slate-500">
+                Preencha quando quem assina a anamnese e autoriza o atendimento
+                for diferente de quem recebe o atendimento.
+              </p>
+            </div>
+
             <EnderecoClienteFields
               initialValues={{
                 cep: cliente?.cep ?? "",
@@ -306,4 +352,3 @@ export default function ClienteServerForm({
     </div>
   );
 }
-
