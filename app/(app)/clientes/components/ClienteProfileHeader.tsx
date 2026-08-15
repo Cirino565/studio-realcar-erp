@@ -2,7 +2,9 @@
 
 import ClienteProfileActions from "./ClienteProfileActions";
 import type { Cliente } from "@/lib/types";
+import { useRouter } from "next/navigation";
 import {
+  ArrowLeft,
   Camera,
   FileText,
   MapPin,
@@ -58,11 +60,22 @@ export default function ClienteProfileHeader({
   const enderecoEstruturado = montarEnderecoEstruturado(cliente);
   const enderecoOriginal = cliente.enderecoOriginal?.trim() || "";
 
+  const router = useRouter();
+
   return (
     <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.06] sm:p-6">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,0.14),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(13,148,136,0.10),transparent_32%)]" />
 
       <div className="relative space-y-5">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-600 transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700 dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-300"
+        >
+          <ArrowLeft className="size-4" />
+          Voltar
+        </button>
+
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-4">
             <div className="flex size-16 shrink-0 items-center justify-center rounded-3xl bg-gradient-to-br from-violet-600 to-fuchsia-500 text-xl font-bold text-white shadow-lg shadow-violet-500/20">
