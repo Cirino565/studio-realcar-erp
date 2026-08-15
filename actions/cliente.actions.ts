@@ -246,6 +246,9 @@ export async function atualizarClienteNoAtendimento(
       cidade: true,
       estado: true,
       enderecoOriginal: true,
+      responsavelNome: true,
+      responsavelTelefone: true,
+      responsavelParentesco: true,
       observacoes: true,
     },
   });
