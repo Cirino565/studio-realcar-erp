@@ -82,6 +82,9 @@ type FormData = {
   origem: string;
   procedimentoInteresse: string;
   nascimento: string;
+  responsavelNome: string;
+  responsavelTelefone: string;
+  responsavelParentesco: string;
   observacoes: string;
   areaEstetica: boolean;
   areaCilios: boolean;
@@ -182,6 +185,9 @@ function montarFormulario(
       origem: origemPadrao,
       procedimentoInteresse: procedimentoPadrao,
       nascimento: "",
+      responsavelNome: "",
+      responsavelTelefone: "",
+      responsavelParentesco: "",
       observacoes: "",
       areaEstetica: false,
       areaCilios: false,
@@ -208,6 +214,9 @@ function montarFormulario(
       cliente.procedimento ??
       procedimentoPadrao,
     nascimento: formatarDataInput(cliente.nascimento),
+    responsavelNome: cliente.responsavelNome ?? "",
+    responsavelTelefone: formatarTelefone(cliente.responsavelTelefone ?? ""),
+    responsavelParentesco: cliente.responsavelParentesco ?? "",
     observacoes: cliente.observacoes ?? "",
     areaEstetica: cliente.areaEstetica ?? false,
     areaCilios: cliente.areaCilios ?? false,
@@ -291,6 +300,9 @@ function NovoClienteForm({
       procedimentoInteresse:
         form.procedimentoInteresse || procedimentoPadrao,
       nascimento: form.nascimento,
+      responsavelNome: form.responsavelNome.trim(),
+      responsavelTelefone: formatarTelefone(form.responsavelTelefone),
+      responsavelParentesco: form.responsavelParentesco,
       observacoes: form.observacoes.trim(),
     });
   }
@@ -407,6 +419,69 @@ function NovoClienteForm({
               className="premium-input w-full min-w-0 max-w-full text-base sm:text-sm"
             />
           </label>
+
+          <div className="min-w-0 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              Responsável legal (se o cliente for menor de idade)
+            </p>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <label className="min-w-0">
+                <Label>Nome do responsável</Label>
+                <input
+                  name="responsavelNome"
+                  value={form.responsavelNome}
+                  onChange={(event) =>
+                    alterarCampo("responsavelNome", event.target.value)
+                  }
+                  placeholder="Ex: nome da mãe ou responsável"
+                  className="premium-input w-full min-w-0 max-w-full text-base sm:text-sm"
+                />
+              </label>
+
+              <label className="min-w-0">
+                <Label>Telefone do responsável</Label>
+                <input
+                  name="responsavelTelefone"
+                  value={form.responsavelTelefone}
+                  onChange={(event) =>
+                    alterarCampo(
+                      "responsavelTelefone",
+                      formatarTelefone(event.target.value),
+                    )
+                  }
+                  placeholder="(11) 91234-5678"
+                  className="premium-input w-full min-w-0 max-w-full text-base sm:text-sm"
+                  inputMode="tel"
+                />
+              </label>
+
+              <label className="min-w-0">
+                <Label>Vínculo</Label>
+                <select
+                  name="responsavelParentesco"
+                  value={form.responsavelParentesco}
+                  onChange={(event) =>
+                    alterarCampo("responsavelParentesco", event.target.value)
+                  }
+                  className="premium-input w-full min-w-0 max-w-full text-base sm:text-sm"
+                >
+                  <option value="">Selecione</option>
+                  <option value="Mãe">Mãe</option>
+                  <option value="Pai">Pai</option>
+                  <option value="Avó">Avó</option>
+                  <option value="Avô">Avô</option>
+                  <option value="Tutor(a) legal">Tutor(a) legal</option>
+                  <option value="Outro">Outro</option>
+                </select>
+              </label>
+            </div>
+
+            <p className="text-xs leading-5 text-slate-500">
+              Preencha quando quem assina a anamnese e autoriza o atendimento for
+              diferente de quem recebe o atendimento.
+            </p>
+          </div>
 
           <label>
             <Label>Origem</Label>
