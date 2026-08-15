@@ -7,7 +7,26 @@ import ClienteProfileHeader from "@/app/(app)/clientes/components/ClienteProfile
 
 type ClientePageProps = {
   params: Promise<{ id: string }> | { id: string };
+  searchParams?:
+    | Promise<{ aba?: string }>
+    | { aba?: string };
 };
+
+// Abas que podem ser abertas direto pela URL (ex.: /clientes/12?aba=fotos).
+// Serve para chegar na aba certa vindo de outra tela, sem precisar clicar.
+const ABAS_VALIDAS = [
+  "anamnese",
+  "fotos",
+  "documentos",
+  "procedimentos",
+  "evolucao",
+] as const;
+
+type AbaValida = (typeof ABAS_VALIDAS)[number];
+
+function resolverAba(valor?: string): AbaValida | undefined {
+  return ABAS_VALIDAS.find((aba) => aba === valor);
+}
 
 function toIsoString(value: Date | string | null | undefined) {
   return value ? new Date(value).toISOString() : "";
@@ -85,11 +104,17 @@ async function getClienteClinico(clienteId: number) {
   });
 }
 
-export default async function ClientePage({ params }: ClientePageProps) {
+export default async function ClientePage({
+  params,
+  searchParams,
+}: ClientePageProps) {
   const usuario = await requirePagePermission("clientes.visualizar");
 
   const { id } = await params;
   const clienteId = Number(id);
+
+  const parametros = searchParams ? await searchParams : undefined;
+  const abaInicial = resolverAba(parametros?.aba);
 
   if (!id || !Number.isInteger(clienteId) || clienteId <= 0) {
     return (
@@ -216,7 +241,7 @@ export default async function ClientePage({ params }: ClientePageProps) {
     <div className="app-mobile-safe space-y-5 sm:space-y-6">
       <ClienteProfileHeader data={data} cliente={cliente} />
 
-      <ClienteClinicoTabs data={data} />
+      <ClienteClinicoTabs data={data} initialTab={abaInicial} />
     </div>
   );
 }

@@ -3,7 +3,8 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { Activity, AlertCircle, CheckCircle2, X } from "lucide-react";
+import Link from "next/link";
+import { Activity, AlertCircle, CheckCircle2, ImageIcon, X } from "lucide-react";
 
 import { registrarEvolucaoPendente } from "@/actions/agendamento.actions";
 
@@ -212,7 +213,19 @@ export default function RegistrarEvolucaoPendenteModal({
           </div>
         </main>
 
-        <footer className="shrink-0 border-t border-slate-200 bg-white p-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] sm:px-5">
+        <footer className="shrink-0 space-y-2 border-t border-slate-200 bg-white p-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] sm:px-5">
+          {/* As fotos sao anexadas junto com a evolucao, no fim do dia.
+              Abre em outra aba para nao perder o texto ja digitado aqui. */}
+          <Link
+            href={`/clientes/${item.clienteId}?aba=fotos`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 text-sm font-bold text-violet-800 hover:bg-violet-100"
+          >
+            <ImageIcon size={17} />
+            Adicionar fotos desta cliente
+          </Link>
+
           <button
             type="button"
             onClick={salvar}
