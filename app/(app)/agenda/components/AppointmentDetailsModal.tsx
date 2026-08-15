@@ -296,7 +296,7 @@ export default function AppointmentDetailsModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] h-[100dvh] overflow-hidden lg:flex lg:items-center lg:justify-end lg:p-5">
+    <div className="fixed inset-0 z-[100] h-[100dvh] overflow-hidden lg:flex lg:items-center lg:justify-center lg:p-5">
       <button
         type="button"
         aria-label="Fechar detalhes do atendimento"
