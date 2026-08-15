@@ -21,8 +21,12 @@ import ClienteQuickMessageModal from "./ClienteQuickMessageModal";
 
 
 // Busca tolerante: ignora acento e maiuscula/minuscula, para que "joao"
-// encontre "Joao" e "Joao" encontre "Joao". Para telefone, compara so os
-// digitos, ignorando parenteses, traco e espaco.
+// encontre "Joao" e vice-versa.
+//
+// A busca por texto olha SO nome e procedimento de interesse. Endereco ficou
+// de fora de proposito: como muita rua se chama "Joao", "Maria" etc., buscar
+// no endereco trazia cliente sem nenhuma relacao com o nome digitado.
+// Telefone e CPF sao comparados so pelos digitos, a partir de 3 numeros.
 function normalizarBusca(valor?: string | null) {
   return (valor ?? "")
     .normalize("NFD")
@@ -122,20 +126,11 @@ export default function ClientesClient({
       const atendeTexto =
         !texto ||
         normalizarBusca(cliente.nome).includes(texto) ||
-        normalizarBusca(cliente.telefone).includes(texto) ||
-        normalizarBusca(cliente.cpf).includes(texto) ||
-        normalizarBusca(cliente.whatsapp).includes(texto) ||
+        normalizarBusca(cliente.procedimentoInteresse).includes(texto) ||
         (temDigitos &&
           (somenteDigitos(cliente.telefone).includes(textoDigitos) ||
             somenteDigitos(cliente.whatsapp).includes(textoDigitos) ||
-            somenteDigitos(cliente.cpf).includes(textoDigitos))) ||
-        normalizarBusca(cliente.cep).includes(texto) ||
-        normalizarBusca(cliente.logradouro).includes(texto) ||
-        normalizarBusca(cliente.bairro).includes(texto) ||
-        normalizarBusca(cliente.cidade).includes(texto) ||
-        normalizarBusca(cliente.enderecoOriginal).includes(texto) ||
-        normalizarBusca(cliente.origem).includes(texto) ||
-        normalizarBusca(cliente.procedimentoInteresse).includes(texto);
+            somenteDigitos(cliente.cpf).includes(textoDigitos)));
 
       const atendeStatus = status === "todos" || cliente.status === status;
 
