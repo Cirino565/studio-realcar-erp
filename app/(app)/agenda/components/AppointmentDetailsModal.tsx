@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Activity,
   AlertCircle,
@@ -11,6 +12,7 @@ import {
   CheckCircle2,
   ChevronRight,
   ClipboardList,
+  ExternalLink,
   MessageCircle,
   Pencil,
   Phone,
@@ -306,7 +308,7 @@ export default function AppointmentDetailsModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="appointment-details-title"
-        className="absolute inset-y-0 right-0 flex h-[100dvh] w-full max-w-[560px] flex-col overflow-hidden border-l border-slate-200 bg-slate-50 shadow-2xl shadow-slate-950/20"
+        className="absolute inset-y-0 right-0 flex h-[100dvh] w-full max-w-[560px] flex-col overflow-hidden border-l border-slate-200 bg-slate-50 shadow-2xl shadow-slate-950/20 lg:inset-y-auto lg:right-4 lg:top-1/2 lg:h-auto lg:max-h-[88vh] lg:-translate-y-1/2 lg:rounded-3xl lg:border"
       >
         <header className="relative shrink-0 border-b border-slate-200 bg-white px-4 py-3 sm:px-5">
           <div className="flex items-center justify-between gap-3">
@@ -390,6 +392,20 @@ export default function AppointmentDetailsModal({
                 </div>
               </div>
             </button>
+
+            {/* Atalho para a ficha completa: o bloco acima abre so a edicao
+                rapida, entao sem isso nao havia como ver o historico da
+                cliente sem sair da agenda e procurar na lista. */}
+            <Link
+              href={`/clientes/${currentAppointment.cliente.id}`}
+              className="flex min-h-11 w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:border-violet-200 hover:bg-violet-50/40 hover:text-violet-800"
+            >
+              <span className="flex items-center gap-2">
+                <ExternalLink size={16} />
+                Ver ficha e histórico
+              </span>
+              <ChevronRight size={16} className="text-slate-400" />
+            </Link>
 
             <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
               <div className="grid gap-2">
