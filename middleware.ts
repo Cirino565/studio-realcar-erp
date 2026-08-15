@@ -33,9 +33,17 @@ export async function middleware(req: NextRequest) {
   // liberar somente este caminho exato.
   const isCapturaClique = pathname === "/api/marketing/captura-clique";
 
+  // Rota usada pelo agendador externo para atualizar a planilha de
+  // conversões do Google Ads. Também não depende da sessão do sistema -
+  // tem sua própria autenticação via MARKETING_EXPORT_SECRET.
+  //
+  // IMPORTANTE:
+  // liberar somente este caminho exato.
+  const isExportarConversoes = pathname === "/api/marketing/exportar-conversoes";
+
   // O middleware não exige cookie de sessão nestas rotas específicas.
   // A validação do segredo continua sendo feita dentro de cada rota.
-  if (isBackupAutomatico || isCapturaClique) {
+  if (isBackupAutomatico || isCapturaClique || isExportarConversoes) {
     return securityHeaders(NextResponse.next());
   }
 

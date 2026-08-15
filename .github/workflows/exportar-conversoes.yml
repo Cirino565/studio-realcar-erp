@@ -1,0 +1,19 @@
+name: Exportar conversões Google Ads
+
+on:
+  schedule:
+    # 04:00 no horário de São Paulo (UTC-3, fixo o ano todo).
+    # Roda cerca de 45 minutos depois do backup automático, de propósito.
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+jobs:
+  exportar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Atualizar planilha de conversões
+        run: |
+          curl --fail --show-error --silent \
+            --request POST \
+            --header "Authorization: Bearer ${{ secrets.MARKETING_EXPORT_SECRET }}" \
+            "https://app.studiorealcar.com.br/api/marketing/exportar-conversoes"

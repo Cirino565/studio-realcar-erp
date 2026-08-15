@@ -446,3 +446,144 @@ export async function limparBackupsAntigosDrive(manter: number) {
 
   return { removidos, mantidos: arquivos.length - removidos };
 }
+
+/* ==========================================================================
+   Planilha de conversões para o Google Ads
+   --------------------------------------------------------------------------
+   Mantém uma planilha do Google Sheets sempre atualizada, no formato que o
+   Google Ads aceita para importar conversão a partir de um "Direct
+   Connection" agendado. O Ads passa a buscar essa planilha sozinho, sem
+   ninguém precisar fazer upload manual.
+   ========================================================================== */
+
+const SHEETS_API_BASE = "https://sheets.googleapis.com/v4/spreadsheets";
+const CONVERSOES_FOLDER_NAME = "Conversões Google Ads";
+const CONVERSOES_SHEET_NAME = "Conversoes Google Ads - Studio Realcar";
+
+async function getOrCreateConversoesFolder() {
+  const rootFolderId = await getOrCreateRootFolder();
+
+  const existente = await findFolder([
+    `'${escapeDriveQueryValue(rootFolderId)}' in parents`,
+    "appProperties has { key='tipoRegistro' and value='conversoes-ads' }",
+  ]);
+
+  if (existente) return existente.id;
+
+  const folder = await createFolder(CONVERSOES_FOLDER_NAME, rootFolderId, {
+    sistema: "studio-realcar",
+    tipoRegistro: "conversoes-ads",
+  });
+
+  return folder.id;
+}
+
+async function encontrarPlanilhaConversoes(folderId: string) {
+  const q = [
+    `'${escapeDriveQueryValue(folderId)}' in parents`,
+    "mimeType = 'application/vnd.google-apps.spreadsheet'",
+    "trashed = false",
+  ].join(" and ");
+
+  const url = new URL(`${DRIVE_API_BASE}/files`);
+  url.searchParams.set("q", q);
+  url.searchParams.set("fields", "files(id,name)");
+  url.searchParams.set("pageSize", "1");
+  url.searchParams.set("spaces", "drive");
+
+  const response = await driveFetch(url.toString());
+  await assertDriveResponse(response, "Falha ao procurar a planilha de conversões");
+
+  const payload = (await response.json()) as { files?: { id: string; name: string }[] };
+  return payload.files?.[0]?.id ?? null;
+}
+
+async function criarPlanilhaConversoes(folderId: string) {
+  const response = await driveFetch(`${DRIVE_API_BASE}/files?fields=id`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: CONVERSOES_SHEET_NAME,
+      mimeType: "application/vnd.google-apps.spreadsheet",
+      parents: [folderId],
+    }),
+  });
+
+  await assertDriveResponse(response, "Falha ao criar a planilha de conversões");
+  const payload = (await response.json()) as { id: string };
+  return payload.id;
+}
+
+async function getOrCreateConversoesSpreadsheet() {
+  const folderId = await getOrCreateConversoesFolder();
+  const existente = await encontrarPlanilhaConversoes(folderId);
+
+  if (existente) return existente;
+
+  return criarPlanilhaConversoes(folderId);
+}
+
+export type LinhaConversaoAds = {
+  gclid: string;
+  nomeConversao: string;
+  dataHora: string;
+  valor: number;
+  moeda: string;
+};
+
+export type ResultadoPlanilhaConversoes = {
+  spreadsheetId: string;
+  url: string;
+};
+
+/**
+ * Sobrescreve a planilha inteira com os dados atuais. Reescrever do zero a
+ * cada execução (em vez de só acrescentar linhas) é proposital: a planilha
+ * sempre reflete a verdade mais recente, e o próprio Google Ads já ignora
+ * conversão duplicada (mesmo GCLID + mesmo horário + mesma conversão), então
+ * reenviar a mesma linha em execuções diferentes não gera contagem dobrada.
+ */
+export async function atualizarPlanilhaConversoesAds(
+  linhas: LinhaConversaoAds[],
+): Promise<ResultadoPlanilhaConversoes> {
+  const spreadsheetId = await getOrCreateConversoesSpreadsheet();
+
+  const limpar = await driveFetch(
+    `${SHEETS_API_BASE}/${spreadsheetId}/values/A1:E100000:clear`,
+    { method: "POST" },
+  );
+  await assertDriveResponse(limpar, "Falha ao limpar a planilha de conversões");
+
+  const valores: (string | number)[][] = [
+    ["Parameters:TimeZone=-0300"],
+    [
+      "Google Click ID",
+      "Conversion Name",
+      "Conversion Time",
+      "Conversion Value",
+      "Conversion Currency",
+    ],
+    ...linhas.map((linha) => [
+      linha.gclid,
+      linha.nomeConversao,
+      linha.dataHora,
+      linha.valor.toFixed(2),
+      linha.moeda,
+    ]),
+  ];
+
+  const escrever = await driveFetch(
+    `${SHEETS_API_BASE}/${spreadsheetId}/values/A1?valueInputOption=RAW`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ values: valores }),
+    },
+  );
+  await assertDriveResponse(escrever, "Falha ao escrever na planilha de conversões");
+
+  return {
+    spreadsheetId,
+    url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+  };
+}
