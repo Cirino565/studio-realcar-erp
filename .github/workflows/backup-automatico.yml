@@ -26,7 +26,16 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "Iniciando backup automático do Studio Realçar..."
+          # Disparo manual (workflow_dispatch) sempre força um backup novo:
+          # se a pessoa clicou em "Run workflow", é porque quer o backup agora.
+          # O agendamento diário mantém a proteção contra backup duplicado.
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            URL_BACKUP="https://app.studiorealcar.com.br/api/backup/automatico?forcar=1"
+            echo "Disparo manual: forçando backup novo..."
+          else
+            URL_BACKUP="https://app.studiorealcar.com.br/api/backup/automatico"
+            echo "Iniciando backup automático do Studio Realçar..."
+          fi
 
           resposta=$(curl \
             --fail-with-body \
@@ -36,7 +45,7 @@ jobs:
             --header "Authorization: Bearer ${BACKUP_TOKEN}" \
             --header "Content-Type: application/json" \
             --data '{}' \
-            "https://app.studiorealcar.com.br/api/backup/automatico")
+            "${URL_BACKUP}")
 
           echo "Resposta do servidor:"
           echo "${resposta}"
