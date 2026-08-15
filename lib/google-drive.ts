@@ -554,8 +554,12 @@ export async function atualizarPlanilhaConversoesAds(
   );
   await assertDriveResponse(limpar, "Falha ao limpar a planilha de conversões");
 
+  // O cabeçalho fica na linha 1, sem a linha "Parameters:TimeZone=" que o
+  // upload manual de arquivo usa. Na conexão direta por Google Sheets, o
+  // Google Ads só reconhece cabeçalho na primeira linha - e como cada data
+  // já carrega o próprio fuso (-0300) embutido, essa linha extra não faz
+  // falta aqui.
   const valores: (string | number)[][] = [
-    ["Parameters:TimeZone=-0300"],
     [
       "Google Click ID",
       "Conversion Name",
