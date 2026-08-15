@@ -93,6 +93,7 @@ export type LeadFormData = {
 export type CampanhaFormData = {
   nome: string;
   canal: string;
+  utmCampaign: string;
   investimento: number;
   leads: number;
   status: string;

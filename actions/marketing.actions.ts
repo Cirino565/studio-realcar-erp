@@ -32,9 +32,15 @@ export type AtualizarLeadInput = CriarLeadInput & {
   id: number;
 };
 
+function normalizarUtmCampaign(valor?: string) {
+  const limpo = (valor || "").trim().toLowerCase();
+  return limpo || null;
+}
+
 export type CriarCampanhaInput = {
   nome: string;
   canal: string;
+  utmCampaign?: string;
   investimento: number;
   leads?: number;
   status: string;
@@ -730,6 +736,10 @@ export async function criarCampanha(dados: CriarCampanhaInput) {
     data: {
       nome,
       canal,
+      // Identificador que o anuncio manda no parametro utm_campaign.
+      // E por ele que o clique acha a campanha certa no CRM, ja que o nome
+      // aqui e escrito para humano e o do anuncio nao.
+      utmCampaign: normalizarUtmCampaign(dados.utmCampaign),
       investimento: limparNumero(dados.investimento),
       leads: 0,
       status: dados.status || "Ativa",

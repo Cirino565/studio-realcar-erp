@@ -451,6 +451,7 @@ model CampanhaMarketing {
   id                Int      @id @default(autoincrement())
   nome              String
   canal             String
+  utmCampaign       String?
   investimento      Float    @default(0)
   leads             Int      @default(0)
   status            String   @default("Ativa")

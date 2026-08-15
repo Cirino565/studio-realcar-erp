@@ -1311,14 +1311,20 @@ function TelefoneDuplicadoModal({
 }
 
 function CampanhaModal({ open, onClose, onSubmit, disabled }: { open: boolean; onClose: () => void; onSubmit: (dados: CampanhaFormData) => void; disabled: boolean }) {
-  const [form, setForm] = useState<CampanhaFormData>({ nome: "", canal: "Instagram", investimento: 0, leads: 0, status: "Ativa", inicio: "", fim: "", observacoes: "" });
-  useEffect(() => { if (open) setForm({ nome: "", canal: "Instagram", investimento: 0, leads: 0, status: "Ativa", inicio: "", fim: "", observacoes: "" }); }, [open]);
+  const [form, setForm] = useState<CampanhaFormData>({ nome: "", canal: "Instagram", utmCampaign: "", investimento: 0, leads: 0, status: "Ativa", inicio: "", fim: "", observacoes: "" });
+  useEffect(() => { if (open) setForm({ nome: "", canal: "Instagram", utmCampaign: "", investimento: 0, leads: 0, status: "Ativa", inicio: "", fim: "", observacoes: "" }); }, [open]);
   if (!open) return null;
 
   return (
     <Modal title="Nova campanha" description="Crie a campanha e vincule os leads reais a ela no CRM." onClose={onClose}>
       <form onSubmit={(event) => { event.preventDefault(); onSubmit(form); }} className="grid gap-4">
         <Input label="Nome da campanha" value={form.nome} onChange={(value) => setForm((prev) => ({ ...prev, nome: value }))} required />
+        <div className="grid gap-1">
+          <Input label="Identificador do anúncio (utm_campaign)" value={form.utmCampaign} onChange={(value) => setForm((prev) => ({ ...prev, utmCampaign: value }))} placeholder="Ex: pesq_limpeza_pele_taboao" />
+          <p className="text-xs leading-5 text-slate-400">
+            É o que aparece na coluna UTM Campaign da planilha de rastreamento. Com ele preenchido, o lead que chega pelo anúncio já entra vinculado a esta campanha sozinho.
+          </p>
+        </div>
         <div className="grid gap-4 sm:grid-cols-2"><Select label="Canal" value={form.canal} onChange={(value) => setForm((prev) => ({ ...prev, canal: value }))} options={CAMPANHA_CANAIS.map((item) => item)} /><Select label="Status" value={form.status} onChange={(value) => setForm((prev) => ({ ...prev, status: value }))} options={CAMPANHA_STATUS.map((item) => item)} /></div>
         <Input label="Orçamento previsto" type="number" step="0.01" value={String(form.investimento)} onChange={(value) => setForm((prev) => ({ ...prev, investimento: Number(value || 0) }))} />
         <div className="grid gap-4 sm:grid-cols-2"><Input label="Início" type="date" value={form.inicio} onChange={(value) => setForm((prev) => ({ ...prev, inicio: value }))} /><Input label="Fim" type="date" value={form.fim} onChange={(value) => setForm((prev) => ({ ...prev, fim: value }))} /></div>

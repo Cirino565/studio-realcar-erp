@@ -35,6 +35,19 @@ function normalizarCodigo(valor?: string | null) {
   return limpo || null;
 }
 
+// Reserva para quando a campanha ainda não tem o utm_campaign preenchido.
+// O prefixo do código de atendimento já diz o serviço, então dá para achar a
+// campanha pelo nome. O valor é um trecho procurado no nome da campanha.
+const TERMOS_POR_PREFIXO: Record<string, string> = {
+  "SR-LIM": "limpeza",
+  "SR-LP": "limpeza",
+  "SR-CRIO": "medidas",
+  "SR-DEP": "depila",
+  "SR-SOB": "ndyag",
+  "SR-LAS": "ndyag",
+  "SR-TAT": "ndyag",
+};
+
 function limpar(valor?: string | null) {
   const texto = (valor || "").trim();
   return texto || null;
@@ -101,20 +114,51 @@ export async function POST(request: NextRequest) {
     );
     const gclid = limpar(typeof body.gclid === "string" ? body.gclid : null);
 
-    // Casamento por nome com a campanha já cadastrada. Best-effort: se não
-    // achar nada parecido, o lead nasce sem campanha em vez de arriscar
-    // vincular errado - dá pra corrigir à mão depois, como já era feito.
+    // Descobre a campanha em duas tentativas:
+    //
+    // 1. pelo identificador utm_campaign cadastrado na campanha - é o jeito
+    //    confiável, porque é exatamente o que o anúncio manda;
+    // 2. se não achar, pelo prefixo do código de atendimento (SR-LIM, SR-CRIO
+    //    etc), que já diz o serviço. Serve de rede de segurança enquanto o
+    //    identificador não estiver preenchido.
+    //
+    // Não achando nem por um nem por outro, o lead nasce sem campanha em vez
+    // de arriscar vincular errado - dá pra corrigir à mão depois.
+    const campanhas = await prisma.campanhaMarketing.findMany({
+      select: { id: true, nome: true, utmCampaign: true },
+    });
+
     let campanhaId: number | null = null;
 
     if (utmCampaign) {
-      const campanhas = await prisma.campanhaMarketing.findMany({
-        select: { id: true, nome: true },
-      });
-
       const alvo = normalizarTexto(utmCampaign);
-      const encontrada = campanhas.find((item) => normalizarTexto(item.nome) === alvo);
 
-      campanhaId = encontrada?.id ?? null;
+      const porUtm = campanhas.find(
+        (item) => item.utmCampaign && normalizarTexto(item.utmCampaign) === alvo,
+      );
+
+      campanhaId =
+        porUtm?.id ??
+        campanhas.find((item) => normalizarTexto(item.nome) === alvo)?.id ??
+        null;
+    }
+
+    // A reserva por prefixo só vale quando o clique NÃO trouxe utm_campaign.
+    //
+    // Se veio um utm_campaign e ele não bateu com nenhuma campanha, isso quer
+    // dizer que a origem é conhecida mas não é uma das campanhas cadastradas -
+    // como "perfil_empresa_google", que são cliques do perfil do Google, não
+    // de anúncio pago. Chutar a campanha nesse caso colocaria receita
+    // orgânica dentro do resultado do anúncio e estragaria o ROAS.
+    if (!campanhaId && !utmCampaign) {
+      const prefixo = codigo.split("-").slice(0, 2).join("-");
+      const termo = TERMOS_POR_PREFIXO[prefixo];
+
+      if (termo) {
+        campanhaId =
+          campanhas.find((item) => normalizarTexto(item.nome).includes(termo))?.id ??
+          null;
+      }
     }
 
     const origem =
