@@ -51,6 +51,7 @@ import {
   registrarObservacaoLead,
   verificarTelefoneLead,
   vincularClienteCampanha,
+  vincularLeadAOutroCliente,
   vincularReceitaCampanha,
 } from "@/actions/marketing.actions";
 import { Button } from "@/components/ui/button";
@@ -384,6 +385,7 @@ export default function MarketingClient({
   const [conflitoTelefone, setConflitoTelefone] = useState<ConflitoTelefoneLead | null>(null);
   const [campanhaModal, setCampanhaModal] = useState(false);
   const [campanhaEditando, setCampanhaEditando] = useState<MarketingCampanha | null>(null);
+  const [leadTrocandoCliente, setLeadTrocandoCliente] = useState<MarketingLead | null>(null);
   const [mensagemModal, setMensagemModal] = useState<MarketingLead | null>(null);
   const [detalhesModal, setDetalhesModal] = useState<MarketingLead | null>(null);
   const [agendamentoModal, setAgendamentoModal] = useState<MarketingLead | null>(null);
@@ -492,6 +494,15 @@ export default function MarketingClient({
     setDetalhesModal(null);
     setLeadEditando(lead);
     setLeadModal(true);
+  }
+
+  function confirmarTrocaCliente(clienteId: number) {
+    if (!leadTrocandoCliente) return;
+
+    executar(async () => {
+      await vincularLeadAOutroCliente(leadTrocandoCliente.id, clienteId);
+      setLeadTrocandoCliente(null);
+    });
   }
 
   function abrirEdicaoCampanha(campanha: MarketingCampanha) {
@@ -696,6 +707,7 @@ export default function MarketingClient({
         onPessoaDiferente={() => resolverConflitoTelefone("pessoa_diferente")}
       />
       <CampanhaModal open={campanhaModal} campanha={campanhaEditando} onClose={() => { setCampanhaModal(false); setCampanhaEditando(null); }} onSubmit={salvarCampanha} disabled={isPending} />
+      <TrocarClienteLeadModal lead={leadTrocandoCliente} clientes={clientes} onClose={() => setLeadTrocandoCliente(null)} onSubmit={confirmarTrocaCliente} disabled={isPending} />
       <MarketingMessageModal lead={mensagemModal} onClose={() => setMensagemModal(null)} onUpdated={() => router.refresh()} podeGerenciar={podeGerenciarMarketing} />
       <LeadDetailsModal
         lead={detalhesModal}
@@ -704,6 +716,7 @@ export default function MarketingClient({
         onSchedule={setAgendamentoModal}
         onDelete={removerLead}
         onUpdated={() => router.refresh()}
+        onTrocarCliente={setLeadTrocandoCliente}
         podeGerenciarMarketing={podeGerenciarMarketing}
         podeGerenciarAgenda={podeGerenciarAgenda}
       />
@@ -1078,6 +1091,53 @@ function VincularClienteCampanhaModal({ campanha, clientes, disabled, onClose, o
         <label className="grid gap-2 text-sm font-medium text-slate-300">Cliente<select value={clienteId} onChange={(event) => setClienteId(event.target.value)} className="premium-input w-full bg-[#1d2437]"><option value="">Selecione</option>{filtrados.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nome}{cliente.campanhaAquisicaoId ? " · já possui campanha" : ""}</option>)}</select><AvisoBusca encontrados={encontrados.length} exibidos={filtrados.length} total={clientes.length} rotulo="cliente" /></label>
         <label className="flex items-start gap-3 rounded-2xl border border-cyan-300/15 bg-cyan-400/8 p-4 text-sm text-cyan-100"><input type="checkbox" checked={retroativo} onChange={(event) => setRetroativo(event.target.checked)} className="mt-1" /><span><strong className="block">Vincular receitas existentes sem campanha</strong><span className="mt-1 block text-xs leading-5 text-cyan-100/70">Use para os três clientes já cadastrados. O sistema atribui vendas e entradas existentes que ainda não possuem campanha, sem criar nova receita.</span></span></label>
         <div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={onClose}>Cancelar</Button><Button type="button" disabled={disabled || !clienteId} onClick={() => onSubmit(Number(clienteId), retroativo)}>{disabled ? "Vinculando..." : "Confirmar vínculo"}</Button></div>
+      </div>
+    </Modal>
+  );
+}
+
+function TrocarClienteLeadModal({ lead, clientes, disabled, onClose, onSubmit }: {
+  lead: MarketingLead | null;
+  clientes: MarketingClienteOption[];
+  disabled: boolean;
+  onClose: () => void;
+  onSubmit: (clienteId: number) => void;
+}) {
+  const [busca, setBusca] = useState("");
+  const [clienteId, setClienteId] = useState("");
+  useEffect(() => { if (lead) { setBusca(""); setClienteId(""); } }, [lead]);
+  if (!lead) return null;
+
+  const encontrados = filtrarPorBusca(
+    clientes,
+    busca,
+    (cliente) => `${cliente.nome} ${cliente.telefone} ${cliente.whatsapp || ""}`,
+    (cliente) => `${cliente.telefone} ${cliente.whatsapp || ""}`,
+  );
+  const filtrados = encontrados.slice(0, 300);
+
+  return (
+    <Modal title="Trocar cliente vinculado" description={lead.nome} onClose={onClose}>
+      <div className="grid gap-4">
+        <p className="rounded-2xl border border-amber-300/15 bg-amber-400/8 p-3 text-xs leading-5 text-amber-100">
+          Use quando o lead ficou ligado ao cliente errado - por exemplo, um
+          cadastro duplicado criado porque o telefone não bateu com o cliente
+          que já existia. O código de atendimento e o GCLID deste lead
+          continuam preservados, só o cliente vinculado muda.
+        </p>
+        <Input label="Buscar cliente" value={busca} onChange={setBusca} placeholder="Nome, telefone ou WhatsApp" />
+        <label className="grid gap-2 text-sm font-medium text-slate-300">
+          Cliente correto
+          <select value={clienteId} onChange={(event) => setClienteId(event.target.value)} className="premium-input w-full bg-[#1d2437]">
+            <option value="">Selecione</option>
+            {filtrados.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nome}</option>)}
+          </select>
+          <AvisoBusca encontrados={encontrados.length} exibidos={filtrados.length} total={clientes.length} rotulo="cliente" />
+        </label>
+        <div className="flex justify-end gap-3">
+          <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button type="button" disabled={disabled || !clienteId} onClick={() => onSubmit(Number(clienteId))}>{disabled ? "Vinculando..." : "Confirmar troca"}</Button>
+        </div>
       </div>
     </Modal>
   );
@@ -1485,6 +1545,7 @@ function LeadDetailsModal({
   onSchedule,
   onDelete,
   onUpdated,
+  onTrocarCliente,
   podeGerenciarMarketing,
   podeGerenciarAgenda,
 }: {
@@ -1494,6 +1555,7 @@ function LeadDetailsModal({
   onSchedule: (lead: MarketingLead) => void;
   onDelete: (id: number) => void;
   onUpdated: () => void;
+  onTrocarCliente: (lead: MarketingLead) => void;
   podeGerenciarMarketing: boolean;
   podeGerenciarAgenda: boolean;
 }) {
@@ -1561,6 +1623,11 @@ function LeadDetailsModal({
             <h4 className="flex items-center gap-2 font-semibold text-white"><Link2 className="size-4 text-cyan-300" />Vínculos</h4>
             <div className="mt-3 grid gap-2">
               {lead.cliente ? <Link href={`/clientes/${lead.cliente.id}`} className="flex items-center justify-between rounded-2xl border border-white/[0.08] bg-black/10 px-3 py-2 text-sm text-slate-200 hover:bg-white/[0.08]"><span>Cliente: {lead.cliente.nome}</span><ExternalLink className="size-4" /></Link> : <p className="rounded-2xl border border-dashed border-white/[0.10] p-3 text-xs text-slate-500">Ainda não há cliente vinculado.</p>}
+              {podeGerenciarMarketing ? (
+                <button type="button" onClick={() => onTrocarCliente(lead)} className="mt-2 text-xs font-semibold text-violet-300 hover:text-violet-200">
+                  {lead.cliente ? "Trocar cliente vinculado" : "Vincular a um cliente existente"}
+                </button>
+              ) : null}
               {lead.agendamento ? <Link href="/agenda" className="rounded-2xl border border-cyan-300/10 bg-cyan-400/8 px-3 py-3 text-sm text-cyan-100 hover:bg-cyan-400/12"><div className="flex items-center justify-between"><strong>{formatarDataHora(lead.agendamento.data)}</strong><ExternalLink className="size-4" /></div><p className="mt-1 text-xs text-cyan-200/70">{lead.agendamento.procedimento} · {lead.agendamento.status}</p></Link> : null}
               {lead.receitaRastreada > 0 ? <div className="rounded-2xl border border-emerald-300/10 bg-emerald-400/8 px-3 py-3 text-sm text-emerald-200">Receita rastreada do agendamento: <strong>{formatarMoeda(lead.receitaRastreada)}</strong></div> : null}
             </div>

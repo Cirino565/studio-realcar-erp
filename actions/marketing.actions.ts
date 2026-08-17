@@ -549,6 +549,65 @@ export async function registrarObservacaoLead(id: number, descricao: string) {
   revalidatePath("/marketing");
 }
 
+/**
+ * Troca o cliente vinculado a um lead. Serve para corrigir o caso em que a
+ * conversão criou um cadastro duplicado (por exemplo, o telefone do lead
+ * não bateu com o telefone de um cliente que já existia) - aqui a família
+ * escolhe o cliente certo à mão, sem precisar mexer no banco.
+ *
+ * Se o lead tiver campanha e o cliente escolhido ainda não tiver campanha de
+ * aquisição, ela é propagada - mesma regra já usada na conversão normal.
+ */
+export async function vincularLeadAOutroCliente(leadId: number, clienteId: number) {
+  await requirePermission("marketing.gerenciar");
+
+  const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+  if (!lead) throw new Error("Lead não encontrado.");
+
+  const cliente = await prisma.cliente.findUnique({
+    where: { id: clienteId },
+    select: { id: true, nome: true, campanhaAquisicaoId: true },
+  });
+  if (!cliente) throw new Error("Cliente não encontrado.");
+
+  await prisma.$transaction(async (tx) => {
+    await tx.lead.update({
+      where: { id: leadId },
+      data: { clienteId },
+    });
+
+    if (lead.campanhaId && !cliente.campanhaAquisicaoId) {
+      await tx.cliente.update({
+        where: { id: clienteId },
+        data: { campanhaAquisicaoId: lead.campanhaId },
+      });
+    }
+
+    await tx.leadInteracao.create({
+      data: {
+        leadId,
+        tipo: "Atualização",
+        descricao: `Vínculo corrigido manualmente para o cliente ${cliente.nome} (#${clienteId}).`,
+      },
+    });
+
+    await tx.auditoria.create({
+      data: {
+        modulo: "Marketing",
+        acao: "Trocou o cliente vinculado ao lead",
+        entidade: "Lead",
+        entidadeId: String(leadId),
+        usuario: "Equipe Studio Realçar",
+        detalhes: `${lead.nome} · agora vinculado a ${cliente.nome} (#${clienteId})`,
+      },
+    });
+  });
+
+  revalidatePath("/marketing");
+  revalidatePath("/clientes");
+  revalidatePath("/");
+}
+
 export async function converterLeadEmCliente(id: number) {
   await requirePermission("marketing.gerenciar");
   const resultado = await converterLeadInterno(id);
