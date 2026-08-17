@@ -707,7 +707,6 @@ export default function MarketingClient({
         onPessoaDiferente={() => resolverConflitoTelefone("pessoa_diferente")}
       />
       <CampanhaModal open={campanhaModal} campanha={campanhaEditando} onClose={() => { setCampanhaModal(false); setCampanhaEditando(null); }} onSubmit={salvarCampanha} disabled={isPending} />
-      <TrocarClienteLeadModal lead={leadTrocandoCliente} clientes={clientes} onClose={() => setLeadTrocandoCliente(null)} onSubmit={confirmarTrocaCliente} disabled={isPending} />
       <MarketingMessageModal lead={mensagemModal} onClose={() => setMensagemModal(null)} onUpdated={() => router.refresh()} podeGerenciar={podeGerenciarMarketing} />
       <LeadDetailsModal
         lead={detalhesModal}
@@ -720,6 +719,11 @@ export default function MarketingClient({
         podeGerenciarMarketing={podeGerenciarMarketing}
         podeGerenciarAgenda={podeGerenciarAgenda}
       />
+      {/* Nasce DEPOIS do LeadDetailsModal de proposito: os dois usam o mesmo
+          Modal compartilhado, com o mesmo z-index. Quem vem depois no JSX
+          fica por cima na tela - antes disso ele abria escondido atras do
+          modal de detalhes. */}
+      <TrocarClienteLeadModal lead={leadTrocandoCliente} clientes={clientes} onClose={() => setLeadTrocandoCliente(null)} onSubmit={confirmarTrocaCliente} disabled={isPending} />
       <AgendarAvaliacaoModal
         lead={agendamentoModal}
         profissionais={profissionais}
