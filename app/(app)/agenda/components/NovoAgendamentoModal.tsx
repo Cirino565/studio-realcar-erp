@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   Ban,
@@ -266,6 +267,8 @@ export default function NovoAgendamentoModal({
   const [erroTitulo, setErroTitulo] = useState("Verifique os dados");
   const [erroAcaoHorario, setErroAcaoHorario] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const [sucesso, setSucesso] = useState(false);
+  const router = useRouter();
   const [mostrarMaisCampos, setMostrarMaisCampos] = useState(false);
   const [horarios, setHorarios] = useState<HorarioDisponivelAgenda[]>([]);
   const [disponibilidadeVersao, setDisponibilidadeVersao] = useState(0);
@@ -342,6 +345,7 @@ export default function NovoAgendamentoModal({
     setData(initialPayload?.data || getHojeInput());
     setHora(initialPayload?.hora || "09:00");
     setExcecaoHorario(false);
+    setSucesso(false);
     setDuracao(formatarDuracao(initialPayload?.duracao || 60));
     setValor(
       naturezaInicial === "RETORNO"
@@ -700,9 +704,16 @@ export default function NovoAgendamentoModal({
           return;
         }
 
+        // Sem isto, salvar fechava e recarregava a pagina na hora - dava a
+        // impressao de que nada tinha acontecido, ja que o reload demora um
+        // instante para comecar.
         setSalvando(false);
-        onClose();
-        window.location.reload();
+        setSucesso(true);
+
+        setTimeout(() => {
+          onClose();
+          router.refresh();
+        }, 900);
       } catch (error) {
         setSalvando(false);
         setErroTitulo("Não foi possível salvar o bloqueio");
@@ -799,9 +810,16 @@ export default function NovoAgendamentoModal({
         return;
       }
 
+      // Sem isto, salvar fechava e recarregava a pagina na hora - dava a
+      // impressao de que nada tinha acontecido, ja que o reload demora um
+      // instante para comecar.
       setSalvando(false);
-      onClose();
-      window.location.reload();
+      setSucesso(true);
+
+      setTimeout(() => {
+        onClose();
+        router.refresh();
+      }, 900);
     } catch (error) {
       setSalvando(false);
       setErroTitulo("Não foi possível salvar o agendamento");
@@ -830,8 +848,12 @@ export default function NovoAgendamentoModal({
     try {
       await excluirBloqueioAgenda(initialPayload.bloqueioId);
       setSalvando(false);
-      onClose();
-      window.location.reload();
+      setSucesso(true);
+
+      setTimeout(() => {
+        onClose();
+        router.refresh();
+      }, 900);
     } catch (error) {
       setSalvando(false);
       setErroTitulo("Não foi possível excluir o bloqueio");
@@ -865,8 +887,13 @@ export default function NovoAgendamentoModal({
         id: initialPayload.bloqueioId,
         escopo,
       });
-      onClose();
-      window.location.reload();
+      setSalvando(false);
+      setSucesso(true);
+
+      setTimeout(() => {
+        onClose();
+        router.refresh();
+      }, 900);
     } catch (error) {
       setSalvando(false);
       setErro(
@@ -1974,31 +2001,38 @@ export default function NovoAgendamentoModal({
 
         </div>
 
-        <footer className="grid shrink-0 grid-cols-2 gap-3 border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900 sm:px-5">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={salvando}
-            className="h-10 rounded-md border border-violet-400 bg-white text-sm font-bold uppercase text-violet-700 transition hover:bg-violet-50 disabled:opacity-50 dark:bg-transparent dark:text-violet-300"
-          >
-            Fechar
-          </button>
+        {sucesso ? (
+          <footer className="flex shrink-0 items-center justify-center gap-2 border-t border-emerald-200 bg-emerald-50 px-4 py-4 text-sm font-bold uppercase text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-950/30 dark:text-emerald-200 sm:px-5">
+            <CheckCircle2 size={20} />
+            Salvo com sucesso
+          </footer>
+        ) : (
+          <footer className="grid shrink-0 grid-cols-2 gap-3 border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900 sm:px-5">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={salvando}
+              className="h-10 rounded-md border border-violet-400 bg-white text-sm font-bold uppercase text-violet-700 transition hover:bg-violet-50 disabled:opacity-50 dark:bg-transparent dark:text-violet-300"
+            >
+              Fechar
+            </button>
 
-          <button
-            type="button"
-            onClick={salvar}
-            disabled={salvando}
-            className="h-10 rounded-md bg-violet-700 text-sm font-bold uppercase text-white shadow-sm transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {salvando
-              ? "Salvando..."
-              : modoEdicaoBloqueio || tipoAtendimento === "bloqueio"
-                ? "Salvar bloqueio"
-                : modoEdicao
-                  ? "Salvar alterações"
-                  : "Salvar"}
-          </button>
-        </footer>
+            <button
+              type="button"
+              onClick={salvar}
+              disabled={salvando}
+              className="h-10 rounded-md bg-violet-700 text-sm font-bold uppercase text-white shadow-sm transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {salvando
+                ? "Salvando..."
+                : modoEdicaoBloqueio || tipoAtendimento === "bloqueio"
+                  ? "Salvar bloqueio"
+                  : modoEdicao
+                    ? "Salvar alterações"
+                    : "Salvar"}
+            </button>
+          </footer>
+        )}
       </div>
     </div>
   );
