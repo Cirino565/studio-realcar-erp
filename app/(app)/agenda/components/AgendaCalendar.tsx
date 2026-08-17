@@ -412,12 +412,12 @@ export default function AgendaCalendar({
     [horarioAtendimento, selectedDate],
   );
   const isClosedDay = funcionamentoDia === null;
-  const agendaStartMinutes = funcionamentoDia
+  const agendaOpeningMinutes = funcionamentoDia
     ? minutosHorario(funcionamentoDia.abertura)
     : minutosHorario(DEFAULT_START_TIME);
   const agendaLastStartMinutes = funcionamentoDia
     ? minutosHorario(funcionamentoDia.fechamento)
-    : agendaStartMinutes;
+    : agendaOpeningMinutes;
   const latestScheduledEndMinutes = useMemo(() => {
     let latest = agendaLastStartMinutes + SLOT_MINUTES;
 
@@ -435,6 +435,31 @@ export default function AgendaCalendar({
 
     return latest;
   }, [agendaLastStartMinutes, agendamentos, bloqueios, selectedDateInput]);
+  // Um agendamento de excecao (fora do horario de funcionamento normal, ex.:
+  // atendimento marcado as 8h com a clinica abrindo as 9h) comecava antes do
+  // topo da grade - ficava salvo certinho, so nao aparecia na tela, porque so
+  // existia logica para ESTICAR o fim da grade (acima), nunca o inicio.
+  const earliestScheduledStartMinutes = useMemo(() => {
+    let earliest = agendaOpeningMinutes;
+
+    agendamentos.forEach((appointment) => {
+      if (formatSaoPauloDateKey(appointment.data) !== selectedDateInput) return;
+      const start = getSaoPauloTimeParts(appointment.data);
+      earliest = Math.min(earliest, start.hour * 60 + start.minute);
+    });
+
+    bloqueios.forEach((bloqueio) => {
+      if (formatSaoPauloDateKey(bloqueio.data) !== selectedDateInput) return;
+      const start = getSaoPauloTimeParts(bloqueio.data);
+      earliest = Math.min(earliest, start.hour * 60 + start.minute);
+    });
+
+    return earliest;
+  }, [agendaOpeningMinutes, agendamentos, bloqueios, selectedDateInput]);
+  const agendaStartMinutes = Math.min(
+    agendaOpeningMinutes,
+    earliestScheduledStartMinutes,
+  );
   const agendaVisualEndMinutes = Math.max(
     agendaLastStartMinutes + SLOT_MINUTES,
     latestScheduledEndMinutes,
