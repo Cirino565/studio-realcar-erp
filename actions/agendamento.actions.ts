@@ -46,6 +46,7 @@ type NovoAgendamento = {
   areaEstetica?: boolean;
   areaCilios?: boolean;
   recorrencia?: RecorrenciaAgendaInput;
+  excecaoHorarioFuncionamento?: boolean;
 };
 
 export type ResultadoSalvarAgenda =
@@ -479,7 +480,15 @@ async function validarConflitoAgenda(
   }
 }
 
-async function validarDatasNoHorarioFuncionamento(datas: Date[]) {
+async function validarDatasNoHorarioFuncionamento(
+  datas: Date[],
+  ignorar?: boolean,
+) {
+  // Exceção deliberada (ex.: atender uma cliente antes do horário normal de
+  // abertura). A família decide isso conscientemente, marcando a caixinha
+  // na tela - não é um bug, é escolha de quem está agendando.
+  if (ignorar) return;
+
   const configuracaoClinica = await prisma.configuracaoClinica.findFirst({
     select: {
       horarioAtendimento: true,
@@ -554,7 +563,10 @@ export async function criarAgendamento(
       ? 0
       : Math.max(0, Number(dados.valor) || 0);
 
-  await validarDatasNoHorarioFuncionamento(datas);
+  await validarDatasNoHorarioFuncionamento(
+    datas,
+    dados.excecaoHorarioFuncionamento,
+  );
 
   for (const data of datas) {
     const conflito = await obterConflitoAgenda({
@@ -645,6 +657,7 @@ export async function criarAgendamento(
             : Boolean(dados.sinalPago),
         naturezaAtendimento,
         agendamentoOrigemId,
+        excecaoHorarioFuncionamento: Boolean(dados.excecaoHorarioFuncionamento),
         serieId,
         recorrenciaTipo: serieId ? regra.tipo : null,
         recorrenciaIntervalo: serieId ? regra.intervalo : null,
@@ -682,7 +695,10 @@ export async function atualizarAgendamento({
       ? 0
       : Math.max(0, Number(dados.valor) || 0);
 
-  await validarDatasNoHorarioFuncionamento([data]);
+  await validarDatasNoHorarioFuncionamento(
+    [data],
+    dados.excecaoHorarioFuncionamento,
+  );
 
   const conflito = await obterConflitoAgenda({
     profissionalId: dados.profissionalId,
@@ -752,6 +768,7 @@ export async function atualizarAgendamento({
             : Boolean(dados.sinalPago),
         naturezaAtendimento,
         agendamentoOrigemId,
+        excecaoHorarioFuncionamento: Boolean(dados.excecaoHorarioFuncionamento),
         statusAntesAtendimento:
           dados.status === "Em atendimento" ? undefined : null,
       },

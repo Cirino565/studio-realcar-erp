@@ -247,6 +247,7 @@ export default function NovoAgendamentoModal({
   const servicoComboboxRef = useRef<HTMLDivElement>(null);
   const [data, setData] = useState("");
   const [hora, setHora] = useState("09:00");
+  const [excecaoHorario, setExcecaoHorario] = useState(false);
   const [duracao, setDuracao] = useState("1 hora");
   const [valor, setValor] = useState("");
   const [status, setStatus] = useState("Agendado");
@@ -340,6 +341,7 @@ export default function NovoAgendamentoModal({
 
     setData(initialPayload?.data || getHojeInput());
     setHora(initialPayload?.hora || "09:00");
+    setExcecaoHorario(false);
     setDuracao(formatarDuracao(initialPayload?.duracao || 60));
     setValor(
       naturezaInicial === "RETORNO"
@@ -773,6 +775,7 @@ export default function NovoAgendamentoModal({
           modoEdicao || naturezaAtendimento === "RETORNO"
             ? { tipo: "nenhuma" as const }
             : recorrencia,
+        excecaoHorarioFuncionamento: excecaoHorario,
       };
 
       const resultado =
@@ -970,6 +973,30 @@ export default function NovoAgendamentoModal({
             </div>
           ) : null}
 
+          <label className="flex items-start gap-3 rounded-2xl border border-amber-300/40 bg-amber-50/60 p-3 text-sm dark:border-amber-400/20 dark:bg-amber-400/10">
+            <input
+              type="checkbox"
+              checked={excecaoHorario}
+              onChange={(event) => {
+                setExcecaoHorario(event.target.checked);
+                setHora("");
+                setErro("");
+                setErroAcaoHorario(false);
+              }}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="block font-bold text-amber-900 dark:text-amber-100">
+                Atendimento fora do horário de funcionamento (exceção)
+              </span>
+              <span className="mt-1 block text-xs leading-5 text-amber-800/80 dark:text-amber-100/70">
+                Use só para um caso pontual, sem mudar o horário de funcionamento
+                geral da clínica. Marcando aqui, você digita a hora livremente,
+                mesmo fora da faixa normal.
+              </span>
+            </span>
+          </label>
+
           <div className="grid grid-cols-2 gap-x-4 gap-y-4">
             <label className="min-w-0">
               <span className={labelClassName()}>Data</span>
@@ -994,51 +1021,71 @@ export default function NovoAgendamentoModal({
 
             <label className="min-w-0">
               <span className={labelClassName()}>Hora início</span>
-              <div className="relative">
-                <select
-                  id="novo-agendamento-hora"
-                  value={hora}
-                  onChange={(event) => {
-                    setHora(event.target.value);
-                    setErro("");
-                    setErroAcaoHorario(false);
-                  }}
-                  className={`${fieldClassName()} appearance-none pr-7`}
-                  aria-busy={isLoadingHorarios}
-                >
-                  <option value="">
-                    {isLoadingHorarios
-                      ? "Carregando horários..."
-                      : horariosDisponiveis.length > 0
-                        ? "Selecione"
-                        : "Nenhum horário livre"}
-                  </option>
-                  {horarioSelecionadoForaDaLista ? (
-                    <option
-                      value={hora}
-                      disabled={Boolean(
-                        horarioSelecionadoNaDisponibilidade &&
-                          !horarioSelecionadoNaDisponibilidade.disponivel,
-                      )}
-                    >
-                      {hora}
-                      {horarioSelecionadoNaDisponibilidade &&
-                      !horarioSelecionadoNaDisponibilidade.disponivel
-                        ? " · indisponível"
-                        : " · horário selecionado"}
+              {excecaoHorario ? (
+                <div className="relative">
+                  <input
+                    type="time"
+                    id="novo-agendamento-hora"
+                    value={hora}
+                    onChange={(event) => {
+                      setHora(event.target.value);
+                      setErro("");
+                      setErroAcaoHorario(false);
+                    }}
+                    className={`${fieldClassName()} pr-7`}
+                  />
+                  <Clock3
+                    size={18}
+                    className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-500"
+                  />
+                </div>
+              ) : (
+                <div className="relative">
+                  <select
+                    id="novo-agendamento-hora"
+                    value={hora}
+                    onChange={(event) => {
+                      setHora(event.target.value);
+                      setErro("");
+                      setErroAcaoHorario(false);
+                    }}
+                    className={`${fieldClassName()} appearance-none pr-7`}
+                    aria-busy={isLoadingHorarios}
+                  >
+                    <option value="">
+                      {isLoadingHorarios
+                        ? "Carregando horários..."
+                        : horariosDisponiveis.length > 0
+                          ? "Selecione"
+                          : "Nenhum horário livre"}
                     </option>
-                  ) : null}
-                  {horariosDisponiveis.map((item) => (
-                    <option key={item.hora} value={item.hora}>
-                      {item.hora}
-                    </option>
-                  ))}
-                </select>
-                <Clock3
-                  size={18}
-                  className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-500"
-                />
-              </div>
+                    {horarioSelecionadoForaDaLista ? (
+                      <option
+                        value={hora}
+                        disabled={Boolean(
+                          horarioSelecionadoNaDisponibilidade &&
+                            !horarioSelecionadoNaDisponibilidade.disponivel,
+                        )}
+                      >
+                        {hora}
+                        {horarioSelecionadoNaDisponibilidade &&
+                        !horarioSelecionadoNaDisponibilidade.disponivel
+                          ? " · indisponível"
+                          : " · horário selecionado"}
+                      </option>
+                    ) : null}
+                    {horariosDisponiveis.map((item) => (
+                      <option key={item.hora} value={item.hora}>
+                        {item.hora}
+                      </option>
+                    ))}
+                  </select>
+                  <Clock3
+                    size={18}
+                    className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-500"
+                  />
+                </div>
+              )}
             </label>
 
             <label className="col-span-2 min-w-0">
