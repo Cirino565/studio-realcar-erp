@@ -36,6 +36,7 @@ import {
 import { buscarDisponibilidadeAgenda } from "@/actions/agendamento.actions";
 import {
   agendarAvaliacaoLead,
+  atualizarCampanha,
   atualizarEtapaLead,
   atualizarLead,
   converterLeadEmCliente,
@@ -382,6 +383,7 @@ export default function MarketingClient({
   const [leadEditando, setLeadEditando] = useState<MarketingLead | null>(null);
   const [conflitoTelefone, setConflitoTelefone] = useState<ConflitoTelefoneLead | null>(null);
   const [campanhaModal, setCampanhaModal] = useState(false);
+  const [campanhaEditando, setCampanhaEditando] = useState<MarketingCampanha | null>(null);
   const [mensagemModal, setMensagemModal] = useState<MarketingLead | null>(null);
   const [detalhesModal, setDetalhesModal] = useState<MarketingLead | null>(null);
   const [agendamentoModal, setAgendamentoModal] = useState<MarketingLead | null>(null);
@@ -492,9 +494,18 @@ export default function MarketingClient({
     setLeadModal(true);
   }
 
+  function abrirEdicaoCampanha(campanha: MarketingCampanha) {
+    setCampanhaEditando(campanha);
+    setCampanhaModal(true);
+  }
+
   function salvarCampanha(dados: CampanhaFormData) {
     executar(async () => {
-      await criarCampanha(dados);
+      if (campanhaEditando) {
+        await atualizarCampanha({ ...dados, id: campanhaEditando.id });
+      } else {
+        await criarCampanha(dados);
+      }
       setCampanhaModal(false);
     });
   }
@@ -662,7 +673,7 @@ export default function MarketingClient({
         ) : null}
 
         {tab === "campanhas" ? (
-          <CampanhasView campanhas={campanhas} leads={leads} clientes={clientes} contas={contas} receitasSemCampanha={receitasSemCampanha} onDelete={removerCampanha} isPending={isPending} podeGerenciar={podeGerenciarMarketing} />
+          <CampanhasView campanhas={campanhas} leads={leads} clientes={clientes} contas={contas} receitasSemCampanha={receitasSemCampanha} onDelete={removerCampanha} onEditar={abrirEdicaoCampanha} isPending={isPending} podeGerenciar={podeGerenciarMarketing} />
         ) : null}
 
         {tab === "mensagens" ? <TemplatesView /> : null}
@@ -684,7 +695,7 @@ export default function MarketingClient({
         onVincular={() => resolverConflitoTelefone("vincular")}
         onPessoaDiferente={() => resolverConflitoTelefone("pessoa_diferente")}
       />
-      <CampanhaModal open={campanhaModal} onClose={() => setCampanhaModal(false)} onSubmit={salvarCampanha} disabled={isPending} />
+      <CampanhaModal open={campanhaModal} campanha={campanhaEditando} onClose={() => { setCampanhaModal(false); setCampanhaEditando(null); }} onSubmit={salvarCampanha} disabled={isPending} />
       <MarketingMessageModal lead={mensagemModal} onClose={() => setMensagemModal(null)} onUpdated={() => router.refresh()} podeGerenciar={podeGerenciarMarketing} />
       <LeadDetailsModal
         lead={detalhesModal}
@@ -858,7 +869,19 @@ function LeadCard({
         <div className="mt-4 grid gap-2">
           <select
             value={currentEtapa}
-            onChange={(event) => onEtapaChange(lead.id, event.target.value as LeadEtapa)}
+            onChange={(event) => {
+              const novaEtapa = event.target.value as LeadEtapa;
+
+              // Marcar "Convertido" aqui so movia o cartao de coluna, sem
+              // criar o cliente - e os dados ficavam presos no lead. Agora
+              // essa escolha dispara a conversao de verdade.
+              if (novaEtapa === "Convertido" && !lead.clienteId) {
+                onConvert(lead.id);
+                return;
+              }
+
+              onEtapaChange(lead.id, novaEtapa);
+            }}
             disabled={isPending}
             className="h-10 rounded-2xl border border-white/[0.10] bg-[#171d2d] px-3 text-xs font-medium text-slate-100 outline-none focus:border-violet-400/40"
           >
@@ -871,7 +894,10 @@ function LeadCard({
             {podeGerenciarAgenda && isLeadAberto(lead) ? (
               <button type="button" onClick={() => onSchedule(lead)} className="rounded-2xl border border-cyan-300/15 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-200 hover:bg-cyan-400/15">{lead.agendamento ? "Reagendar" : "Agendar"}</button>
             ) : null}
-            {lead.etapa !== "Convertido" ? (
+            {/* Enquanto o lead nao tiver cliente vinculado, o botao continua
+                disponivel - inclusive na coluna Convertido. Antes ele sumia
+                ali e o lead ficava sem saida, sem virar cliente. */}
+            {!lead.clienteId ? (
               <button type="button" onClick={() => onConvert(lead.id)} disabled={isPending} className="rounded-2xl border border-violet-300/15 bg-violet-400/10 px-3 py-2 text-xs font-semibold text-violet-200 hover:bg-violet-400/15 disabled:opacity-50">Converter</button>
             ) : null}
           </div>
@@ -890,6 +916,7 @@ function CampanhasView({
   contas,
   receitasSemCampanha,
   onDelete,
+  onEditar,
   isPending,
   podeGerenciar,
 }: {
@@ -899,6 +926,7 @@ function CampanhasView({
   contas: MarketingContaOption[];
   receitasSemCampanha: MarketingReceitaOption[];
   onDelete: (id: number) => void;
+  onEditar: (campanha: MarketingCampanha) => void;
   isPending: boolean;
   podeGerenciar: boolean;
 }) {
@@ -969,6 +997,7 @@ function CampanhasView({
                   <td className="px-5 py-4">{campanha.metricas.roas === null ? "Sem custo" : `${campanha.metricas.roas.toFixed(2)}x`}</td>
                   <td className="px-5 py-4 text-right">
                     {podeGerenciar ? <div className="flex justify-end gap-2">
+                      <button type="button" onClick={() => onEditar(campanha)} disabled={isPending || pendingLocal} className="rounded-xl border border-violet-300/15 bg-violet-400/10 px-3 py-2 text-xs font-semibold text-violet-100">Editar</button>
                       <button type="button" onClick={() => setVincular(campanha)} disabled={isPending || pendingLocal} className="rounded-xl border border-cyan-300/15 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100">Vincular cliente</button>
                       <button type="button" onClick={() => setCusto(campanha)} disabled={isPending || pendingLocal} className="rounded-xl border border-amber-300/15 bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-100">Lançar custo</button>
                       <button type="button" onClick={() => setReceita(campanha)} disabled={isPending || pendingLocal} className="rounded-xl border border-emerald-300/15 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-100">Vincular receita</button>
@@ -1310,13 +1339,35 @@ function TelefoneDuplicadoModal({
   );
 }
 
-function CampanhaModal({ open, onClose, onSubmit, disabled }: { open: boolean; onClose: () => void; onSubmit: (dados: CampanhaFormData) => void; disabled: boolean }) {
+function CampanhaModal({ open, campanha, onClose, onSubmit, disabled }: { open: boolean; campanha?: MarketingCampanha | null; onClose: () => void; onSubmit: (dados: CampanhaFormData) => void; disabled: boolean }) {
   const [form, setForm] = useState<CampanhaFormData>({ nome: "", canal: "Instagram", utmCampaign: "", investimento: 0, leads: 0, status: "Ativa", inicio: "", fim: "", observacoes: "" });
-  useEffect(() => { if (open) setForm({ nome: "", canal: "Instagram", utmCampaign: "", investimento: 0, leads: 0, status: "Ativa", inicio: "", fim: "", observacoes: "" }); }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    // Editando: carrega o que ja existe. Criando: comeca em branco.
+    if (campanha) {
+      setForm({
+        nome: campanha.nome,
+        canal: campanha.canal,
+        utmCampaign: campanha.utmCampaign || "",
+        investimento: campanha.investimento || 0,
+        leads: campanha.leads || 0,
+        status: campanha.status,
+        inicio: campanha.inicio ? String(campanha.inicio).slice(0, 10) : "",
+        fim: campanha.fim ? String(campanha.fim).slice(0, 10) : "",
+        observacoes: campanha.observacoes || "",
+      });
+      return;
+    }
+
+    setForm({ nome: "", canal: "Instagram", utmCampaign: "", investimento: 0, leads: 0, status: "Ativa", inicio: "", fim: "", observacoes: "" });
+  }, [open, campanha]);
+
   if (!open) return null;
 
   return (
-    <Modal title="Nova campanha" description="Crie a campanha e vincule os leads reais a ela no CRM." onClose={onClose}>
+    <Modal title={campanha ? "Editar campanha" : "Nova campanha"} description={campanha ? "Atualize os dados da campanha. O histórico de custos e vínculos é preservado." : "Crie a campanha e vincule os leads reais a ela no CRM."} onClose={onClose}>
       <form onSubmit={(event) => { event.preventDefault(); onSubmit(form); }} className="grid gap-4">
         <Input label="Nome da campanha" value={form.nome} onChange={(value) => setForm((prev) => ({ ...prev, nome: value }))} required />
         <div className="grid gap-1">
@@ -1330,7 +1381,7 @@ function CampanhaModal({ open, onClose, onSubmit, disabled }: { open: boolean; o
         <div className="grid gap-4 sm:grid-cols-2"><Input label="Início" type="date" value={form.inicio} onChange={(value) => setForm((prev) => ({ ...prev, inicio: value }))} /><Input label="Fim" type="date" value={form.fim} onChange={(value) => setForm((prev) => ({ ...prev, fim: value }))} /></div>
         <Textarea label="Observações" value={form.observacoes} onChange={(value) => setForm((prev) => ({ ...prev, observacoes: value }))} />
         <p className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-3 text-xs leading-5 text-slate-400">A quantidade de leads e a conversão deixam de ser digitadas manualmente. O sistema calcula pelos leads realmente vinculados à campanha.</p>
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><Button type="button" variant="outline" onClick={onClose}>Cancelar</Button><Button type="submit" disabled={disabled}>{disabled ? "Salvando..." : "Salvar campanha"}</Button></div>
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><Button type="button" variant="outline" onClick={onClose}>Cancelar</Button><Button type="submit" disabled={disabled}>{disabled ? "Salvando..." : campanha ? "Salvar alterações" : "Salvar campanha"}</Button></div>
       </form>
     </Modal>
   );

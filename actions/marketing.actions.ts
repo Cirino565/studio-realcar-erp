@@ -763,6 +763,44 @@ export async function criarCampanha(dados: CriarCampanhaInput) {
   revalidatePath("/marketing");
 }
 
+export async function atualizarCampanha(dados: CriarCampanhaInput & { id: number }) {
+  await requirePermission("marketing.gerenciar");
+
+  const nome = dados.nome.trim();
+  const canal = dados.canal.trim();
+
+  if (!nome || !canal) {
+    throw new Error("Nome e canal da campanha são obrigatórios.");
+  }
+
+  const campanha = await prisma.campanhaMarketing.update({
+    where: { id: dados.id },
+    data: {
+      nome,
+      canal,
+      utmCampaign: normalizarUtmCampaign(dados.utmCampaign),
+      investimento: limparNumero(dados.investimento),
+      status: dados.status || "Ativa",
+      inicio: dados.inicio ? new Date(`${dados.inicio}T12:00:00-03:00`) : null,
+      fim: dados.fim ? new Date(`${dados.fim}T12:00:00-03:00`) : null,
+      observacoes: limparTexto(dados.observacoes),
+    },
+  });
+
+  await prisma.auditoria.create({
+    data: {
+      modulo: "Marketing",
+      acao: "Atualizou campanha",
+      entidade: "CampanhaMarketing",
+      entidadeId: String(campanha.id),
+      usuario: "Equipe Studio Realçar",
+      detalhes: campanha.nome,
+    },
+  });
+
+  revalidatePath("/marketing");
+}
+
 export async function vincularClienteCampanha(dados: {
   clienteId: number;
   campanhaId: number;
