@@ -1339,6 +1339,25 @@ function TelefoneDuplicadoModal({
   );
 }
 
+/**
+ * Converte a data que vem do banco (objeto Date, ou string ISO) para o
+ * formato "aaaa-mm-dd" que o <input type="date"> exige. O bug anterior
+ * fazia String(dataDoBanco).slice(0,10), que num objeto Date produz algo
+ * como "Sat Aug 01" - texto invalido, que quebrava ao salvar de volta.
+ */
+function paraDataInput(valor: string | Date | null | undefined) {
+  if (!valor) return "";
+
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) return "";
+
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const dia = String(data.getDate()).padStart(2, "0");
+
+  return `${ano}-${mes}-${dia}`;
+}
+
 function CampanhaModal({ open, campanha, onClose, onSubmit, disabled }: { open: boolean; campanha?: MarketingCampanha | null; onClose: () => void; onSubmit: (dados: CampanhaFormData) => void; disabled: boolean }) {
   const [form, setForm] = useState<CampanhaFormData>({ nome: "", canal: "Instagram", utmCampaign: "", investimento: 0, leads: 0, status: "Ativa", inicio: "", fim: "", observacoes: "" });
 
@@ -1354,8 +1373,8 @@ function CampanhaModal({ open, campanha, onClose, onSubmit, disabled }: { open: 
         investimento: campanha.investimento || 0,
         leads: campanha.leads || 0,
         status: campanha.status,
-        inicio: campanha.inicio ? String(campanha.inicio).slice(0, 10) : "",
-        fim: campanha.fim ? String(campanha.fim).slice(0, 10) : "",
+        inicio: paraDataInput(campanha.inicio),
+        fim: paraDataInput(campanha.fim),
         observacoes: campanha.observacoes || "",
       });
       return;
