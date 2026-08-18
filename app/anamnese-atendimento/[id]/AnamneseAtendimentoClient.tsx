@@ -64,6 +64,9 @@ export default function AnamneseAtendimentoClient({
     nomeCanonicoAnamnese(procedimentoInicial || anamneses[0]?.procedimento || "Limpeza de pele"),
   );
 
+  const [versaoSelecionadaId, setVersaoSelecionadaId] =
+    useState<number | null>(null);
+
   const procedimentosDisponiveis = useMemo(
     () =>
       Array.from(
@@ -82,20 +85,23 @@ export default function AnamneseAtendimentoClient({
     [anamneses, modelos, procedimentoInicial, procedimentos],
   );
 
+  const historico = anamneses.filter(
+    (ficha) =>
+      nomeCanonicoAnamnese(ficha.procedimento) ===
+      nomeCanonicoAnamnese(procedimento),
+  );
+
   const fichaAtual =
-    anamneses.find(
-      (ficha) => nomeCanonicoAnamnese(ficha.procedimento) === nomeCanonicoAnamnese(procedimento),
-    ) ?? null;
+    historico.find((ficha) => ficha.id === versaoSelecionadaId) ??
+    historico[0] ??
+    null;
 
   const modeloAtual =
     modelos.find(
       (modelo) =>
-        nomeCanonicoAnamnese(modelo.procedimentoNome) === nomeCanonicoAnamnese(procedimento),
+        nomeCanonicoAnamnese(modelo.procedimentoNome) ===
+        nomeCanonicoAnamnese(procedimento),
     ) ?? null;
-
-  const historico = anamneses.filter(
-    (ficha) => nomeCanonicoAnamnese(ficha.procedimento) === nomeCanonicoAnamnese(procedimento),
-  );
 
   return (
     <main className="min-h-[100dvh] min-w-0 overflow-x-hidden bg-slate-50 px-3 py-3 text-slate-900 dark:bg-slate-950 dark:text-white sm:px-5 sm:py-5">
@@ -121,7 +127,10 @@ export default function AnamneseAtendimentoClient({
             </span>
             <select
               value={procedimento}
-              onChange={(event) => setProcedimento(event.target.value)}
+              onChange={(event) => {
+                setProcedimento(event.target.value);
+                setVersaoSelecionadaId(null);
+              }}
               className="premium-input h-13 w-full text-base"
             >
               {procedimentosDisponiveis.map((item) => (
@@ -143,6 +152,7 @@ export default function AnamneseAtendimentoClient({
           fichaAtual={fichaAtual}
           historico={historico}
           respostas={respostas}
+          onSelecionarVersao={setVersaoSelecionadaId}
         />
       </div>
     </main>

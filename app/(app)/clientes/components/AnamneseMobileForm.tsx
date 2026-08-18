@@ -53,6 +53,7 @@ type Props = {
   fichaAtual: ClienteAnamneseData | null;
   historico: ClienteAnamneseData[];
   respostas: ClienteAnamneseRespostaData[];
+  onSelecionarVersao?: (id: number | null) => void;
 };
 
 type Etapa = {
@@ -371,6 +372,7 @@ export default function AnamneseMobileForm({
   fichaAtual,
   historico,
   respostas,
+  onSelecionarVersao,
 }: Props) {
   const [erro, setErro] = useState("");
   const [avisoPdf, setAvisoPdf] = useState("");
@@ -778,12 +780,54 @@ export default function AnamneseMobileForm({
           <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.035]">
             <p className="text-sm font-bold text-slate-900 dark:text-white">Histórico de versões</p>
             <div className="mt-3 space-y-2">
-              {historico.map((item) => (
-                <div key={item.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-white/10 dark:bg-white/[0.04]">
-                  <span className="font-semibold">Versão {item.versao}</span>
-                  <span className="text-slate-500">{item.status === "FINALIZADA" ? "Assinada" : "Rascunho"}</span>
-                </div>
-              ))}
+              {historico.map((item) => {
+                const selecionada = fichaAtual?.id === item.id;
+
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => onSelecionarVersao?.(item.id)}
+                    className={`flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left text-sm transition ${
+                      selecionada
+                        ? "border-emerald-300 bg-emerald-50 shadow-sm ring-1 ring-emerald-200"
+                        : "border-slate-200 bg-white hover:border-violet-300 hover:bg-violet-50"
+                    } dark:border-white/10 dark:bg-white/[0.04]`}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold">
+                          Versão {item.versao}
+                        </span>
+
+                        {selecionada ? (
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[0.62rem] font-extrabold uppercase tracking-wide text-emerald-700">
+                            Visualizando
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {item.assinadaEm ? (
+                        <span className="mt-1 block text-xs text-slate-500">
+                          {formatarData(item.assinadaEm)}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <span
+                      className={
+                        selecionada
+                          ? "text-xs font-bold text-emerald-700"
+                          : "text-xs text-slate-500"
+                      }
+                    >
+                      {item.status === "FINALIZADA"
+                        ? "Assinada"
+                        : "Rascunho"}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         ) : null}
