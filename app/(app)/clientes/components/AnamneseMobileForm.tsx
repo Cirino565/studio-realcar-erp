@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   useEffect,
   useMemo,
@@ -376,7 +377,13 @@ export default function AnamneseMobileForm({
   const [acaoPdf, setAcaoPdf] = useState<"baixar" | "compartilhar" | "whatsapp" | null>(null);
   const [respondidasObrigatorias, setRespondidasObrigatorias] = useState(0);
   const [isPending, startTransition] = useTransition();
+  const [salvandoFormulario, setSalvandoFormulario] = useState<
+    "rascunho" | "finalizar" | null
+  >(null);
   const formRef = useRef<HTMLFormElement | null>(null);
+  const envioEmAndamentoRef = useRef(false);
+  const novaVersaoEmAndamentoRef = useRef(false);
+  const router = useRouter();
 
   const respostasDaFicha = useMemo(() => {
     if (fichaAtual) {
@@ -589,6 +596,46 @@ export default function AnamneseMobileForm({
     }
   }
 
+  async function enviarFormulario(event: ReactFormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    // Trava sincrona: mesmo varios toques muito rapidos so enviam uma vez.
+    if (envioEmAndamentoRef.current) return;
+
+    const submitter = (event.nativeEvent as SubmitEvent)
+      .submitter as HTMLButtonElement | null;
+
+    const intencao =
+      submitter?.value === "finalizar" ? "finalizar" : "rascunho";
+
+    if (intencao === "finalizar" && !validarFinalizacao()) {
+      return;
+    }
+
+    envioEmAndamentoRef.current = true;
+    setSalvandoFormulario(intencao);
+    setErro("");
+
+    const dados = new FormData(event.currentTarget);
+    dados.set("intencao", intencao);
+
+    try {
+      await salvarRespostasAnamneseRapida(dados);
+
+      // Atualiza imediatamente a tela da anamnese.
+      router.refresh();
+    } catch (error) {
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível salvar a anamnese.",
+      );
+    } finally {
+      envioEmAndamentoRef.current = false;
+      setSalvandoFormulario(null);
+    }
+  }
+
   if (!modelo) {
     return (
       <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100">
@@ -702,10 +749,23 @@ export default function AnamneseMobileForm({
                   "A versao assinada continua guardada no historico. Se voce so quer consultar ou baixar a ficha atual, cancele.",
               );
 
-              if (!confirmado) return;
+              if (
+                !confirmado ||
+                novaVersaoEmAndamentoRef.current ||
+                isPending
+              ) {
+                return;
+              }
+
+              novaVersaoEmAndamentoRef.current = true;
 
               startTransition(async () => {
-                await criarNovaRevisaoAnamnese(clienteId, procedimento);
+                try {
+                  await criarNovaRevisaoAnamnese(clienteId, procedimento);
+                  router.refresh();
+                } finally {
+                  novaVersaoEmAndamentoRef.current = false;
+                }
               });
             }}
           >
@@ -739,18 +799,17 @@ export default function AnamneseMobileForm({
   return (
     <form
       ref={formRef}
-      action={salvarRespostasAnamneseRapida}
       onChange={atualizarProgresso}
       onClick={() => window.requestAnimationFrame(atualizarProgresso)}
-      onSubmit={(event: ReactFormEvent<HTMLFormElement>) => {
-        const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
-        if (submitter?.value === "finalizar" && !validarFinalizacao()) {
-          event.preventDefault();
-        }
-      }}
+      onSubmit={enviarFormulario}
       className="space-y-4"
     >
       <input type="hidden" name="clienteId" value={clienteId} />
+      <input
+        type="hidden"
+        name="anamneseIdAtual"
+        value={fichaAtual?.id ?? ""}
+      />
       <input type="hidden" name="modeloId" value={modelo.id} />
       <input type="hidden" name="procedimento" value={procedimento} />
       <input type="hidden" name="totalPerguntas" value={modelo.perguntas.length} />
@@ -918,11 +977,38 @@ export default function AnamneseMobileForm({
       {erro ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-100">{erro}</div> : null}
 
       <div className="sticky bottom-2 z-20 grid gap-2 rounded-3xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur dark:border-white/10 dark:bg-slate-950/95 sm:grid-cols-2">
-        <button type="submit" name="intencao" value="rascunho" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-700 dark:border-white/10 dark:text-slate-200">
-          <Save size={17} /> Salvar rascunho
+        <button
+          type="submit"
+          name="intencao"
+          value="rascunho"
+          disabled={salvandoFormulario !== null}
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:text-slate-200"
+        >
+          {salvandoFormulario === "rascunho" ? (
+            <Loader2 size={17} className="animate-spin" />
+          ) : (
+            <Save size={17} />
+          )}
+          {salvandoFormulario === "rascunho"
+            ? "Salvando..."
+            : "Salvar rascunho"}
         </button>
-        <button type="submit" name="intencao" value="finalizar" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 text-sm font-bold text-white shadow-sm">
-          <ShieldCheck size={18} /> Finalizar e assinar
+
+        <button
+          type="submit"
+          name="intencao"
+          value="finalizar"
+          disabled={salvandoFormulario !== null}
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 text-sm font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {salvandoFormulario === "finalizar" ? (
+            <Loader2 size={18} className="animate-spin" />
+          ) : (
+            <ShieldCheck size={18} />
+          )}
+          {salvandoFormulario === "finalizar"
+            ? "Finalizando..."
+            : "Finalizar e assinar"}
         </button>
       </div>
     </form>

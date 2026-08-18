@@ -525,21 +525,70 @@ async function obterOuCriarRascunho(
   procedimento: string | null,
   profissional: string | null,
   dataFicha: Date,
+  anamneseIdAtual: number | null,
 ) {
+  // Se a tela esta editando um rascunho especifico, somente esse
+  // registro pode ser salvo. Uma ficha finalizada nunca vira
+  // automaticamente uma nova versao.
+  if (anamneseIdAtual) {
+    const fichaAtual = await prisma.clienteAnamnese.findFirst({
+      where: {
+        id: anamneseIdAtual,
+        clienteId,
+      },
+    });
+
+    if (!fichaAtual) {
+      throw new Error(
+        "A versão desta anamnese não foi encontrada. Atualize a página e tente novamente.",
+      );
+    }
+
+    if (fichaAtual.status === "FINALIZADA") {
+      throw new Error(
+        "Esta anamnese já foi finalizada. Para alterar, use Iniciar nova versão.",
+      );
+    }
+
+    return prisma.clienteAnamnese.update({
+      where: { id: fichaAtual.id },
+      data: {
+        profissional,
+        dataFicha,
+        status: "RASCUNHO",
+      },
+    });
+  }
+
   const ultimaFicha = await prisma.clienteAnamnese.findFirst({
-    where: { clienteId, procedimento: procedimento ?? undefined },
+    where: {
+      clienteId,
+      procedimento: procedimento ?? undefined,
+    },
     orderBy: [{ versao: "desc" }, { updatedAt: "desc" }],
   });
 
-  if (ultimaFicha?.status !== "FINALIZADA") {
-    if (ultimaFicha) {
-      return prisma.clienteAnamnese.update({
-        where: { id: ultimaFicha.id },
-        data: { profissional, dataFicha, status: "RASCUNHO" },
-      });
+  if (ultimaFicha) {
+    // IMPORTANTE:
+    // salvar/finalizar nunca cria automaticamente a proxima versao.
+    // Isso impede clique repetido de gerar versao 2, 3, 4...
+    if (ultimaFicha.status === "FINALIZADA") {
+      throw new Error(
+        "Esta anamnese já foi finalizada. Para criar outra, use Iniciar nova versão.",
+      );
     }
+
+    return prisma.clienteAnamnese.update({
+      where: { id: ultimaFicha.id },
+      data: {
+        profissional,
+        dataFicha,
+        status: "RASCUNHO",
+      },
+    });
   }
 
+  // Somente a PRIMEIRA ficha pode nascer automaticamente.
   return prisma.clienteAnamnese.create({
     data: {
       clienteId,
@@ -547,7 +596,7 @@ async function obterOuCriarRascunho(
       profissional,
       dataFicha,
       status: "RASCUNHO",
-      versao: (ultimaFicha?.versao ?? 0) + 1,
+      versao: 1,
     },
   });
 }
@@ -556,6 +605,8 @@ export async function salvarRespostasAnamneseRapida(formData: FormData) {
   const usuario = await requirePermission("clientes.clinico");
   const clienteId = getNumber(formData, "clienteId");
   const modeloId = getNumber(formData, "modeloId") || null;
+  const anamneseIdAtual =
+    getNumber(formData, "anamneseIdAtual") || null;
   const procedimento = getString(formData, "procedimento");
   const profissional = getString(formData, "profissional") || usuario.nome;
   const dataFichaTexto = getString(formData, "dataFicha");
@@ -609,6 +660,7 @@ export async function salvarRespostasAnamneseRapida(formData: FormData) {
     procedimento,
     profissional,
     dataFicha,
+    anamneseIdAtual,
   );
 
   await prisma.$transaction(async (tx) => {
@@ -662,6 +714,7 @@ export async function salvarRespostasAnamneseRapida(formData: FormData) {
   });
 
   revalidatePath(`/clientes/${clienteId}`);
+  revalidatePath(`/anamnese-atendimento/${clienteId}`);
   revalidatePath("/clientes");
 }
 
@@ -695,4 +748,5 @@ export async function criarNovaRevisaoAnamnese(
   });
 
   revalidatePath(`/clientes/${clienteId}`);
+  revalidatePath(`/anamnese-atendimento/${clienteId}`);
 }
