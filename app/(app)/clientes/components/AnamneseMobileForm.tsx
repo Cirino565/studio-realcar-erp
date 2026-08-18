@@ -53,7 +53,7 @@ type Props = {
   fichaAtual: ClienteAnamneseData | null;
   historico: ClienteAnamneseData[];
   respostas: ClienteAnamneseRespostaData[];
-  onSelecionarVersao?: (id: number | null) => void;
+  onSelecionarVersao: (id: number | null) => void;
 };
 
 type Etapa = {
@@ -787,7 +787,16 @@ export default function AnamneseMobileForm({
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => onSelecionarVersao?.(item.id)}
+                    onClick={() => {
+                      onSelecionarVersao(item.id);
+
+                      window.requestAnimationFrame(() => {
+                        window.scrollTo({
+                          top: 0,
+                          behavior: "smooth",
+                        });
+                      });
+                    }}
                     className={`flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left text-sm transition ${
                       selecionada
                         ? "border-emerald-300 bg-emerald-50 shadow-sm ring-1 ring-emerald-200"

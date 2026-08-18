@@ -143,7 +143,7 @@ export default function AnamneseAtendimentoClient({
         </section>
 
         <AnamneseMobileForm
-          key={procedimento}
+          key={`${procedimento}-${fichaAtual?.id ?? "nova"}`}
           clienteId={clienteId}
           clienteNome={clienteNome}
           clienteTelefone={clienteTelefone}

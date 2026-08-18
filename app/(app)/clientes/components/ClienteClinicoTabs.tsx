@@ -242,6 +242,9 @@ export function ClienteClinicoTabs({
   const [evolucoesPendentesResolvidas, setEvolucoesPendentesResolvidas] =
     useState<number[]>([]);
 
+  const [versaoAnamneseSelecionadaId, setVersaoAnamneseSelecionadaId] =
+    useState<number | null>(null);
+
   const [procedimentoAnamnese, setProcedimentoAnamnese] =
     useState(
       nomeCanonicoAnamnese(
@@ -329,12 +332,18 @@ export function ClienteClinicoTabs({
       (item) => item.id === evolucaoPendenteSelecionada,
     ) || null;
 
+  const historicoAnamneseAtual = data.anamneses.filter(
+    (ficha) =>
+      nomeCanonicoAnamnese(ficha.procedimento) ===
+      nomeCanonicoAnamnese(procedimentoAnamnese),
+  );
+
   const anamneseAtual =
-    data.anamneses.find(
-      (ficha) =>
-        nomeCanonicoAnamnese(ficha.procedimento) ===
-        nomeCanonicoAnamnese(procedimentoAnamnese),
-    ) ?? null;
+    historicoAnamneseAtual.find(
+      (ficha) => ficha.id === versaoAnamneseSelecionadaId,
+    ) ??
+    historicoAnamneseAtual[0] ??
+    null;
 
   const modeloAnamneseAtual =
     data.anamneseModelos.find(
@@ -504,7 +513,10 @@ export function ClienteClinicoTabs({
                   <select
                     name="procedimentoVisual"
                     value={procedimentoAnamnese}
-                    onChange={(event) => setProcedimentoAnamnese(event.target.value)}
+                    onChange={(event) => {
+                      setProcedimentoAnamnese(event.target.value);
+                      setVersaoAnamneseSelecionadaId(null);
+                    }}
                     className="premium-input h-13 w-full text-base"
                   >
                     {procedimentosDisponiveis.map((procedimento) => (
@@ -521,18 +533,16 @@ export function ClienteClinicoTabs({
               </div>
 
               <AnamneseMobileForm
+                key={`${procedimentoAnamnese}-${anamneseAtual?.id ?? "nova"}`}
                 clienteId={data.id}
                 clienteNome={data.nome}
                 clienteTelefone={data.whatsapp || data.telefone}
                 procedimento={procedimentoAnamnese}
                 modelo={modeloAnamneseAtual}
                 fichaAtual={anamneseAtual}
-                historico={data.anamneses.filter(
-                  (ficha) =>
-                    nomeCanonicoAnamnese(ficha.procedimento) ===
-                    nomeCanonicoAnamnese(procedimentoAnamnese),
-                )}
+                historico={historicoAnamneseAtual}
                 respostas={data.anamneseRespostas}
+                onSelecionarVersao={setVersaoAnamneseSelecionadaId}
               />
             </div>
           </div>
