@@ -37,6 +37,7 @@ import { buscarDisponibilidadeAgenda } from "@/actions/agendamento.actions";
 import {
   agendarAvaliacaoLead,
   atualizarCampanha,
+  atualizarChamouWhatsapp,
   atualizarEtapaLead,
   atualizarLead,
   converterLeadEmCliente,
@@ -280,6 +281,14 @@ function calcularResumo(leads: MarketingLead[], campanhas: MarketingCampanha[]):
   const receitaRastreada = campanhas.reduce((acc, campanha) => acc + campanha.metricas.receitaBruta, 0);
   const receitaLiquida = campanhas.reduce((acc, campanha) => acc + campanha.metricas.receitaLiquida, 0);
 
+  // So entram nessa conta os leads que vieram de clique de anuncio (tem
+  // codigo de atendimento) - e exatamente o universo que a pergunta "quantos
+  // codigos gerados viram conversa de verdade" precisa medir.
+  const leadsComCodigo = leads.filter((lead) => Boolean(lead.codigoAtendimento));
+  const leadsChamaramWhatsapp = leadsComCodigo.filter(
+    (lead) => lead.chamouWhatsapp === "Chamou",
+  ).length;
+
   return {
     totalLeads: leads.length,
     leadsAtivos,
@@ -297,6 +306,12 @@ function calcularResumo(leads: MarketingLead[], campanhas: MarketingCampanha[]):
     receitaRastreada,
     receitaLiquida,
     resultadoMarketing: receitaLiquida - custoRealTotal,
+    leadsComCodigo: leadsComCodigo.length,
+    leadsChamaramWhatsapp,
+    taxaChamouWhatsapp:
+      leadsComCodigo.length > 0
+        ? (leadsChamaramWhatsapp / leadsComCodigo.length) * 100
+        : null,
   };
 }
 
@@ -521,6 +536,12 @@ export default function MarketingClient({
     });
   }
 
+  function alterarChamouWhatsapp(id: number, valor: "Chamou" | "Não chamou" | "A verificar") {
+    executar(async () => {
+      await atualizarChamouWhatsapp(id, valor);
+    });
+  }
+
   function alterarEtapa(id: number, etapa: LeadEtapa) {
     if (etapa === "Perdido") {
       const motivo = window.prompt("Qual foi o motivo da perda desta oportunidade?");
@@ -602,11 +623,25 @@ export default function MarketingClient({
           </section>
         ) : null}
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <ResumoCard title="Leads ativos" value={String(resumo.leadsAtivos)} detail={`${resumo.totalLeads} oportunidade(s) no total`} icon={UsersRound} />
           <ResumoCard title="Avaliações vinculadas" value={String(resumo.avaliacoesAgendadas)} detail="Agendamentos originados pelo CRM" icon={CalendarClock} />
           <ResumoCard title="Convertidos" value={String(resumo.leadsConvertidos)} detail={`${resumo.leadsPerdidos} perdido(s)`} icon={UserCheck} />
           <ResumoCard title="Campanhas ativas" value={String(resumo.campanhasAtivas)} detail={`Custo real: ${formatarMoeda(resumo.custoRealTotal)}`} icon={Megaphone} />
+          <ResumoCard
+            title="Chamou no WhatsApp"
+            value={
+              resumo.taxaChamouWhatsapp === null
+                ? "—"
+                : `${resumo.taxaChamouWhatsapp.toFixed(0)}%`
+            }
+            detail={
+              resumo.leadsComCodigo === 0
+                ? "Nenhum lead de anúncio ainda"
+                : `${resumo.leadsChamaramWhatsapp} de ${resumo.leadsComCodigo} código(s) confirmados`
+            }
+            icon={MessageCircle}
+          />
         </section>
 
         <section className="premium-card-soft p-4 md:p-5">
@@ -671,6 +706,7 @@ export default function MarketingClient({
                 description={etapa.description}
                 leads={etapa.leads}
                 onEtapaChange={alterarEtapa}
+                onChamouWhatsappChange={alterarChamouWhatsapp}
                 onMessage={setMensagemModal}
                 onDetails={setDetalhesModal}
                 onSchedule={setAgendamentoModal}
@@ -772,6 +808,7 @@ function PipelineColumn({
   description,
   leads,
   onEtapaChange,
+  onChamouWhatsappChange,
   onMessage,
   onDetails,
   onSchedule,
@@ -785,6 +822,7 @@ function PipelineColumn({
   description: string;
   leads: MarketingLead[];
   onEtapaChange: (id: number, etapa: LeadEtapa) => void;
+  onChamouWhatsappChange: (id: number, valor: "Chamou" | "Não chamou" | "A verificar") => void;
   onMessage: (lead: MarketingLead) => void;
   onDetails: (lead: MarketingLead) => void;
   onSchedule: (lead: MarketingLead) => void;
@@ -815,6 +853,7 @@ function PipelineColumn({
             lead={lead}
             currentEtapa={etapa}
             onEtapaChange={onEtapaChange}
+            onChamouWhatsappChange={onChamouWhatsappChange}
             onMessage={onMessage}
             onDetails={onDetails}
             onSchedule={onSchedule}
@@ -833,6 +872,7 @@ function LeadCard({
   lead,
   currentEtapa,
   onEtapaChange,
+  onChamouWhatsappChange,
   onMessage,
   onDetails,
   onSchedule,
@@ -844,6 +884,7 @@ function LeadCard({
   lead: MarketingLead;
   currentEtapa: LeadEtapa;
   onEtapaChange: (id: number, etapa: LeadEtapa) => void;
+  onChamouWhatsappChange: (id: number, valor: "Chamou" | "Não chamou" | "A verificar") => void;
   onMessage: (lead: MarketingLead) => void;
   onDetails: (lead: MarketingLead) => void;
   onSchedule: (lead: MarketingLead) => void;
@@ -904,6 +945,33 @@ function LeadCard({
           >
             {LEAD_ETAPAS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
           </select>
+
+          {/* So faz sentido perguntar isso para quem veio de clique de
+              anuncio - lead criado a mao ja teve conversa de verdade na
+              hora do cadastro. */}
+          {lead.codigoAtendimento ? (
+            <select
+              value={lead.chamouWhatsapp}
+              onChange={(event) =>
+                onChamouWhatsappChange(
+                  lead.id,
+                  event.target.value as "Chamou" | "Não chamou" | "A verificar",
+                )
+              }
+              disabled={isPending}
+              className={`h-10 rounded-2xl border px-3 text-xs font-medium outline-none focus:border-violet-400/40 ${
+                lead.chamouWhatsapp === "Chamou"
+                  ? "border-emerald-300/20 bg-emerald-400/10 text-emerald-100"
+                  : lead.chamouWhatsapp === "Não chamou"
+                    ? "border-rose-300/20 bg-rose-400/10 text-rose-100"
+                    : "border-amber-300/20 bg-amber-400/10 text-amber-100"
+              }`}
+            >
+              <option value="A verificar">Chamou no WhatsApp? · A verificar</option>
+              <option value="Chamou">✓ Chamou no WhatsApp</option>
+              <option value="Não chamou">✕ Não chamou no WhatsApp</option>
+            </select>
+          ) : null}
 
           <div className="grid grid-cols-2 gap-2">
             <button type="button" onClick={() => onMessage(lead)} className="rounded-2xl border border-emerald-300/15 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-400/15">WhatsApp</button>
@@ -1614,6 +1682,9 @@ function LeadDetailsModal({
               <Detail label="Origem" value={getOrigemLabel(lead.origem)} />
               <Detail label="Campanha" value={lead.campanha?.nome || "Sem campanha"} />
               <Detail label="Código de atendimento" value={lead.codigoAtendimento || "Não informado"} />
+              {lead.codigoAtendimento ? (
+                <Detail label="Chamou no WhatsApp" value={lead.chamouWhatsapp} />
+              ) : null}
               <Detail label="Valor previsto" value={formatarMoeda(lead.valorPrevisto)} />
               <Detail label="Último contato" value={lead.ultimoContatoEm ? formatarDataHora(lead.ultimoContatoEm) : "Ainda não registrado"} />
               <Detail label="Próximo contato" value={lead.proximoContatoEm ? formatarData(lead.proximoContatoEm) : "Não programado"} />

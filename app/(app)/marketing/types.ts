@@ -119,6 +119,9 @@ export type MarketingResumo = {
   receitaRastreada: number;
   receitaLiquida: number;
   resultadoMarketing: number;
+  leadsComCodigo: number;
+  leadsChamaramWhatsapp: number;
+  taxaChamouWhatsapp: number | null;
 };
 
 export const LEAD_ETAPAS: { value: LeadEtapa; label: string; description: string }[] = [

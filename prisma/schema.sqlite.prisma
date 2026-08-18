@@ -419,6 +419,10 @@ model Lead {
   campanha         CampanhaMarketing? @relation(fields: [campanhaId], references: [id], onDelete: SetNull)
   codigoAtendimento String?
   gclid            String?
+  // "Chamou" / "Nao chamou" / "A verificar" - controle manual de quem
+  // atende, para medir quantos codigos gerados no clique do anuncio
+  // realmente viraram conversa de verdade no WhatsApp.
+  chamouWhatsapp   String    @default("A verificar")
   interacoes       LeadInteracao[]
   comunicacoes      ComunicacaoRegistro[]
   createdAt        DateTime  @default(now())

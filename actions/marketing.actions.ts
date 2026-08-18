@@ -380,6 +380,53 @@ export async function atualizarLead(dados: AtualizarLeadInput) {
   return lead;
 }
 
+export type ChamouWhatsappStatus = "Chamou" | "Não chamou" | "A verificar";
+
+const CHAMOU_WHATSAPP_VALORES: ChamouWhatsappStatus[] = [
+  "A verificar",
+  "Chamou",
+  "Não chamou",
+];
+
+/**
+ * Marca se o lead de fato chamou no WhatsApp ou nao. O botao da landing page
+ * so abre a conversa com o texto pronto - quem envia de verdade e a pessoa,
+ * entao existe codigo gerado sem conversa nenhuma. Isso mede esse vazamento.
+ */
+export async function atualizarChamouWhatsapp(
+  id: number,
+  valor: ChamouWhatsappStatus,
+) {
+  await requirePermission("marketing.gerenciar");
+
+  if (!CHAMOU_WHATSAPP_VALORES.includes(valor)) {
+    throw new Error("Valor inválido para o campo Chamou no WhatsApp.");
+  }
+
+  const lead = await prisma.lead.findUnique({
+    where: { id },
+    select: { nome: true, codigoAtendimento: true },
+  });
+  if (!lead) throw new Error("Lead não encontrado.");
+
+  await prisma.$transaction(async (tx) => {
+    await tx.lead.update({
+      where: { id },
+      data: { chamouWhatsapp: valor },
+    });
+
+    await tx.leadInteracao.create({
+      data: {
+        leadId: id,
+        tipo: "Atualização",
+        descricao: `Marcado como "${valor}" no WhatsApp${lead.codigoAtendimento ? ` (código ${lead.codigoAtendimento})` : ""}.`,
+      },
+    });
+  });
+
+  revalidatePath("/marketing");
+}
+
 export async function atualizarEtapaLead(id: number, etapa: LeadEtapa) {
   await requirePermission("marketing.gerenciar");
 
