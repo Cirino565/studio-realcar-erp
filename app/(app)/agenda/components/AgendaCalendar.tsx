@@ -747,6 +747,32 @@ export default function AgendaCalendar({
     setCalendarOpen(false);
   }
 
+  useEffect(() => {
+    function handleOpenAgendaCalendar(event: Event) {
+      event.preventDefault();
+
+      const selected = new Date(selectedDate);
+
+      setCalendarDraftDate(selected);
+      setCalendarViewDate(
+        new Date(selected.getFullYear(), selected.getMonth(), 1),
+      );
+      setCalendarOpen(true);
+    }
+
+    window.addEventListener(
+      "studio-realcar:open-agenda-calendar",
+      handleOpenAgendaCalendar,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "studio-realcar:open-agenda-calendar",
+        handleOpenAgendaCalendar,
+      );
+    };
+  }, [selectedDate]);
+
   function changeCalendarMonth(amount: number) {
     setCalendarViewDate((current) =>
       new Date(current.getFullYear(), current.getMonth() + amount, 1),
@@ -1026,18 +1052,12 @@ export default function AgendaCalendar({
 
           <div className="order-3 col-span-2 min-w-0 lg:order-none lg:col-span-1">
             <div className="mb-1 flex items-center justify-between gap-3 px-1">
-              <button
-                type="button"
-                onClick={openCalendar}
-                className="flex min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5 text-left text-[0.7rem] font-extrabold capitalize tracking-wide text-slate-600 transition hover:bg-violet-50 hover:text-violet-700 dark:text-slate-200 dark:hover:bg-violet-500/10 dark:hover:text-violet-100 sm:text-xs"
-                title="Abrir calendário"
-                aria-label={`Abrir calendário de ${formatMonthYear(dateStripVisibleMonth)}`}
+              <p
+                className="truncate px-1 text-[0.7rem] font-extrabold capitalize tracking-wide text-slate-600 dark:text-slate-200 sm:text-xs"
+                aria-live="polite"
               >
-                <CalendarDays size={13} className="shrink-0 text-violet-600 sm:hidden" />
-                <span className="truncate" aria-live="polite">
-                  {formatMonthYear(dateStripVisibleMonth)}
-                </span>
-              </button>
+                {formatMonthYear(dateStripVisibleMonth)}
+              </p>
               <span className="hidden text-[0.65rem] font-medium text-slate-400 sm:inline dark:text-slate-500">
                 Deslize para navegar
               </span>

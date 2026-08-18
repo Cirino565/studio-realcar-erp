@@ -12,12 +12,30 @@ export default function Header() {
     month: "long",
   }).format(new Date());
 
+  function abrirAgendaCalendario() {
+    const evento = new Event("studio-realcar:open-agenda-calendar", {
+      cancelable: true,
+    });
+
+    const eventoNaoFoiTratado = window.dispatchEvent(evento);
+
+    if (eventoNaoFoiTratado) {
+      window.location.href = "/agenda";
+    }
+  }
+
   return (
     <header className="app-header sticky top-0 z-30 flex min-h-14 items-center justify-between gap-3 border-b px-3 py-2.5 shadow-sm backdrop-blur-xl sm:px-4 lg:px-6">
       <div className="flex min-w-0 items-center gap-2.5">
-        <div className="app-header-date-icon flex size-9 shrink-0 items-center justify-center rounded-xl">
+        <button
+          type="button"
+          onClick={abrirAgendaCalendario}
+          className="app-header-date-icon flex size-9 shrink-0 items-center justify-center rounded-xl transition active:scale-95"
+          aria-label="Abrir calendário da agenda"
+          title="Abrir calendário"
+        >
           <CalendarDays className="size-4" />
-        </div>
+        </button>
 
         <div className="min-w-0">
           <p className="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400 sm:hidden">
