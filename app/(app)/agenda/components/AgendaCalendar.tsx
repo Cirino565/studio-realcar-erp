@@ -520,6 +520,7 @@ export default function AgendaCalendar({
   const dateStripScrollFrameRef = useRef<number | null>(null);
   const agendaScrollRef = useRef<HTMLDivElement | null>(null);
   const autoScrolledAgendaKeyRef = useRef<string | null>(null);
+  const [mostrarBotaoAgora, setMostrarBotaoAgora] = useState(false);
 
   useEffect(() => {
     const updateNow = () => setNow(new Date());
@@ -979,6 +980,97 @@ export default function AgendaCalendar({
     selectedDateInput,
     selectedDateIsToday,
     totalMinutes,
+    viewMode,
+  ]);
+
+  function irParaAgora() {
+    const container = agendaScrollRef.current;
+
+    if (!container || currentTimeLine === null) return;
+
+    const espacoSuperior = Math.min(
+      140,
+      container.clientHeight * 0.28,
+    );
+
+    const maxScrollTop = Math.max(
+      0,
+      container.scrollHeight - container.clientHeight,
+    );
+
+    const destino = Math.min(
+      maxScrollTop,
+      Math.max(0, currentTimeLine - espacoSuperior),
+    );
+
+    container.scrollTo({
+      top: destino,
+      behavior: "smooth",
+    });
+  }
+
+  useEffect(() => {
+    if (
+      viewMode !== "day" ||
+      isClosedDay ||
+      !selectedDateIsToday ||
+      currentTimeLine === null
+    ) {
+      setMostrarBotaoAgora(false);
+      return;
+    }
+
+    const container = agendaScrollRef.current;
+
+    if (!container) return;
+
+    function verificarHorarioAtualVisivel() {
+      if (!container || currentTimeLine === null) return;
+
+      const inicioVisivel = container.scrollTop;
+      const fimVisivel =
+        container.scrollTop + container.clientHeight;
+
+      const margem = Math.min(
+        70,
+        container.clientHeight * 0.15,
+      );
+
+      const linhaEstaVisivel =
+        currentTimeLine >= inicioVisivel + margem &&
+        currentTimeLine <= fimVisivel - margem;
+
+      setMostrarBotaoAgora(!linhaEstaVisivel);
+    }
+
+    verificarHorarioAtualVisivel();
+
+    container.addEventListener(
+      "scroll",
+      verificarHorarioAtualVisivel,
+      { passive: true },
+    );
+
+    window.addEventListener(
+      "resize",
+      verificarHorarioAtualVisivel,
+    );
+
+    return () => {
+      container.removeEventListener(
+        "scroll",
+        verificarHorarioAtualVisivel,
+      );
+
+      window.removeEventListener(
+        "resize",
+        verificarHorarioAtualVisivel,
+      );
+    };
+  }, [
+    currentTimeLine,
+    isClosedDay,
+    selectedDateIsToday,
     viewMode,
   ]);
 
@@ -1824,6 +1916,26 @@ export default function AgendaCalendar({
           </div>
         </div>
       )}
+        {mostrarBotaoAgora ? (
+          <button
+            type="button"
+            onClick={irParaAgora}
+            className="absolute bottom-[4.6rem] right-3 z-[35] inline-flex items-center gap-2 rounded-full border border-rose-200/90 bg-white/90 px-3 py-2 text-[0.68rem] font-extrabold text-rose-600 shadow-[0_8px_24px_rgba(15,23,42,0.16)] backdrop-blur-xl transition active:scale-95 dark:border-rose-400/25 dark:bg-slate-900/90 dark:text-rose-300 lg:hidden"
+            aria-label={`Voltar para o horário atual, ${currentTimeLabel}`}
+            title={`Agora: ${currentTimeLabel}`}
+          >
+            <span className="relative flex size-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-50" />
+              <span className="relative inline-flex size-2.5 rounded-full bg-rose-500" />
+            </span>
+
+            Agora
+
+            <span className="font-black text-slate-500 dark:text-slate-300">
+              {currentTimeLabel}
+            </span>
+          </button>
+        ) : null}
       </section>
 
       {calendarOpen && typeof document !== "undefined"
