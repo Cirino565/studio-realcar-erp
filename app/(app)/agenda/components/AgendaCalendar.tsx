@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   BadgeCheck,
@@ -520,6 +520,7 @@ export default function AgendaCalendar({
   const dateStripScrollFrameRef = useRef<number | null>(null);
   const agendaScrollRef = useRef<HTMLDivElement | null>(null);
   const autoScrolledAgendaKeyRef = useRef<string | null>(null);
+  const agendaSwipeStartRef = useRef<{ x: number; y: number } | null>(null);
   const [mostrarBotaoAgora, setMostrarBotaoAgora] = useState(false);
 
   useEffect(() => {
@@ -986,7 +987,18 @@ export default function AgendaCalendar({
   function irParaAgora() {
     const container = agendaScrollRef.current;
 
-    if (!container || currentTimeLine === null) return;
+    if (!container) return;
+
+    const current = getSaoPauloTimeParts(now);
+    const currentMinutes =
+      current.hour * 60 + current.minute - agendaStartMinutes;
+
+    const clampedMinutes = Math.min(
+      Math.max(currentMinutes, 0),
+      totalMinutes,
+    );
+
+    const markerTop = clampedMinutes * MINUTE_HEIGHT;
 
     const espacoSuperior = Math.min(
       140,
@@ -1000,13 +1012,79 @@ export default function AgendaCalendar({
 
     const destino = Math.min(
       maxScrollTop,
-      Math.max(0, currentTimeLine - espacoSuperior),
+      Math.max(0, markerTop - espacoSuperior),
     );
 
     container.scrollTo({
       top: destino,
       behavior: "smooth",
     });
+  }
+
+  function handleAgendaTouchStart(event: TouchEvent<HTMLDivElement>) {
+    if (viewMode !== "day" || shouldEnableHorizontalScroll) {
+      agendaSwipeStartRef.current = null;
+      return;
+    }
+
+    const target = event.target as HTMLElement;
+
+    if (
+      target.closest(
+        "article, input, textarea, select, [role='dialog']",
+      )
+    ) {
+      agendaSwipeStartRef.current = null;
+      return;
+    }
+
+    const touch = event.touches[0];
+
+    if (!touch) return;
+
+    agendaSwipeStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+    };
+  }
+
+  function handleAgendaTouchEnd(event: TouchEvent<HTMLDivElement>) {
+    const inicio = agendaSwipeStartRef.current;
+    agendaSwipeStartRef.current = null;
+
+    if (
+      !inicio ||
+      viewMode !== "day" ||
+      shouldEnableHorizontalScroll
+    ) {
+      return;
+    }
+
+    const touch = event.changedTouches[0];
+
+    if (!touch) return;
+
+    const deltaX = touch.clientX - inicio.x;
+    const deltaY = touch.clientY - inicio.y;
+
+    const distanciaHorizontal = Math.abs(deltaX);
+    const distanciaVertical = Math.abs(deltaY);
+
+    if (
+      distanciaHorizontal < 70 ||
+      distanciaHorizontal < distanciaVertical * 1.35
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (deltaX < 0) {
+      goToDate(addDays(selectedDate, 1));
+      return;
+    }
+
+    goToDate(addDays(selectedDate, -1));
   }
 
   useEffect(() => {
@@ -1115,7 +1193,14 @@ export default function AgendaCalendar({
 
               <button
                 type="button"
-                onClick={() => goToDate(today)}
+                onClick={() => {
+                  if (selectedDateIsToday && viewMode === "day") {
+                    irParaAgora();
+                    return;
+                  }
+
+                  goToDate(today);
+                }}
                 className="h-9 border-r border-violet-200 px-3 text-xs font-extrabold uppercase tracking-wide text-violet-700 transition hover:bg-violet-50 dark:border-violet-500/40 dark:text-violet-200 dark:hover:bg-violet-500/10"
               >
                 Hoje
@@ -1541,10 +1626,12 @@ export default function AgendaCalendar({
       ) : (
         <div
           ref={agendaScrollRef}
+          onTouchStart={handleAgendaTouchStart}
+          onTouchEnd={handleAgendaTouchEnd}
           className={
             shouldEnableHorizontalScroll
               ? "max-h-[calc(100dvh-165px)] w-full max-w-full overflow-auto overscroll-contain pb-[calc(78px+env(safe-area-inset-bottom))] lg:pb-0"
-              : "max-h-[calc(100dvh-165px)] w-full max-w-full overflow-y-auto overflow-x-hidden overscroll-contain pb-[calc(78px+env(safe-area-inset-bottom))] lg:pb-0"
+              : "max-h-[calc(100dvh-165px)] w-full max-w-full touch-pan-y overflow-y-auto overflow-x-hidden overscroll-contain pb-[calc(78px+env(safe-area-inset-bottom))] lg:pb-0"
           }
         >
           <div
@@ -1570,7 +1657,13 @@ export default function AgendaCalendar({
                   key={profissional.id}
                   className="sticky top-0 z-40 h-11 border-b border-r border-slate-300 bg-white px-2 shadow-[0_2px_5px_rgba(15,23,42,0.08)] dark:border-slate-700 dark:bg-slate-900"
                 >
-                  <div className="flex h-full min-w-0 items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowVisibilityPanel(true)}
+                    className="flex h-full w-full min-w-0 items-center justify-center gap-2 rounded-md px-1 transition hover:bg-violet-50/80 active:bg-violet-100 dark:hover:bg-violet-500/10 dark:active:bg-violet-500/15"
+                    title="Trocar agenda ou profissional"
+                    aria-label={`Trocar agenda. Profissional atual: ${profissional.nome}`}
+                  >
                     <span
                       className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border shadow-sm"
                       style={{
@@ -1581,17 +1674,24 @@ export default function AgendaCalendar({
                     >
                       <UserRound size={14} />
                     </span>
-                    <div className="min-w-0">
+
+                    <div className="min-w-0 text-left">
                       <p className="truncate text-xs font-extrabold text-slate-800 dark:text-slate-100 sm:text-sm">
                         {profissional.nome}
                       </p>
+
                       {profissional.area ? (
                         <p className="hidden truncate text-[0.64rem] text-slate-400 sm:block">
                           {profissional.area}
                         </p>
                       ) : null}
                     </div>
-                  </div>
+
+                    <ChevronDown
+                      size={12}
+                      className="shrink-0 text-slate-400 sm:hidden"
+                    />
+                  </button>
                 </div>
               );
             })}
