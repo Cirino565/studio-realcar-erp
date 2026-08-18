@@ -1046,10 +1046,10 @@ export default function AgendaCalendar({
             <div
               ref={dateStripRef}
               onScroll={handleDateStripScroll}
-              className="touch-scroll-x min-w-0 snap-x snap-mandatory overflow-x-auto overscroll-x-contain px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:scrollbar-premium sm:[scrollbar-width:auto]"
+              className="touch-scroll-x min-w-0 snap-x snap-mandatory overflow-x-auto overscroll-x-contain px-0 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:px-1 sm:scrollbar-premium sm:[scrollbar-width:auto]"
               aria-label="Navegação contínua por datas"
             >
-              <div className="flex w-max min-w-full items-center gap-1.5">
+              <div className="grid w-full grid-flow-col auto-cols-[calc((100%-1.5rem)/7)] items-center gap-1 sm:flex sm:w-max sm:min-w-full sm:gap-1.5">
                 {dateStripDays.map((day) => {
                   const active = isSameDay(day, selectedDate);
                   const todayItem = isSameDay(day, today);
@@ -1065,7 +1065,7 @@ export default function AgendaCalendar({
                       aria-current={active ? "date" : undefined}
                       aria-label={`${formatWeekday(day)}, ${formatDateCompact(day)}${todayItem ? ", hoje" : ""}`}
                       title={formatDateCompact(day)}
-                      className={`relative flex h-11 w-10 snap-center flex-none flex-col items-center justify-center rounded-xl border text-center transition sm:h-12 sm:w-16 ${
+                      className={`relative flex h-11 w-full snap-center flex-col items-center justify-center rounded-xl border text-center transition sm:h-12 sm:w-16 sm:flex-none ${
                         active
                           ? "border-violet-700 bg-violet-700 text-white shadow-[0_5px_14px_rgba(109,40,217,0.22)]"
                           : todayItem
