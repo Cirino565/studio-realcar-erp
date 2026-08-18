@@ -1425,8 +1425,8 @@ export default function AgendaCalendar({
           ref={agendaScrollRef}
           className={
             shouldEnableHorizontalScroll
-              ? "max-h-[calc(100dvh-205px)] w-full max-w-full overflow-auto overscroll-contain pb-[calc(96px+env(safe-area-inset-bottom))] lg:pb-0"
-              : "max-h-[calc(100dvh-205px)] w-full max-w-full overflow-y-auto overflow-x-hidden overscroll-contain pb-[calc(96px+env(safe-area-inset-bottom))] lg:pb-0"
+              ? "max-h-[calc(100dvh-220px)] w-full max-w-full overflow-auto overscroll-contain pb-[calc(140px+env(safe-area-inset-bottom))] lg:pb-0"
+              : "max-h-[calc(100dvh-220px)] w-full max-w-full overflow-y-auto overflow-x-hidden overscroll-contain pb-[calc(140px+env(safe-area-inset-bottom))] lg:pb-0"
           }
         >
           <div
