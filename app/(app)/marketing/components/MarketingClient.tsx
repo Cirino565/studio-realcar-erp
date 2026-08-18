@@ -270,6 +270,13 @@ function calcularResumo(leads: MarketingLead[], campanhas: MarketingCampanha[]):
   const leadsConvertidos = leads.filter((lead) => lead.etapa === "Convertido").length;
   const leadsPerdidos = leads.filter((lead) => lead.etapa === "Perdido").length;
   const leadsAtivos = leads.filter((lead) => lead.etapa !== "Convertido" && lead.etapa !== "Perdido").length;
+
+  // "Novo" e "Aguardando resposta" sao as duas colunas que exigem acao da
+  // pessoa que atende - "Agendado" e "Convertido" sao so consulta, ja tem
+  // data marcada ou ja fechou. Esse numero e a lista de tarefas do dia.
+  const leadsPendentesDeAcao = leads.filter(
+    (lead) => lead.etapa === "Novo" || lead.etapa === "Aguardando resposta",
+  ).length;
   const avaliacoesAgendadas = leads.filter((lead) => lead.agendamentoId && lead.etapa !== "Perdido").length;
   const pipelineTotal = leads.reduce((acc, lead) => acc + lead.valorPrevisto, 0);
   const pipelineAtivo = leads
@@ -292,6 +299,7 @@ function calcularResumo(leads: MarketingLead[], campanhas: MarketingCampanha[]):
   return {
     totalLeads: leads.length,
     leadsAtivos,
+    leadsPendentesDeAcao,
     leadsConvertidos,
     leadsPerdidos,
     avaliacoesAgendadas,
@@ -622,6 +630,45 @@ export default function MarketingClient({
             </button>
           </section>
         ) : null}
+
+        {/* "Novo" + "Aguardando resposta" e a lista de tarefas do dia -
+            e a unica coisa que precisa de acao. "Agendado" e "Convertido"
+            sao so consulta. Por isso fica em destaque, acima dos outros
+            numeros, nao misturado com eles. */}
+        <section
+          className={`flex flex-col gap-1 rounded-3xl border p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5 ${
+            resumo.leadsPendentesDeAcao > 0
+              ? "border-amber-300/25 bg-amber-400/10"
+              : "border-emerald-300/20 bg-emerald-400/8"
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className={`flex size-11 shrink-0 items-center justify-center rounded-2xl ${
+                resumo.leadsPendentesDeAcao > 0
+                  ? "bg-amber-400/20 text-amber-100"
+                  : "bg-emerald-400/20 text-emerald-100"
+              }`}
+            >
+              <Target className="size-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                Com quem falar hoje
+              </p>
+              <p className="mt-0.5 text-sm text-slate-300">
+                Leads em "Novo" ou "Aguardando resposta" - o resto é só consulta.
+              </p>
+            </div>
+          </div>
+          <p
+            className={`text-3xl font-bold sm:text-right ${
+              resumo.leadsPendentesDeAcao > 0 ? "text-amber-100" : "text-emerald-100"
+            }`}
+          >
+            {resumo.leadsPendentesDeAcao}
+          </p>
+        </section>
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <ResumoCard title="Leads ativos" value={String(resumo.leadsAtivos)} detail={`${resumo.totalLeads} oportunidade(s) no total`} icon={UsersRound} />
@@ -1385,7 +1432,10 @@ function LeadModal({
           />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          {!lead ? <Select label="Etapa inicial" value={form.etapa} onChange={(value) => setForm((prev) => ({ ...prev, etapa: value as LeadEtapa }))} options={LEAD_ETAPAS.filter((item) => ["Novo", "Contato"].includes(item.value)).map((item) => item.value)} /> : <div />}
+          {/* A etapa inicial deixou de ser escolha: "Contato" nao existe
+              mais como etapa propria, entao todo lead novo comeca em
+              "Novo" - sem opcao pra confundir. */}
+          <div />
           <ValorInput label="Valor previsto" value={form.valorPrevisto} onChange={(value) => setForm((prev) => ({ ...prev, valorPrevisto: value }))} />
         </div>
         <Textarea label="Observações" value={form.observacoes} onChange={(value) => setForm((prev) => ({ ...prev, observacoes: value }))} />

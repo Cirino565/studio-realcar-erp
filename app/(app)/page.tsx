@@ -448,7 +448,7 @@ export default async function Home() {
   const avaliacoesSemConfirmacao = leadsAbertos
     .filter(
       (lead) =>
-        lead.etapa === "Avaliação" &&
+        lead.etapa === "Agendado" &&
         lead.agendamento &&
         lead.agendamento.status === "Agendado" &&
         lead.agendamento.data >= inicioHoje &&
@@ -462,7 +462,7 @@ export default async function Home() {
 
   const negociacoesParadas = leadsAbertos
     .filter((lead) => {
-      if (lead.etapa !== "Negociação") return false;
+      if (lead.etapa !== "Aguardando resposta") return false;
       const referencia = lead.ultimoContatoEm || lead.updatedAt;
       return referencia < limiteNegociacaoParada;
     })
@@ -481,7 +481,7 @@ export default async function Home() {
         lead.agendamento.data >= inicioHoje &&
         lead.agendamento.data < limiteAvaliacoesProximas;
 
-      return lead.etapa === "Negociação" || Boolean(avaliacaoProxima);
+      return lead.etapa === "Aguardando resposta" || Boolean(avaliacaoProxima);
     })
     .sort((a, b) => {
       const dataA = a.agendamento?.data.getTime() || Number.MAX_SAFE_INTEGER;
@@ -493,8 +493,8 @@ export default async function Home() {
   type CategoriaFilaComercial =
     | "Follow-up vencido"
     | "Contato de hoje"
-    | "Avaliação sem confirmação"
-    | "Negociação parada"
+    | "Agendamento sem confirmação"
+    | "Aguardando resposta parada"
     | "Prioridade comercial";
 
   type LeadFilaBase = (typeof leadsAbertos)[number];
@@ -526,7 +526,7 @@ export default async function Home() {
 
     const primeiroNome = lead.nome.split(" ")[0];
     const mensagem =
-      categoria === "Negociação parada"
+      categoria === "Aguardando resposta parada"
         ? `Olá, ${primeiroNome}! Tudo bem? Aqui é do Studio Realçar. Passando para retomar nossa conversa${lead.interesse ? ` sobre ${lead.interesse}` : ""}. Ficou alguma dúvida em que possamos ajudar?`
         : `Olá, ${primeiroNome}! Tudo bem? Aqui é do Studio Realçar. Passando para dar continuidade ao nosso contato${lead.interesse ? ` sobre ${lead.interesse}` : ""}. Posso te ajudar por aqui?`;
 
@@ -564,8 +564,8 @@ export default async function Home() {
     if (!lead.agendamento) return;
     adicionarNaFila(
       lead,
-      "Avaliação sem confirmação",
-      `Avaliação em ${formatarDataCurta(lead.agendamento.data)} às ${formatarHorario(lead.agendamento.data)} ainda está como Agendado.`,
+      "Agendamento sem confirmação",
+      `Agendamento em ${formatarDataCurta(lead.agendamento.data)} às ${formatarHorario(lead.agendamento.data)} ainda está como Agendado.`,
       { podeConfirmarAgendamento: true },
     );
   });
@@ -575,7 +575,7 @@ export default async function Home() {
     const dias = Math.max(3, Math.floor((inicioHoje.getTime() - referencia.getTime()) / UM_DIA_MS));
     adicionarNaFila(
       lead,
-      "Negociação parada",
+      "Aguardando resposta parada",
       `Sem contato comercial registrado há ${dias} dias.`,
     );
   });

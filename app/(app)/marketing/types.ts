@@ -1,6 +1,6 @@
 import type { CampanhaMarketing, Lead, LeadInteracao } from "@prisma/client";
 
-export type LeadEtapa = "Novo" | "Contato" | "Avaliação" | "Negociação" | "Convertido" | "Perdido";
+export type LeadEtapa = "Novo" | "Aguardando resposta" | "Agendado" | "Convertido" | "Perdido";
 
 export type MarketingLead = Lead & {
   cliente: {
@@ -105,6 +105,7 @@ export type CampanhaFormData = {
 export type MarketingResumo = {
   totalLeads: number;
   leadsAtivos: number;
+  leadsPendentesDeAcao: number;
   leadsConvertidos: number;
   leadsPerdidos: number;
   avaliacoesAgendadas: number;
@@ -125,10 +126,9 @@ export type MarketingResumo = {
 };
 
 export const LEAD_ETAPAS: { value: LeadEtapa; label: string; description: string }[] = [
-  { value: "Novo", label: "Novo", description: "Contato recém-chegado" },
-  { value: "Contato", label: "Contato", description: "Primeira conversa iniciada" },
-  { value: "Avaliação", label: "Avaliação", description: "Avaliação ou atendimento inicial agendado" },
-  { value: "Negociação", label: "Negociação", description: "Condição, pacote ou tratamento em análise" },
+  { value: "Novo", label: "Novo", description: "Chegou o lead, ainda não virou nada" },
+  { value: "Aguardando resposta", label: "Aguardando resposta", description: "Conversou e ficou de retornar, ou está decidindo" },
+  { value: "Agendado", label: "Agendado", description: "Tem data marcada na agenda" },
   { value: "Convertido", label: "Convertido", description: "Virou cliente ou fechou oportunidade" },
   { value: "Perdido", label: "Perdido", description: "Oportunidade encerrada sem avanço" },
 ];

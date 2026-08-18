@@ -519,15 +519,19 @@ export async function registrarContatoLead(id: number, proximoContato?: string |
 
   const agora = new Date();
   const proximo = dataSeguimento(proximoContato);
-  const novaEtapa = lead.etapa === "Novo" ? "Contato" : lead.etapa;
 
+  // Antes, registrar um contato movia sozinho o lead de "Novo" para a
+  // proxima etapa - so porque o OPERADOR clicou em abrir o WhatsApp, sem
+  // saber se a cliente respondeu de verdade. A regra combinada em 18/08 e
+  // clara: o card so muda quando o CLIENTE muda de comportamento, nunca
+  // por uma acao do operador. Quem decide mover para "Aguardando resposta"
+  // agora e a pessoa que atende, pelo seletor de etapa no proprio cartao.
   await prisma.$transaction(async (tx) => {
     await tx.lead.update({
       where: { id },
       data: {
         ultimoContatoEm: agora,
         proximoContatoEm: proximo,
-        etapa: novaEtapa,
       },
     });
 
@@ -774,7 +778,7 @@ export async function agendarAvaliacaoLead(dados: AgendarAvaliacaoLeadInput) {
       data: {
         clienteId,
         agendamentoId: agendamento.id,
-        etapa: "Avaliação",
+        etapa: "Agendado",
         proximoContatoEm: null,
       },
     });

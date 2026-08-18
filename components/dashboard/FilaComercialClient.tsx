@@ -18,8 +18,8 @@ import { useMemo, useState, useTransition } from "react";
 type CategoriaFilaComercial =
   | "Follow-up vencido"
   | "Contato de hoje"
-  | "Avaliação sem confirmação"
-  | "Negociação parada"
+  | "Agendamento sem confirmação"
+  | "Aguardando resposta parada"
   | "Prioridade comercial";
 
 type FilaComercialItem = {
@@ -71,12 +71,12 @@ function estiloCategoria(categoria: CategoriaFilaComercial) {
         badge: "border-amber-200 bg-amber-50 text-amber-700",
         detalhe: "text-amber-700",
       };
-    case "Avaliação sem confirmação":
+    case "Agendamento sem confirmação":
       return {
         badge: "border-violet-200 bg-violet-50 text-violet-700",
         detalhe: "text-violet-700",
       };
-    case "Negociação parada":
+    case "Aguardando resposta parada":
       return {
         badge: "border-cyan-200 bg-cyan-50 text-cyan-700",
         detalhe: "text-cyan-700",
