@@ -2020,7 +2020,7 @@ export default function AgendaCalendar({
           <button
             type="button"
             onClick={irParaAgora}
-            className="absolute bottom-[4.6rem] right-3 z-[35] inline-flex items-center gap-2 rounded-full border border-rose-200/90 bg-white/90 px-3 py-2 text-[0.68rem] font-extrabold text-rose-600 shadow-[0_8px_24px_rgba(15,23,42,0.16)] backdrop-blur-xl transition active:scale-95 dark:border-rose-400/25 dark:bg-slate-900/90 dark:text-rose-300 lg:hidden"
+            className="absolute bottom-[calc(6.5rem+env(safe-area-inset-bottom))] right-3 z-[35] inline-flex items-center gap-2 rounded-full border border-rose-200/90 bg-white/90 px-3 py-2 text-[0.68rem] font-extrabold text-rose-600 shadow-[0_8px_24px_rgba(15,23,42,0.16)] backdrop-blur-xl transition active:scale-95 dark:border-rose-400/25 dark:bg-slate-900/90 dark:text-rose-300 lg:hidden"
             aria-label={`Voltar para o horário atual, ${currentTimeLabel}`}
             title={`Agora: ${currentTimeLabel}`}
           >
