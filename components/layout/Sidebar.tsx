@@ -321,10 +321,7 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
 
       {quantidadeColunasMobile > 0 ? (
         <nav
-          className="app-bottom-nav fixed inset-x-2 bottom-2 z-40 rounded-2xl border p-1.5 shadow-2xl backdrop-blur-xl lg:hidden"
-          style={{
-            paddingBottom: "max(0.375rem, env(safe-area-inset-bottom))",
-          }}
+          className="app-bottom-nav app-bottom-dock fixed inset-x-3 bottom-[calc(0.5rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-[28rem] rounded-[1.35rem] border p-1 shadow-[0_12px_32px_rgba(15,23,42,0.16)] backdrop-blur-2xl lg:hidden"
         >
           <div
             className="grid gap-1"
@@ -341,9 +338,9 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
                   key={item.href}
                   href={item.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[0.63rem] font-semibold transition-all ${
+                  className={`flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-[0.9rem] px-1 py-1.5 text-[0.6rem] font-semibold transition-all ${
                     ativo
-                      ? "bg-violet-50 text-violet-800"
+                      ? "bg-violet-600/10 text-violet-800 shadow-sm ring-1 ring-violet-500/10"
                       : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                   }`}
                 >
@@ -361,9 +358,9 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(true)}
-                className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[0.63rem] font-semibold transition-all ${
+                className={`flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-[0.9rem] px-1 py-1.5 text-[0.6rem] font-semibold transition-all ${
                   menuExtraAtivo
-                    ? "bg-violet-50 text-violet-800"
+                    ? "bg-violet-600/10 text-violet-800 shadow-sm ring-1 ring-violet-500/10"
                     : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                 }`}
                 aria-label="Abrir outros módulos"

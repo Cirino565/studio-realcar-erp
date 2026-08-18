@@ -960,7 +960,7 @@ export default function AgendaCalendar({
     <>
       <section className="relative w-full max-w-full overflow-hidden border border-slate-300 bg-white text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:rounded-xl">
       <div className="border-b border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-900">
-        <div className="flex min-h-14 flex-col gap-2 px-2 py-2 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center lg:gap-4 lg:px-3">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-1.5 gap-y-1 px-2 py-1.5 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:gap-4 lg:px-3 lg:py-2">
           <div className="flex min-w-0 items-center gap-1.5">
             <div className="flex shrink-0 overflow-hidden rounded-lg border border-violet-300 bg-white dark:border-violet-500/50 dark:bg-slate-950">
               <a
@@ -1016,7 +1016,7 @@ export default function AgendaCalendar({
             <button
               type="button"
               onClick={openCalendar}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-violet-700 transition hover:bg-violet-50 dark:text-violet-200 dark:hover:bg-violet-500/10"
+              className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-md text-violet-700 transition hover:bg-violet-50 dark:text-violet-200 dark:hover:bg-violet-500/10 sm:flex"
               title={formatDateCompact(selectedDate)}
               aria-label="Abrir calendário"
             >
@@ -1024,14 +1024,20 @@ export default function AgendaCalendar({
             </button>
           </div>
 
-          <div className="order-3 min-w-0 lg:order-none">
+          <div className="order-3 col-span-2 min-w-0 lg:order-none lg:col-span-1">
             <div className="mb-1 flex items-center justify-between gap-3 px-1">
-              <p
-                className="truncate text-[0.7rem] font-extrabold capitalize tracking-wide text-slate-600 dark:text-slate-200 sm:text-xs"
-                aria-live="polite"
+              <button
+                type="button"
+                onClick={openCalendar}
+                className="flex min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5 text-left text-[0.7rem] font-extrabold capitalize tracking-wide text-slate-600 transition hover:bg-violet-50 hover:text-violet-700 dark:text-slate-200 dark:hover:bg-violet-500/10 dark:hover:text-violet-100 sm:text-xs"
+                title="Abrir calendário"
+                aria-label={`Abrir calendário de ${formatMonthYear(dateStripVisibleMonth)}`}
               >
-                {formatMonthYear(dateStripVisibleMonth)}
-              </p>
+                <CalendarDays size={13} className="shrink-0 text-violet-600 sm:hidden" />
+                <span className="truncate" aria-live="polite">
+                  {formatMonthYear(dateStripVisibleMonth)}
+                </span>
+              </button>
               <span className="hidden text-[0.65rem] font-medium text-slate-400 sm:inline dark:text-slate-500">
                 Deslize para navegar
               </span>
@@ -1059,7 +1065,7 @@ export default function AgendaCalendar({
                       aria-current={active ? "date" : undefined}
                       aria-label={`${formatWeekday(day)}, ${formatDateCompact(day)}${todayItem ? ", hoje" : ""}`}
                       title={formatDateCompact(day)}
-                      className={`relative flex h-[52px] w-11 snap-center flex-none flex-col items-center justify-center rounded-xl border text-center transition sm:h-12 sm:w-16 ${
+                      className={`relative flex h-11 w-10 snap-center flex-none flex-col items-center justify-center rounded-xl border text-center transition sm:h-12 sm:w-16 ${
                         active
                           ? "border-violet-700 bg-violet-700 text-white shadow-[0_5px_14px_rgba(109,40,217,0.22)]"
                           : todayItem
@@ -1094,17 +1100,17 @@ export default function AgendaCalendar({
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-1.5">
+          <div className="order-2 flex items-center justify-end gap-1 lg:order-none lg:gap-1.5">
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setShowVisibilityPanel((current) => !current)}
-                className="flex h-9 items-center gap-2 rounded-md px-2.5 text-violet-700 transition hover:bg-violet-50 dark:text-violet-200 dark:hover:bg-violet-500/10"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-violet-700 transition hover:bg-violet-50 dark:text-violet-200 dark:hover:bg-violet-500/10 sm:h-9 sm:w-auto sm:gap-2 sm:rounded-md sm:px-2.5"
                 title="Selecionar agendas"
               >
                 <UsersRound size={18} />
                 <span className="hidden text-xs font-bold sm:inline">Agendas</span>
-                <ChevronDown size={13} />
+                <ChevronDown size={13} className="hidden sm:block" />
               </button>
 
               {showVisibilityPanel ? (
@@ -1171,7 +1177,7 @@ export default function AgendaCalendar({
               type="button"
               onClick={abrirNovoPadrao}
               disabled={isClosedDay || (!visibleProfessionals[0] && !profissionais[0])}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-700 text-white shadow-md shadow-violet-700/25 transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50 sm:h-11 sm:w-11"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-700 text-white shadow-md shadow-violet-700/25 transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50 sm:h-11 sm:w-11"
               title="Novo agendamento"
             >
               <Plus size={21} />
@@ -1425,8 +1431,8 @@ export default function AgendaCalendar({
           ref={agendaScrollRef}
           className={
             shouldEnableHorizontalScroll
-              ? "max-h-[calc(100dvh-220px)] w-full max-w-full overflow-auto overscroll-contain pb-[calc(140px+env(safe-area-inset-bottom))] lg:pb-0"
-              : "max-h-[calc(100dvh-220px)] w-full max-w-full overflow-y-auto overflow-x-hidden overscroll-contain pb-[calc(140px+env(safe-area-inset-bottom))] lg:pb-0"
+              ? "max-h-[calc(100dvh-165px)] w-full max-w-full overflow-auto overscroll-contain pb-[calc(78px+env(safe-area-inset-bottom))] lg:pb-0"
+              : "max-h-[calc(100dvh-165px)] w-full max-w-full overflow-y-auto overflow-x-hidden overscroll-contain pb-[calc(78px+env(safe-area-inset-bottom))] lg:pb-0"
           }
         >
           <div
