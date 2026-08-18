@@ -948,29 +948,37 @@ function LeadCard({
 
           {/* So faz sentido perguntar isso para quem veio de clique de
               anuncio - lead criado a mao ja teve conversa de verdade na
-              hora do cadastro. */}
+              hora do cadastro.
+              Texto das opcoes curto de proposito: a primeira versao repetia
+              "no WhatsApp" em cada opcao e o texto nao cabia no cartao,
+              brigando com a setinha do menu. */}
           {lead.codigoAtendimento ? (
-            <select
-              value={lead.chamouWhatsapp}
-              onChange={(event) =>
-                onChamouWhatsappChange(
-                  lead.id,
-                  event.target.value as "Chamou" | "Não chamou" | "A verificar",
-                )
-              }
-              disabled={isPending}
-              className={`h-10 rounded-2xl border px-3 text-xs font-medium outline-none focus:border-violet-400/40 ${
-                lead.chamouWhatsapp === "Chamou"
-                  ? "border-emerald-300/20 bg-emerald-400/10 text-emerald-100"
-                  : lead.chamouWhatsapp === "Não chamou"
-                    ? "border-rose-300/20 bg-rose-400/10 text-rose-100"
-                    : "border-amber-300/20 bg-amber-400/10 text-amber-100"
-              }`}
-            >
-              <option value="A verificar">Chamou no WhatsApp? · A verificar</option>
-              <option value="Chamou">✓ Chamou no WhatsApp</option>
-              <option value="Não chamou">✕ Não chamou no WhatsApp</option>
-            </select>
+            <label className="grid gap-1">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                Chamou no WhatsApp?
+              </span>
+              <select
+                value={lead.chamouWhatsapp}
+                onChange={(event) =>
+                  onChamouWhatsappChange(
+                    lead.id,
+                    event.target.value as "Chamou" | "Não chamou" | "A verificar",
+                  )
+                }
+                disabled={isPending}
+                className={`h-10 w-full rounded-2xl border pl-3 pr-2 text-xs font-medium outline-none focus:border-violet-400/40 ${
+                  lead.chamouWhatsapp === "Chamou"
+                    ? "border-emerald-300/20 bg-emerald-400/10 text-emerald-100"
+                    : lead.chamouWhatsapp === "Não chamou"
+                      ? "border-rose-300/20 bg-rose-400/10 text-rose-100"
+                      : "border-amber-300/20 bg-amber-400/10 text-amber-100"
+                }`}
+              >
+                <option value="A verificar">A verificar</option>
+                <option value="Chamou">✓ Chamou</option>
+                <option value="Não chamou">✕ Não chamou</option>
+              </select>
+            </label>
           ) : null}
 
           <div className="grid grid-cols-2 gap-2">
