@@ -106,6 +106,7 @@ type Props = {
   initialDate: string;
   initialProfissionalFiltro: string;
   initialClienteId?: string | null;
+  initialAgendamentoId?: string | null;
   initialView: "day" | "week";
   horarioAtendimento?: string | null;
   podeEditarCliente: boolean;
@@ -186,6 +187,7 @@ export default function AgendaClient({
   initialDate,
   initialProfissionalFiltro,
   initialClienteId,
+  initialAgendamentoId,
   initialView,
   horarioAtendimento,
   podeEditarCliente,
@@ -220,7 +222,18 @@ export default function AgendaClient({
   }, [agendamentos]);
 
   const [selectedAppointment, setSelectedAppointment] =
-    useState<AgendamentoAgenda | null>(null);
+    useState<AgendamentoAgenda | null>(() => {
+      if (!initialAgendamentoId) return null;
+
+      const id = Number(initialAgendamentoId);
+
+      if (!Number.isFinite(id)) return null;
+
+      return (
+        agendamentos.find((agendamento) => agendamento.id === id) ??
+        null
+      );
+    });
 
   const [messageAppointment, setMessageAppointment] =
     useState<AgendamentoAgenda | null>(null);

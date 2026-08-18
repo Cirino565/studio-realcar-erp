@@ -28,6 +28,23 @@ type ClienteComAgenda = Cliente & {
  * Proximo agendamento futuro da cliente, ignorando os cancelados.
  * Devolve null quando nao ha nada marcado daqui pra frente.
  */
+function toAgendaDate(value: Date | string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "America/Sao_Paulo",
+  }).formatToParts(new Date(value));
+
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+
+  if (!year || !month || !day) return "";
+
+  return `${year}-${month}-${day}`;
+}
+
 function proximoAgendamento(cliente: ClienteComAgenda) {
   const agora = new Date();
 
@@ -53,15 +70,23 @@ function ProximoAgendamento({ cliente }: { cliente: ClienteComAgenda }) {
     );
   }
 
+  const dataAgenda = toAgendaDate(proximo.data);
+
   return (
-    <span className="inline-flex flex-col">
-      <span className="font-bold text-violet-700 dark:text-violet-300">
+    <Link
+      href={`/agenda?data=${dataAgenda}&agendamentoId=${proximo.id}`}
+      className="group inline-flex max-w-full flex-col rounded-lg px-1.5 py-1 -mx-1.5 -my-1 transition hover:bg-violet-50 focus:outline-none focus:ring-2 focus:ring-violet-400/40 dark:hover:bg-violet-500/10"
+      title="Abrir este agendamento na agenda"
+      aria-label={`Abrir agendamento de ${formatarData(proximo.data)} na agenda`}
+    >
+      <span className="font-bold text-violet-700 transition group-hover:text-violet-900 group-hover:underline dark:text-violet-300 dark:group-hover:text-violet-200">
         {formatarData(proximo.data)}
       </span>
-      <span className="truncate text-xs text-slate-500">
+
+      <span className="truncate text-xs text-slate-500 transition group-hover:text-slate-700 dark:group-hover:text-slate-300">
         {proximo.procedimento}
       </span>
-    </span>
+    </Link>
   );
 }
 

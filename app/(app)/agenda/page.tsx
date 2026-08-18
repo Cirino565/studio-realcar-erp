@@ -147,6 +147,11 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
     "clienteId",
   );
 
+  const agendamentoIdParam = getParam(
+    resolvedSearchParams,
+    "agendamentoId",
+  );
+
   const [
     clientes,
     profissionais,
@@ -378,6 +383,7 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
         initialDate={toDateInput(dataSelecionada)}
         initialProfissionalFiltro={profissionalFiltro}
         initialClienteId={clienteIdParam}
+        initialAgendamentoId={agendamentoIdParam}
         initialView={viewMode}
         horarioAtendimento={configuracaoClinica?.horarioAtendimento || null}
         podeEditarCliente={podeEditarCliente}
