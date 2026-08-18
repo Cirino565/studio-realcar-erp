@@ -1,6 +1,7 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -213,6 +214,10 @@ export default function AgendaClient({
 
   const [agendamentosAtuais, setAgendamentosAtuais] =
     useState<AgendamentoAgenda[]>(agendamentos);
+
+  useEffect(() => {
+    setAgendamentosAtuais(agendamentos);
+  }, [agendamentos]);
 
   const [selectedAppointment, setSelectedAppointment] =
     useState<AgendamentoAgenda | null>(null);

@@ -274,6 +274,7 @@ export default function NovoAgendamentoModal({
   const [disponibilidadeVersao, setDisponibilidadeVersao] = useState(0);
   const [isLoadingHorarios, startHorariosTransition] = useTransition();
   const conteudoScrollRef = useRef<HTMLDivElement>(null);
+  const modalInicializadoRef = useRef(false);
 
   useLockBodyScroll(open);
 
@@ -294,7 +295,13 @@ export default function NovoAgendamentoModal({
     !modoEdicao && !modoEdicaoBloqueio ? areaPadraoAgendamento : null;
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      modalInicializadoRef.current = false;
+      return;
+    }
+
+    if (modalInicializadoRef.current) return;
+    modalInicializadoRef.current = true;
 
     const temClientePreSelecionado = Boolean(initialPayload?.clienteId);
     const deveBloquearCliente = Boolean(temClientePreSelecionado && !modoEdicao);
@@ -709,11 +716,11 @@ export default function NovoAgendamentoModal({
         // instante para comecar.
         setSalvando(false);
         setSucesso(true);
+        router.refresh();
 
         setTimeout(() => {
           onClose();
-          router.refresh();
-        }, 900);
+        }, 1400);
       } catch (error) {
         setSalvando(false);
         setErroTitulo("Não foi possível salvar o bloqueio");
@@ -815,11 +822,11 @@ export default function NovoAgendamentoModal({
       // instante para comecar.
       setSalvando(false);
       setSucesso(true);
+      router.refresh();
 
       setTimeout(() => {
         onClose();
-        router.refresh();
-      }, 900);
+      }, 1400);
     } catch (error) {
       setSalvando(false);
       setErroTitulo("Não foi possível salvar o agendamento");
@@ -849,11 +856,11 @@ export default function NovoAgendamentoModal({
       await excluirBloqueioAgenda(initialPayload.bloqueioId);
       setSalvando(false);
       setSucesso(true);
+      router.refresh();
 
       setTimeout(() => {
         onClose();
-        router.refresh();
-      }, 900);
+      }, 1400);
     } catch (error) {
       setSalvando(false);
       setErroTitulo("Não foi possível excluir o bloqueio");
@@ -889,11 +896,11 @@ export default function NovoAgendamentoModal({
       });
       setSalvando(false);
       setSucesso(true);
+      router.refresh();
 
       setTimeout(() => {
         onClose();
-        router.refresh();
-      }, 900);
+      }, 1400);
     } catch (error) {
       setSalvando(false);
       setErro(
