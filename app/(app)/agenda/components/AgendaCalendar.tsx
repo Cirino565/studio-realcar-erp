@@ -71,6 +71,7 @@ type Props = {
   profissionais: ProfissionalAgenda[];
   todosProfissionais: ProfissionalAgenda[];
   agendamentos: AgendamentoAgenda[];
+  focusAgendamentoId?: string | null;
   bloqueios: BloqueioAgenda[];
   onNovoHorario: (payload: NovoHorarioPayload) => void;
   onSelectAppointment: (appointment: AgendamentoAgenda) => void;
@@ -395,6 +396,7 @@ export default function AgendaCalendar({
   profissionais,
   todosProfissionais,
   agendamentos,
+  focusAgendamentoId,
   bloqueios,
   onNovoHorario,
   onSelectAppointment,
@@ -520,6 +522,9 @@ export default function AgendaCalendar({
   const dateStripScrollFrameRef = useRef<number | null>(null);
   const agendaScrollRef = useRef<HTMLDivElement | null>(null);
   const autoScrolledAgendaKeyRef = useRef<string | null>(null);
+  const focusAgendamentoConsumidoRef = useRef<number | null>(null);
+  const [agendamentoDestacadoId, setAgendamentoDestacadoId] =
+    useState<number | null>(null);
   const agendaSwipeStartRef = useRef<{ x: number; y: number } | null>(null);
   const [mostrarBotaoAgora, setMostrarBotaoAgora] = useState(false);
 
@@ -945,7 +950,14 @@ export default function AgendaCalendar({
   ]);
 
   useEffect(() => {
-    if (viewMode !== "day" || isClosedDay || !selectedDateIsToday) return;
+    if (
+      viewMode !== "day" ||
+      isClosedDay ||
+      !selectedDateIsToday ||
+      Boolean(focusAgendamentoId)
+    ) {
+      return;
+    }
 
     const container = agendaScrollRef.current;
     const autoScrollKey = `${selectedDateInput}-${viewMode}`;
@@ -976,11 +988,72 @@ export default function AgendaCalendar({
     return () => window.cancelAnimationFrame(frame);
   }, [
     agendaStartMinutes,
+    focusAgendamentoId,
     isClosedDay,
     now,
     selectedDateInput,
     selectedDateIsToday,
     totalMinutes,
+    viewMode,
+  ]);
+
+  useEffect(() => {
+    if (!focusAgendamentoId || viewMode !== "day") return;
+
+    const id = Number(focusAgendamentoId);
+
+    if (
+      !Number.isFinite(id) ||
+      focusAgendamentoConsumidoRef.current === id
+    ) {
+      return;
+    }
+
+    const agendamento = agendamentos.find(
+      (item) => item.id === id,
+    );
+
+    if (!agendamento) return;
+
+    if (
+      formatSaoPauloDateKey(agendamento.data) !==
+      selectedDateInput
+    ) {
+      return;
+    }
+
+    focusAgendamentoConsumidoRef.current = id;
+    setAgendamentoDestacadoId(id);
+
+    const frame = window.requestAnimationFrame(() => {
+      const elemento =
+        document.querySelector<HTMLElement>(
+          `[data-agendamento-id="${id}"]`,
+        );
+
+      if (!elemento) return;
+
+      elemento.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+        inline: "center",
+      });
+    });
+
+    const timer = window.setTimeout(() => {
+      setAgendamentoDestacadoId((atual) =>
+        atual === id ? null : atual,
+      );
+    }, 3200);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
+  }, [
+    agendamentos,
+    focusAgendamentoId,
+    selectedDateInput,
     viewMode,
   ]);
 
@@ -1864,10 +1937,13 @@ export default function AgendaCalendar({
                       const statusPalette = getStatusPalette(appointment.status);
                       const isCompactAppointment = height < 70;
                       const isNextAppointment = nextAppointmentIds.has(appointment.id);
+                      const isFocusedAppointment =
+                        agendamentoDestacadoId === appointment.id;
 
                       return (
                         <article
                           key={appointment.id}
+                          data-agendamento-id={appointment.id}
                           role="button"
                           tabIndex={0}
                           onClick={() => onSelectAppointment(appointment)}
@@ -1876,14 +1952,23 @@ export default function AgendaCalendar({
                               onSelectAppointment(appointment);
                             }
                           }}
-                          className="absolute left-0.5 right-0.5 z-10 cursor-pointer overflow-hidden rounded-sm border text-left shadow-sm transition hover:brightness-105 hover:shadow-md sm:left-0.5 sm:right-0.5"
+                          className="absolute left-0.5 right-0.5 z-10 cursor-pointer overflow-hidden rounded-sm border text-left shadow-sm transition-all duration-300 hover:brightness-105 hover:shadow-md sm:left-0.5 sm:right-0.5"
                           style={{
                             top,
                             height,
                             color: statusPalette.text,
                             borderColor: statusPalette.overlayBorder,
                             background: `linear-gradient(135deg, ${statusPalette.solid}, ${statusPalette.gradientEnd})`,
-                            boxShadow: `inset 3px 0 0 ${palette.solid}`,
+                            boxShadow: isFocusedAppointment
+                              ? `0 0 0 3px rgba(124,58,237,.38), 0 12px 30px rgba(124,58,237,.28), inset 3px 0 0 ${palette.solid}`
+                              : `inset 3px 0 0 ${palette.solid}`,
+                            zIndex: isFocusedAppointment ? 30 : 10,
+                            outline: isFocusedAppointment
+                              ? "2px solid rgba(167,139,250,.72)"
+                              : undefined,
+                            outlineOffset: isFocusedAppointment
+                              ? "2px"
+                              : undefined,
                           }}
                         >
                           <div

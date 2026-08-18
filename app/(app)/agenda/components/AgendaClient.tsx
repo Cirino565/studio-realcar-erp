@@ -222,18 +222,7 @@ export default function AgendaClient({
   }, [agendamentos]);
 
   const [selectedAppointment, setSelectedAppointment] =
-    useState<AgendamentoAgenda | null>(() => {
-      if (!initialAgendamentoId) return null;
-
-      const id = Number(initialAgendamentoId);
-
-      if (!Number.isFinite(id)) return null;
-
-      return (
-        agendamentos.find((agendamento) => agendamento.id === id) ??
-        null
-      );
-    });
+    useState<AgendamentoAgenda | null>(null);
 
   const [messageAppointment, setMessageAppointment] =
     useState<AgendamentoAgenda | null>(null);
@@ -461,6 +450,7 @@ export default function AgendaClient({
             profissionais={profissionaisVisiveis}
             todosProfissionais={profissionais}
             agendamentos={agendamentosAtuais}
+            focusAgendamentoId={initialAgendamentoId}
             bloqueios={bloqueios}
             onNovoHorario={abrirNovoHorario}
             onSelectAppointment={setSelectedAppointment}
