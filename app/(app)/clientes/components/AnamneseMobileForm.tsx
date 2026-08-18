@@ -982,16 +982,29 @@ export default function AnamneseMobileForm({
           name="intencao"
           value="rascunho"
           disabled={salvandoFormulario !== null}
+          aria-busy={salvandoFormulario === "rascunho"}
           className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:text-slate-200"
         >
-          {salvandoFormulario === "rascunho" ? (
-            <Loader2 size={17} className="animate-spin" />
-          ) : (
-            <Save size={17} />
-          )}
-          {salvandoFormulario === "rascunho"
-            ? "Salvando..."
-            : "Salvar rascunho"}
+          <span className="relative size-[17px] shrink-0">
+            <Save
+              size={17}
+              className={
+                salvandoFormulario === "rascunho"
+                  ? "absolute inset-0 opacity-0"
+                  : "absolute inset-0 opacity-100"
+              }
+            />
+            <Loader2
+              size={17}
+              className={
+                salvandoFormulario === "rascunho"
+                  ? "absolute inset-0 animate-spin opacity-100"
+                  : "absolute inset-0 opacity-0"
+              }
+            />
+          </span>
+
+          <span>Salvar rascunho</span>
         </button>
 
         <button
@@ -999,16 +1012,29 @@ export default function AnamneseMobileForm({
           name="intencao"
           value="finalizar"
           disabled={salvandoFormulario !== null}
-          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 text-sm font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+          aria-busy={salvandoFormulario === "finalizar"}
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 text-sm font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-70"
         >
-          {salvandoFormulario === "finalizar" ? (
-            <Loader2 size={18} className="animate-spin" />
-          ) : (
-            <ShieldCheck size={18} />
-          )}
-          {salvandoFormulario === "finalizar"
-            ? "Finalizando..."
-            : "Finalizar e assinar"}
+          <span className="relative size-[18px] shrink-0">
+            <ShieldCheck
+              size={18}
+              className={
+                salvandoFormulario === "finalizar"
+                  ? "absolute inset-0 opacity-0"
+                  : "absolute inset-0 opacity-100"
+              }
+            />
+            <Loader2
+              size={18}
+              className={
+                salvandoFormulario === "finalizar"
+                  ? "absolute inset-0 animate-spin opacity-100"
+                  : "absolute inset-0 opacity-0"
+              }
+            />
+          </span>
+
+          <span>Finalizar e assinar</span>
         </button>
       </div>
     </form>
