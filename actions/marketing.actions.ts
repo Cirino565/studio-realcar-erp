@@ -57,6 +57,7 @@ export type AgendarAvaliacaoLeadInput = {
   hora: string;
   duracao: number;
   valor: number;
+  sinalPago?: boolean;
 };
 
 function limparTexto(value?: string | null) {
@@ -786,10 +787,16 @@ export async function agendarAvaliacaoLead(dados: AgendarAvaliacaoLeadInput) {
     const agendamento = agendamentoEditavel
       ? await tx.agendamento.update({
           where: { id: agendamentoEditavel.id },
-          data: dadosAgendamento,
+          data: {
+            ...dadosAgendamento,
+            ...(dados.sinalPago ? { sinalPago: true } : {}),
+          },
         })
       : await tx.agendamento.create({
-          data: dadosAgendamento,
+          data: {
+            ...dadosAgendamento,
+            sinalPago: Boolean(dados.sinalPago),
+          },
         });
 
     await tx.lead.update({
@@ -807,7 +814,7 @@ export async function agendarAvaliacaoLead(dados: AgendarAvaliacaoLeadInput) {
       data: {
         leadId: lead.id,
         tipo: agendamentoEditavel ? "Reagendamento" : "Agendamento",
-        descricao: `${procedimento} ${agendamentoEditavel ? "reagendado" : "agendado"} para ${dados.data} às ${dados.hora}. Agendamento #${agendamento.id}.`,
+        descricao: `${procedimento} ${agendamentoEditavel ? "reagendado" : "agendado"} para ${dados.data} às ${dados.hora}. Agendamento #${agendamento.id}.${dados.sinalPago ? " Sinal marcado como pago." : ""}`,
       },
     });
 

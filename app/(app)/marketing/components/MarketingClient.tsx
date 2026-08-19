@@ -1841,6 +1841,7 @@ function AgendarAvaliacaoModal({
   const [hora, setHora] = useState("");
   const [duracao, setDuracao] = useState("30");
   const [valor, setValor] = useState("0");
+  const [sinalPago, setSinalPago] = useState(false);
   const [horarios, setHorarios] = useState<{ hora: string; disponivel: boolean; motivo?: string }[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -1855,6 +1856,7 @@ function AgendarAvaliacaoModal({
     setHora("");
     setDuracao(String(servicoInicial?.duracaoPadrao || 30));
     setValor(String(servicoInicial?.valorPadrao || 0));
+    setSinalPago(false);
     setErro(null);
   }, [lead, profissionais, avaliacao]);
 
@@ -1912,6 +1914,7 @@ function AgendarAvaliacaoModal({
           hora,
           duracao: Number(duracao) || servicoParaAgendar.duracaoPadrao,
           valor: Number(valor) || 0,
+          sinalPago,
         });
         onSuccess();
       } catch (error) {
@@ -1931,8 +1934,30 @@ function AgendarAvaliacaoModal({
         </div>
         <div className="grid gap-4 sm:grid-cols-3"><Input label="Data" type="date" min={hojeInput()} value={data} onChange={setData} /><Input label="Duração, min" type="number" min="15" step="5" value={duracao} onChange={setDuracao} /><Input label="Valor" type="number" min="0" step="0.01" value={valor} onChange={setValor} /></div>
         <label className="grid gap-2 text-sm font-medium text-slate-300">Horário disponível<select value={hora} onChange={(event) => setHora(event.target.value)} disabled={loadingHorarios || disponiveis.length === 0} className="premium-input w-full bg-[#1d2437]"><option value="">{loadingHorarios ? "Carregando horários..." : disponiveis.length ? "Selecione" : "Nenhum horário disponível"}</option>{disponiveis.map((item) => <option key={item.hora} value={item.hora}>{item.hora}</option>)}</select></label>
+
+        <label className="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] px-4 py-3.5 transition hover:bg-emerald-400/[0.12]">
+          <span className="min-w-0">
+            <span className="block text-sm font-bold text-emerald-200">
+              Pagou sinal
+            </span>
+            <span className="mt-0.5 block text-xs leading-5 text-emerald-200/70">
+              Marque quando o cliente já tiver pago o sinal da reserva. O marcador aparecerá automaticamente na agenda.
+            </span>
+          </span>
+
+          <input
+            type="checkbox"
+            checked={sinalPago}
+            onChange={(event) => setSinalPago(event.target.checked)}
+            className="size-5 shrink-0 accent-emerald-500"
+          />
+        </label>
+
         {ocupados.length ? <div className="rounded-2xl border border-white/[0.08] bg-black/10 p-3"><p className="text-xs font-semibold text-slate-300">Alguns horários ocupados</p><div className="mt-2 space-y-1 text-xs text-slate-500">{ocupados.map((item) => <p key={item.hora}>{item.hora}: {item.motivo || "indisponível"}</p>)}</div></div> : null}
-        <div className="rounded-2xl border border-cyan-300/15 bg-cyan-400/8 p-3 text-xs leading-5 text-cyan-100">Ao salvar, o sistema reutiliza um cliente existente pelo telefone ou cria o cadastro necessário, gera o agendamento real e move o lead para Avaliação.</div>
+        <div className="rounded-2xl border border-cyan-300/15 bg-cyan-400/8 p-3 text-xs leading-5 text-cyan-100">
+          Ao salvar, o sistema reutiliza um cliente existente pelo telefone ou cria o cadastro necessário, gera o agendamento real e move o lead para Agendado.
+          {sinalPago ? " O sinal será marcado como pago na agenda." : ""}
+        </div>
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><Button type="button" variant="outline" onClick={onClose}>Cancelar</Button><Button type="button" onClick={salvar} disabled={pending || loadingHorarios || !hora}><CalendarPlus className="size-4" />{pending ? "Agendando..." : "Criar agendamento"}</Button></div>
       </div>
     </Modal>
