@@ -267,17 +267,108 @@ function dataInput(value?: Date | string | null) {
   }).format(date);
 }
 
+type FilaContatoTipo = "atrasado" | "novo" | "hoje" | "sem_data";
+
+type FilaContatoItem = {
+  lead: MarketingLead;
+  tipo: FilaContatoTipo;
+  prioridade: number;
+  label: string;
+  detalhe: string;
+  ordem: number;
+};
+
+function hojeSaoPauloInput() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function montarFilaContatoHoje(leads: MarketingLead[]): FilaContatoItem[] {
+  const hoje = hojeSaoPauloInput();
+
+  const itens = leads.flatMap<FilaContatoItem>((lead) => {
+    if (lead.etapa !== "Novo" && lead.etapa !== "Aguardando resposta") {
+      return [];
+    }
+
+    const dataProximoContato = lead.proximoContatoEm
+      ? dataInput(lead.proximoContatoEm)
+      : null;
+
+    // Se existe uma data futura, o CRM respeita o combinado e nao incomoda
+    // hoje. O lead reaparece automaticamente quando chegar o dia.
+    if (dataProximoContato && dataProximoContato > hoje) {
+      return [];
+    }
+
+    if (dataProximoContato && dataProximoContato < hoje) {
+      return [{
+        lead,
+        tipo: "atrasado",
+        prioridade: 0,
+        label: "Atrasado",
+        detalhe: `Retorno previsto para ${formatarData(lead.proximoContatoEm)}`,
+        ordem: new Date(lead.proximoContatoEm!).getTime(),
+      }];
+    }
+
+    if (lead.etapa === "Novo" && !dataProximoContato) {
+      return [{
+        lead,
+        tipo: "novo",
+        prioridade: 1,
+        label: "Novo lead",
+        detalhe: "Ainda precisa do primeiro acompanhamento",
+        ordem: new Date(lead.createdAt).getTime(),
+      }];
+    }
+
+    if (dataProximoContato === hoje) {
+      return [{
+        lead,
+        tipo: "hoje",
+        prioridade: 2,
+        label: "Retorno hoje",
+        detalhe: "Follow-up programado para hoje",
+        ordem: new Date(lead.proximoContatoEm!).getTime(),
+      }];
+    }
+
+    // Um lead em Aguardando resposta sem proxima data e um ponto cego.
+    // Ele fica visivel ate que seja agendado um retorno, agendado,
+    // convertido ou perdido.
+    return [{
+      lead,
+      tipo: "sem_data",
+      prioridade: 3,
+      label: "Sem retorno",
+      detalhe: "Aguardando resposta sem próximo contato programado",
+      ordem: new Date(lead.createdAt).getTime(),
+    }];
+  });
+
+  return itens.sort((a, b) => {
+    if (a.prioridade !== b.prioridade) {
+      return a.prioridade - b.prioridade;
+    }
+
+    return a.ordem - b.ordem;
+  });
+}
+
 function calcularResumo(leads: MarketingLead[], campanhas: MarketingCampanha[]): MarketingResumo {
   const leadsConvertidos = leads.filter((lead) => lead.etapa === "Convertido").length;
   const leadsPerdidos = leads.filter((lead) => lead.etapa === "Perdido").length;
   const leadsAtivos = leads.filter((lead) => lead.etapa !== "Convertido" && lead.etapa !== "Perdido").length;
 
-  // "Novo" e "Aguardando resposta" sao as duas colunas que exigem acao da
-  // pessoa que atende - "Agendado" e "Convertido" sao so consulta, ja tem
-  // data marcada ou ja fechou. Esse numero e a lista de tarefas do dia.
-  const leadsPendentesDeAcao = leads.filter(
-    (lead) => lead.etapa === "Novo" || lead.etapa === "Aguardando resposta",
-  ).length;
+  // Agora este numero representa trabalho real para hoje:
+  // atrasados + novos + retornos de hoje + aguardando sem data.
+  // Follow-up futuro nao entra antes da hora.
+  const leadsPendentesDeAcao = montarFilaContatoHoje(leads).length;
   const avaliacoesAgendadas = leads.filter((lead) => lead.agendamentoId && lead.etapa !== "Perdido").length;
   const pipelineTotal = leads.reduce((acc, lead) => acc + lead.valorPrevisto, 0);
   const pipelineAtivo = leads
@@ -406,6 +497,7 @@ export default function MarketingClient({
   const [tab, setTab] = useState<TabKey>("pipeline");
   const [pipelineModo, setPipelineModo] =
     useState<"ativos" | "encerrados">("ativos");
+  const [filaHojeAberta, setFilaHojeAberta] = useState(false);
   const [leadModal, setLeadModal] = useState(false);
   const [leadEditando, setLeadEditando] = useState<MarketingLead | null>(null);
   const [conflitoTelefone, setConflitoTelefone] = useState<ConflitoTelefoneLead | null>(null);
@@ -436,6 +528,20 @@ export default function MarketingClient({
   }, [leads, detalhesModal, mensagemModal, agendamentoModal]);
 
   const resumo = useMemo(() => calcularResumo(leads, campanhas), [campanhas, leads]);
+
+  const filaContatoHoje = useMemo(
+    () => montarFilaContatoHoje(leads),
+    [leads],
+  );
+
+  const resumoFilaHoje = useMemo(() => {
+    return {
+      atrasados: filaContatoHoje.filter((item) => item.tipo === "atrasado").length,
+      novos: filaContatoHoje.filter((item) => item.tipo === "novo").length,
+      hoje: filaContatoHoje.filter((item) => item.tipo === "hoje").length,
+      semData: filaContatoHoje.filter((item) => item.tipo === "sem_data").length,
+    };
+  }, [filaContatoHoje]);
 
   const origens = useMemo(() => {
     const valores = new Set(leads.map((lead) => lead.origem).filter((item): item is string => Boolean(item)));
@@ -673,43 +779,186 @@ export default function MarketingClient({
           </section>
         ) : null}
 
-        {/* "Novo" + "Aguardando resposta" e a lista de tarefas do dia -
-            e a unica coisa que precisa de acao. "Agendado" e "Convertido"
-            sao so consulta. Por isso fica em destaque, acima dos outros
-            numeros, nao misturado com eles. */}
-        <section
-          className={`flex flex-col gap-1 rounded-3xl border p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5 ${
-            resumo.leadsPendentesDeAcao > 0
-              ? "border-amber-300/25 bg-amber-400/10"
-              : "border-emerald-300/20 bg-emerald-400/8"
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className={`flex size-11 shrink-0 items-center justify-center rounded-2xl ${
-                resumo.leadsPendentesDeAcao > 0
-                  ? "bg-amber-400/20 text-amber-100"
-                  : "bg-emerald-400/20 text-emerald-100"
-              }`}
-            >
-              <Target className="size-5" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
-                Com quem falar hoje
-              </p>
-              <p className="mt-0.5 text-sm text-slate-300">
-                Leads em "Novo" ou "Aguardando resposta" - o resto é só consulta.
-              </p>
-            </div>
-          </div>
-          <p
-            className={`text-3xl font-bold sm:text-right ${
-              resumo.leadsPendentesDeAcao > 0 ? "text-amber-100" : "text-emerald-100"
+        {/* Fila operacional calculada automaticamente com os dados que o CRM
+            ja possui. Follow-up futuro so aparece no dia correto. */}
+        <section className="space-y-3">
+          <button
+            type="button"
+            onClick={() => setFilaHojeAberta((aberta) => !aberta)}
+            className={`flex w-full flex-col gap-3 rounded-3xl border p-4 text-left transition sm:flex-row sm:items-center sm:justify-between sm:p-5 ${
+              resumo.leadsPendentesDeAcao > 0
+                ? "border-amber-300/25 bg-amber-400/10 hover:bg-amber-400/[0.14]"
+                : "border-emerald-300/20 bg-emerald-400/8 hover:bg-emerald-400/[0.11]"
             }`}
           >
-            {resumo.leadsPendentesDeAcao}
-          </p>
+            <div className="flex items-center gap-3">
+              <div
+                className={`flex size-11 shrink-0 items-center justify-center rounded-2xl ${
+                  resumo.leadsPendentesDeAcao > 0
+                    ? "bg-amber-400/20 text-amber-100"
+                    : "bg-emerald-400/20 text-emerald-100"
+                }`}
+              >
+                <Target className="size-5" />
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  Com quem falar hoje
+                </p>
+
+                {resumo.leadsPendentesDeAcao > 0 ? (
+                  <p className="mt-0.5 text-sm text-slate-300">
+                    {resumoFilaHoje.atrasados > 0
+                      ? `${resumoFilaHoje.atrasados} atrasado(s) · `
+                      : ""}
+                    {resumoFilaHoje.novos > 0
+                      ? `${resumoFilaHoje.novos} novo(s) · `
+                      : ""}
+                    {resumoFilaHoje.hoje > 0
+                      ? `${resumoFilaHoje.hoje} retorno(s) hoje · `
+                      : ""}
+                    {resumoFilaHoje.semData > 0
+                      ? `${resumoFilaHoje.semData} sem retorno agendado`
+                      : ""}
+                  </p>
+                ) : (
+                  <p className="mt-0.5 text-sm text-emerald-200/80">
+                    Nenhum contato pendente para hoje.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-4 sm:justify-end">
+              <span
+                className={`text-xs font-semibold ${
+                  resumo.leadsPendentesDeAcao > 0
+                    ? "text-amber-200/70"
+                    : "text-emerald-200/70"
+                }`}
+              >
+                {filaHojeAberta ? "Fechar fila" : "Ver fila"}
+              </span>
+
+              <span
+                className={`text-3xl font-bold ${
+                  resumo.leadsPendentesDeAcao > 0
+                    ? "text-amber-100"
+                    : "text-emerald-100"
+                }`}
+              >
+                {resumo.leadsPendentesDeAcao}
+              </span>
+            </div>
+          </button>
+
+          {filaHojeAberta ? (
+            <div className="rounded-3xl border border-white/[0.10] bg-white/[0.045] p-3 sm:p-4">
+              <div className="mb-3 flex items-center justify-between gap-3 px-1">
+                <div>
+                  <h2 className="text-sm font-bold text-white">
+                    Fila automática de hoje
+                  </h2>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    A ordem é: atrasados, novos leads, retornos de hoje e contatos sem próxima data.
+                  </p>
+                </div>
+
+                <span className="rounded-full border border-white/[0.10] bg-white/[0.06] px-3 py-1 text-xs font-bold text-slate-300">
+                  {filaContatoHoje.length}
+                </span>
+              </div>
+
+              {filaContatoHoje.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-emerald-300/20 bg-emerald-400/[0.06] p-6 text-center">
+                  <CheckCircle2 className="mx-auto size-7 text-emerald-300" />
+                  <p className="mt-3 text-sm font-semibold text-emerald-100">
+                    Tudo em dia.
+                  </p>
+                  <p className="mt-1 text-xs text-emerald-200/60">
+                    O CRM não encontrou nenhum contato que precise de ação hoje.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-2">
+                  {filaContatoHoje.map((item, index) => {
+                    const badgeClass =
+                      item.tipo === "atrasado"
+                        ? "border-rose-300/20 bg-rose-400/10 text-rose-200"
+                        : item.tipo === "novo"
+                          ? "border-violet-300/20 bg-violet-400/10 text-violet-200"
+                          : item.tipo === "hoje"
+                            ? "border-amber-300/20 bg-amber-400/10 text-amber-200"
+                            : "border-slate-300/15 bg-white/[0.06] text-slate-300";
+
+                    return (
+                      <article
+                        key={item.lead.id}
+                        className="rounded-2xl border border-white/[0.08] bg-[#20283b]/72 p-3 sm:p-4"
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <button
+                            type="button"
+                            onClick={() => setDetalhesModal(item.lead)}
+                            className="min-w-0 flex-1 text-left"
+                          >
+                            <div className="flex items-start gap-3">
+                              <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-white/[0.07] text-xs font-black text-slate-300">
+                                {index + 1}
+                              </span>
+
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h3 className="truncate text-sm font-bold text-white">
+                                    {item.lead.nome}
+                                  </h3>
+
+                                  <span
+                                    className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${badgeClass}`}
+                                  >
+                                    {item.label}
+                                  </span>
+                                </div>
+
+                                <p className="mt-1 text-xs text-slate-400">
+                                  {item.detalhe}
+                                </p>
+
+                                <p className="mt-1 truncate text-[11px] text-slate-500">
+                                  {item.lead.interesse || "Interesse não informado"}
+                                  {" · "}
+                                  {item.lead.etapa}
+                                </p>
+                              </div>
+                            </div>
+                          </button>
+
+                          <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setMensagemModal(item.lead)}
+                              className="rounded-xl border border-emerald-300/15 bg-emerald-400/10 px-3 py-2 text-xs font-bold text-emerald-200 transition hover:bg-emerald-400/15"
+                            >
+                              WhatsApp
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setDetalhesModal(item.lead)}
+                              className="rounded-xl border border-white/[0.10] bg-white/[0.06] px-3 py-2 text-xs font-bold text-slate-200 transition hover:bg-white/[0.10]"
+                            >
+                              Detalhes
+                            </button>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : null}
         </section>
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
