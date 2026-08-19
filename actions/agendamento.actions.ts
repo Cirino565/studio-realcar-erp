@@ -46,7 +46,6 @@ type NovoAgendamento = {
   areaEstetica?: boolean;
   areaCilios?: boolean;
   recorrencia?: RecorrenciaAgendaInput;
-  excecaoHorarioFuncionamento?: boolean;
 };
 
 export type ResultadoSalvarAgenda =
@@ -480,15 +479,7 @@ async function validarConflitoAgenda(
   }
 }
 
-async function validarDatasNoHorarioFuncionamento(
-  datas: Date[],
-  ignorar?: boolean,
-) {
-  // Exceção deliberada (ex.: atender uma cliente antes do horário normal de
-  // abertura). A família decide isso conscientemente, marcando a caixinha
-  // na tela - não é um bug, é escolha de quem está agendando.
-  if (ignorar) return;
-
+async function validarDatasNoHorarioFuncionamento(datas: Date[]) {
   const configuracaoClinica = await prisma.configuracaoClinica.findFirst({
     select: {
       horarioAtendimento: true,
@@ -563,10 +554,7 @@ export async function criarAgendamento(
       ? 0
       : Math.max(0, Number(dados.valor) || 0);
 
-  await validarDatasNoHorarioFuncionamento(
-    datas,
-    dados.excecaoHorarioFuncionamento,
-  );
+  await validarDatasNoHorarioFuncionamento(datas);
 
   for (const data of datas) {
     const conflito = await obterConflitoAgenda({
@@ -657,7 +645,6 @@ export async function criarAgendamento(
             : Boolean(dados.sinalPago),
         naturezaAtendimento,
         agendamentoOrigemId,
-        excecaoHorarioFuncionamento: Boolean(dados.excecaoHorarioFuncionamento),
         serieId,
         recorrenciaTipo: serieId ? regra.tipo : null,
         recorrenciaIntervalo: serieId ? regra.intervalo : null,
@@ -695,10 +682,7 @@ export async function atualizarAgendamento({
       ? 0
       : Math.max(0, Number(dados.valor) || 0);
 
-  await validarDatasNoHorarioFuncionamento(
-    [data],
-    dados.excecaoHorarioFuncionamento,
-  );
+  await validarDatasNoHorarioFuncionamento([data]);
 
   const conflito = await obterConflitoAgenda({
     profissionalId: dados.profissionalId,
@@ -768,7 +752,6 @@ export async function atualizarAgendamento({
             : Boolean(dados.sinalPago),
         naturezaAtendimento,
         agendamentoOrigemId,
-        excecaoHorarioFuncionamento: Boolean(dados.excecaoHorarioFuncionamento),
         statusAntesAtendimento:
           dados.status === "Em atendimento" ? undefined : null,
       },
@@ -1339,22 +1322,32 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
       },
     });
 
+    // "Avaliação" e "Negociação" eram os nomes antigos do funil, trocados
+    // em 18/08 por "Agendado" e "Aguardando resposta". O atendimento
+    // concluido e prova de conversa de verdade - marca "Chamou no
+    // WhatsApp?" junto, se ainda estiver em "A verificar", pelo mesmo
+    // motivo das outras transicoes automaticas do funil.
     const leadVinculado = await tx.lead.findUnique({
       where: { agendamentoId: agendamento.id },
-      select: { id: true, etapa: true },
+      select: { id: true, etapa: true, chamouWhatsapp: true },
     });
 
-    if (leadVinculado?.etapa === "Avaliação") {
+    if (leadVinculado?.etapa === "Agendado") {
       await tx.lead.update({
         where: { id: leadVinculado.id },
-        data: { etapa: "Negociação" },
+        data: {
+          etapa: "Aguardando resposta",
+          ...(leadVinculado.chamouWhatsapp === "A verificar"
+            ? { chamouWhatsapp: "Chamou" }
+            : {}),
+        },
       });
 
       await tx.leadInteracao.create({
         data: {
           leadId: leadVinculado.id,
           tipo: "Atendimento",
-          descricao: `Atendimento concluído: ${procedimentoRealizado}. Lead movido automaticamente para Negociação.`,
+          descricao: `Atendimento concluído: ${procedimentoRealizado}. Lead movido automaticamente para Aguardando resposta.`,
         },
       });
     }

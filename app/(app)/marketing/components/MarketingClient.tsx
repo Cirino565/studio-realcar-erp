@@ -20,6 +20,7 @@ import {
   History,
   Link2,
   Megaphone,
+  Hash,
   MessageCircle,
   Pencil,
   Phone,
@@ -961,6 +962,17 @@ function LeadCard({
           <strong className="shrink-0 text-slate-100">{formatarMoeda(lead.valorPrevisto)}</strong>
         </div>
         {lead.telefone ? <div className="flex items-center gap-2"><Phone className="size-3.5 text-slate-500" /><span>{lead.telefone}</span></div> : null}
+        {/* So existe em lead que veio de clique de anuncio. Visivel direto
+            no cartao para nao precisar abrir Detalhes um por um so pra
+            achar o codigo e cruzar com a planilha de rastreamento. */}
+        {lead.codigoAtendimento ? (
+          <div className="flex items-center gap-2">
+            <Hash className="size-3.5 text-slate-500" />
+            <span className="font-mono text-[11px] tracking-tight text-slate-300">
+              {lead.codigoAtendimento}
+            </span>
+          </div>
+        ) : null}
         {lead.agendamento ? (
           <div className="rounded-xl border border-cyan-300/10 bg-cyan-400/8 px-2.5 py-2 text-cyan-100">
             <p className="font-semibold">{formatarDataHora(lead.agendamento.data)}</p>

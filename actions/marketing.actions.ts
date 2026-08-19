@@ -213,6 +213,7 @@ async function converterLeadInterno(id: number) {
         convertidoEm: new Date(),
         proximoContatoEm: null,
         motivoPerda: null,
+        ...chamouWhatsappSeAindaNaoMarcado(lead.chamouWhatsapp),
       },
     });
 
@@ -427,6 +428,20 @@ export async function atualizarChamouWhatsapp(
   revalidatePath("/marketing");
 }
 
+/**
+ * Sempre que o lead sai de "Novo" por um caminho que so acontece depois de
+ * uma conversa de verdade - mover a etapa a mao, agendar, converter - o
+ * "Chamou no WhatsApp?" e marcado junto, se ainda estiver em "A verificar".
+ * Poupa o segundo clique: quem move o lead ja confirmou que houve conversa.
+ *
+ * "Perdido" fica de fora de proposito. Ir pra Perdido pode ser porque a
+ * pessoa nunca respondeu nada - marcar "Chamou" nesse caso estragaria
+ * justamente a métrica que esse campo existe para medir.
+ */
+function chamouWhatsappSeAindaNaoMarcado(chamouAtual: string) {
+  return chamouAtual === "A verificar" ? { chamouWhatsapp: "Chamou" } : {};
+}
+
 export async function atualizarEtapaLead(id: number, etapa: LeadEtapa) {
   await requirePermission("marketing.gerenciar");
 
@@ -442,7 +457,10 @@ export async function atualizarEtapaLead(id: number, etapa: LeadEtapa) {
     throw new Error("Informe o motivo da perda para encerrar este lead.");
   }
 
-  const anterior = await prisma.lead.findUnique({ where: { id }, select: { etapa: true, nome: true } });
+  const anterior = await prisma.lead.findUnique({
+    where: { id },
+    select: { etapa: true, nome: true, chamouWhatsapp: true },
+  });
   if (!anterior) throw new Error("Lead não encontrado.");
 
   await prisma.$transaction(async (tx) => {
@@ -451,6 +469,7 @@ export async function atualizarEtapaLead(id: number, etapa: LeadEtapa) {
       data: {
         etapa,
         motivoPerda: null,
+        ...chamouWhatsappSeAindaNaoMarcado(anterior.chamouWhatsapp),
       },
     });
 
@@ -780,6 +799,7 @@ export async function agendarAvaliacaoLead(dados: AgendarAvaliacaoLeadInput) {
         agendamentoId: agendamento.id,
         etapa: "Agendado",
         proximoContatoEm: null,
+        ...chamouWhatsappSeAindaNaoMarcado(lead.chamouWhatsapp),
       },
     });
 
