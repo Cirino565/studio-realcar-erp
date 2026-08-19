@@ -51,6 +51,7 @@ import {
   registrarContatoLead,
   registrarCustoCampanha,
   registrarObservacaoLead,
+  registrarResultadoContatoLead,
   verificarTelefoneLead,
   vincularClienteCampanha,
   vincularLeadAOutroCliente,
@@ -368,6 +369,17 @@ function montarFilaContatoHoje(leads: MarketingLead[]): FilaContatoItem[] {
 
     return a.ordem - b.ordem;
   });
+}
+
+function contarTentativasSemResposta(lead: MarketingLead) {
+  return lead.interacoes.filter((interacao) => {
+    const descricao = normalizarTexto(interacao.descricao || "");
+
+    return (
+      interacao.tipo === "Tentativa sem resposta" ||
+      descricao.includes("resultado do contato: nao respondeu")
+    );
+  }).length;
 }
 
 function calcularResumo(leads: MarketingLead[], campanhas: MarketingCampanha[]): MarketingResumo {
@@ -864,33 +876,19 @@ export default function MarketingClient({
     lead: MarketingLead,
     resultado: string,
     dias: number,
+    houveResposta: boolean,
   ) {
     setErro(null);
     setLeadAcaoRapidaId(lead.id);
 
     startTransition(async () => {
       try {
-        const dataRetorno = dataFuturaEmDiasInput(dias);
-
-        // Primeiro programa o retorno para impedir que a automacao
-        // padrao de Aguardando resposta crie outro D+2.
-        await definirProximoContatoLead(
-          lead.id,
-          dataRetorno,
-        );
-
-        if (lead.etapa === "Novo") {
-          await atualizarEtapaLead(
-            lead.id,
-            "Aguardando resposta",
-          );
-        }
-
-        // Guarda o contexto comercial no historico.
-        await registrarObservacaoLead(
-          lead.id,
-          `Resultado do contato: ${resultado}`,
-        );
+        await registrarResultadoContatoLead({
+          leadId: lead.id,
+          resultado,
+          proximoContato: dataFuturaEmDiasInput(dias),
+          houveResposta,
+        });
 
         router.refresh();
       } catch (error) {
@@ -902,6 +900,22 @@ export default function MarketingClient({
       } finally {
         setLeadAcaoRapidaId(null);
       }
+    });
+  }
+
+  function encerrarSemRespostaRapido(lead: MarketingLead) {
+    const tentativas = contarTentativasSemResposta(lead);
+
+    if (tentativas < 3) return;
+
+    const confirmar = window.confirm(
+      `Este lead já teve ${tentativas} tentativa(s) sem resposta. Encerrar como Perdido por "Sem resposta"?`,
+    );
+
+    if (!confirmar) return;
+
+    executar(async () => {
+      await marcarLeadPerdido(lead.id, "Sem resposta");
     });
   }
 
@@ -1046,6 +1060,9 @@ export default function MarketingClient({
               ) : (
                 <div className="grid gap-2">
                   {filaContatoHoje.map((item, index) => {
+                    const tentativasSemResposta =
+                      contarTentativasSemResposta(item.lead);
+
                     const badgeClass =
                       item.tipo === "atrasado"
                         ? "border-rose-300/20 bg-rose-400/10 text-rose-200"
@@ -1093,6 +1110,18 @@ export default function MarketingClient({
                                   {" · "}
                                   {item.lead.etapa}
                                 </p>
+
+                                {tentativasSemResposta > 0 ? (
+                                  <span
+                                    className={`mt-2 inline-flex rounded-full border px-2 py-1 text-[10px] font-bold ${
+                                      tentativasSemResposta >= 3
+                                        ? "border-rose-300 bg-rose-50 text-rose-800"
+                                        : "border-slate-200 bg-slate-50 text-slate-600"
+                                    }`}
+                                  >
+                                    {tentativasSemResposta} tentativa(s) sem resposta
+                                  </span>
+                                ) : null}
                               </div>
                             </div>
                           </button>
@@ -1147,6 +1176,7 @@ export default function MarketingClient({
                                       item.lead,
                                       "Não respondeu. Novo retorno programado para o dia seguinte.",
                                       1,
+                                      false,
                                     )
                                   }
                                   disabled={isPending}
@@ -1165,6 +1195,7 @@ export default function MarketingClient({
                                       item.lead,
                                       "Cliente está pesquisando preços antes de decidir.",
                                       2,
+                                      true,
                                     )
                                   }
                                   disabled={isPending}
@@ -1183,6 +1214,7 @@ export default function MarketingClient({
                                       item.lead,
                                       "Cliente informou que vai pensar antes de decidir.",
                                       2,
+                                      true,
                                     )
                                   }
                                   disabled={isPending}
@@ -1201,6 +1233,7 @@ export default function MarketingClient({
                                       item.lead,
                                       "Cliente pediu mais tempo antes de um novo contato.",
                                       3,
+                                      true,
                                     )
                                   }
                                   disabled={isPending}
@@ -1212,6 +1245,19 @@ export default function MarketingClient({
                                   </span>
                                 </button>
                               </div>
+
+                              {tentativasSemResposta >= 3 ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    encerrarSemRespostaRapido(item.lead)
+                                  }
+                                  disabled={isPending}
+                                  className="mt-2 w-full rounded-xl border border-rose-300 bg-rose-50 px-3 py-2 text-[11px] font-bold text-rose-800 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  Encerrar como sem resposta
+                                </button>
+                              ) : null}
                             </div>
 
                             {leadAcaoRapidaId === item.lead.id && isPending ? (
@@ -1656,6 +1702,10 @@ function LeadCard({
   podeGerenciarAgenda: boolean;
 }) {
   const atrasado = followUpAtrasado(lead);
+  const tentativasSemResposta = contarTentativasSemResposta(lead);
+  const retornoHoje =
+    Boolean(lead.proximoContatoEm) &&
+    dataInput(lead.proximoContatoEm) === hojeSaoPauloInput();
 
   return (
     <article className="rounded-3xl border border-white/[0.10] bg-[#20283b]/88 p-4 shadow-lg shadow-black/10">
@@ -1680,15 +1730,35 @@ function LeadCard({
         {lead.proximoContatoEm &&
         (lead.etapa === "Novo" || lead.etapa === "Aguardando resposta") ? (
           <div
-            className={`flex items-center gap-2 ${
-              atrasado ? "font-semibold text-amber-200" : "text-violet-200"
+            className={`flex items-center gap-2 font-semibold ${
+              atrasado
+                ? "text-rose-200"
+                : retornoHoje
+                  ? "text-amber-200"
+                  : "text-violet-200"
             }`}
           >
             <Clock3 className="size-3.5" />
             <span>
-              Retorno: {formatarData(lead.proximoContatoEm)}
-              {atrasado ? " · atrasado" : ""}
+              {atrasado
+                ? `Retorno atrasado · ${formatarData(lead.proximoContatoEm)}`
+                : retornoHoje
+                  ? "Retorno hoje"
+                  : `Retorno ${formatarData(lead.proximoContatoEm)}`}
             </span>
+          </div>
+        ) : null}
+
+        {tentativasSemResposta > 0 && isLeadAberto(lead) ? (
+          <div
+            className={`rounded-xl border px-2.5 py-2 font-semibold ${
+              tentativasSemResposta >= 3
+                ? "border-rose-300/20 bg-rose-400/10 text-rose-200"
+                : "border-white/[0.08] bg-white/[0.04] text-slate-300"
+            }`}
+          >
+            {tentativasSemResposta} tentativa(s) sem resposta
+            {tentativasSemResposta >= 3 ? " · revisar encerramento" : ""}
           </div>
         ) : null}
         {/* So existe em lead que veio de clique de anuncio. Visivel direto
@@ -1704,8 +1774,17 @@ function LeadCard({
         ) : null}
         {lead.agendamento ? (
           <div className="rounded-xl border border-cyan-300/10 bg-cyan-400/8 px-2.5 py-2 text-cyan-100">
-            <p className="font-semibold">{formatarDataHora(lead.agendamento.data)}</p>
-            <p className="mt-0.5 truncate text-[11px] text-cyan-200/70">{lead.agendamento.procedimento} · {lead.agendamento.profissional?.nome || "Profissional não informado"}</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-semibold">
+                {formatarDataHora(lead.agendamento.data)}
+              </p>
+              <span className="rounded-full border border-cyan-300/15 bg-cyan-400/10 px-2 py-0.5 text-[10px] font-bold text-cyan-100">
+                {lead.agendamento.status}
+              </span>
+            </div>
+            <p className="mt-0.5 truncate text-[11px] text-cyan-200/70">
+              {lead.agendamento.procedimento} · {lead.agendamento.profissional?.nome || "Profissional não informado"}
+            </p>
           </div>
         ) : null}
         {lead.receitaRastreada > 0 ? <p className="text-emerald-300">Receita rastreada: <strong>{formatarMoeda(lead.receitaRastreada)}</strong></p> : null}

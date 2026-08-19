@@ -79,6 +79,55 @@ function normalizarNaturezaAtendimento(
   return value === "RETORNO" ? "RETORNO" : "PROCEDIMENTO";
 }
 
+function normalizarStatusAgendaOperacional(value?: string | null) {
+  return (value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function tipoSaidaDoAgendamento(status?: string | null) {
+  const normalizado = normalizarStatusAgendaOperacional(status);
+
+  if (normalizado.includes("cancel")) {
+    return "cancelado" as const;
+  }
+
+  if (
+    normalizado.includes("falt") ||
+    normalizado.includes("nao comparec") ||
+    normalizado.includes("ausent")
+  ) {
+    return "falta" as const;
+  }
+
+  return null;
+}
+
+function dataFollowUpAgendaEmDias(dias: number) {
+  const formatador = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  const hoje = formatador.format(new Date());
+  const base = new Date(`${hoje}T12:00:00-03:00`);
+  const alvo = new Date(base.getTime() + dias * 24 * 60 * 60 * 1000);
+
+  return alvo;
+}
+
+function formatarDataHoraLeadAgenda(data: Date) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+    timeZone: "America/Sao_Paulo",
+  }).format(data);
+}
+
 export type NovoBloqueioAgenda = {
   profissionalId: number;
   data: string;
@@ -698,6 +747,27 @@ export async function atualizarAgendamento({
   const clienteId = dados.clienteId || (await resolverCliente(dados));
 
   await prisma.$transaction(async (tx) => {
+    const agendamentoAnterior = await tx.agendamento.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        data: true,
+        status: true,
+        profissionalId: true,
+        lead: {
+          select: {
+            id: true,
+            etapa: true,
+            proximoContatoEm: true,
+          },
+        },
+      },
+    });
+
+    if (!agendamentoAnterior) {
+      throw new Error("Agendamento não encontrado.");
+    }
+
     let agendamentoOrigemId: number | null = null;
 
     if (naturezaAtendimento === "RETORNO" && dados.agendamentoOrigemId) {
@@ -733,7 +803,7 @@ export async function atualizarAgendamento({
       });
     }
 
-    await tx.agendamento.update({
+    const agendamentoAtualizado = await tx.agendamento.update({
       where: {
         id,
       },
@@ -755,11 +825,90 @@ export async function atualizarAgendamento({
         statusAntesAtendimento:
           dados.status === "Em atendimento" ? undefined : null,
       },
+      select: {
+        id: true,
+        data: true,
+        status: true,
+        profissionalId: true,
+      },
     });
+
+    const leadVinculado = agendamentoAnterior.lead;
+
+    if (
+      leadVinculado &&
+      !["Convertido", "Perdido"].includes(leadVinculado.etapa)
+    ) {
+      const saidaAtual = tipoSaidaDoAgendamento(agendamentoAtualizado.status);
+      const saidaAnterior = tipoSaidaDoAgendamento(agendamentoAnterior.status);
+      const statusNormalizado = normalizarStatusAgendaOperacional(
+        agendamentoAtualizado.status,
+      );
+
+      if (saidaAtual) {
+        const proximoContato =
+          leadVinculado.proximoContatoEm ||
+          dataFollowUpAgendaEmDias(1);
+
+        await tx.lead.update({
+          where: { id: leadVinculado.id },
+          data: {
+            etapa: "Aguardando resposta",
+            proximoContatoEm: proximoContato,
+          },
+        });
+
+        if (
+          saidaAtual !== saidaAnterior ||
+          leadVinculado.etapa !== "Aguardando resposta"
+        ) {
+          await tx.leadInteracao.create({
+            data: {
+              leadId: leadVinculado.id,
+              tipo: saidaAtual === "falta" ? "Falta" : "Cancelamento",
+              descricao:
+                saidaAtual === "falta"
+                  ? `Cliente não compareceu ao agendamento de ${formatarDataHoraLeadAgenda(agendamentoAtualizado.data)}. Lead movido automaticamente para Aguardando resposta.`
+                  : `Agendamento de ${formatarDataHoraLeadAgenda(agendamentoAtualizado.data)} cancelado. Lead movido automaticamente para Aguardando resposta.`,
+            },
+          });
+        }
+      } else if (
+        statusNormalizado !== "atendido" &&
+        statusNormalizado !== "em atendimento"
+      ) {
+        const dataMudou =
+          agendamentoAnterior.data.getTime() !==
+          agendamentoAtualizado.data.getTime();
+        const profissionalMudou =
+          agendamentoAnterior.profissionalId !==
+          agendamentoAtualizado.profissionalId;
+        const foiReativado = Boolean(saidaAnterior);
+
+        await tx.lead.update({
+          where: { id: leadVinculado.id },
+          data: {
+            etapa: "Agendado",
+            proximoContatoEm: null,
+          },
+        });
+
+        if (dataMudou || profissionalMudou || foiReativado) {
+          await tx.leadInteracao.create({
+            data: {
+              leadId: leadVinculado.id,
+              tipo: "Reagendamento",
+              descricao: `Agenda atualizada para ${formatarDataHoraLeadAgenda(agendamentoAtualizado.data)}. Lead mantido automaticamente em Agendado.`,
+            },
+          });
+        }
+      }
+    }
   });
 
   revalidatePath("/agenda");
   revalidatePath("/clientes");
+  revalidatePath("/marketing");
   revalidatePath("/");
 
   return { ok: true };
@@ -768,13 +917,54 @@ export async function atualizarAgendamento({
 export async function excluirAgendamento(id: number) {
   await requirePermission("agenda.gerenciar");
 
-  await prisma.agendamento.delete({
-    where: {
-      id,
-    },
+  await prisma.$transaction(async (tx) => {
+    const agendamento = await tx.agendamento.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        data: true,
+        lead: {
+          select: {
+            id: true,
+            etapa: true,
+          },
+        },
+      },
+    });
+
+    if (!agendamento) {
+      throw new Error("Agendamento não encontrado.");
+    }
+
+    if (
+      agendamento.lead &&
+      !["Convertido", "Perdido"].includes(agendamento.lead.etapa)
+    ) {
+      await tx.lead.update({
+        where: { id: agendamento.lead.id },
+        data: {
+          agendamentoId: null,
+          etapa: "Aguardando resposta",
+          proximoContatoEm: dataFollowUpAgendaEmDias(1),
+        },
+      });
+
+      await tx.leadInteracao.create({
+        data: {
+          leadId: agendamento.lead.id,
+          tipo: "Cancelamento",
+          descricao: `Agendamento de ${formatarDataHoraLeadAgenda(agendamento.data)} removido da Agenda. Lead movido automaticamente para Aguardando resposta.`,
+        },
+      });
+    }
+
+    await tx.agendamento.delete({
+      where: { id },
+    });
   });
 
   revalidatePath("/agenda");
+  revalidatePath("/marketing");
   revalidatePath("/");
 }
 
@@ -796,27 +986,74 @@ export async function cancelarSerieAgendamento({
     throw new Error("Este agendamento não pertence a uma série recorrente.");
   }
 
-  const resultado = await prisma.agendamento.updateMany({
-    where: {
-      serieId: atual.serieId,
-      ...(escopo === "seguintes" ? { data: { gte: atual.data } } : {}),
-      status: { notIn: ["Atendido", "Em atendimento", "Cancelado"] },
-    },
-    data: { status: "Cancelado" },
-  });
+  const whereCancelamento = {
+    serieId: atual.serieId,
+    ...(escopo === "seguintes" ? { data: { gte: atual.data } } : {}),
+    status: { notIn: ["Atendido", "Em atendimento", "Cancelado"] },
+  };
 
-  await prisma.auditoria.create({
-    data: {
-      modulo: "Agenda",
-      acao: escopo === "toda" ? "Cancelou série recorrente" : "Cancelou recorrências futuras",
-      entidade: "Agendamento",
-      entidadeId: String(id),
-      usuario: "Equipe Studio Realçar",
-      detalhes: `${resultado.count} agendamento(s) recorrente(s) cancelado(s).`,
-    },
+  await prisma.$transaction(async (tx) => {
+    const afetados = await tx.agendamento.findMany({
+      where: whereCancelamento,
+      select: {
+        id: true,
+        data: true,
+        lead: {
+          select: {
+            id: true,
+            etapa: true,
+            proximoContatoEm: true,
+          },
+        },
+      },
+    });
+
+    const resultado = await tx.agendamento.updateMany({
+      where: whereCancelamento,
+      data: { status: "Cancelado" },
+    });
+
+    for (const agendamento of afetados) {
+      if (
+        !agendamento.lead ||
+        ["Convertido", "Perdido"].includes(agendamento.lead.etapa)
+      ) {
+        continue;
+      }
+
+      await tx.lead.update({
+        where: { id: agendamento.lead.id },
+        data: {
+          etapa: "Aguardando resposta",
+          proximoContatoEm:
+            agendamento.lead.proximoContatoEm ||
+            dataFollowUpAgendaEmDias(1),
+        },
+      });
+
+      await tx.leadInteracao.create({
+        data: {
+          leadId: agendamento.lead.id,
+          tipo: "Cancelamento",
+          descricao: `Agendamento recorrente de ${formatarDataHoraLeadAgenda(agendamento.data)} cancelado. Lead movido automaticamente para Aguardando resposta.`,
+        },
+      });
+    }
+
+    await tx.auditoria.create({
+      data: {
+        modulo: "Agenda",
+        acao: escopo === "toda" ? "Cancelou série recorrente" : "Cancelou recorrências futuras",
+        entidade: "Agendamento",
+        entidadeId: String(id),
+        usuario: "Equipe Studio Realçar",
+        detalhes: `${resultado.count} agendamento(s) recorrente(s) cancelado(s).`,
+      },
+    });
   });
 
   revalidatePath("/agenda");
+  revalidatePath("/marketing");
   revalidatePath("/");
 }
 
@@ -1337,6 +1574,7 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
         etapa: true,
         clienteId: true,
         chamouWhatsapp: true,
+        proximoContatoEm: true,
       },
     });
 
@@ -1356,11 +1594,14 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
           // Reforcamos o vinculo sem criar nenhum cadastro novo.
           clienteId: agendamento.clienteId,
           etapa: proximaEtapa,
+          proximoContatoEm: houveVendaReal
+            ? null
+            : leadVinculado.proximoContatoEm ||
+              dataFollowUpAgendaEmDias(2),
 
           ...(houveVendaReal
             ? {
                 convertidoEm: dataAtendimento,
-                proximoContatoEm: null,
                 motivoPerda: null,
               }
             : {}),
@@ -1379,7 +1620,7 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
             tipo: houveVendaReal ? "Conversão" : "Atendimento",
             descricao: houveVendaReal
               ? `Atendimento concluído com venda de R$ ${venda.valorTotal.toFixed(2)}. Lead movido automaticamente de ${leadVinculado.etapa} para Convertido.`
-              : `Atendimento concluído sem venda. Lead movido automaticamente de ${leadVinculado.etapa} para Aguardando resposta.`,
+              : `Atendimento concluído sem venda. Lead movido automaticamente de ${leadVinculado.etapa} para Aguardando resposta, com novo follow-up programado.`,
           },
         });
       }

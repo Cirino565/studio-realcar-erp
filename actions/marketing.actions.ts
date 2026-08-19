@@ -627,6 +627,93 @@ export async function registrarContatoLead(id: number, proximoContato?: string |
   revalidatePath("/");
 }
 
+export type RegistrarResultadoContatoLeadInput = {
+  leadId: number;
+  resultado: string;
+  proximoContato: string;
+  houveResposta: boolean;
+};
+
+export async function registrarResultadoContatoLead(
+  dados: RegistrarResultadoContatoLeadInput,
+) {
+  await requirePermission("marketing.gerenciar");
+
+  const resultado = dados.resultado.trim();
+  if (!resultado) {
+    throw new Error("Informe o resultado do contato.");
+  }
+
+  const proximo = dataSeguimento(dados.proximoContato);
+  if (!proximo) {
+    throw new Error("Informe quando o lead deve voltar para a fila.");
+  }
+
+  const lead = await prisma.lead.findUnique({
+    where: { id: dados.leadId },
+    select: {
+      id: true,
+      nome: true,
+      etapa: true,
+      chamouWhatsapp: true,
+    },
+  });
+
+  if (!lead) {
+    throw new Error("Lead não encontrado.");
+  }
+
+  if (!["Novo", "Aguardando resposta"].includes(lead.etapa)) {
+    throw new Error(
+      "Este lead não está em uma etapa que aceita resultado de follow-up.",
+    );
+  }
+
+  const agora = new Date();
+  const proximaEtapa =
+    lead.etapa === "Novo"
+      ? "Aguardando resposta"
+      : lead.etapa;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.lead.update({
+      where: { id: lead.id },
+      data: {
+        etapa: proximaEtapa,
+        ultimoContatoEm: agora,
+        proximoContatoEm: proximo,
+        motivoPerda: null,
+        ...(dados.houveResposta
+          ? chamouWhatsappSeAindaNaoMarcado(lead.chamouWhatsapp)
+          : {}),
+      },
+    });
+
+    await tx.leadInteracao.create({
+      data: {
+        leadId: lead.id,
+        tipo: dados.houveResposta
+          ? "Resultado"
+          : "Tentativa sem resposta",
+        descricao: `${resultado} Próximo contato programado para ${dados.proximoContato}.`,
+      },
+    });
+
+    if (lead.etapa !== proximaEtapa) {
+      await tx.leadInteracao.create({
+        data: {
+          leadId: lead.id,
+          tipo: "Etapa",
+          descricao: `${lead.etapa} → ${proximaEtapa}.`,
+        },
+      });
+    }
+  });
+
+  revalidatePath("/marketing");
+  revalidatePath("/");
+}
+
 export async function definirProximoContatoLead(id: number, data?: string | null) {
   await requirePermission("marketing.gerenciar");
   const proximo = dataSeguimento(data);
