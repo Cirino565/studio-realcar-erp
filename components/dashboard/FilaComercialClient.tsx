@@ -1,7 +1,7 @@
 "use client";
 
 import { confirmarAgendamentoCentral } from "@/actions/dashboard.actions";
-import { registrarContatoLead } from "@/actions/marketing.actions";
+import { registrarResultadoContatoLead } from "@/actions/marketing.actions";
 import { WhatsAppLink } from "@/components/ui/whatsapp-link";
 import {
   BadgeCheck,
@@ -20,7 +20,7 @@ type CategoriaFilaComercial =
   | "Contato de hoje"
   | "Agendamento sem confirmação"
   | "Aguardando resposta parada"
-  | "Prioridade comercial";
+  | "Sem próxima ação";
 
 type FilaComercialItem = {
   id: number;
@@ -39,9 +39,9 @@ type FilaComercialItem = {
 type ResumoFila = {
   atrasados: number;
   hoje: number;
-  avaliacoes: number;
+  confirmacoes: number;
   negociacoes: number;
-  prioridades: number;
+  semProximaAcao: number;
   totalAbertos: number;
 };
 
@@ -57,6 +57,25 @@ function formatarMoeda(valor: number) {
     style: "currency",
     currency: "BRL",
   }).format(valor);
+}
+
+function dataFuturaEmDiasInput(dias: number) {
+  const hoje = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
+  const base = new Date(`${hoje}T12:00:00-03:00`);
+  const alvo = new Date(base.getTime() + dias * 24 * 60 * 60 * 1000);
+
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(alvo);
 }
 
 function estiloCategoria(categoria: CategoriaFilaComercial) {
@@ -78,13 +97,13 @@ function estiloCategoria(categoria: CategoriaFilaComercial) {
       };
     case "Aguardando resposta parada":
       return {
-        badge: "border-cyan-200 bg-cyan-50 text-cyan-700",
-        detalhe: "text-cyan-700",
+        badge: "border-cyan-200 bg-cyan-50 text-cyan-800",
+        detalhe: "text-cyan-800",
       };
-    default:
+    case "Sem próxima ação":
       return {
-        badge: "border-blue-200 bg-blue-50 text-blue-700",
-        detalhe: "text-blue-700",
+        badge: "border-blue-200 bg-blue-50 text-blue-800",
+        detalhe: "text-blue-800",
       };
   }
 }
@@ -105,19 +124,63 @@ export default function FilaComercialClient({
     [itens, processados],
   );
 
-  function registrarContato(id: number) {
+  function registrarResultado(
+    item: FilaComercialItem,
+    resultado:
+      | "nao_respondeu"
+      | "amanha"
+      | "dois_dias"
+      | "tres_dias",
+  ) {
+    const configuracoes = {
+      nao_respondeu: {
+        dias: 1,
+        houveResposta: false,
+        descricao:
+          "Cliente não respondeu ao contato realizado pela Central do Dia.",
+      },
+      amanha: {
+        dias: 1,
+        houveResposta: true,
+        descricao:
+          "Contato realizado. Novo retorno programado para amanhã.",
+      },
+      dois_dias: {
+        dias: 2,
+        houveResposta: true,
+        descricao:
+          "Contato realizado. Novo retorno programado para daqui a 2 dias.",
+      },
+      tres_dias: {
+        dias: 3,
+        houveResposta: true,
+        descricao:
+          "Contato realizado. Novo retorno programado para daqui a 3 dias.",
+      },
+    } as const;
+
+    const configuracao = configuracoes[resultado];
     setErro(null);
 
     startTransition(async () => {
       try {
-        await registrarContatoLead(id, null);
-        setProcessados((atuais) => [...atuais, id]);
+        await registrarResultadoContatoLead({
+          leadId: item.id,
+          resultado: configuracao.descricao,
+          proximoContato: dataFuturaEmDiasInput(configuracao.dias),
+          houveResposta: configuracao.houveResposta,
+        });
+
+        // Esconde imediatamente depois do salvamento. Diferente do antigo
+        // "Contato feito", agora a proxima data tambem fica gravada no banco,
+        // por isso o card continua fora da fila apos atualizar a pagina.
+        setProcessados((atuais) => [...atuais, item.id]);
         router.refresh();
       } catch (error) {
         setErro(
           error instanceof Error
             ? error.message
-            : "Não foi possível registrar o contato comercial.",
+            : "Não foi possível registrar o resultado do contato.",
         );
       }
     });
@@ -156,19 +219,19 @@ export default function FilaComercialClient({
       className: "border-amber-100 bg-amber-50/70 text-amber-700",
     },
     {
-      label: "Avaliações a confirmar",
-      valor: resumo.avaliacoes,
+      label: "Agendamentos a confirmar",
+      valor: resumo.confirmacoes,
       className: "border-violet-100 bg-violet-50/70 text-violet-700",
     },
     {
       label: "Negociações paradas",
       valor: resumo.negociacoes,
-      className: "border-cyan-100 bg-cyan-50/70 text-cyan-700",
+      className: "border-cyan-100 bg-cyan-50/70 text-cyan-800",
     },
     {
-      label: "Prioridades comerciais",
-      valor: resumo.prioridades,
-      className: "border-blue-100 bg-blue-50/70 text-blue-700",
+      label: "Sem próxima ação",
+      valor: resumo.semProximaAcao,
+      className: "border-blue-100 bg-blue-50/70 text-blue-800",
     },
   ];
 
@@ -193,8 +256,8 @@ export default function FilaComercialClient({
             <strong className="text-slate-900">{resumo.totalAbertos}</strong> oportunidade(s) aberta(s) no CRM.
           </span>
         </div>
-        <p className="text-[11px] font-medium text-slate-400">
-          Negociação parada = 3 ou mais dias sem contato comercial registrado.
+        <p className="text-[11px] font-medium text-slate-500">
+          A fila respeita o próximo contato programado. Quando você registra o resultado, o lead só volta na data escolhida.
         </p>
       </div>
 
@@ -267,30 +330,75 @@ export default function FilaComercialClient({
                       <BadgeCheck className="size-4" />
                       Confirmou
                     </button>
-                  ) : podeGerenciarMarketing ? (
-                    <button
-                      type="button"
-                      disabled={isPending}
-                      onClick={() => registrarContato(item.id)}
-                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <CheckCircle2 className="size-4" />
-                      Contato feito
-                    </button>
                   ) : (
-                    <div className="flex min-h-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center text-[11px] font-semibold text-slate-500">
-                      Somente consulta
-                    </div>
+                    <Link
+                      href="/marketing"
+                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:border-blue-200 hover:text-blue-700"
+                    >
+                      Abrir CRM
+                    </Link>
                   )}
                 </div>
 
+                {!podeConfirmar && podeGerenciarMarketing ? (
+                  <div className="mt-2">
+                    <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">
+                      Depois do contato
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => registrarResultado(item, "nao_respondeu")}
+                        className="min-h-9 rounded-xl border border-slate-200 bg-slate-50 px-2 py-2 text-[11px] font-bold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Não respondeu
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => registrarResultado(item, "amanha")}
+                        className="min-h-9 rounded-xl border border-blue-200 bg-blue-50 px-2 py-2 text-[11px] font-bold text-blue-800 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Amanhã
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => registrarResultado(item, "dois_dias")}
+                        className="min-h-9 rounded-xl border border-violet-200 bg-violet-50 px-2 py-2 text-[11px] font-bold text-violet-800 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        +2 dias
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => registrarResultado(item, "tres_dias")}
+                        className="min-h-9 rounded-xl border border-cyan-200 bg-cyan-50 px-2 py-2 text-[11px] font-bold text-cyan-800 transition hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        +3 dias
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="mt-2 grid grid-cols-2 gap-2">
-                  <Link
-                    href="/marketing"
-                    className="inline-flex min-h-9 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:border-blue-200 hover:text-blue-700"
-                  >
-                    Abrir CRM
-                  </Link>
+                  {podeConfirmar ? (
+                    <Link
+                      href="/marketing"
+                      className="inline-flex min-h-9 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:border-blue-200 hover:text-blue-700"
+                    >
+                      Abrir CRM
+                    </Link>
+                  ) : (
+                    <div className="flex min-h-9 items-center justify-center rounded-xl bg-slate-50 px-3 py-2 text-center text-[11px] font-semibold text-slate-500">
+                      Resultado salvo = sai da fila
+                    </div>
+                  )}
 
                   {item.agendaUrl ? (
                     <Link

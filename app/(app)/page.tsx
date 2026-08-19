@@ -429,7 +429,12 @@ export default async function Home() {
   const saldoMes = entradasMes - saidasMes;
 
   const followUpsVencidos = leadsAbertos
-    .filter((lead) => lead.proximoContatoEm && lead.proximoContatoEm < inicioHoje)
+    .filter(
+      (lead) =>
+        ["Novo", "Aguardando resposta"].includes(lead.etapa) &&
+        lead.proximoContatoEm &&
+        lead.proximoContatoEm < inicioHoje,
+    )
     .sort((a, b) =>
       (a.proximoContatoEm?.getTime() || 0) - (b.proximoContatoEm?.getTime() || 0),
     );
@@ -437,6 +442,7 @@ export default async function Home() {
   const followUpsHoje = leadsAbertos
     .filter(
       (lead) =>
+        ["Novo", "Aguardando resposta"].includes(lead.etapa) &&
         lead.proximoContatoEm &&
         lead.proximoContatoEm >= inicioHoje &&
         lead.proximoContatoEm < inicioAmanha,
@@ -463,6 +469,12 @@ export default async function Home() {
   const negociacoesParadas = leadsAbertos
     .filter((lead) => {
       if (lead.etapa !== "Aguardando resposta") return false;
+
+      // Se ja existe um follow-up programado, o CRM deve respeitar a data
+      // combinada. O lead so e tratado como "parado" quando ficou sem
+      // proxima acao definida.
+      if (lead.proximoContatoEm) return false;
+
       const referencia = lead.ultimoContatoEm || lead.updatedAt;
       return referencia < limiteNegociacaoParada;
     })
@@ -472,22 +484,28 @@ export default async function Home() {
       return referenciaA - referenciaB;
     });
 
-  const oportunidadesPrioritarias = leadsAbertos
+  const semProximaAcao = leadsAbertos
     .filter((lead) => {
-      const avaliacaoProxima =
-        lead.agendamento &&
-        lead.agendamento.status !== "Cancelado" &&
-        lead.agendamento.status !== "Atendido" &&
-        lead.agendamento.data >= inicioHoje &&
-        lead.agendamento.data < limiteAvaliacoesProximas;
+      if (!["Novo", "Aguardando resposta"].includes(lead.etapa)) {
+        return false;
+      }
 
-      return lead.etapa === "Aguardando resposta" || Boolean(avaliacaoProxima);
+      if (lead.proximoContatoEm) return false;
+
+      // Negociacoes antigas ja entram na categoria especifica acima.
+      // Aqui ficam os novos leads e aguardando resposta recentes que
+      // ainda nao receberam uma proxima data de acompanhamento.
+      if (lead.etapa === "Aguardando resposta") {
+        const referencia = lead.ultimoContatoEm || lead.updatedAt;
+        if (referencia < limiteNegociacaoParada) return false;
+      }
+
+      return true;
     })
     .sort((a, b) => {
-      const dataA = a.agendamento?.data.getTime() || Number.MAX_SAFE_INTEGER;
-      const dataB = b.agendamento?.data.getTime() || Number.MAX_SAFE_INTEGER;
-      if (dataA !== dataB) return dataA - dataB;
-      return b.valorPrevisto - a.valorPrevisto;
+      if (a.etapa === "Novo" && b.etapa !== "Novo") return -1;
+      if (a.etapa !== "Novo" && b.etapa === "Novo") return 1;
+      return a.createdAt.getTime() - b.createdAt.getTime();
     });
 
   type CategoriaFilaComercial =
@@ -495,7 +513,7 @@ export default async function Home() {
     | "Contato de hoje"
     | "Agendamento sem confirmação"
     | "Aguardando resposta parada"
-    | "Prioridade comercial";
+    | "Sem próxima ação";
 
   type LeadFilaBase = (typeof leadsAbertos)[number];
 
@@ -580,11 +598,14 @@ export default async function Home() {
     );
   });
 
-  oportunidadesPrioritarias.slice(0, 8).forEach((lead) => {
-    const detalhe = lead.agendamento
-      ? `Próximo atendimento em ${formatarDataCurta(lead.agendamento.data)} às ${formatarHorario(lead.agendamento.data)}.`
-      : "Oportunidade em negociação que merece acompanhamento.";
-    adicionarNaFila(lead, "Prioridade comercial", detalhe);
+  semProximaAcao.slice(0, 8).forEach((lead) => {
+    adicionarNaFila(
+      lead,
+      "Sem próxima ação",
+      lead.etapa === "Novo"
+        ? "Lead novo ainda sem próximo contato programado."
+        : "Aguardando resposta sem próximo contato programado.",
+    );
   });
 
   const filaComercialLimitada = filaComercial.slice(0, 14);
@@ -988,7 +1009,7 @@ export default async function Home() {
               <h2 className="text-lg font-bold text-slate-950">Fila comercial inteligente</h2>
             </div>
             <p className="mt-1 text-sm text-slate-500">
-              Prioriza o que exige ação hoje usando follow-ups, avaliações, negociações e agenda real do CRM.
+              Mostra somente o que exige uma ação comercial real agora, respeitando os próximos contatos programados no CRM.
             </p>
           </div>
           <Link
@@ -1005,9 +1026,9 @@ export default async function Home() {
             resumo={{
               atrasados: followUpsVencidos.length,
               hoje: followUpsHoje.length,
-              avaliacoes: avaliacoesSemConfirmacao.length,
+              confirmacoes: avaliacoesSemConfirmacao.length,
               negociacoes: negociacoesParadas.length,
-              prioridades: oportunidadesPrioritarias.length,
+              semProximaAcao: semProximaAcao.length,
               totalAbertos: totalLeadsAbertos,
             }}
             podeGerenciarMarketing={podeGerenciarMarketing}
