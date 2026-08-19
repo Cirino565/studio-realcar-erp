@@ -267,6 +267,16 @@ function dataInput(value?: Date | string | null) {
   }).format(date);
 }
 
+function dataFuturaEmDiasInput(dias: number) {
+  const hoje = dataInput(new Date());
+  const base = new Date(`${hoje}T12:00:00-03:00`);
+  const alvo = new Date(
+    base.getTime() + dias * 24 * 60 * 60 * 1000,
+  );
+
+  return dataInput(alvo);
+}
+
 type FilaContatoTipo = "atrasado" | "novo" | "hoje" | "sem_data";
 
 type FilaContatoItem = {
@@ -511,6 +521,8 @@ export default function MarketingClient({
   const [etapaFiltro, setEtapaFiltro] = useState("todas");
   const [origemFiltro, setOrigemFiltro] = useState("todas");
   const [erro, setErro] = useState<string | null>(null);
+  const [leadAcaoRapidaId, setLeadAcaoRapidaId] =
+    useState<number | null>(null);
 
   useEffect(() => {
     if (detalhesModal) {
@@ -741,6 +753,44 @@ export default function MarketingClient({
       await excluirCampanha(id);
     });
   }
+  function programarRetornoRapido(
+    lead: MarketingLead,
+    dias: number,
+  ) {
+    setErro(null);
+    setLeadAcaoRapidaId(lead.id);
+
+    startTransition(async () => {
+      try {
+        const dataRetorno = dataFuturaEmDiasInput(dias);
+
+        // Grava primeiro a data escolhida.
+        // Se o lead estiver em Novo, a automacao de mudanca de etapa
+        // encontrara essa data e nao criara outro D+2.
+        await definirProximoContatoLead(
+          lead.id,
+          dataRetorno,
+        );
+
+        if (lead.etapa === "Novo") {
+          await atualizarEtapaLead(
+            lead.id,
+            "Aguardando resposta",
+          );
+        }
+
+        router.refresh();
+      } catch (error) {
+        setErro(
+          error instanceof Error
+            ? error.message
+            : "Não foi possível programar o retorno.",
+        );
+      } finally {
+        setLeadAcaoRapidaId(null);
+      }
+    });
+  }
 
   return (
     <>
@@ -787,28 +837,28 @@ export default function MarketingClient({
             onClick={() => setFilaHojeAberta((aberta) => !aberta)}
             className={`flex w-full flex-col gap-3 rounded-3xl border p-4 text-left transition sm:flex-row sm:items-center sm:justify-between sm:p-5 ${
               resumo.leadsPendentesDeAcao > 0
-                ? "border-amber-300/25 bg-amber-400/10 hover:bg-amber-400/[0.14]"
-                : "border-emerald-300/20 bg-emerald-400/8 hover:bg-emerald-400/[0.11]"
+                ? "border-amber-300 bg-amber-50 hover:bg-amber-100"
+                : "border-emerald-300 bg-emerald-50 hover:bg-emerald-100"
             }`}
           >
             <div className="flex items-center gap-3">
               <div
                 className={`flex size-11 shrink-0 items-center justify-center rounded-2xl ${
                   resumo.leadsPendentesDeAcao > 0
-                    ? "bg-amber-400/20 text-amber-100"
-                    : "bg-emerald-400/20 text-emerald-100"
+                    ? "bg-amber-100 text-amber-700"
+                    : "bg-emerald-100 text-emerald-700"
                 }`}
               >
                 <Target className="size-5" />
               </div>
 
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-700">
                   Com quem falar hoje
                 </p>
 
                 {resumo.leadsPendentesDeAcao > 0 ? (
-                  <p className="mt-0.5 text-sm text-slate-300">
+                  <p className="mt-0.5 text-sm font-medium text-slate-700">
                     {resumoFilaHoje.atrasados > 0
                       ? `${resumoFilaHoje.atrasados} atrasado(s) · `
                       : ""}
@@ -823,7 +873,7 @@ export default function MarketingClient({
                       : ""}
                   </p>
                 ) : (
-                  <p className="mt-0.5 text-sm text-emerald-200/80">
+                  <p className="mt-0.5 text-sm font-medium text-emerald-800">
                     Nenhum contato pendente para hoje.
                   </p>
                 )}
@@ -834,8 +884,8 @@ export default function MarketingClient({
               <span
                 className={`text-xs font-semibold ${
                   resumo.leadsPendentesDeAcao > 0
-                    ? "text-amber-200/70"
-                    : "text-emerald-200/70"
+                    ? "text-amber-800"
+                    : "text-emerald-800"
                 }`}
               >
                 {filaHojeAberta ? "Fechar fila" : "Ver fila"}
@@ -844,8 +894,8 @@ export default function MarketingClient({
               <span
                 className={`text-3xl font-bold ${
                   resumo.leadsPendentesDeAcao > 0
-                    ? "text-amber-100"
-                    : "text-emerald-100"
+                    ? "text-amber-950"
+                    : "text-emerald-950"
                 }`}
               >
                 {resumo.leadsPendentesDeAcao}
@@ -873,7 +923,7 @@ export default function MarketingClient({
               {filaContatoHoje.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-emerald-300/20 bg-emerald-400/[0.06] p-6 text-center">
                   <CheckCircle2 className="mx-auto size-7 text-emerald-300" />
-                  <p className="mt-3 text-sm font-semibold text-emerald-100">
+                  <p className="mt-3 text-sm font-semibold text-emerald-950">
                     Tudo em dia.
                   </p>
                   <p className="mt-1 text-xs text-emerald-200/60">
@@ -934,22 +984,80 @@ export default function MarketingClient({
                             </div>
                           </button>
 
-                          <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => setMensagemModal(item.lead)}
-                              className="rounded-xl border border-emerald-300/15 bg-emerald-400/10 px-3 py-2 text-xs font-bold text-emerald-200 transition hover:bg-emerald-400/15"
-                            >
-                              WhatsApp
-                            </button>
+                          <div className="grid gap-2 sm:min-w-[19rem]">
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setMensagemModal(item.lead)}
+                                className="rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100"
+                              >
+                                WhatsApp
+                              </button>
 
-                            <button
-                              type="button"
-                              onClick={() => setDetalhesModal(item.lead)}
-                              className="rounded-xl border border-white/[0.10] bg-white/[0.06] px-3 py-2 text-xs font-bold text-slate-200 transition hover:bg-white/[0.10]"
-                            >
-                              Detalhes
-                            </button>
+                              <button
+                                type="button"
+                                onClick={() => setDetalhesModal(item.lead)}
+                                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                              >
+                                Detalhes
+                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-4 gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  programarRetornoRapido(item.lead, 1)
+                                }
+                                disabled={isPending}
+                                className="rounded-xl border border-violet-200 bg-violet-50 px-2 py-2 text-[10px] font-bold text-violet-800 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50 sm:text-[11px]"
+                              >
+                                Amanhã
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  programarRetornoRapido(item.lead, 2)
+                                }
+                                disabled={isPending}
+                                className="rounded-xl border border-violet-200 bg-violet-50 px-2 py-2 text-[10px] font-bold text-violet-800 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50 sm:text-[11px]"
+                              >
+                                +2 dias
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  programarRetornoRapido(item.lead, 3)
+                                }
+                                disabled={isPending}
+                                className="rounded-xl border border-violet-200 bg-violet-50 px-2 py-2 text-[10px] font-bold text-violet-800 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50 sm:text-[11px]"
+                              >
+                                +3 dias
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  programarRetornoRapido(item.lead, 7)
+                                }
+                                disabled={isPending}
+                                className="rounded-xl border border-violet-200 bg-violet-50 px-2 py-2 text-[10px] font-bold text-violet-800 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50 sm:text-[11px]"
+                              >
+                                +7 dias
+                              </button>
+                            </div>
+
+                            {leadAcaoRapidaId === item.lead.id && isPending ? (
+                              <p className="text-[11px] font-semibold text-violet-700">
+                                Programando retorno...
+                              </p>
+                            ) : (
+                              <p className="text-[11px] text-slate-500">
+                                Após falar, escolha quando este lead deve voltar para sua fila.
+                              </p>
+                            )}
                           </div>
                         </div>
                       </article>
@@ -1056,15 +1164,15 @@ export default function MarketingClient({
                 }}
                 className={`flex min-h-16 items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left transition ${
                   pipelineModo === "ativos"
-                    ? "bg-violet-500/15 text-white shadow-lg shadow-violet-950/10 ring-1 ring-violet-400/20"
-                    : "text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+                    ? "bg-violet-100 text-violet-950 shadow-sm ring-1 ring-violet-300"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 }`}
               >
                 <span>
                   <span className="block text-sm font-bold">
                     Ativos
                   </span>
-                  <span className="mt-0.5 block text-[0.68rem] text-slate-400">
+                  <span className="mt-0.5 block text-[0.68rem] text-slate-600">
                     Trabalho que ainda precisa de ação
                   </span>
                 </span>
@@ -1072,8 +1180,8 @@ export default function MarketingClient({
                 <span
                   className={`flex min-w-9 items-center justify-center rounded-full px-2.5 py-1 text-sm font-black ${
                     pipelineModo === "ativos"
-                      ? "bg-violet-400/20 text-violet-100"
-                      : "bg-white/[0.06] text-slate-400"
+                      ? "bg-violet-200 text-violet-900"
+                      : "bg-slate-100 text-slate-700"
                   }`}
                 >
                   {resumo.leadsAtivos}
@@ -1088,15 +1196,15 @@ export default function MarketingClient({
                 }}
                 className={`flex min-h-16 items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left transition ${
                   pipelineModo === "encerrados"
-                    ? "bg-emerald-500/12 text-white shadow-lg shadow-emerald-950/10 ring-1 ring-emerald-400/20"
-                    : "text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+                    ? "bg-emerald-100 text-emerald-950 shadow-sm ring-1 ring-emerald-300"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 }`}
               >
                 <span>
                   <span className="block text-sm font-bold">
                     Encerrados
                   </span>
-                  <span className="mt-0.5 block text-[0.68rem] text-slate-400">
+                  <span className="mt-0.5 block text-[0.68rem] text-slate-600">
                     Convertidos e oportunidades perdidas
                   </span>
                 </span>
@@ -1104,8 +1212,8 @@ export default function MarketingClient({
                 <span
                   className={`flex min-w-9 items-center justify-center rounded-full px-2.5 py-1 text-sm font-black ${
                     pipelineModo === "encerrados"
-                      ? "bg-emerald-400/20 text-emerald-100"
-                      : "bg-white/[0.06] text-slate-400"
+                      ? "bg-emerald-200 text-emerald-900"
+                      : "bg-slate-100 text-slate-700"
                   }`}
                 >
                   {resumo.leadsConvertidos + resumo.leadsPerdidos}
