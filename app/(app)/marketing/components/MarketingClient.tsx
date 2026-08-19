@@ -404,6 +404,8 @@ export default function MarketingClient({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [tab, setTab] = useState<TabKey>("pipeline");
+  const [pipelineModo, setPipelineModo] =
+    useState<"ativos" | "encerrados">("ativos");
   const [leadModal, setLeadModal] = useState(false);
   const [leadEditando, setLeadEditando] = useState<MarketingLead | null>(null);
   const [conflitoTelefone, setConflitoTelefone] = useState<ConflitoTelefoneLead | null>(null);
@@ -440,6 +442,18 @@ export default function MarketingClient({
     return Array.from(valores).sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [leads]);
 
+  const etapasPipelineVisiveis = useMemo(() => {
+    return LEAD_ETAPAS.filter((etapa) => {
+      const encerrada =
+        etapa.value === "Convertido" ||
+        etapa.value === "Perdido";
+
+      return pipelineModo === "encerrados"
+        ? encerrada
+        : !encerrada;
+    });
+  }, [pipelineModo]);
+
   const leadsFiltrados = useMemo(() => {
     const termo = normalizarTexto(busca.trim());
 
@@ -448,18 +462,45 @@ export default function MarketingClient({
         `${lead.nome} ${lead.telefone || ""} ${lead.origem || ""} ${lead.interesse || ""} ${lead.campanha?.nome || ""} ${lead.observacoes || ""} ${lead.codigoAtendimento || ""}`,
       );
       const matchesBusca = !termo || textoBusca.includes(termo);
-      const matchesEtapa = etapaFiltro === "todas" || lead.etapa === etapaFiltro;
-      const matchesOrigem = origemFiltro === "todas" || lead.origem === origemFiltro;
-      return matchesBusca && matchesEtapa && matchesOrigem;
+      const matchesEtapa =
+        etapaFiltro === "todas" ||
+        lead.etapa === etapaFiltro;
+      const matchesOrigem =
+        origemFiltro === "todas" ||
+        lead.origem === origemFiltro;
+
+      const encerrado =
+        lead.etapa === "Convertido" ||
+        lead.etapa === "Perdido";
+
+      const matchesModo =
+        pipelineModo === "encerrados"
+          ? encerrado
+          : !encerrado;
+
+      return (
+        matchesBusca &&
+        matchesEtapa &&
+        matchesOrigem &&
+        matchesModo
+      );
     });
-  }, [busca, etapaFiltro, leads, origemFiltro]);
+  }, [
+    busca,
+    etapaFiltro,
+    leads,
+    origemFiltro,
+    pipelineModo,
+  ]);
 
   const leadsPorEtapa = useMemo(() => {
-    return LEAD_ETAPAS.map((etapa) => ({
+    return etapasPipelineVisiveis.map((etapa) => ({
       ...etapa,
-      leads: leadsFiltrados.filter((lead) => lead.etapa === etapa.value),
+      leads: leadsFiltrados.filter(
+        (lead) => lead.etapa === etapa.value,
+      ),
     }));
-  }, [leadsFiltrados]);
+  }, [etapasPipelineVisiveis, leadsFiltrados]);
 
   function executar(tarefa: () => Promise<void>) {
     setErro(null);
@@ -708,8 +749,19 @@ export default function MarketingClient({
               <label className="relative">
                 <Filter className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
                 <select value={etapaFiltro} onChange={(event) => setEtapaFiltro(event.target.value)} className="premium-input h-11 w-full bg-[#1d2437] pl-11">
-                  <option value="todas">Todas as etapas</option>
-                  {LEAD_ETAPAS.map((etapa) => <option key={etapa.value} value={etapa.value}>{etapa.label}</option>)}
+                  <option value="todas">
+                    {pipelineModo === "ativos"
+                      ? "Todas as etapas ativas"
+                      : "Todos os encerrados"}
+                  </option>
+                  {etapasPipelineVisiveis.map((etapa) => (
+                    <option
+                      key={etapa.value}
+                      value={etapa.value}
+                    >
+                      {etapa.label}
+                    </option>
+                  ))}
                 </select>
               </label>
 
@@ -745,8 +797,81 @@ export default function MarketingClient({
         </section>
 
         {tab === "pipeline" ? (
-          <section className="grid gap-4 xl:grid-cols-3 2xl:grid-cols-6">
-            {leadsPorEtapa.map((etapa) => (
+          <>
+            <section className="grid grid-cols-2 gap-2 rounded-3xl border border-white/[0.10] bg-white/[0.045] p-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPipelineModo("ativos");
+                  setEtapaFiltro("todas");
+                }}
+                className={`flex min-h-16 items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left transition ${
+                  pipelineModo === "ativos"
+                    ? "bg-violet-500/15 text-white shadow-lg shadow-violet-950/10 ring-1 ring-violet-400/20"
+                    : "text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+                }`}
+              >
+                <span>
+                  <span className="block text-sm font-bold">
+                    Ativos
+                  </span>
+                  <span className="mt-0.5 block text-[0.68rem] text-slate-400">
+                    Trabalho que ainda precisa de ação
+                  </span>
+                </span>
+
+                <span
+                  className={`flex min-w-9 items-center justify-center rounded-full px-2.5 py-1 text-sm font-black ${
+                    pipelineModo === "ativos"
+                      ? "bg-violet-400/20 text-violet-100"
+                      : "bg-white/[0.06] text-slate-400"
+                  }`}
+                >
+                  {resumo.leadsAtivos}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setPipelineModo("encerrados");
+                  setEtapaFiltro("todas");
+                }}
+                className={`flex min-h-16 items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left transition ${
+                  pipelineModo === "encerrados"
+                    ? "bg-emerald-500/12 text-white shadow-lg shadow-emerald-950/10 ring-1 ring-emerald-400/20"
+                    : "text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+                }`}
+              >
+                <span>
+                  <span className="block text-sm font-bold">
+                    Encerrados
+                  </span>
+                  <span className="mt-0.5 block text-[0.68rem] text-slate-400">
+                    Convertidos e oportunidades perdidas
+                  </span>
+                </span>
+
+                <span
+                  className={`flex min-w-9 items-center justify-center rounded-full px-2.5 py-1 text-sm font-black ${
+                    pipelineModo === "encerrados"
+                      ? "bg-emerald-400/20 text-emerald-100"
+                      : "bg-white/[0.06] text-slate-400"
+                  }`}
+                >
+                  {resumo.leadsConvertidos + resumo.leadsPerdidos}
+                </span>
+              </button>
+            </section>
+
+            <section
+              className={`grid gap-4 ${
+                pipelineModo === "ativos"
+                  ? "xl:grid-cols-3"
+                  : "xl:grid-cols-2"
+              }`}
+            >
+              {leadsPorEtapa.map((etapa) => (
               <PipelineColumn
                 key={etapa.value}
                 etapa={etapa.value}
@@ -764,7 +889,8 @@ export default function MarketingClient({
                 podeGerenciarAgenda={podeGerenciarAgenda}
               />
             ))}
-          </section>
+            </section>
+          </>
         ) : null}
 
         {tab === "campanhas" ? (
