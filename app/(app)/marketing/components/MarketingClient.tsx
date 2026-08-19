@@ -792,6 +792,51 @@ export default function MarketingClient({
     });
   }
 
+  function registrarResultadoRapido(
+    lead: MarketingLead,
+    resultado: string,
+    dias: number,
+  ) {
+    setErro(null);
+    setLeadAcaoRapidaId(lead.id);
+
+    startTransition(async () => {
+      try {
+        const dataRetorno = dataFuturaEmDiasInput(dias);
+
+        // Primeiro programa o retorno para impedir que a automacao
+        // padrao de Aguardando resposta crie outro D+2.
+        await definirProximoContatoLead(
+          lead.id,
+          dataRetorno,
+        );
+
+        if (lead.etapa === "Novo") {
+          await atualizarEtapaLead(
+            lead.id,
+            "Aguardando resposta",
+          );
+        }
+
+        // Guarda o contexto comercial no historico.
+        await registrarObservacaoLead(
+          lead.id,
+          `Resultado do contato: ${resultado}`,
+        );
+
+        router.refresh();
+      } catch (error) {
+        setErro(
+          error instanceof Error
+            ? error.message
+            : "Não foi possível registrar o resultado do contato.",
+        );
+      } finally {
+        setLeadAcaoRapidaId(null);
+      }
+    });
+  }
+
   return (
     <>
       <div className="space-y-6 pb-20 lg:pb-0">
@@ -984,78 +1029,130 @@ export default function MarketingClient({
                             </div>
                           </button>
 
-                          <div className="grid gap-2 sm:min-w-[19rem]">
-                            <div className="grid grid-cols-2 gap-2">
+                          <div className="grid gap-2 sm:min-w-[21rem]">
+                            <div
+                              className={`grid gap-2 ${
+                                podeGerenciarAgenda
+                                  ? "grid-cols-3"
+                                  : "grid-cols-2"
+                              }`}
+                            >
                               <button
                                 type="button"
                                 onClick={() => setMensagemModal(item.lead)}
-                                className="rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100"
+                                className="rounded-xl border border-emerald-300 bg-emerald-50 px-2 py-2 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100"
                               >
                                 WhatsApp
                               </button>
 
+                              {podeGerenciarAgenda ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setAgendamentoModal(item.lead)
+                                  }
+                                  className="rounded-xl border border-cyan-300 bg-cyan-50 px-2 py-2 text-xs font-bold text-cyan-800 transition hover:bg-cyan-100"
+                                >
+                                  Agendar
+                                </button>
+                              ) : null}
+
                               <button
                                 type="button"
                                 onClick={() => setDetalhesModal(item.lead)}
-                                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                                className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
                               >
                                 Detalhes
                               </button>
                             </div>
 
-                            <div className="grid grid-cols-4 gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  programarRetornoRapido(item.lead, 1)
-                                }
-                                disabled={isPending}
-                                className="rounded-xl border border-violet-200 bg-violet-50 px-2 py-2 text-[10px] font-bold text-violet-800 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50 sm:text-[11px]"
-                              >
-                                Amanhã
-                              </button>
+                            <div>
+                              <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">
+                                Resultado do contato
+                              </p>
 
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  programarRetornoRapido(item.lead, 2)
-                                }
-                                disabled={isPending}
-                                className="rounded-xl border border-violet-200 bg-violet-50 px-2 py-2 text-[10px] font-bold text-violet-800 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50 sm:text-[11px]"
-                              >
-                                +2 dias
-                              </button>
+                              <div className="grid grid-cols-2 gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    registrarResultadoRapido(
+                                      item.lead,
+                                      "Não respondeu. Novo retorno programado para o dia seguinte.",
+                                      1,
+                                    )
+                                  }
+                                  disabled={isPending}
+                                  className="rounded-xl border border-slate-200 bg-slate-50 px-2 py-2 text-[11px] font-bold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  Não respondeu
+                                  <span className="ml-1 font-medium text-slate-500">
+                                    +1d
+                                  </span>
+                                </button>
 
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  programarRetornoRapido(item.lead, 3)
-                                }
-                                disabled={isPending}
-                                className="rounded-xl border border-violet-200 bg-violet-50 px-2 py-2 text-[10px] font-bold text-violet-800 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50 sm:text-[11px]"
-                              >
-                                +3 dias
-                              </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    registrarResultadoRapido(
+                                      item.lead,
+                                      "Cliente está pesquisando preços antes de decidir.",
+                                      2,
+                                    )
+                                  }
+                                  disabled={isPending}
+                                  className="rounded-xl border border-violet-200 bg-violet-50 px-2 py-2 text-[11px] font-bold text-violet-800 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  Pesquisando preço
+                                  <span className="ml-1 font-medium text-violet-600">
+                                    +2d
+                                  </span>
+                                </button>
 
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  programarRetornoRapido(item.lead, 7)
-                                }
-                                disabled={isPending}
-                                className="rounded-xl border border-violet-200 bg-violet-50 px-2 py-2 text-[10px] font-bold text-violet-800 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50 sm:text-[11px]"
-                              >
-                                +7 dias
-                              </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    registrarResultadoRapido(
+                                      item.lead,
+                                      "Cliente informou que vai pensar antes de decidir.",
+                                      2,
+                                    )
+                                  }
+                                  disabled={isPending}
+                                  className="rounded-xl border border-blue-200 bg-blue-50 px-2 py-2 text-[11px] font-bold text-blue-800 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  Vai pensar
+                                  <span className="ml-1 font-medium text-blue-600">
+                                    +2d
+                                  </span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    registrarResultadoRapido(
+                                      item.lead,
+                                      "Cliente pediu mais tempo antes de um novo contato.",
+                                      3,
+                                    )
+                                  }
+                                  disabled={isPending}
+                                  className="rounded-xl border border-amber-200 bg-amber-50 px-2 py-2 text-[11px] font-bold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  Mais tempo
+                                  <span className="ml-1 font-medium text-amber-700">
+                                    +3d
+                                  </span>
+                                </button>
+                              </div>
                             </div>
 
                             {leadAcaoRapidaId === item.lead.id && isPending ? (
                               <p className="text-[11px] font-semibold text-violet-700">
-                                Programando retorno...
+                                Salvando resultado...
                               </p>
                             ) : (
-                              <p className="text-[11px] text-slate-500">
-                                Após falar, escolha quando este lead deve voltar para sua fila.
+                              <p className="text-[11px] leading-4 text-slate-500">
+                                O CRM registra o motivo e programa sozinho quando este lead deve voltar para sua fila.
                               </p>
                             )}
                           </div>
