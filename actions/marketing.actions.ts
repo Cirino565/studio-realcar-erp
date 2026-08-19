@@ -78,6 +78,21 @@ function dataSeguimento(value?: string | null) {
   return new Date(`${value}T12:00:00-03:00`);
 }
 
+function dataSeguimentoAutomaticoEmDias(dias: number) {
+  const formatador = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  const hoje = formatador.format(new Date());
+  const base = new Date(`${hoje}T12:00:00-03:00`);
+  const alvo = new Date(base.getTime() + dias * 24 * 60 * 60 * 1000);
+
+  return dataSeguimento(formatador.format(alvo));
+}
+
 async function localizarClientePorTelefone(telefone?: string | null) {
   const alvo = normalizarTelefone(telefone);
   if (alvo.length < 8) return null;
@@ -460,9 +475,25 @@ export async function atualizarEtapaLead(id: number, etapa: LeadEtapa) {
 
   const anterior = await prisma.lead.findUnique({
     where: { id },
-    select: { etapa: true, nome: true, chamouWhatsapp: true },
+    select: {
+      etapa: true,
+      nome: true,
+      chamouWhatsapp: true,
+      proximoContatoEm: true,
+    },
   });
   if (!anterior) throw new Error("Lead não encontrado.");
+
+  // Quando uma conversa termina em "vou pensar", "vou pesquisar", etc.,
+  // o CRM programa sozinho um retorno para daqui a 2 dias.
+  //
+  // Se ja existir uma data definida manualmente, ela e preservada.
+  const proximoContatoAutomatico =
+    etapa === "Aguardando resposta" &&
+    anterior.etapa !== "Aguardando resposta" &&
+    !anterior.proximoContatoEm
+      ? dataSeguimentoAutomaticoEmDias(2)
+      : null;
 
   await prisma.$transaction(async (tx) => {
     await tx.lead.update({
@@ -470,16 +501,26 @@ export async function atualizarEtapaLead(id: number, etapa: LeadEtapa) {
       data: {
         etapa,
         motivoPerda: null,
+        ...(proximoContatoAutomatico
+          ? { proximoContatoEm: proximoContatoAutomatico }
+          : {}),
         ...chamouWhatsappSeAindaNaoMarcado(anterior.chamouWhatsapp),
       },
     });
 
     if (anterior.etapa !== etapa) {
+      const descricaoFollowUp = proximoContatoAutomatico
+        ? ` Próximo contato programado automaticamente para ${proximoContatoAutomatico.toLocaleDateString(
+            "pt-BR",
+            { timeZone: "America/Sao_Paulo" },
+          )}.`
+        : "";
+
       await tx.leadInteracao.create({
         data: {
           leadId: id,
           tipo: "Etapa",
-          descricao: `${anterior.etapa} → ${etapa}`,
+          descricao: `${anterior.etapa} → ${etapa}.${descricaoFollowUp}`,
         },
       });
     }

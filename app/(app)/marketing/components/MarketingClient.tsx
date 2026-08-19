@@ -1337,6 +1337,21 @@ function LeadCard({
           <strong className="shrink-0 text-slate-100">{formatarMoeda(lead.valorPrevisto)}</strong>
         </div>
         {lead.telefone ? <div className="flex items-center gap-2"><Phone className="size-3.5 text-slate-500" /><span>{lead.telefone}</span></div> : null}
+
+        {lead.proximoContatoEm &&
+        (lead.etapa === "Novo" || lead.etapa === "Aguardando resposta") ? (
+          <div
+            className={`flex items-center gap-2 ${
+              atrasado ? "font-semibold text-amber-200" : "text-violet-200"
+            }`}
+          >
+            <Clock3 className="size-3.5" />
+            <span>
+              Retorno: {formatarData(lead.proximoContatoEm)}
+              {atrasado ? " · atrasado" : ""}
+            </span>
+          </div>
+        ) : null}
         {/* So existe em lead que veio de clique de anuncio. Visivel direto
             no cartao para nao precisar abrir Detalhes um por um so pra
             achar o codigo e cruzar com a planilha de rastreamento. */}
