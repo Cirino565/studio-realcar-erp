@@ -1322,34 +1322,81 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
       },
     });
 
-    // "Avaliação" e "Negociação" eram os nomes antigos do funil, trocados
-    // em 18/08 por "Agendado" e "Aguardando resposta". O atendimento
-    // concluido e prova de conversa de verdade - marca "Chamou no
-    // WhatsApp?" junto, se ainda estiver em "A verificar", pelo mesmo
-    // motivo das outras transicoes automaticas do funil.
+    // O atendimento finalizado tambem atualiza automaticamente o funil
+    // comercial quando este agendamento veio de um lead:
+    //
+    // - venda real (> R$ 0) -> Convertido
+    // - atendimento sem venda -> Aguardando resposta
+    //
+    // Convertido e Perdido nunca sao reabertos automaticamente.
     const leadVinculado = await tx.lead.findUnique({
       where: { agendamentoId: agendamento.id },
-      select: { id: true, etapa: true, chamouWhatsapp: true },
+      select: {
+        id: true,
+        nome: true,
+        etapa: true,
+        clienteId: true,
+        chamouWhatsapp: true,
+      },
     });
 
-    if (leadVinculado?.etapa === "Agendado") {
+    if (
+      leadVinculado &&
+      !["Convertido", "Perdido"].includes(leadVinculado.etapa)
+    ) {
+      const houveVendaReal = venda.valorTotal > 0;
+      const proximaEtapa = houveVendaReal
+        ? "Convertido"
+        : "Aguardando resposta";
+
       await tx.lead.update({
         where: { id: leadVinculado.id },
         data: {
-          etapa: "Aguardando resposta",
+          // O cliente ja foi criado/vinculado quando o lead foi agendado.
+          // Reforcamos o vinculo sem criar nenhum cadastro novo.
+          clienteId: agendamento.clienteId,
+          etapa: proximaEtapa,
+
+          ...(houveVendaReal
+            ? {
+                convertidoEm: dataAtendimento,
+                proximoContatoEm: null,
+                motivoPerda: null,
+              }
+            : {}),
+
           ...(leadVinculado.chamouWhatsapp === "A verificar"
             ? { chamouWhatsapp: "Chamou" }
             : {}),
         },
       });
 
-      await tx.leadInteracao.create({
-        data: {
-          leadId: leadVinculado.id,
-          tipo: "Atendimento",
-          descricao: `Atendimento concluído: ${procedimentoRealizado}. Lead movido automaticamente para Aguardando resposta.`,
-        },
-      });
+      // So cria evento de historico se realmente houve mudanca de etapa.
+      if (leadVinculado.etapa !== proximaEtapa) {
+        await tx.leadInteracao.create({
+          data: {
+            leadId: leadVinculado.id,
+            tipo: houveVendaReal ? "Conversão" : "Atendimento",
+            descricao: houveVendaReal
+              ? `Atendimento concluído com venda de R$ ${venda.valorTotal.toFixed(2)}. Lead movido automaticamente de ${leadVinculado.etapa} para Convertido.`
+              : `Atendimento concluído sem venda. Lead movido automaticamente de ${leadVinculado.etapa} para Aguardando resposta.`,
+          },
+        });
+      }
+
+      // Registra a conversao automatica tambem na auditoria.
+      if (houveVendaReal) {
+        await tx.auditoria.create({
+          data: {
+            modulo: "Marketing",
+            acao: "Converteu lead automaticamente após atendimento",
+            entidade: "Lead",
+            entidadeId: String(leadVinculado.id),
+            usuario: profissional,
+            detalhes: `${leadVinculado.nome} · cliente #${agendamento.clienteId} · venda #${venda.vendaId} · R$ ${venda.valorTotal.toFixed(2)}`,
+          },
+        });
+      }
     }
 
     await tx.auditoria.create({
