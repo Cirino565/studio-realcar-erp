@@ -610,7 +610,16 @@ export default function MarketingClient({
     return Array.from(valores).sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [leads]);
 
+  const buscaGlobalAtiva =
+    busca.trim().length > 0;
+
   const etapasPipelineVisiveis = useMemo(() => {
+    // Enquanto existe uma busca, ela ignora a separacao operacional
+    // Ativos / Encerrados. A pesquisa precisa localizar qualquer lead.
+    if (buscaGlobalAtiva) {
+      return LEAD_ETAPAS;
+    }
+
     return LEAD_ETAPAS.filter((etapa) => {
       const encerrada =
         etapa.value === "Convertido" ||
@@ -620,7 +629,7 @@ export default function MarketingClient({
         ? encerrada
         : !encerrada;
     });
-  }, [pipelineModo]);
+  }, [buscaGlobalAtiva, pipelineModo]);
 
   const leadsFiltrados = useMemo(() => {
     const termo = normalizarTexto(busca.trim());
@@ -642,9 +651,11 @@ export default function MarketingClient({
         lead.etapa === "Perdido";
 
       const matchesModo =
-        pipelineModo === "encerrados"
-          ? encerrado
-          : !encerrado;
+        termo.length > 0
+          ? true
+          : pipelineModo === "encerrados"
+            ? encerrado
+            : !encerrado;
 
       return (
         matchesBusca &&
@@ -662,13 +673,27 @@ export default function MarketingClient({
   ]);
 
   const leadsPorEtapa = useMemo(() => {
-    return etapasPipelineVisiveis.map((etapa) => ({
-      ...etapa,
-      leads: leadsFiltrados.filter(
-        (lead) => lead.etapa === etapa.value,
-      ),
-    }));
-  }, [etapasPipelineVisiveis, leadsFiltrados]);
+    const resultado = etapasPipelineVisiveis.map(
+      (etapa) => ({
+        ...etapa,
+        leads: leadsFiltrados.filter(
+          (lead) => lead.etapa === etapa.value,
+        ),
+      }),
+    );
+
+    // Na busca global nao faz sentido mostrar quatro colunas vazias.
+    // Exibe apenas as etapas onde existe algum resultado.
+    return buscaGlobalAtiva
+      ? resultado.filter(
+          (etapa) => etapa.leads.length > 0,
+        )
+      : resultado;
+  }, [
+    buscaGlobalAtiva,
+    etapasPipelineVisiveis,
+    leadsFiltrados,
+  ]);
 
   function executar(tarefa: () => Promise<void>) {
     setErro(null);
@@ -1367,8 +1392,11 @@ export default function MarketingClient({
                 <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
                 <input
                   value={busca}
-                  onChange={(event) => setBusca(event.target.value)}
-                  placeholder="Buscar lead, telefone, campanha ou interesse"
+                  onChange={(event) => {
+                    setBusca(event.target.value);
+                    setEtapaFiltro("todas");
+                  }}
+                  placeholder="Buscar em todos os leads, ativos ou encerrados"
                   className="premium-input h-11 w-full pl-11"
                 />
               </label>
@@ -1493,9 +1521,11 @@ export default function MarketingClient({
 
             <section
               className={`grid gap-4 ${
-                pipelineModo === "ativos"
+                buscaGlobalAtiva
                   ? "xl:grid-cols-3"
-                  : "xl:grid-cols-2"
+                  : pipelineModo === "ativos"
+                    ? "xl:grid-cols-3"
+                    : "xl:grid-cols-2"
               }`}
             >
               {leadsPorEtapa.map((etapa) => (
