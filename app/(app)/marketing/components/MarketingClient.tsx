@@ -1148,7 +1148,7 @@ export default function MarketingClient({
                                   onClick={() =>
                                     setAgendamentoModal(item.lead)
                                   }
-                                  className="rounded-xl border border-cyan-300 bg-cyan-50 px-2 py-2 text-xs font-bold text-cyan-800 transition hover:bg-cyan-100"
+                                  className="rounded-xl border border-cyan-300 bg-cyan-50 px-2 py-2 text-xs font-bold text-cyan-800 transition hover:bg-cyan-200"
                                 >
                                   Agendar
                                 </button>
@@ -1782,7 +1782,7 @@ function LeadCard({
                 {lead.agendamento.status}
               </span>
             </div>
-            <p className="mt-0.5 truncate text-[11px] text-cyan-200/70">
+            <p className="mt-0.5 truncate text-[11px] text-cyan-900">
               {lead.agendamento.procedimento} · {lead.agendamento.profissional?.nome || "Profissional não informado"}
             </p>
           </div>
@@ -2777,7 +2777,7 @@ function LeadDetailsModal({
           </section>
 
           <section className="rounded-3xl border border-white/[0.10] bg-white/[0.055] p-4">
-            <h4 className="flex items-center gap-2 font-semibold text-white"><Link2 className="size-4 text-cyan-300" />Vínculos</h4>
+            <h4 className="flex items-center gap-2 font-semibold text-white"><Link2 className="size-4 text-cyan-900" />Vínculos</h4>
             <div className="mt-3 grid gap-2">
               {lead.cliente ? <Link href={`/clientes/${lead.cliente.id}`} className="flex items-center justify-between rounded-2xl border border-white/[0.08] bg-black/10 px-3 py-2 text-sm text-slate-200 hover:bg-white/[0.08]"><span>Cliente: {lead.cliente.nome}</span><ExternalLink className="size-4" /></Link> : <p className="rounded-2xl border border-dashed border-white/[0.10] p-3 text-xs text-slate-500">Ainda não há cliente vinculado.</p>}
               {podeGerenciarMarketing ? (
@@ -2785,7 +2785,7 @@ function LeadDetailsModal({
                   {lead.cliente ? "Trocar cliente vinculado" : "Vincular a um cliente existente"}
                 </button>
               ) : null}
-              {lead.agendamento ? <Link href="/agenda" className="rounded-2xl border border-cyan-300/10 bg-cyan-400/8 px-3 py-3 text-sm text-cyan-100 hover:bg-cyan-400/12"><div className="flex items-center justify-between"><strong>{formatarDataHora(lead.agendamento.data)}</strong><ExternalLink className="size-4" /></div><p className="mt-1 text-xs text-cyan-200/70">{lead.agendamento.procedimento} · {lead.agendamento.status}</p></Link> : null}
+              {lead.agendamento ? <Link href="/agenda" className="rounded-2xl border border-cyan-300/10 bg-cyan-400/8 px-3 py-3 text-sm text-cyan-100 hover:bg-cyan-400/12"><div className="flex items-center justify-between"><strong>{formatarDataHora(lead.agendamento.data)}</strong><ExternalLink className="size-4" /></div><p className="mt-1 text-xs text-cyan-900">{lead.agendamento.procedimento} · {lead.agendamento.status}</p></Link> : null}
               {lead.receitaRastreada > 0 ? <div className="rounded-2xl border border-emerald-300/10 bg-emerald-400/8 px-3 py-3 text-sm text-emerald-200">Receita rastreada do agendamento: <strong>{formatarMoeda(lead.receitaRastreada)}</strong></div> : null}
             </div>
           </section>
