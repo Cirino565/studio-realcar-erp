@@ -2943,12 +2943,12 @@ function AgendarAvaliacaoModal({
           ) : null}
         </div>
 
-        <label className="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] px-4 py-3.5 transition hover:bg-emerald-400/[0.12]">
+        <label className="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3.5 transition hover:bg-emerald-100 dark:border-emerald-400/20 dark:bg-emerald-400/[0.08] dark:hover:bg-emerald-400/[0.12]">
           <span className="min-w-0">
-            <span className="block text-sm font-bold text-emerald-200">
+            <span className="block text-sm font-bold text-emerald-900 dark:text-emerald-200">
               Pagou sinal
             </span>
-            <span className="mt-0.5 block text-xs leading-5 text-emerald-200/70">
+            <span className="mt-0.5 block text-xs leading-5 text-emerald-700 dark:text-emerald-200/70">
               Marque quando o cliente já tiver pago o sinal da reserva. O marcador aparecerá automaticamente na agenda.
             </span>
           </span>
@@ -2957,11 +2957,43 @@ function AgendarAvaliacaoModal({
             type="checkbox"
             checked={sinalPago}
             onChange={(event) => setSinalPago(event.target.checked)}
-            className="size-5 shrink-0 accent-emerald-500"
+            className="size-5 shrink-0 accent-emerald-600"
           />
         </label>
 
-        {ocupados.length ? <div className="rounded-2xl border border-white/[0.08] bg-black/10 p-3"><p className="text-xs font-semibold text-slate-300">Alguns horários ocupados</p><div className="mt-2 space-y-1 text-xs text-slate-500">{ocupados.map((item) => <p key={item.hora}>{item.hora}: {item.motivo || "indisponível"}</p>)}</div></div> : null}
+        {ocupados.length ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5 dark:border-white/[0.08] dark:bg-white/[0.04]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  Também indisponíveis
+                </p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Horários já ocupados ou bloqueados para esta combinação.
+                </p>
+              </div>
+
+              <span className="shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-600 dark:border-white/[0.10] dark:bg-white/[0.06] dark:text-slate-300">
+                {ocupados.length} indisponível(is)
+              </span>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {ocupados.map((item) => (
+                <span
+                  key={item.hora}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 dark:border-white/[0.10] dark:bg-white/[0.05] dark:text-slate-400"
+                >
+                  <span className="font-bold text-slate-700 dark:text-slate-200">
+                    {item.hora}
+                  </span>
+                  <span className="text-slate-400">·</span>
+                  <span>{item.motivo || "indisponível"}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <div className="rounded-2xl border border-cyan-300/15 bg-cyan-400/8 p-3 text-xs leading-5 text-cyan-100">
           Ao salvar, o sistema reutiliza um cliente existente pelo telefone ou cria o cadastro necessário, gera o agendamento real e move o lead para Agendado.
           {sinalPago ? " O sinal será marcado como pago na agenda." : ""}
