@@ -2803,8 +2803,19 @@ function AgendarAvaliacaoModal({
       try {
         const resultado = await buscarDisponibilidadeAgenda({ profissionalId: Number(profissionalId), data, duracao: Number(duracao) || 30 });
         setHorarios(resultado);
-        const primeiro = resultado.find((item) => item.disponivel)?.hora || "";
-        setHora((atual) => resultado.some((item) => item.hora === atual && item.disponivel) ? atual : primeiro);
+
+        // Mantem o horario somente se ele continuar disponivel.
+        // Quando muda data, profissional ou duracao, a pessoa escolhe
+        // conscientemente um dos horarios livres exibidos na tela.
+        setHora((atual) =>
+          resultado.some(
+            (item) =>
+              item.hora === atual &&
+              item.disponivel,
+          )
+            ? atual
+            : "",
+        );
       } catch {
         setHorarios([]);
         setHora("");
@@ -2866,7 +2877,71 @@ function AgendarAvaliacaoModal({
           <label className="grid gap-2 text-sm font-medium text-slate-300">Serviço<select value={servicoId} onChange={(event) => escolherServico(event.target.value)} className="premium-input w-full bg-[#1d2437]"><option value="">Selecione</option>{servicos.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select></label>
         </div>
         <div className="grid gap-4 sm:grid-cols-3"><Input label="Data" type="date" min={hojeInput()} value={data} onChange={setData} /><Input label="Duração, min" type="number" min="15" step="5" value={duracao} onChange={setDuracao} /><Input label="Valor" type="number" min="0" step="0.01" value={valor} onChange={setValor} /></div>
-        <label className="grid gap-2 text-sm font-medium text-slate-300">Horário disponível<select value={hora} onChange={(event) => setHora(event.target.value)} disabled={loadingHorarios || disponiveis.length === 0} className="premium-input w-full bg-[#1d2437]"><option value="">{loadingHorarios ? "Carregando horários..." : disponiveis.length ? "Selecione" : "Nenhum horário disponível"}</option>{disponiveis.map((item) => <option key={item.hora} value={item.hora}>{item.hora}</option>)}</select></label>
+        <div className="grid gap-2">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                Horários disponíveis
+              </p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Escolha um dos horários livres abaixo.
+              </p>
+            </div>
+
+            {!loadingHorarios && disponiveis.length > 0 ? (
+              <span className="shrink-0 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-bold text-violet-700 dark:border-violet-400/20 dark:bg-violet-400/10 dark:text-violet-200">
+                {disponiveis.length} livre(s)
+              </span>
+            ) : null}
+          </div>
+
+          {loadingHorarios ? (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center text-sm font-medium text-slate-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-slate-400">
+              Consultando agenda...
+            </div>
+          ) : disponiveis.length > 0 ? (
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+              {disponiveis.map((item) => {
+                const selecionado =
+                  hora === item.hora;
+
+                return (
+                  <button
+                    key={item.hora}
+                    type="button"
+                    onClick={() =>
+                      setHora(item.hora)
+                    }
+                    className={`min-h-11 rounded-xl border px-2 py-2 text-sm font-bold transition ${
+                      selecionado
+                        ? "border-violet-500 bg-violet-600 text-white shadow-md shadow-violet-500/20 ring-2 ring-violet-200"
+                        : "border-slate-200 bg-white text-slate-700 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-800 dark:border-white/[0.10] dark:bg-white/[0.05] dark:text-slate-200 dark:hover:border-violet-400/30 dark:hover:bg-violet-400/10"
+                    }`}
+                  >
+                    {item.hora}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-center dark:border-amber-400/20 dark:bg-amber-400/10">
+              <p className="text-sm font-bold text-amber-900 dark:text-amber-100">
+                Nenhum horário disponível
+              </p>
+
+              <p className="mt-1 text-xs text-amber-700 dark:text-amber-200/70">
+                Escolha outra data, profissional ou ajuste a duração.
+              </p>
+            </div>
+          )}
+
+          {hora ? (
+            <div className="flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-800 dark:border-violet-400/20 dark:bg-violet-400/10 dark:text-violet-200">
+              <CheckCircle2 className="size-4" />
+              Horário selecionado: {hora}
+            </div>
+          ) : null}
+        </div>
 
         <label className="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] px-4 py-3.5 transition hover:bg-emerald-400/[0.12]">
           <span className="min-w-0">
