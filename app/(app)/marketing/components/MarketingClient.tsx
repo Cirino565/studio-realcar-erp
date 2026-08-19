@@ -517,6 +517,8 @@ export default function MarketingClient({
   const [mensagemModal, setMensagemModal] = useState<MarketingLead | null>(null);
   const [detalhesModal, setDetalhesModal] = useState<MarketingLead | null>(null);
   const [agendamentoModal, setAgendamentoModal] = useState<MarketingLead | null>(null);
+  const [leadPerdaModal, setLeadPerdaModal] =
+    useState<MarketingLead | null>(null);
   const [busca, setBusca] = useState("");
   const [etapaFiltro, setEtapaFiltro] = useState("todas");
   const [origemFiltro, setOrigemFiltro] = useState("todas");
@@ -540,6 +542,42 @@ export default function MarketingClient({
   }, [leads, detalhesModal, mensagemModal, agendamentoModal]);
 
   const resumo = useMemo(() => calcularResumo(leads, campanhas), [campanhas, leads]);
+
+  const resumoMotivosPerda = useMemo(() => {
+    const perdidos = leads.filter(
+      (lead) => lead.etapa === "Perdido",
+    );
+
+    const contagem = new Map<string, number>();
+
+    for (const lead of perdidos) {
+      const motivo =
+        lead.motivoPerda?.trim() ||
+        "Sem motivo informado";
+
+      contagem.set(
+        motivo,
+        (contagem.get(motivo) || 0) + 1,
+      );
+    }
+
+    const itens = Array.from(contagem.entries())
+      .map(([motivo, quantidade]) => ({
+        motivo,
+        quantidade,
+        percentual:
+          perdidos.length > 0
+            ? (quantidade / perdidos.length) * 100
+            : 0,
+      }))
+      .sort((a, b) => b.quantidade - a.quantidade)
+      .slice(0, 5);
+
+    return {
+      total: perdidos.length,
+      itens,
+    };
+  }, [leads]);
 
   const filaContatoHoje = useMemo(
     () => montarFilaContatoHoje(leads),
@@ -712,11 +750,16 @@ export default function MarketingClient({
 
   function alterarEtapa(id: number, etapa: LeadEtapa) {
     if (etapa === "Perdido") {
-      const motivo = window.prompt("Qual foi o motivo da perda desta oportunidade?");
-      if (!motivo?.trim()) return;
-      executar(async () => {
-        await marcarLeadPerdido(id, motivo);
-      });
+      const lead = leads.find(
+        (item) => item.id === id,
+      );
+
+      if (!lead) {
+        setErro("Lead não encontrado.");
+        return;
+      }
+
+      setLeadPerdaModal(lead);
       return;
     }
 
@@ -729,6 +772,31 @@ export default function MarketingClient({
 
     executar(async () => {
       await atualizarEtapaLead(id, etapa);
+    });
+  }
+
+  function confirmarPerdaLead(
+    motivo: string,
+    detalhe?: string,
+  ) {
+    const lead = leadPerdaModal;
+
+    if (!lead) return;
+
+    executar(async () => {
+      await marcarLeadPerdido(
+        lead.id,
+        motivo,
+      );
+
+      if (detalhe?.trim()) {
+        await registrarObservacaoLead(
+          lead.id,
+          `Detalhe da perda: ${detalhe.trim()}`,
+        );
+      }
+
+      setLeadPerdaModal(null);
     });
   }
 
@@ -1187,6 +1255,65 @@ export default function MarketingClient({
           />
         </section>
 
+        {tab === "pipeline" &&
+        pipelineModo === "encerrados" &&
+        resumoMotivosPerda.total > 0 ? (
+          <section className="rounded-3xl border border-rose-200 bg-rose-50 p-4 sm:p-5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-rose-700">
+                  Motivos de perda
+                </p>
+
+                <h2 className="mt-1 text-lg font-bold text-slate-900">
+                  Por que estamos perdendo oportunidades?
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-600">
+                  Baseado nos {resumoMotivosPerda.total} lead(s) encerrados como perdidos.
+                </p>
+              </div>
+
+              <span className="w-fit rounded-full border border-rose-200 bg-white px-3 py-1.5 text-sm font-bold text-rose-800">
+                {resumoMotivosPerda.total} perdido(s)
+              </span>
+            </div>
+
+            <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+              {resumoMotivosPerda.itens.map(
+                (item, index) => (
+                  <div
+                    key={item.motivo}
+                    className="rounded-2xl border border-rose-100 bg-white p-3 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-rose-100 text-xs font-black text-rose-700">
+                        {index + 1}
+                      </span>
+
+                      <span className="text-sm font-black text-rose-800">
+                        {item.percentual.toFixed(0)}%
+                      </span>
+                    </div>
+
+                    <p className="mt-3 line-clamp-2 text-sm font-bold text-slate-800">
+                      {item.motivo}
+                    </p>
+
+                    <p className="mt-1 text-xs text-slate-500">
+                      {item.quantidade} oportunidade(s)
+                    </p>
+                  </div>
+                ),
+              )}
+            </div>
+
+            <p className="mt-3 text-xs leading-5 text-slate-500">
+              A partir de agora, usar os motivos padronizados deixará este relatório cada vez mais confiável.
+            </p>
+          </section>
+        ) : null}
+
         <section className="premium-card-soft p-4 md:p-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="grid gap-3 lg:grid-cols-[1.4fr_0.8fr_0.9fr] xl:min-w-0 xl:flex-1">
@@ -1353,6 +1480,13 @@ export default function MarketingClient({
 
         {tab === "mensagens" ? <TemplatesView /> : null}
       </div>
+
+      <PerdaLeadModal
+        lead={leadPerdaModal}
+        disabled={isPending}
+        onClose={() => setLeadPerdaModal(null)}
+        onSubmit={confirmarPerdaLead}
+      />
 
       <LeadModal
         open={leadModal}
@@ -1972,6 +2106,210 @@ function TemplatesView() {
         </article>
       ))}
     </section>
+  );
+}
+
+function PerdaLeadModal({
+  lead,
+  disabled,
+  onClose,
+  onSubmit,
+}: {
+  lead: MarketingLead | null;
+  disabled: boolean;
+  onClose: () => void;
+  onSubmit: (
+    motivo: string,
+    detalhe?: string,
+  ) => void;
+}) {
+  const [motivo, setMotivo] = useState("");
+  const [outroMotivo, setOutroMotivo] = useState("");
+  const [detalhe, setDetalhe] = useState("");
+
+  useEffect(() => {
+    if (!lead) return;
+
+    setMotivo("");
+    setOutroMotivo("");
+    setDetalhe("");
+  }, [lead?.id]);
+
+  if (!lead) return null;
+
+  const motivos = [
+    {
+      value: "Preço",
+      description:
+        "Valor foi o principal motivo para não fechar.",
+    },
+    {
+      value: "Sem resposta",
+      description:
+        "Parou de responder e a oportunidade será encerrada.",
+    },
+    {
+      value: "Escolheu concorrente",
+      description:
+        "Informou que decidiu realizar em outro local.",
+    },
+    {
+      value: "Desistiu",
+      description:
+        "Desistiu de realizar o procedimento neste momento.",
+    },
+    {
+      value: "Sem interesse",
+      description:
+        "Não demonstrou interesse em continuar a negociação.",
+    },
+    {
+      value: "Outro",
+      description:
+        "Use quando nenhum dos motivos acima representar o caso.",
+    },
+  ];
+
+  const motivoFinal =
+    motivo === "Outro"
+      ? outroMotivo.trim()
+      : motivo;
+
+  return (
+    <Modal
+      title="Encerrar oportunidade"
+      description={`Lead: ${lead.nome}`}
+      onClose={onClose}
+    >
+      <div className="space-y-5">
+        <div className="rounded-2xl border border-rose-300/20 bg-rose-400/[0.08] p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 size-5 shrink-0 text-rose-300" />
+
+            <div>
+              <p className="text-sm font-bold text-rose-100">
+                Marcar como Perdido
+              </p>
+
+              <p className="mt-1 text-xs leading-5 text-rose-200/70">
+                O lead será removido do funil ativo e ficará disponível em Encerrados. Nenhum histórico será apagado.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-3 text-sm font-bold text-slate-200">
+            Qual foi o principal motivo?
+          </p>
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            {motivos.map((item) => {
+              const selecionado =
+                motivo === item.value;
+
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  onClick={() =>
+                    setMotivo(item.value)
+                  }
+                  disabled={disabled}
+                  className={`rounded-2xl border p-3 text-left transition ${
+                    selecionado
+                      ? "border-rose-400/50 bg-rose-400/15 ring-1 ring-rose-400/20"
+                      : "border-white/[0.10] bg-white/[0.05] hover:bg-white/[0.08]"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={`text-sm font-bold ${
+                        selecionado
+                          ? "text-rose-100"
+                          : "text-slate-200"
+                      }`}
+                    >
+                      {item.value}
+                    </span>
+
+                    {selecionado ? (
+                      <CheckCircle2 className="size-4 text-rose-300" />
+                    ) : null}
+                  </div>
+
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    {item.description}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {motivo === "Outro" ? (
+          <label className="grid gap-2 text-sm font-medium text-slate-300">
+            Motivo
+            <input
+              value={outroMotivo}
+              onChange={(event) =>
+                setOutroMotivo(
+                  event.target.value,
+                )
+              }
+              placeholder="Ex.: mudou de cidade"
+              className="premium-input w-full"
+              autoFocus
+            />
+          </label>
+        ) : null}
+
+        <label className="grid gap-2 text-sm font-medium text-slate-300">
+          Detalhe adicional
+          <textarea
+            value={detalhe}
+            onChange={(event) =>
+              setDetalhe(event.target.value)
+            }
+            placeholder="Opcional. Ex.: achou o valor acima do orçamento e decidiu pesquisar outras clínicas."
+            className="min-h-24 rounded-3xl border border-white/[0.10] bg-[#1d2437] p-4 text-sm text-slate-100 outline-none focus:border-violet-400/40"
+          />
+          <span className="text-xs leading-5 text-slate-500">
+            O detalhe fica no histórico, mas não interfere no relatório do motivo principal.
+          </span>
+        </label>
+
+        <div className="flex flex-col-reverse gap-2 border-t border-white/[0.08] pt-4 sm:flex-row sm:justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={disabled}
+          >
+            Cancelar
+          </Button>
+
+          <Button
+            type="button"
+            onClick={() =>
+              onSubmit(
+                motivoFinal,
+                detalhe,
+              )
+            }
+            disabled={
+              disabled ||
+              !motivoFinal.trim()
+            }
+            className="bg-rose-600 text-white hover:bg-rose-700"
+          >
+            {disabled
+              ? "Salvando..."
+              : "Confirmar perda"}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
