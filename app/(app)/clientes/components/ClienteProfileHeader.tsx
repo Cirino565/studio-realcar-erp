@@ -8,6 +8,7 @@ import {
   Camera,
   FileText,
   MapPin,
+  Phone,
   Sparkles,
   Stethoscope,
 } from "lucide-react";
@@ -131,6 +132,44 @@ export default function ClienteProfileHeader({
           </div>
         ) : null}
 
+        {cliente.contatoConfiancaNome || cliente.contatoConfiancaTelefone ? (
+          <div className="rounded-2xl border border-teal-200 bg-teal-50 p-4 dark:border-teal-400/20 dark:bg-teal-500/10">
+            <div className="flex items-start gap-3">
+              <Phone className="mt-0.5 size-5 shrink-0 text-teal-700 dark:text-teal-300" />
+
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-bold uppercase tracking-wide text-teal-800 dark:text-teal-200">
+                    Contato de confiança
+                  </p>
+
+                  {cliente.contatoConfiancaAutorizado ? (
+                    <span className="rounded-full border border-emerald-200 bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-500/15 dark:text-emerald-200">
+                      Contato autorizado
+                    </span>
+                  ) : (
+                    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-600 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-300">
+                      Autorização não registrada
+                    </span>
+                  )}
+                </div>
+
+                <p className="mt-2 break-words text-sm font-bold text-slate-900 dark:text-white">
+                  {cliente.contatoConfiancaNome || "Nome não informado"}
+                  {cliente.contatoConfiancaVinculo
+                    ? ` · ${cliente.contatoConfiancaVinculo}`
+                    : ""}
+                </p>
+
+                {cliente.contatoConfiancaTelefone ? (
+                  <p className="mt-1 text-sm font-medium text-teal-800 dark:text-teal-200">
+                    {cliente.contatoConfiancaTelefone}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.04]">
             <div className="flex items-center gap-2 text-slate-500">

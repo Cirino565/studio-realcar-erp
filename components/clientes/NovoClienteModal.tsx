@@ -85,6 +85,10 @@ type FormData = {
   responsavelNome: string;
   responsavelTelefone: string;
   responsavelParentesco: string;
+  contatoConfiancaNome: string;
+  contatoConfiancaTelefone: string;
+  contatoConfiancaVinculo: string;
+  contatoConfiancaAutorizado: boolean;
   observacoes: string;
   areaEstetica: boolean;
   areaCilios: boolean;
@@ -209,6 +213,10 @@ function montarFormulario(
       responsavelNome: "",
       responsavelTelefone: "",
       responsavelParentesco: "",
+      contatoConfiancaNome: "",
+      contatoConfiancaTelefone: "",
+      contatoConfiancaVinculo: "",
+      contatoConfiancaAutorizado: false,
       observacoes: "",
       areaEstetica: false,
       areaCilios: false,
@@ -238,6 +246,12 @@ function montarFormulario(
     responsavelNome: cliente.responsavelNome ?? "",
     responsavelTelefone: formatarTelefone(cliente.responsavelTelefone ?? ""),
     responsavelParentesco: cliente.responsavelParentesco ?? "",
+    contatoConfiancaNome: cliente.contatoConfiancaNome ?? "",
+    contatoConfiancaTelefone: formatarTelefone(
+      cliente.contatoConfiancaTelefone ?? "",
+    ),
+    contatoConfiancaVinculo: cliente.contatoConfiancaVinculo ?? "",
+    contatoConfiancaAutorizado: cliente.contatoConfiancaAutorizado ?? false,
     observacoes: cliente.observacoes ?? "",
     areaEstetica: cliente.areaEstetica ?? false,
     areaCilios: cliente.areaCilios ?? false,
@@ -324,6 +338,12 @@ function NovoClienteForm({
       responsavelNome: form.responsavelNome.trim(),
       responsavelTelefone: formatarTelefone(form.responsavelTelefone),
       responsavelParentesco: form.responsavelParentesco,
+      contatoConfiancaNome: form.contatoConfiancaNome.trim(),
+      contatoConfiancaTelefone: formatarTelefone(
+        form.contatoConfiancaTelefone,
+      ),
+      contatoConfiancaVinculo: form.contatoConfiancaVinculo,
+      contatoConfiancaAutorizado: form.contatoConfiancaAutorizado,
       observacoes: form.observacoes.trim(),
     });
   }
@@ -510,6 +530,94 @@ function NovoClienteForm({
             </p>
           </details>
 
+          <div className="space-y-3 rounded-2xl border border-teal-200 bg-teal-50 p-4 dark:border-teal-400/20 dark:bg-teal-500/10 sm:col-span-2">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-teal-800 dark:text-teal-200">
+                Contato de confiança
+                <span className="ml-2 normal-case tracking-normal text-slate-500 dark:text-slate-400">
+                  opcional
+                </span>
+              </p>
+              <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">
+                Pessoa próxima que podemos contatar caso seja necessário falar com alguém de confiança do cliente.
+              </p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <label className="min-w-0">
+                <Label>Nome</Label>
+                <input
+                  name="contatoConfiancaNome"
+                  value={form.contatoConfiancaNome}
+                  onChange={(event) =>
+                    alterarCampo("contatoConfiancaNome", event.target.value)
+                  }
+                  placeholder="Nome da pessoa"
+                  className="premium-input w-full min-w-0 max-w-full text-base sm:text-sm"
+                />
+              </label>
+
+              <label className="min-w-0">
+                <Label>Telefone / WhatsApp</Label>
+                <input
+                  name="contatoConfiancaTelefone"
+                  value={form.contatoConfiancaTelefone}
+                  onChange={(event) =>
+                    alterarCampo(
+                      "contatoConfiancaTelefone",
+                      formatarTelefone(event.target.value),
+                    )
+                  }
+                  placeholder="(11) 91234-5678"
+                  className="premium-input w-full min-w-0 max-w-full text-base sm:text-sm"
+                  inputMode="tel"
+                />
+              </label>
+
+              <label className="min-w-0">
+                <Label>Vínculo</Label>
+                <select
+                  name="contatoConfiancaVinculo"
+                  value={form.contatoConfiancaVinculo}
+                  onChange={(event) =>
+                    alterarCampo("contatoConfiancaVinculo", event.target.value)
+                  }
+                  className="premium-input w-full min-w-0 max-w-full text-base sm:text-sm"
+                >
+                  <option value="">Selecione</option>
+                  <option value="Cônjuge / companheiro(a)">Cônjuge / companheiro(a)</option>
+                  <option value="Mãe">Mãe</option>
+                  <option value="Pai">Pai</option>
+                  <option value="Filho(a)">Filho(a)</option>
+                  <option value="Irmão(ã)">Irmão(ã)</option>
+                  <option value="Amigo(a)">Amigo(a)</option>
+                  <option value="Outro">Outro</option>
+                </select>
+              </label>
+            </div>
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-teal-200 bg-white px-4 py-3 dark:border-teal-400/20 dark:bg-white/[0.05]">
+              <input
+                type="checkbox"
+                checked={form.contatoConfiancaAutorizado}
+                onChange={(event) =>
+                  alterarCampo(
+                    "contatoConfiancaAutorizado",
+                    event.target.checked,
+                  )
+                }
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-teal-600"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-slate-800 dark:text-slate-100">
+                  Cliente autoriza contato, se necessário
+                </span>
+                <span className="mt-0.5 block text-xs leading-5 text-slate-500 dark:text-slate-400">
+                  Uso restrito a situações relacionadas ao atendimento.
+                </span>
+              </span>
+            </label>
+          </div>
           <label>
             <Label>Origem</Label>
             <select

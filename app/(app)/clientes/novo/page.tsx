@@ -33,6 +33,11 @@ async function salvarNovoCliente(formData: FormData) {
     responsavelNome: getString(formData, "responsavelNome"),
     responsavelTelefone: getString(formData, "responsavelTelefone"),
     responsavelParentesco: getString(formData, "responsavelParentesco"),
+    contatoConfiancaNome: getString(formData, "contatoConfiancaNome"),
+    contatoConfiancaTelefone: getString(formData, "contatoConfiancaTelefone"),
+    contatoConfiancaVinculo: getString(formData, "contatoConfiancaVinculo"),
+    contatoConfiancaAutorizado:
+      formData.get("contatoConfiancaAutorizado") === "on",
     observacoes: getString(formData, "observacoes"),
     areaEstetica: formData.get("areaEstetica") === "on",
     areaCilios: formData.get("areaCilios") === "on",

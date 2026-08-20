@@ -41,6 +41,10 @@ export type ClienteForm = {
   responsavelNome?: string;
   responsavelTelefone?: string;
   responsavelParentesco?: string;
+  contatoConfiancaNome?: string;
+  contatoConfiancaTelefone?: string;
+  contatoConfiancaVinculo?: string;
+  contatoConfiancaAutorizado?: boolean;
   observacoes?: string;
   areaEstetica?: boolean;
   areaCilios?: boolean;
@@ -80,6 +84,10 @@ export async function criarCliente(dados: ClienteForm) {
       responsavelNome: textoOpcional(dados.responsavelNome),
       responsavelTelefone: textoOpcional(dados.responsavelTelefone),
       responsavelParentesco: textoOpcional(dados.responsavelParentesco),
+      contatoConfiancaNome: textoOpcional(dados.contatoConfiancaNome),
+      contatoConfiancaTelefone: textoOpcional(dados.contatoConfiancaTelefone),
+      contatoConfiancaVinculo: textoOpcional(dados.contatoConfiancaVinculo),
+      contatoConfiancaAutorizado: Boolean(dados.contatoConfiancaAutorizado),
       observacoes: textoOpcional(dados.observacoes),
       areaEstetica: Boolean(dados.areaEstetica),
       areaCilios: Boolean(dados.areaCilios),
@@ -123,6 +131,10 @@ export async function atualizarCliente(dados: ClienteForm) {
       responsavelNome: textoOpcional(dados.responsavelNome),
       responsavelTelefone: textoOpcional(dados.responsavelTelefone),
       responsavelParentesco: textoOpcional(dados.responsavelParentesco),
+      contatoConfiancaNome: textoOpcional(dados.contatoConfiancaNome),
+      contatoConfiancaTelefone: textoOpcional(dados.contatoConfiancaTelefone),
+      contatoConfiancaVinculo: textoOpcional(dados.contatoConfiancaVinculo),
+      contatoConfiancaAutorizado: Boolean(dados.contatoConfiancaAutorizado),
       observacoes: textoOpcional(dados.observacoes),
       areaEstetica: Boolean(dados.areaEstetica),
       areaCilios: Boolean(dados.areaCilios),

@@ -28,6 +28,10 @@ model Cliente {
   responsavelNome        String?
   responsavelTelefone    String?
   responsavelParentesco  String?
+  contatoConfiancaNome        String?
+  contatoConfiancaTelefone    String?
+  contatoConfiancaVinculo     String?
+  contatoConfiancaAutorizado  Boolean  @default(false)
   observacoes  String?
   procedimento String?
   valorGasto   Float    @default(0)

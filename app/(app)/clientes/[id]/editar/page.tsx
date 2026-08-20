@@ -71,6 +71,14 @@ export default async function EditarClientePage({ params }: EditarClientePagePro
       responsavelNome: (formData.get("responsavelNome") as string) || "",
       responsavelTelefone: (formData.get("responsavelTelefone") as string) || "",
       responsavelParentesco: (formData.get("responsavelParentesco") as string) || "",
+      contatoConfiancaNome:
+        (formData.get("contatoConfiancaNome") as string) || "",
+      contatoConfiancaTelefone:
+        (formData.get("contatoConfiancaTelefone") as string) || "",
+      contatoConfiancaVinculo:
+        (formData.get("contatoConfiancaVinculo") as string) || "",
+      contatoConfiancaAutorizado:
+        formData.get("contatoConfiancaAutorizado") === "on",
       observacoes: (formData.get("observacoes") as string) || "",
       areaEstetica: formData.get("areaEstetica") === "on",
       areaCilios: formData.get("areaCilios") === "on",

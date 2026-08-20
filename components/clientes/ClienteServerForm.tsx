@@ -271,6 +271,72 @@ export default function ClienteServerForm({
               </p>
             </div>
 
+            <div className="min-w-0 space-y-3 rounded-2xl border border-teal-200 bg-teal-50 p-4 sm:col-span-2 dark:border-teal-400/20 dark:bg-teal-500/10">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-teal-800 dark:text-teal-200">
+                  Contato de confiança
+                  <span className="ml-2 normal-case tracking-normal text-slate-500 dark:text-slate-400">
+                    opcional
+                  </span>
+                </p>
+                <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">
+                  Pessoa próxima que podemos contatar caso seja necessário falar com alguém de confiança do cliente.
+                </p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field
+                  label="Nome"
+                  name="contatoConfiancaNome"
+                  defaultValue={cliente?.contatoConfiancaNome ?? ""}
+                  placeholder="Nome da pessoa"
+                />
+
+                <Field
+                  label="Telefone / WhatsApp"
+                  name="contatoConfiancaTelefone"
+                  defaultValue={cliente?.contatoConfiancaTelefone ?? ""}
+                  placeholder="(11) 91234-5678"
+                />
+
+                <label className="min-w-0 space-y-2">
+                  <span className="block break-words text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Vínculo
+                  </span>
+                  <select
+                    name="contatoConfiancaVinculo"
+                    defaultValue={cliente?.contatoConfiancaVinculo ?? ""}
+                    className="premium-input min-h-12 w-full min-w-0 max-w-full"
+                  >
+                    <option value="">Selecione</option>
+                    <option value="Cônjuge / companheiro(a)">Cônjuge / companheiro(a)</option>
+                    <option value="Mãe">Mãe</option>
+                    <option value="Pai">Pai</option>
+                    <option value="Filho(a)">Filho(a)</option>
+                    <option value="Irmão(ã)">Irmão(ã)</option>
+                    <option value="Amigo(a)">Amigo(a)</option>
+                    <option value="Outro">Outro</option>
+                  </select>
+                </label>
+              </div>
+
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-teal-200 bg-white px-4 py-3 dark:border-teal-400/20 dark:bg-white/[0.05]">
+                <input
+                  type="checkbox"
+                  name="contatoConfiancaAutorizado"
+                  defaultChecked={cliente?.contatoConfiancaAutorizado ?? false}
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-teal-600"
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    Cliente autoriza contato, se necessário
+                  </span>
+                  <span className="mt-0.5 block text-xs leading-5 text-slate-500 dark:text-slate-400">
+                    Uso restrito a situações relacionadas ao atendimento.
+                  </span>
+                </span>
+              </label>
+            </div>
             <EnderecoClienteFields
               initialValues={{
                 cep: cliente?.cep ?? "",
