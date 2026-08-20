@@ -814,9 +814,9 @@ body {
 }
 
 .app-bottom-dock {
-  border-color: rgba(226, 232, 240, 0.88);
-  background-color: rgba(255, 255, 255, 0.86);
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+  border-color: rgba(226, 232, 240, 0.72);
+  background-color: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.11);
 }
 
 /* Premium dark mode */
@@ -902,9 +902,9 @@ body {
 }
 
 .theme-dark .app-bottom-dock {
-  border-color: rgba(255, 255, 255, 0.12);
-  background-color: rgba(15, 23, 42, 0.86);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.30);
+  border-color: rgba(255, 255, 255, 0.10);
+  background-color: rgba(15, 23, 42, 0.72);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.26);
 }
 
 .theme-dark .app-shell .premium-card,
@@ -1489,4 +1489,67 @@ body {
 }
 .theme-dark .app-shell :where(button, a, input, select, textarea):focus-visible {
   box-shadow: 0 0 0 4px rgba(167, 139, 250, 0.20) !important;
+}
+
+
+/* Light-first readability reinforcement (2026-08) */
+.theme-light .app-shell :is(.text-slate-400, .text-slate-500, .text-slate-600),
+.theme-light .app-shell [class*="text-slate-400/"],
+.theme-light .app-shell [class*="text-slate-500/"],
+.theme-light .app-shell [class*="text-slate-600/"] {
+  color: #475569 !important;
+}
+
+.theme-light .app-shell [class*="text-cyan-100/"],
+.theme-light .app-shell [class*="text-cyan-200/"],
+.theme-light .app-shell [class*="text-cyan-300/"],
+.theme-light .app-shell [class*="text-sky-100/"],
+.theme-light .app-shell [class*="text-sky-200/"],
+.theme-light .app-shell [class*="text-sky-300/"],
+.theme-light .app-shell [class*="text-blue-100/"],
+.theme-light .app-shell [class*="text-blue-200/"],
+.theme-light .app-shell [class*="text-blue-300/"],
+.theme-light .app-shell [class*="text-teal-100/"],
+.theme-light .app-shell [class*="text-teal-200/"],
+.theme-light .app-shell [class*="text-teal-300/"] {
+  color: #075985 !important;
+}
+
+.theme-light .app-shell [class*="text-emerald-100/"],
+.theme-light .app-shell [class*="text-emerald-200/"],
+.theme-light .app-shell [class*="text-emerald-300/"],
+.theme-light .app-shell [class*="text-green-100/"],
+.theme-light .app-shell [class*="text-green-200/"],
+.theme-light .app-shell [class*="text-green-300/"] {
+  color: #047857 !important;
+}
+
+.theme-light .app-shell [class*="text-amber-100/"],
+.theme-light .app-shell [class*="text-amber-200/"],
+.theme-light .app-shell [class*="text-amber-300/"],
+.theme-light .app-shell [class*="text-yellow-100/"],
+.theme-light .app-shell [class*="text-yellow-200/"],
+.theme-light .app-shell [class*="text-yellow-300/"],
+.theme-light .app-shell [class*="text-orange-100/"],
+.theme-light .app-shell [class*="text-orange-200/"],
+.theme-light .app-shell [class*="text-orange-300/"] {
+  color: #92400e !important;
+}
+
+.theme-light .app-shell [class*="text-rose-100/"],
+.theme-light .app-shell [class*="text-rose-200/"],
+.theme-light .app-shell [class*="text-rose-300/"],
+.theme-light .app-shell [class*="text-red-100/"],
+.theme-light .app-shell [class*="text-red-200/"],
+.theme-light .app-shell [class*="text-red-300/"] {
+  color: #be123c !important;
+}
+
+.theme-light .app-shell [class*="text-violet-100/"],
+.theme-light .app-shell [class*="text-violet-200/"],
+.theme-light .app-shell [class*="text-violet-300/"],
+.theme-light .app-shell [class*="text-fuchsia-100/"],
+.theme-light .app-shell [class*="text-fuchsia-200/"],
+.theme-light .app-shell [class*="text-fuchsia-300/"] {
+  color: #6d28d9 !important;
 }

@@ -249,6 +249,8 @@ export default function NovoAgendamentoModal({
   const [data, setData] = useState("");
   const [hora, setHora] = useState("09:00");
   const [excecaoHorario, setExcecaoHorario] = useState(false);
+  const [permitirEncaixeSemIntervalo, setPermitirEncaixeSemIntervalo] =
+    useState(false);
   const [duracao, setDuracao] = useState("1 hora");
   const [valor, setValor] = useState("");
   const [status, setStatus] = useState("Agendado");
@@ -352,6 +354,7 @@ export default function NovoAgendamentoModal({
     setData(initialPayload?.data || getHojeInput());
     setHora(initialPayload?.hora || "09:00");
     setExcecaoHorario(false);
+    setPermitirEncaixeSemIntervalo(false);
     setSucesso(false);
     setDuracao(formatarDuracao(initialPayload?.duracao || 60));
     setValor(
@@ -439,6 +442,10 @@ export default function NovoAgendamentoModal({
           duracao: interpretarDuracao(duracao),
           ignoreId: modoEdicao ? initialPayload?.agendamentoId : undefined,
           ignoreBloqueioId: modoEdicaoBloqueio ? initialPayload?.bloqueioId : undefined,
+          permitirEncaixeSemIntervalo:
+            tipoAtendimento === "bloqueio"
+              ? true
+              : permitirEncaixeSemIntervalo,
         });
 
         setHorarios(resultado);
@@ -453,6 +460,8 @@ export default function NovoAgendamentoModal({
     duracao,
     modoEdicao,
     modoEdicaoBloqueio,
+    tipoAtendimento,
+    permitirEncaixeSemIntervalo,
     initialPayload?.agendamentoId,
     initialPayload?.bloqueioId,
     disponibilidadeVersao,
@@ -524,7 +533,7 @@ export default function NovoAgendamentoModal({
   }, [servicoSelecionadoId, servicos]);
 
   const horariosDisponiveis = horarios.filter((item) => item.disponivel);
-  const horariosOcupados = horarios.filter((item) => !item.disponivel).slice(0, 5);
+  const horariosOcupados = horarios.filter((item) => !item.disponivel).slice(0, 8);
   const horarioSelecionadoNaDisponibilidade = hora
     ? horarios.find((item) => item.hora === hora)
     : undefined;
@@ -654,10 +663,17 @@ export default function NovoAgendamentoModal({
     const horarioSelecionado = horarios.find((item) => item.hora === hora);
 
     if (horarioSelecionado && !horarioSelecionado.disponivel) {
-      setErroTitulo("Horário indisponível");
-      setErro(
-        `O horário ${hora} está ocupado por ${horarioSelecionado.motivo || "outro compromisso"}. Escolha outro horário disponível.`,
-      );
+      if (horarioSelecionado.tipo === "intervalo") {
+        setErroTitulo("Intervalo entre atendimentos");
+        setErro(
+          `${horarioSelecionado.motivo || "Este horário está dentro do intervalo padrão de 30 minutos entre clientes."} Ative “Permitir encaixe sem intervalo” se quiser usar este horário excepcionalmente.`,
+        );
+      } else {
+        setErroTitulo("Horário indisponível");
+        setErro(
+          `O horário ${hora} está ocupado por ${horarioSelecionado.motivo || "outro compromisso"}. Escolha outro horário disponível.`,
+        );
+      }
       setErroAcaoHorario(true);
       direcionarParaOutroHorario();
       return;
@@ -794,6 +810,7 @@ export default function NovoAgendamentoModal({
             ? { tipo: "nenhuma" as const }
             : recorrencia,
         excecaoHorarioFuncionamento: excecaoHorario,
+        permitirEncaixeSemIntervalo,
       };
 
       const resultado =
@@ -1111,6 +1128,7 @@ export default function NovoAgendamentoModal({
                     {horariosDisponiveis.map((item) => (
                       <option key={item.hora} value={item.hora}>
                         {item.hora}
+                        {item.encaixe ? " · encaixe" : ""}
                       </option>
                     ))}
                   </select>
@@ -1149,6 +1167,36 @@ export default function NovoAgendamentoModal({
               </div>
             </label>
           </div>
+
+          {tipoAtendimento === "agendamento" ? (
+            <label className="mt-4 flex items-start justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-3.5 text-sm dark:border-amber-400/20 dark:bg-amber-400/10">
+              <span className="min-w-0">
+                <span className="block font-bold text-amber-950 dark:text-amber-100">
+                  Permitir encaixe sem intervalo de 30 min
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-amber-800 dark:text-amber-100/70">
+                  O padrão reserva 30 minutos entre clientes. Ative apenas quando quiser atender um cliente logo após o outro. Sobreposição real continua bloqueada.
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                checked={permitirEncaixeSemIntervalo}
+                onChange={(event) => {
+                  setPermitirEncaixeSemIntervalo(event.target.checked);
+                  setHora("");
+                  setErro("");
+                  setErroAcaoHorario(false);
+                }}
+                className="mt-0.5 size-5 shrink-0 accent-amber-600"
+              />
+            </label>
+          ) : null}
+
+          {horarioSelecionadoNaDisponibilidade?.encaixe ? (
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100">
+              Encaixe selecionado: este horário não terá o intervalo padrão de 30 minutos entre clientes.
+            </div>
+          ) : null}
 
           {initialPayload?.hora && !modoEdicao && !modoEdicaoBloqueio ? (
             <p className="mt-2 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
@@ -1720,7 +1768,7 @@ export default function NovoAgendamentoModal({
             {horariosOcupados.length > 0 ? (
               <details className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/50">
                 <summary className="cursor-pointer text-xs font-semibold text-slate-600 dark:text-slate-300">
-                  Ver horários ocupados
+                  Ver horários indisponíveis
                   {isLoadingHorarios ? " · atualizando..." : ""}
                 </summary>
 
@@ -1728,9 +1776,13 @@ export default function NovoAgendamentoModal({
                   {horariosOcupados.map((item) => (
                     <div
                       key={item.hora}
-                      className="flex items-center justify-between gap-3 text-xs text-slate-500"
+                      className={`flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-xs ${
+                        item.tipo === "intervalo"
+                          ? "bg-amber-50 text-amber-900 dark:bg-amber-400/10 dark:text-amber-100"
+                          : "text-slate-600 dark:text-slate-300"
+                      }`}
                     >
-                      <span>{item.hora}</span>
+                      <span className="font-bold">{item.hora}</span>
                       <span className="truncate">{item.motivo}</span>
                     </div>
                   ))}

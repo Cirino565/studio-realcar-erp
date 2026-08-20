@@ -58,6 +58,7 @@ export type AgendarAvaliacaoLeadInput = {
   duracao: number;
   valor: number;
   sinalPago?: boolean;
+  permitirEncaixeSemIntervalo?: boolean;
 };
 
 function limparTexto(value?: string | null) {
@@ -858,6 +859,9 @@ export async function agendarAvaliacaoLead(dados: AgendarAvaliacaoLeadInput) {
     data: dados.data,
     duracao,
     ignoreId: agendamentoEditavel?.id,
+    permitirEncaixeSemIntervalo: Boolean(
+      dados.permitirEncaixeSemIntervalo,
+    ),
   });
 
   const horario = disponibilidade.find((item) => item.hora === dados.hora);

@@ -2884,7 +2884,17 @@ function AgendarAvaliacaoModal({
   const [duracao, setDuracao] = useState("30");
   const [valor, setValor] = useState("0");
   const [sinalPago, setSinalPago] = useState(false);
-  const [horarios, setHorarios] = useState<{ hora: string; disponivel: boolean; motivo?: string }[]>([]);
+  const [permitirEncaixeSemIntervalo, setPermitirEncaixeSemIntervalo] =
+    useState(false);
+  const [horarios, setHorarios] = useState<
+    {
+      hora: string;
+      disponivel: boolean;
+      motivo?: string;
+      tipo?: "livre" | "agendamento" | "bloqueio" | "intervalo";
+      encaixe?: boolean;
+    }[]
+  >([]);
   const [erro, setErro] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [loadingHorarios, startHorariosTransition] = useTransition();
@@ -2899,6 +2909,7 @@ function AgendarAvaliacaoModal({
     setDuracao(String(servicoInicial?.duracaoPadrao || 30));
     setValor(String(servicoInicial?.valorPadrao || 0));
     setSinalPago(false);
+    setPermitirEncaixeSemIntervalo(false);
     setErro(null);
   }, [lead, profissionais, avaliacao]);
 
@@ -2910,7 +2921,12 @@ function AgendarAvaliacaoModal({
 
     startHorariosTransition(async () => {
       try {
-        const resultado = await buscarDisponibilidadeAgenda({ profissionalId: Number(profissionalId), data, duracao: Number(duracao) || 30 });
+        const resultado = await buscarDisponibilidadeAgenda({
+          profissionalId: Number(profissionalId),
+          data,
+          duracao: Number(duracao) || 30,
+          permitirEncaixeSemIntervalo,
+        });
         setHorarios(resultado);
 
         // Mantem o horario somente se ele continuar disponivel.
@@ -2930,14 +2946,15 @@ function AgendarAvaliacaoModal({
         setHora("");
       }
     });
-  }, [lead, profissionalId, data, duracao]);
+  }, [lead, profissionalId, data, duracao, permitirEncaixeSemIntervalo]);
 
   if (!lead) return null;
 
   const leadId = lead.id;
   const servicoSelecionado = servicos.find((servico) => String(servico.id) === servicoId) || avaliacao;
   const disponiveis = horarios.filter((item) => item.disponivel);
-  const ocupados = horarios.filter((item) => !item.disponivel).slice(0, 4);
+  const encaixesDisponiveis = disponiveis.filter((item) => item.encaixe);
+  const ocupados = horarios.filter((item) => !item.disponivel).slice(0, 8);
 
   function escolherServico(id: string) {
     setServicoId(id);
@@ -2968,6 +2985,7 @@ function AgendarAvaliacaoModal({
           duracao: Number(duracao) || servicoParaAgendar.duracaoPadrao,
           valor: Number(valor) || 0,
           sinalPago,
+          permitirEncaixeSemIntervalo,
         });
         onSuccess();
       } catch (error) {
@@ -2979,13 +2997,55 @@ function AgendarAvaliacaoModal({
   return (
     <Modal title="Agendar pelo CRM" description={`Lead: ${lead.nome}`} onClose={onClose}>
       <div className="grid gap-4">
-        {lead.agendamento ? <div className="rounded-2xl border border-cyan-300/15 bg-cyan-400/8 p-3 text-sm text-cyan-100"><strong>Agendamento atual:</strong> {formatarDataHora(lead.agendamento.data)}. Se ainda estiver ativo, o mesmo registro será reagendado sem criar duplicidade. Atendimentos já finalizados ou cancelados são preservados e um novo agendamento será criado.</div> : null}
-        {erro ? <div className="rounded-2xl border border-rose-300/20 bg-rose-400/10 p-3 text-sm text-rose-100">{erro}</div> : null}
+        {lead.agendamento ? (
+          <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-3 text-sm leading-5 text-cyan-900 dark:border-cyan-400/20 dark:bg-cyan-400/10 dark:text-cyan-100">
+            <strong>Agendamento atual:</strong> {formatarDataHora(lead.agendamento.data)}. Se ainda estiver ativo, o mesmo registro será reagendado sem criar duplicidade. Atendimentos já finalizados ou cancelados são preservados e um novo agendamento será criado.
+          </div>
+        ) : null}
+        {erro ? (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-medium text-rose-800 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-100">
+            {erro}
+          </div>
+        ) : null}
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="grid gap-2 text-sm font-medium text-slate-300">Profissional<select value={profissionalId} onChange={(event) => setProfissionalId(event.target.value)} className="premium-input w-full bg-[#1d2437]"><option value="">Selecione</option>{profissionais.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select></label>
-          <label className="grid gap-2 text-sm font-medium text-slate-300">Serviço<select value={servicoId} onChange={(event) => escolherServico(event.target.value)} className="premium-input w-full bg-[#1d2437]"><option value="">Selecione</option>{servicos.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select></label>
+          <label className="grid gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+            Profissional
+            <select value={profissionalId} onChange={(event) => setProfissionalId(event.target.value)} className="premium-input w-full">
+              <option value="">Selecione</option>
+              {profissionais.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+            Serviço
+            <select value={servicoId} onChange={(event) => escolherServico(event.target.value)} className="premium-input w-full">
+              <option value="">Selecione</option>
+              {servicos.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
+            </select>
+          </label>
         </div>
         <div className="grid gap-4 sm:grid-cols-3"><Input label="Data" type="date" min={hojeInput()} value={data} onChange={setData} /><Input label="Duração, min" type="number" min="15" step="5" value={duracao} onChange={setDuracao} /><Input label="Valor" type="number" min="0" step="0.01" value={valor} onChange={setValor} /></div>
+
+        <label className="flex cursor-pointer items-start justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5 transition hover:bg-amber-100 dark:border-amber-400/20 dark:bg-amber-400/10 dark:hover:bg-amber-400/15">
+          <span className="min-w-0">
+            <span className="block text-sm font-bold text-amber-950 dark:text-amber-100">
+              Permitir encaixe sem intervalo de 30 min
+            </span>
+            <span className="mt-0.5 block text-xs leading-5 text-amber-800 dark:text-amber-100/70">
+              Por padrão, a agenda reserva 30 minutos entre clientes. Ative apenas quando quiser atender um cliente logo após o outro. Sobreposição real continua bloqueada.
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={permitirEncaixeSemIntervalo}
+            onChange={(event) => {
+              setPermitirEncaixeSemIntervalo(event.target.checked);
+              setHora("");
+              setErro(null);
+            }}
+            className="mt-0.5 size-5 shrink-0 accent-amber-600"
+          />
+        </label>
+
         <div className="grid gap-2">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -3000,6 +3060,9 @@ function AgendarAvaliacaoModal({
             {!loadingHorarios && disponiveis.length > 0 ? (
               <span className="shrink-0 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-bold text-violet-700 dark:border-violet-400/20 dark:bg-violet-400/10 dark:text-violet-200">
                 {disponiveis.length} livre(s)
+                {encaixesDisponiveis.length > 0
+                  ? ` · ${encaixesDisponiveis.length} encaixe(s)`
+                  : ""}
               </span>
             ) : null}
           </div>
@@ -3023,11 +3086,20 @@ function AgendarAvaliacaoModal({
                     }
                     className={`min-h-11 rounded-xl border px-2 py-2 text-sm font-bold transition ${
                       selecionado
-                        ? "border-violet-500 bg-violet-600 text-white shadow-md shadow-violet-500/20 ring-2 ring-violet-200"
-                        : "border-slate-200 bg-white text-slate-700 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-800 dark:border-white/[0.10] dark:bg-white/[0.05] dark:text-slate-200 dark:hover:border-violet-400/30 dark:hover:bg-violet-400/10"
+                        ? item.encaixe
+                          ? "border-amber-600 bg-amber-600 text-white shadow-md shadow-amber-500/20 ring-2 ring-amber-200"
+                          : "border-violet-500 bg-violet-600 text-white shadow-md shadow-violet-500/20 ring-2 ring-violet-200"
+                        : item.encaixe
+                          ? "border-amber-300 bg-amber-50 text-amber-900 hover:border-amber-400 hover:bg-amber-100 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-100"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-800 dark:border-white/[0.10] dark:bg-white/[0.05] dark:text-slate-200 dark:hover:border-violet-400/30 dark:hover:bg-violet-400/10"
                     }`}
                   >
-                    {item.hora}
+                    <span className="block">{item.hora}</span>
+                    {item.encaixe ? (
+                      <span className={`mt-0.5 block text-[9px] uppercase tracking-wide ${selecionado ? "text-white/90" : "text-amber-700 dark:text-amber-200"}`}>
+                        encaixe
+                      </span>
+                    ) : null}
                   </button>
                 );
               })}
@@ -3048,6 +3120,9 @@ function AgendarAvaliacaoModal({
             <div className="flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-800 dark:border-violet-400/20 dark:bg-violet-400/10 dark:text-violet-200">
               <CheckCircle2 className="size-4" />
               Horário selecionado: {hora}
+              {horarios.find((item) => item.hora === hora)?.encaixe
+                ? " · encaixe sem intervalo"
+                : ""}
             </div>
           ) : null}
         </div>
@@ -3078,7 +3153,7 @@ function AgendarAvaliacaoModal({
                   Também indisponíveis
                 </p>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Horários já ocupados ou bloqueados para esta combinação.
+                  Horários ocupados, bloqueados ou reservados pelo intervalo padrão de 30 min.
                 </p>
               </div>
 
@@ -3091,21 +3166,24 @@ function AgendarAvaliacaoModal({
               {ocupados.map((item) => (
                 <span
                   key={item.hora}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 dark:border-white/[0.10] dark:bg-white/[0.05] dark:text-slate-400"
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${
+                    item.tipo === "intervalo"
+                      ? "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100"
+                      : "border-slate-200 bg-white text-slate-600 dark:border-white/[0.10] dark:bg-white/[0.05] dark:text-slate-300"
+                  }`}
                 >
-                  <span className="font-bold text-slate-700 dark:text-slate-200">
-                    {item.hora}
-                  </span>
-                  <span className="text-slate-400">·</span>
+                  <span className="font-bold">{item.hora}</span>
+                  <span className={item.tipo === "intervalo" ? "text-amber-500" : "text-slate-400"}>·</span>
                   <span>{item.motivo || "indisponível"}</span>
                 </span>
               ))}
             </div>
           </div>
         ) : null}
-        <div className="rounded-2xl border border-cyan-300/15 bg-cyan-400/8 p-3 text-xs leading-5 text-cyan-100">
+        <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-3 text-xs leading-5 text-cyan-900 dark:border-cyan-400/20 dark:bg-cyan-400/10 dark:text-cyan-100">
           Ao salvar, o sistema reutiliza um cliente existente pelo telefone ou cria o cadastro necessário, gera o agendamento real e move o lead para Agendado.
           {sinalPago ? " O sinal será marcado como pago na agenda." : ""}
+          {permitirEncaixeSemIntervalo ? " Encaixes sem o intervalo padrão de 30 minutos estão liberados para esta marcação." : ""}
         </div>
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><Button type="button" variant="outline" onClick={onClose}>Cancelar</Button><Button type="button" onClick={salvar} disabled={pending || loadingHorarios || !hora}><CalendarPlus className="size-4" />{pending ? "Agendando..." : "Criar agendamento"}</Button></div>
       </div>
@@ -3114,14 +3192,20 @@ function AgendarAvaliacaoModal({
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
-  return <div><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-1 text-sm font-medium text-slate-200">{value}</p></div>;
+  return <div><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</p><p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{value}</p></div>;
 }
 
 function Modal({ title, description, children, onClose, wide = false }: { title: string; description: string; children: React.ReactNode; onClose: () => void; wide?: boolean }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:p-4">
-      <div className={`max-h-[92vh] w-full overflow-y-auto rounded-t-[2rem] border border-white/[0.12] bg-[#171d2a] p-5 shadow-2xl shadow-black/40 scrollbar-premium sm:rounded-[2rem] sm:p-6 ${wide ? "sm:max-w-6xl" : "sm:max-w-3xl"}`}>
-        <div className="mb-6 flex items-start justify-between gap-4"><div><h3 className="text-xl font-semibold text-white">{title}</h3><p className="mt-1 text-sm text-slate-400">{description}</p></div><button type="button" onClick={onClose} className="rounded-2xl border border-white/[0.10] bg-white/[0.06] px-3 py-2 text-sm font-semibold text-slate-300 hover:bg-white/[0.10]">Fechar</button></div>
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 backdrop-blur-sm sm:items-center sm:p-4" style={{ backgroundColor: "rgba(2, 6, 23, 0.55)" }}>
+      <div className={`max-h-[92vh] w-full overflow-y-auto rounded-t-[2rem] border border-slate-200 bg-white p-5 text-slate-900 shadow-2xl shadow-slate-950/20 scrollbar-premium dark:border-white/[0.12] dark:bg-[#171d2a] dark:text-slate-100 dark:shadow-black/40 sm:rounded-[2rem] sm:p-6 ${wide ? "sm:max-w-6xl" : "sm:max-w-3xl"}`}>
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-xl font-bold text-slate-950 dark:text-white">{title}</h3>
+            <p className="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">{description}</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-800 dark:border-white/[0.10] dark:bg-white/[0.06] dark:text-slate-300 dark:hover:bg-white/[0.10]">Fechar</button>
+        </div>
         {children}
       </div>
     </div>
@@ -3129,13 +3213,13 @@ function Modal({ title, description, children, onClose, wide = false }: { title:
 }
 
 function Input({ label, onChange, ...props }: Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange"> & { label: string; onChange: (value: string) => void }) {
-  return <label className="grid gap-2 text-sm font-medium text-slate-300">{label}<input {...props} onChange={(event) => onChange(event.target.value)} className="premium-input w-full" /></label>;
+  return <label className="grid gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">{label}<input {...props} onChange={(event) => onChange(event.target.value)} className="premium-input w-full" /></label>;
 }
 
 function Select({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
-  return <label className="grid gap-2 text-sm font-medium text-slate-300">{label}<select value={value} onChange={(event) => onChange(event.target.value)} className="premium-input w-full bg-[#1d2437]">{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
+  return <label className="grid gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">{label}<select value={value} onChange={(event) => onChange(event.target.value)} className="premium-input w-full">{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
 }
 
 function Textarea({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <label className="grid gap-2 text-sm font-medium text-slate-300">{label}<textarea value={value} onChange={(event) => onChange(event.target.value)} className="min-h-28 rounded-3xl border border-white/[0.10] bg-[#1d2437] p-4 text-sm text-slate-100 outline-none focus:border-violet-400/40" /></label>;
+  return <label className="grid gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">{label}<textarea value={value} onChange={(event) => onChange(event.target.value)} className="min-h-28 rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-900 outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100 dark:border-white/[0.10] dark:bg-[#1d2437] dark:text-slate-100 dark:focus:border-violet-400/40 dark:focus:ring-violet-500/15" /></label>;
 }

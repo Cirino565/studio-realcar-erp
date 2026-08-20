@@ -46,6 +46,8 @@ type NovoAgendamento = {
   areaEstetica?: boolean;
   areaCilios?: boolean;
   recorrencia?: RecorrenciaAgendaInput;
+  permitirEncaixeSemIntervalo?: boolean;
+  excecaoHorarioFuncionamento?: boolean;
 };
 
 export type ResultadoSalvarAgenda =
@@ -71,7 +73,10 @@ type ParametrosConflitoAgenda = {
   duracao: number;
   ignoreId?: number;
   ignoreBloqueioId?: number;
+  permitirEncaixeSemIntervalo?: boolean;
 };
+
+const INTERVALO_ENTRE_ATENDIMENTOS_MINUTOS = 30;
 
 function normalizarNaturezaAtendimento(
   value?: NaturezaAtendimentoAgenda,
@@ -412,12 +417,72 @@ function formatHourMinute(value: Date) {
   }).format(value);
 }
 
+function conflitaComIntervaloEntreAtendimentos(
+  inicioNovo: Date,
+  fimNovo: Date,
+  inicioExistente: Date,
+  fimExistente: Date,
+) {
+  const existeSobreposicaoReal =
+    inicioExistente < fimNovo && fimExistente > inicioNovo;
+
+  if (existeSobreposicaoReal) {
+    return false;
+  }
+
+  const inicioProtegido = addMinutes(
+    inicioExistente,
+    -INTERVALO_ENTRE_ATENDIMENTOS_MINUTOS,
+  );
+  const fimProtegido = addMinutes(
+    fimExistente,
+    INTERVALO_ENTRE_ATENDIMENTOS_MINUTOS,
+  );
+
+  return inicioProtegido < fimNovo && fimProtegido > inicioNovo;
+}
+
+function motivoIntervaloEntreAtendimentos({
+  inicioNovo,
+  fimNovo,
+  inicioExistente,
+  fimExistente,
+  clienteNome,
+}: {
+  inicioNovo: Date;
+  fimNovo: Date;
+  inicioExistente: Date;
+  fimExistente: Date;
+  clienteNome: string;
+}) {
+  if (inicioNovo >= fimExistente) {
+    const livreApos = addMinutes(
+      fimExistente,
+      INTERVALO_ENTRE_ATENDIMENTOS_MINUTOS,
+    );
+
+    return `Intervalo de ${INTERVALO_ENTRE_ATENDIMENTOS_MINUTOS} min após ${clienteNome} · livre às ${formatHourMinute(livreApos)}`;
+  }
+
+  if (fimNovo <= inicioExistente) {
+    const limiteAntes = addMinutes(
+      inicioExistente,
+      -INTERVALO_ENTRE_ATENDIMENTOS_MINUTOS,
+    );
+
+    return `Intervalo de ${INTERVALO_ENTRE_ATENDIMENTOS_MINUTOS} min antes de ${clienteNome} · novo atendimento deve terminar até ${formatHourMinute(limiteAntes)}`;
+  }
+
+  return `Intervalo de ${INTERVALO_ENTRE_ATENDIMENTOS_MINUTOS} min em torno do atendimento de ${clienteNome}`;
+}
+
 async function obterConflitoAgenda({
   profissionalId,
   data,
   duracao,
   ignoreId,
   ignoreBloqueioId,
+  permitirEncaixeSemIntervalo = false,
 }: ParametrosConflitoAgenda): Promise<ErroEsperadoAgendamento | null> {
   if (!profissionalId) return null;
 
@@ -452,6 +517,9 @@ async function obterConflitoAgenda({
             nome: true,
           },
         },
+      },
+      orderBy: {
+        data: "asc",
       },
     }),
     prisma.bloqueioAgenda.findMany({
@@ -513,6 +581,38 @@ async function obterConflitoAgenda({
       mensagem: `Não foi possível salvar. Em ${dataTexto}, o intervalo escolhido (${inicioNovoTexto} às ${fimNovoTexto}) se sobrepõe ao bloqueio “${conflitoBloqueio.motivo}”, das ${inicio} às ${fim}. Escolha outro horário ou edite o bloqueio existente.`,
       campo: "hora",
     };
+  }
+
+  if (!permitirEncaixeSemIntervalo) {
+    const conflitoIntervalo = agendamentosDoDia.find((agendamento) => {
+      const inicioExistente = new Date(agendamento.data);
+      const fimExistente = addMinutes(inicioExistente, agendamento.duracao);
+
+      return conflitaComIntervaloEntreAtendimentos(
+        inicioNovo,
+        fimNovo,
+        inicioExistente,
+        fimExistente,
+      );
+    });
+
+    if (conflitoIntervalo) {
+      const inicioExistente = new Date(conflitoIntervalo.data);
+      const fimExistente = addMinutes(
+        inicioExistente,
+        conflitoIntervalo.duracao,
+      );
+      const inicio = formatHourMinute(inicioExistente);
+      const fim = formatHourMinute(fimExistente);
+
+      return {
+        ok: false,
+        codigo: "CONFLITO_AGENDAMENTO",
+        titulo: "Intervalo entre atendimentos",
+        mensagem: `A agenda reserva ${INTERVALO_ENTRE_ATENDIMENTOS_MINUTOS} minutos entre clientes. Em ${dataTexto}, o horário escolhido (${inicioNovoTexto} às ${fimNovoTexto}) fica muito próximo do atendimento de ${conflitoIntervalo.cliente.nome}, marcado das ${inicio} às ${fim}. Escolha outro horário ou ative “Permitir encaixe sem intervalo”.`,
+        campo: "hora",
+      };
+    }
   }
 
   return null;
@@ -603,13 +703,18 @@ export async function criarAgendamento(
       ? 0
       : Math.max(0, Number(dados.valor) || 0);
 
-  await validarDatasNoHorarioFuncionamento(datas);
+  if (!dados.excecaoHorarioFuncionamento) {
+    await validarDatasNoHorarioFuncionamento(datas);
+  }
 
   for (const data of datas) {
     const conflito = await obterConflitoAgenda({
       profissionalId: dados.profissionalId,
       data,
       duracao,
+      permitirEncaixeSemIntervalo: Boolean(
+        dados.permitirEncaixeSemIntervalo,
+      ),
     });
 
     if (conflito) {
@@ -731,13 +836,18 @@ export async function atualizarAgendamento({
       ? 0
       : Math.max(0, Number(dados.valor) || 0);
 
-  await validarDatasNoHorarioFuncionamento([data]);
+  if (!dados.excecaoHorarioFuncionamento) {
+    await validarDatasNoHorarioFuncionamento([data]);
+  }
 
   const conflito = await obterConflitoAgenda({
     profissionalId: dados.profissionalId,
     data,
     duracao,
     ignoreId: id,
+    permitirEncaixeSemIntervalo: Boolean(
+      dados.permitirEncaixeSemIntervalo,
+    ),
   });
 
   if (conflito) {
@@ -1081,6 +1191,7 @@ export async function criarBloqueioAgenda(
       profissionalId: dados.profissionalId,
       data,
       duracao,
+      permitirEncaixeSemIntervalo: true,
     });
 
     if (conflito) {
@@ -1155,6 +1266,7 @@ export async function atualizarBloqueioAgenda({
     data,
     duracao,
     ignoreBloqueioId: id,
+    permitirEncaixeSemIntervalo: true,
   });
 
   if (conflito) {
@@ -1795,6 +1907,8 @@ export type HorarioDisponivelAgenda = {
   hora: string;
   disponivel: boolean;
   motivo?: string;
+  tipo?: "livre" | "agendamento" | "bloqueio" | "intervalo";
+  encaixe?: boolean;
 };
 
 function montarHorario(data: string, hora: string) {
@@ -1896,12 +2010,14 @@ export async function buscarDisponibilidadeAgenda({
   duracao = 60,
   ignoreId,
   ignoreBloqueioId,
+  permitirEncaixeSemIntervalo = false,
 }: {
   profissionalId?: number;
   data: string;
   duracao?: number;
   ignoreId?: number;
   ignoreBloqueioId?: number;
+  permitirEncaixeSemIntervalo?: boolean;
 }): Promise<HorarioDisponivelAgenda[]> {
   await requirePermission("agenda.visualizar");
 
@@ -2011,6 +2127,7 @@ export async function buscarDisponibilidadeAgenda({
         hora,
         disponivel: false,
         motivo: `${conflitoAgendamento.cliente.nome} · ${inicio} às ${fim}`,
+        tipo: "agendamento" as const,
       };
     }
 
@@ -2031,12 +2148,49 @@ export async function buscarDisponibilidadeAgenda({
         hora,
         disponivel: false,
         motivo: `${conflitoBloqueio.motivo} · ${inicio} às ${fim}`,
+        tipo: "bloqueio" as const,
+      };
+    }
+
+    const conflitoIntervalo = agendamentosDoDia.find((agendamento) => {
+      const inicioExistente = new Date(agendamento.data);
+      const fimExistente = addMinutes(inicioExistente, agendamento.duracao);
+
+      return conflitaComIntervaloEntreAtendimentos(
+        inicioNovo,
+        fimNovo,
+        inicioExistente,
+        fimExistente,
+      );
+    });
+
+    if (conflitoIntervalo) {
+      const inicioExistente = new Date(conflitoIntervalo.data);
+      const fimExistente = addMinutes(
+        inicioExistente,
+        conflitoIntervalo.duracao,
+      );
+      const motivo = motivoIntervaloEntreAtendimentos({
+        inicioNovo,
+        fimNovo,
+        inicioExistente,
+        fimExistente,
+        clienteNome: conflitoIntervalo.cliente.nome,
+      });
+
+      return {
+        hora,
+        disponivel: permitirEncaixeSemIntervalo,
+        motivo,
+        tipo: "intervalo" as const,
+        encaixe: permitirEncaixeSemIntervalo,
       };
     }
 
     return {
       hora,
       disponivel: true,
+      tipo: "livre" as const,
     };
   });
 }
