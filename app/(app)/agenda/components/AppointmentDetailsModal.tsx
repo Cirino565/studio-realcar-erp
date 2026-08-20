@@ -55,6 +55,10 @@ export type ClienteAtendimentoDetalhes = {
   responsavelNome: string | null;
   responsavelTelefone: string | null;
   responsavelParentesco: string | null;
+  contatoConfiancaNome: string | null;
+  contatoConfiancaTelefone: string | null;
+  contatoConfiancaVinculo: string | null;
+  contatoConfiancaAutorizado: boolean;
   observacoes: string | null;
 };
 

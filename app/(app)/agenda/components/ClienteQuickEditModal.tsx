@@ -27,6 +27,10 @@ type ClienteAtendimento = {
   responsavelNome: string | null;
   responsavelTelefone: string | null;
   responsavelParentesco: string | null;
+  contatoConfiancaNome: string | null;
+  contatoConfiancaTelefone: string | null;
+  contatoConfiancaVinculo: string | null;
+  contatoConfiancaAutorizado: boolean;
   observacoes: string | null;
 };
 
@@ -64,6 +68,10 @@ type FormState = {
   responsavelNome: string;
   responsavelTelefone: string;
   responsavelParentesco: string;
+  contatoConfiancaNome: string;
+  contatoConfiancaTelefone: string;
+  contatoConfiancaVinculo: string;
+  contatoConfiancaAutorizado: boolean;
   telefone: string;
   whatsapp: string;
   cpf: string;
@@ -84,6 +92,11 @@ function montarForm(cliente: ClienteAtendimento): FormState {
     responsavelNome: cliente.responsavelNome || "",
     responsavelTelefone: cliente.responsavelTelefone || "",
     responsavelParentesco: cliente.responsavelParentesco || "",
+    contatoConfiancaNome: cliente.contatoConfiancaNome || "",
+    contatoConfiancaTelefone: cliente.contatoConfiancaTelefone || "",
+    contatoConfiancaVinculo: cliente.contatoConfiancaVinculo || "",
+    contatoConfiancaAutorizado:
+      cliente.contatoConfiancaAutorizado ?? false,
     telefone: cliente.telefone || "",
     whatsapp: cliente.whatsapp || "",
     cpf: cliente.cpf || "",
@@ -154,6 +167,11 @@ export default function ClienteQuickEditModal({
           responsavelNome: formAtual.responsavelNome,
           responsavelTelefone: formAtual.responsavelTelefone,
           responsavelParentesco: formAtual.responsavelParentesco,
+          contatoConfiancaNome: formAtual.contatoConfiancaNome,
+          contatoConfiancaTelefone: formAtual.contatoConfiancaTelefone,
+          contatoConfiancaVinculo: formAtual.contatoConfiancaVinculo,
+          contatoConfiancaAutorizado:
+            formAtual.contatoConfiancaAutorizado,
           telefone: formAtual.telefone,
           whatsapp: formAtual.whatsapp,
           cpf: formAtual.cpf,
@@ -359,6 +377,101 @@ export default function ClienteQuickEditModal({
                     </select>
                   </label>
                 </div>
+              </details>
+
+              <details className="mt-4 rounded-2xl border border-teal-200 bg-teal-50 p-3">
+                <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-wide text-teal-800">
+                  Contato de confiança · opcional
+                </summary>
+
+                <p className="mt-2 text-xs leading-5 text-slate-600">
+                  Pessoa de confiança que podemos contatar caso seja necessário falar com alguém próximo ao cliente.
+                </p>
+
+                <div className="mt-3 grid gap-4 sm:grid-cols-3">
+                  <label>
+                    <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                      Nome
+                    </span>
+                    <input
+                      value={form.contatoConfiancaNome}
+                      onChange={(event) =>
+                        atualizar("contatoConfiancaNome", event.target.value)
+                      }
+                      className="premium-input w-full"
+                      placeholder="Nome da pessoa"
+                    />
+                  </label>
+
+                  <label>
+                    <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                      Telefone / WhatsApp
+                    </span>
+                    <input
+                      value={form.contatoConfiancaTelefone}
+                      onChange={(event) =>
+                        atualizar(
+                          "contatoConfiancaTelefone",
+                          event.target.value,
+                        )
+                      }
+                      className="premium-input w-full"
+                      inputMode="tel"
+                      placeholder="(11) 91234-5678"
+                    />
+                  </label>
+
+                  <label>
+                    <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                      Vínculo
+                    </span>
+                    <select
+                      value={form.contatoConfiancaVinculo}
+                      onChange={(event) =>
+                        atualizar(
+                          "contatoConfiancaVinculo",
+                          event.target.value,
+                        )
+                      }
+                      className="premium-input w-full"
+                    >
+                      <option value="">Selecione</option>
+                      <option value="Cônjuge / companheiro(a)">
+                        Cônjuge / companheiro(a)
+                      </option>
+                      <option value="Mãe">Mãe</option>
+                      <option value="Pai">Pai</option>
+                      <option value="Filho(a)">Filho(a)</option>
+                      <option value="Irmão(ã)">Irmão(ã)</option>
+                      <option value="Amigo(a)">Amigo(a)</option>
+                      <option value="Outro">Outro</option>
+                    </select>
+                  </label>
+                </div>
+
+                <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-teal-200 bg-white px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={form.contatoConfiancaAutorizado}
+                    onChange={(event) =>
+                      atualizar(
+                        "contatoConfiancaAutorizado",
+                        event.target.checked,
+                      )
+                    }
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-teal-600"
+                  />
+
+                  <span>
+                    <span className="block text-sm font-semibold text-slate-800">
+                      Cliente autoriza contato, se necessário
+                    </span>
+
+                    <span className="mt-0.5 block text-xs leading-5 text-slate-500">
+                      Uso restrito a situações relacionadas ao atendimento.
+                    </span>
+                  </span>
+                </label>
               </details>
             </section>
 

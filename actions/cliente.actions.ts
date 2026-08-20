@@ -187,6 +187,10 @@ export type ClienteAtendimentoForm = {
   responsavelNome?: string;
   responsavelTelefone?: string;
   responsavelParentesco?: string;
+  contatoConfiancaNome?: string;
+  contatoConfiancaTelefone?: string;
+  contatoConfiancaVinculo?: string;
+  contatoConfiancaAutorizado?: boolean;
   observacoes?: string;
 };
 
@@ -229,6 +233,10 @@ export async function atualizarClienteNoAtendimento(
       responsavelNome: textoOpcional(dados.responsavelNome),
       responsavelTelefone: textoOpcional(dados.responsavelTelefone),
       responsavelParentesco: textoOpcional(dados.responsavelParentesco),
+      contatoConfiancaNome: textoOpcional(dados.contatoConfiancaNome),
+      contatoConfiancaTelefone: textoOpcional(dados.contatoConfiancaTelefone),
+      contatoConfiancaVinculo: textoOpcional(dados.contatoConfiancaVinculo),
+      contatoConfiancaAutorizado: Boolean(dados.contatoConfiancaAutorizado),
       telefone: telefone || whatsapp || "",
       whatsapp,
       cpf: textoOpcional(dados.cpf),
@@ -261,6 +269,10 @@ export async function atualizarClienteNoAtendimento(
       responsavelNome: true,
       responsavelTelefone: true,
       responsavelParentesco: true,
+      contatoConfiancaNome: true,
+      contatoConfiancaTelefone: true,
+      contatoConfiancaVinculo: true,
+      contatoConfiancaAutorizado: true,
       observacoes: true,
     },
   });
