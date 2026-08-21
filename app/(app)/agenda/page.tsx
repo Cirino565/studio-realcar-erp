@@ -6,9 +6,7 @@ import { prisma } from "@/lib/prisma";
 import AgendaClient from "./components/AgendaClient";
 
 type AgendaPageProps = {
-  searchParams?:
-    | Promise<Record<string, string | string[] | undefined>>
-    | Record<string, string | string[] | undefined>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
 function getParam(

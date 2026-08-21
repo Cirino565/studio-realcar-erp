@@ -184,6 +184,8 @@ model Lancamento {
   taxaPagamento            Float    @default(0)
   taxaPercentualAplicada   Float    @default(0)
   taxaFixaAplicada         Float    @default(0)
+  prazoRecebimentoDias     Int      @default(0)
+  recebimentoPrevistoEm    DateTime?
   tipo                     String
   categoria                String?
   observacoes              String?
@@ -207,6 +209,7 @@ model Lancamento {
   @@index([contaFinanceiraId, data])
   @@index([campanhaId, data])
   @@index([formaPagamentoConfigId])
+  @@index([recebimentoPrevistoEm, statusPagamento])
 }
 
 model Fornecedor {
@@ -313,6 +316,8 @@ model Venda {
   taxaPagamento       Float     @default(0)
   taxaPercentualAplicada Float  @default(0)
   taxaFixaAplicada    Float     @default(0)
+  prazoRecebimentoDias Int      @default(0)
+  recebimentoPrevistoEm DateTime?
   valorLiquido        Float?
   formaPagamento      String?
   formaPagamentoConfigId Int?
@@ -342,6 +347,7 @@ model Venda {
   @@index([contaFinanceiraId, data])
   @@index([campanhaId, data])
   @@index([formaPagamentoConfigId])
+  @@index([recebimentoPrevistoEm, statusPagamento])
 }
 
 model VendaItem {

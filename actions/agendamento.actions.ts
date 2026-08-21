@@ -584,6 +584,36 @@ async function obterConflitoAgenda({
   }
 
   if (!permitirEncaixeSemIntervalo) {
+    const conflitoIntervaloBloqueio = bloqueiosDoDia.find((bloqueio) => {
+      const inicioExistente = new Date(bloqueio.data);
+      const fimExistente = addMinutes(inicioExistente, bloqueio.duracao);
+
+      return conflitaComIntervaloEntreAtendimentos(
+        inicioNovo,
+        fimNovo,
+        inicioExistente,
+        fimExistente,
+      );
+    });
+
+    if (conflitoIntervaloBloqueio) {
+      const inicioExistente = new Date(conflitoIntervaloBloqueio.data);
+      const fimExistente = addMinutes(
+        inicioExistente,
+        conflitoIntervaloBloqueio.duracao,
+      );
+      const inicio = formatHourMinute(inicioExistente);
+      const fim = formatHourMinute(fimExistente);
+
+      return {
+        ok: false,
+        codigo: "CONFLITO_BLOQUEIO",
+        titulo: "Intervalo de segurança da agenda",
+        mensagem: `A agenda reserva ${INTERVALO_ENTRE_ATENDIMENTOS_MINUTOS} minutos de intervalo. Em ${dataTexto}, o horário escolhido (${inicioNovoTexto} às ${fimNovoTexto}) fica muito próximo do bloqueio "${conflitoIntervaloBloqueio.motivo}", marcado das ${inicio} às ${fim}. Escolha outro horário ou ative "Permitir encaixe sem intervalo".`,
+        campo: "hora",
+      };
+    }
+
     const conflitoIntervalo = agendamentosDoDia.find((agendamento) => {
       const inicioExistente = new Date(agendamento.data);
       const fimExistente = addMinutes(inicioExistente, agendamento.duracao);
@@ -2149,6 +2179,42 @@ export async function buscarDisponibilidadeAgenda({
         disponivel: false,
         motivo: `${conflitoBloqueio.motivo} · ${inicio} às ${fim}`,
         tipo: "bloqueio" as const,
+      };
+    }
+
+    const conflitoIntervaloBloqueio = bloqueiosDoDia.find((bloqueio) => {
+      const inicioExistente = new Date(bloqueio.data);
+      const fimExistente = addMinutes(inicioExistente, bloqueio.duracao);
+
+      return conflitaComIntervaloEntreAtendimentos(
+        inicioNovo,
+        fimNovo,
+        inicioExistente,
+        fimExistente,
+      );
+    });
+
+    if (conflitoIntervaloBloqueio) {
+      const inicioExistente = new Date(conflitoIntervaloBloqueio.data);
+      const fimExistente = addMinutes(
+        inicioExistente,
+        conflitoIntervaloBloqueio.duracao,
+      );
+
+      const motivo = motivoIntervaloEntreAtendimentos({
+        inicioNovo,
+        fimNovo,
+        inicioExistente,
+        fimExistente,
+        clienteNome: `bloqueio "${conflitoIntervaloBloqueio.motivo}"`,
+      });
+
+      return {
+        hora,
+        disponivel: permitirEncaixeSemIntervalo,
+        motivo,
+        tipo: "intervalo" as const,
+        encaixe: permitirEncaixeSemIntervalo,
       };
     }
 
