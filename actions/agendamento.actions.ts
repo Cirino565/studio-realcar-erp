@@ -2048,6 +2048,113 @@ function gerarSlotsDisponibilidade(
   return slots;
 }
 
+export type ResultadoBuscaAgendamentoAgenda = {
+  id: number;
+  clienteId: number;
+  clienteNome: string;
+  clienteTelefone: string;
+  clienteWhatsapp: string | null;
+  procedimento: string;
+  data: string;
+  dataAgenda: string;
+  status: string;
+  profissionalId: number | null;
+  profissionalNome: string | null;
+};
+
+export async function buscarAgendamentosAgendaPorClientes(
+  clienteIds: number[],
+): Promise<ResultadoBuscaAgendamentoAgenda[]> {
+  await requirePermission("agenda.visualizar");
+
+  const ids = Array.from(
+    new Set(
+      clienteIds
+        .map((id) => Number(id))
+        .filter(
+          (id) => Number.isInteger(id) && id > 0,
+        ),
+    ),
+  ).slice(0, 8);
+
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const agora = new Date();
+
+  const select = {
+    id: true,
+    clienteId: true,
+    procedimento: true,
+    data: true,
+    status: true,
+    profissionalId: true,
+    cliente: {
+      select: {
+        nome: true,
+        telefone: true,
+        whatsapp: true,
+      },
+    },
+    profissional: {
+      select: {
+        nome: true,
+      },
+    },
+  } as const;
+
+  const porCliente = await Promise.all(
+    ids.map(async (clienteId) => {
+      const [proximos, anteriores] =
+        await Promise.all([
+          prisma.agendamento.findMany({
+            where: {
+              clienteId,
+              data: { gte: agora },
+              status: {
+                notIn: ["Cancelado", "Cancelada"],
+              },
+            },
+            select,
+            orderBy: { data: "asc" },
+            take: 5,
+          }),
+
+          prisma.agendamento.findMany({
+            where: {
+              clienteId,
+              data: { lt: agora },
+              status: {
+                notIn: ["Cancelado", "Cancelada"],
+              },
+            },
+            select,
+            orderBy: { data: "desc" },
+            take: 3,
+          }),
+        ]);
+
+      return [...proximos, ...anteriores];
+    }),
+  );
+
+  return porCliente.flat().map((agendamento) => ({
+    id: agendamento.id,
+    clienteId: agendamento.clienteId,
+    clienteNome: agendamento.cliente.nome,
+    clienteTelefone: agendamento.cliente.telefone,
+    clienteWhatsapp: agendamento.cliente.whatsapp,
+    procedimento: agendamento.procedimento,
+    data: agendamento.data.toISOString(),
+    dataAgenda: formatDateSaoPaulo(agendamento.data),
+    status: agendamento.status,
+    profissionalId: agendamento.profissionalId,
+    profissionalNome:
+      agendamento.profissional?.nome ?? null,
+  }));
+}
+
 export async function buscarDisponibilidadeAgenda({
   profissionalId,
   data,

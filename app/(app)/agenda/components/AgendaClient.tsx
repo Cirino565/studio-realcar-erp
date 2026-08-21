@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import type { KitVendaOption, ProdutoVendaOption } from "@/lib/vendas.types";
 
 import AgendaCalendar, { type NovoHorarioPayload } from "./AgendaCalendar";
+import AgendaSearch from "./AgendaSearch";
 import AppointmentDetailsModal, {
   type AppointmentDetails,
   type ClienteAtendimentoDetalhes,
@@ -444,7 +445,30 @@ export default function AgendaClient({
             </div>
           </section>
         ) : (
-          <AgendaCalendar
+          <>
+            <AgendaSearch
+              clientes={clientes}
+              onSelect={(resultado) => {
+                const params = new URLSearchParams({
+                  data: resultado.dataAgenda,
+                  agendamentoId: String(resultado.id),
+                  view: "day",
+                });
+
+                if (resultado.profissionalId) {
+                  params.set(
+                    "profissional",
+                    String(resultado.profissionalId),
+                  );
+                }
+
+                window.location.assign(
+                  `/agenda?${params.toString()}`,
+                );
+              }}
+            />
+
+            <AgendaCalendar
             selectedDate={selectedDate}
             onDateChange={handleDateChange}
             profissionalFiltro={profissionalFiltro}
@@ -461,6 +485,7 @@ export default function AgendaClient({
             horarioAtendimento={horarioAtendimento}
             viewMode={initialView}
           />
+          </>
         )}
       </div>
 
