@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 const MAX_SOURCE_SIZE = 30 * 1024 * 1024;
 const MAX_DIMENSION = 2200;
 const TARGET_SIZE = 3 * 1024 * 1024;
+const MAX_BATCH_FILES = 20;
 
 type Props = {
   clienteId: number;
@@ -17,6 +18,12 @@ type Props = {
 };
 
 type StatusEnvio = "idle" | "preparando" | "enviando";
+
+type FotoSelecionada = {
+  id: string;
+  file: File;
+  previewUrl: string;
+};
 
 function dateInputValue() {
   const now = new Date();
@@ -101,25 +108,87 @@ export function ClienteFotoUploadForm({ clienteId, driveConfigurado }: Props) {
   const router = useRouter();
   const cameraInput = useRef<HTMLInputElement>(null);
   const galleryInput = useRef<HTMLInputElement>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selectedPhotos, setSelectedPhotos] = useState<FotoSelecionada[]>([]);
   const [status, setStatus] = useState<StatusEnvio>("idle");
   const [message, setMessage] = useState<string | null>(null);
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const previewUrlsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      previewUrlsRef.current.clear();
     };
-  }, [previewUrl]);
+  }, []);
 
-  function selectFile(file: File | null) {
-    setSelectedFile(file);
-    setPreviewUrl(file ? URL.createObjectURL(file) : null);
+  function criarFotoSelecionada(file: File): FotoSelecionada {
+    const previewUrl = URL.createObjectURL(file);
+    previewUrlsRef.current.add(previewUrl);
+
+    return {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      file,
+      previewUrl,
+    };
+  }
+
+  function revogarPreview(previewUrl: string) {
+    if (!previewUrlsRef.current.has(previewUrl)) return;
+
+    URL.revokeObjectURL(previewUrl);
+    previewUrlsRef.current.delete(previewUrl);
+  }
+
+  function addFiles(files: File[]) {
+    setMessage(null);
+
+    const imagens = files.filter((file) => file.type.startsWith("image/"));
+
+    if (imagens.length === 0) {
+      setMessage("Selecione arquivos de imagem.");
+      return;
+    }
+
+    const disponiveis = Math.max(0, MAX_BATCH_FILES - selectedPhotos.length);
+
+    if (disponiveis === 0) {
+      setMessage(`O limite por lote e de ${MAX_BATCH_FILES} fotos.`);
+      return;
+    }
+
+    const novas = imagens
+      .slice(0, disponiveis)
+      .map(criarFotoSelecionada);
+
+    setSelectedPhotos((current) => [...current, ...novas]);
+
+    if (imagens.length > disponiveis) {
+      setMessage(
+        `Foram adicionadas ${disponiveis} fotos. O limite por lote e de ${MAX_BATCH_FILES}.`,
+      );
+    }
+  }
+
+  function removeFile(id: string) {
+    setSelectedPhotos((current) => {
+      const foto = current.find((item) => item.id === id);
+
+      if (foto) {
+        revogarPreview(foto.previewUrl);
+      }
+
+      return current.filter((item) => item.id !== id);
+    });
+
     setMessage(null);
   }
 
-  function clearFile() {
-    selectFile(null);
+  function clearFiles() {
+    setSelectedPhotos((current) => {
+      current.forEach((item) => revogarPreview(item.previewUrl));
+      return [];
+    });
+
     if (cameraInput.current) cameraInput.current.value = "";
     if (galleryInput.current) galleryInput.current.value = "";
   }
@@ -133,45 +202,114 @@ export function ClienteFotoUploadForm({ clienteId, driveConfigurado }: Props) {
       return;
     }
 
-    if (!selectedFile) {
-      setMessage("Tire uma foto ou escolha uma imagem da galeria.");
+    if (selectedPhotos.length === 0) {
+      setMessage("Tire uma foto ou escolha imagens da galeria.");
       return;
     }
 
     const form = event.currentTarget;
-    const formData = new FormData(form);
+    const fotosDoLote = [...selectedPhotos];
+    const sucessos = new Set<string>();
+    const falhas: Array<{ id: string; erro: string }> = [];
 
     try {
-      setStatus("preparando");
-      const preparedFile = await prepareImage(selectedFile);
-      formData.set("arquivo", preparedFile, preparedFile.name);
-      setStatus("enviando");
+      for (let index = 0; index < fotosDoLote.length; index += 1) {
+        const foto = fotosDoLote[index];
 
-      const response = await fetch("/api/clientes/fotos", {
-        method: "POST",
-        body: formData,
-      });
+        setProgress({
+          current: index + 1,
+          total: fotosDoLote.length,
+        });
 
-      const payload = (await response.json().catch(() => null)) as
-        | { erro?: string; ok?: boolean }
-        | null;
+        try {
+          setStatus("preparando");
 
-      if (!response.ok) {
-        throw new Error(payload?.erro || "Não foi possível enviar a foto.");
+          const preparedFile = await prepareImage(foto.file);
+          const formData = new FormData(form);
+
+          formData.set("arquivo", preparedFile, preparedFile.name);
+
+          setStatus("enviando");
+
+          const response = await fetch("/api/clientes/fotos", {
+            method: "POST",
+            body: formData,
+          });
+
+          const payload = (await response.json().catch(() => null)) as
+            | { erro?: string; ok?: boolean }
+            | null;
+
+          if (!response.ok) {
+            throw new Error(
+              payload?.erro || `Não foi possível enviar ${foto.file.name}.`,
+            );
+          }
+
+          sucessos.add(foto.id);
+        } catch (error) {
+          falhas.push({
+            id: foto.id,
+            erro:
+              error instanceof Error
+                ? error.message
+                : `Falha ao enviar ${foto.file.name}.`,
+          });
+        }
       }
 
-      form.reset();
-      clearFile();
-      setMessage("Foto enviada com segurança para o Google Drive.");
-      router.refresh();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Falha ao enviar a foto.");
+      if (sucessos.size > 0) {
+        router.refresh();
+      }
+
+      if (falhas.length === 0) {
+        fotosDoLote.forEach((foto) => revogarPreview(foto.previewUrl));
+        setSelectedPhotos([]);
+
+        form.reset();
+
+        if (cameraInput.current) cameraInput.current.value = "";
+        if (galleryInput.current) galleryInput.current.value = "";
+
+        setMessage(
+          fotosDoLote.length === 1
+            ? "Foto enviada com segurança para o Google Drive."
+            : `${fotosDoLote.length} fotos enviadas com segurança para o Google Drive.`,
+        );
+      } else {
+        setSelectedPhotos((current) =>
+          current.filter((foto) => {
+            if (!sucessos.has(foto.id)) return true;
+
+            revogarPreview(foto.previewUrl);
+            return false;
+          }),
+        );
+
+        const primeiraFalha = falhas[0]?.erro || "Falha no envio.";
+
+        setMessage(
+          `${sucessos.size} de ${fotosDoLote.length} fotos foram enviadas. ` +
+            `${falhas.length} permaneceram selecionadas para tentar novamente. ` +
+            `Motivo: ${primeiraFalha}`,
+        );
+      }
     } finally {
       setStatus("idle");
+      setProgress({ current: 0, total: 0 });
     }
   }
 
   const busy = status !== "idle";
+
+  const botaoTexto =
+    status === "preparando"
+      ? `Preparando ${progress.current} de ${progress.total}...`
+      : status === "enviando"
+        ? `Enviando ${progress.current} de ${progress.total}...`
+        : selectedPhotos.length > 1
+          ? `Salvar ${selectedPhotos.length} fotos`
+          : "Salvar foto clínica";
 
   return (
     <form
@@ -220,38 +358,95 @@ export function ClienteFotoUploadForm({ clienteId, driveConfigurado }: Props) {
         accept="image/*"
         capture="environment"
         className="hidden"
-        onChange={(event) => selectFile(event.target.files?.[0] ?? null)}
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+
+          if (file) addFiles([file]);
+
+          event.target.value = "";
+        }}
       />
 
       <input
         ref={galleryInput}
         type="file"
         accept="image/*"
+        multiple
         className="hidden"
-        onChange={(event) => selectFile(event.target.files?.[0] ?? null)}
+        onChange={(event) => {
+          addFiles(Array.from(event.target.files ?? []));
+          event.target.value = "";
+        }}
       />
 
-      {selectedFile && previewUrl ? (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/60">
-          <div className="relative aspect-[4/3]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={previewUrl}
-              alt="Pré-visualização da foto selecionada"
-              className="h-full w-full object-contain"
-            />
-            <button
-              type="button"
-              onClick={clearFile}
-              disabled={busy}
-              className="absolute right-2 top-2 flex size-9 items-center justify-center rounded-full bg-slate-950/80 text-white shadow-lg transition hover:bg-slate-950 disabled:opacity-50"
-              aria-label="Remover foto selecionada"
-            >
-              <X size={18} />
-            </button>
+      {selectedPhotos.length > 0 ? (
+        <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-slate-950/60">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold text-slate-900 dark:text-white">
+                {selectedPhotos.length === 1
+                  ? "1 foto selecionada"
+                  : `${selectedPhotos.length} fotos selecionadas`}
+              </p>
+              <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                O título, tipo, procedimento, data e descrição serão aplicados ao lote.
+              </p>
+            </div>
+
+            {selectedPhotos.length > 1 ? (
+              <button
+                type="button"
+                onClick={clearFiles}
+                disabled={busy}
+                className="shrink-0 text-xs font-bold text-rose-600 hover:text-rose-700 disabled:opacity-50"
+              >
+                Remover todas
+              </button>
+            ) : null}
           </div>
-          <div className="border-t border-slate-200 px-4 py-3 text-xs text-slate-600 dark:border-white/10 dark:text-slate-300">
-            {selectedFile.name} • {formatBytes(selectedFile.size)}
+
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {selectedPhotos.map((foto, index) => (
+              <div
+                key={foto.id}
+                className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/[0.04]"
+              >
+                <div className="relative aspect-[4/3]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={foto.previewUrl}
+                    alt={`Pré-visualização da foto ${index + 1}`}
+                    className="h-full w-full object-cover"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => removeFile(foto.id)}
+                    disabled={busy}
+                    className="absolute right-1.5 top-1.5 flex size-8 items-center justify-center rounded-full border border-white/80 bg-black/85 text-white shadow-lg transition hover:bg-black disabled:opacity-50"
+                    aria-label={`Remover foto ${index + 1}`}
+                  >
+                    <X size={18} strokeWidth={3} />
+                  </button>
+
+                  <span className="absolute bottom-1.5 left-1.5 rounded-md bg-slate-950/75 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                    {index + 1}
+                  </span>
+                </div>
+
+                <div className="px-2.5 py-2">
+                  <p
+                    className="truncate text-[11px] font-semibold text-slate-700 dark:text-slate-200"
+                    title={foto.file.name}
+                  >
+                    {foto.file.name}
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-slate-400">
+                    {formatBytes(foto.file.size)}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       ) : null}
@@ -313,7 +508,15 @@ export function ClienteFotoUploadForm({ clienteId, driveConfigurado }: Props) {
       </label>
 
       {message ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-3 text-sm leading-5 text-slate-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200">
+        <div
+          role="status"
+          aria-live="polite"
+          className={`fixed bottom-4 left-1/2 z-[300] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-2xl border px-4 py-3 text-sm font-semibold shadow-2xl sm:left-auto sm:right-4 sm:translate-x-0 ${
+            message.includes("com segurança")
+              ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+              : "border-rose-300 bg-rose-50 text-rose-900"
+          }`}
+        >
           {message}
         </div>
       ) : null}
@@ -321,14 +524,14 @@ export function ClienteFotoUploadForm({ clienteId, driveConfigurado }: Props) {
       <Button
         type="submit"
         className="w-full"
-        disabled={busy || !driveConfigurado || !selectedFile}
+        disabled={busy || !driveConfigurado || selectedPhotos.length === 0}
       >
-        {busy ? <Loader2 size={17} className="animate-spin" /> : <UploadCloud size={17} />}
-        {status === "preparando"
-          ? "Preparando imagem..."
-          : status === "enviando"
-            ? "Enviando ao Drive..."
-            : "Salvar foto clínica"}
+        {busy ? (
+          <Loader2 size={17} className="animate-spin" />
+        ) : (
+          <UploadCloud size={17} />
+        )}
+        {botaoTexto}
       </Button>
     </form>
   );
