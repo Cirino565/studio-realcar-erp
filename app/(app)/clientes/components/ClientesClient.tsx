@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { Plus, UsersRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { CampanhaMarketing, OrigemCliente, ProcedimentoInteresse } from "@prisma/client";
@@ -94,6 +94,7 @@ export default function ClientesClient({
   const [procedimentoFiltro, setProcedimentoFiltro] = useState("todos");
   const [retornoFiltro, setRetornoFiltro] = useState("todos");
   const [areaFiltro, setAreaFiltro] = useState("todas");
+  const [quantidadeVisivel, setQuantidadeVisivel] = useState(10);
   const [modalAberto, setModalAberto] = useState(false);
   const [mensagemAberta, setMensagemAberta] = useState(false);
   const [clienteSelecionado, setClienteSelecionado] =
@@ -216,6 +217,19 @@ export default function ClientesClient({
     });
   }, [clientes, busca, status, areaFiltro, ordenacao, procedimentoFiltro, retornoFiltro]);
 
+  const clientesExibidos = clientesFiltrados.slice(0, quantidadeVisivel);
+
+  useEffect(() => {
+    setQuantidadeVisivel(10);
+  }, [
+    busca,
+    status,
+    areaFiltro,
+    ordenacao,
+    procedimentoFiltro,
+    retornoFiltro,
+  ]);
+
   function novoCliente() {
     setClienteSelecionado(null);
     setModalAberto(true);
@@ -316,11 +330,29 @@ export default function ClientesClient({
         />
 
         <ClienteTable
-          clientes={clientesFiltrados}
+          clientes={clientesExibidos}
           onEditar={editarCliente}
           onExcluir={removerCliente}
           onMensagem={abrirMensagem}
         />
+
+        {clientesFiltrados.length > quantidadeVisivel ? (
+          <div className="flex flex-col items-center gap-2 py-4">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Mostrando {clientesExibidos.length} de {clientesFiltrados.length} clientes
+            </p>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                setQuantidadeVisivel((atual) => atual + 10)
+              }
+            >
+              Carregar mais 10
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       <NovoClienteModal
