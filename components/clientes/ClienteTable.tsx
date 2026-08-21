@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import {
   CalendarClock,
   CalendarDays,
@@ -125,7 +125,7 @@ function AreaBadges({
   if (areaEstetica) {
     return (
       <span className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[0.68rem] font-bold text-violet-700 dark:border-violet-400/20 dark:bg-violet-400/10 dark:text-violet-300">
-        Estética
+        EstÃ©tica
       </span>
     );
   }
@@ -133,14 +133,14 @@ function AreaBadges({
   if (areaCilios) {
     return (
       <span className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[0.68rem] font-bold text-sky-700 dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-300">
-        Cílios
+        CÃ­lios
       </span>
     );
   }
 
   return (
     <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[0.68rem] font-bold text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400">
-      Sem área definida
+      Sem Ã¡rea definida
     </span>
   );
 }
@@ -193,12 +193,12 @@ export default function ClienteTable({
               <th className="px-5 py-4 text-left font-bold">Cliente</th>
               <th className="px-5 py-4 text-left font-bold">Contato</th>
               <th className="px-5 py-4 text-left font-bold">Interesse</th>
-              <th className="px-5 py-4 text-left font-bold">Áreas</th>
+              <th className="px-5 py-4 text-left font-bold">Ãreas</th>
               <th className="px-5 py-4 text-left font-bold">Valor gasto</th>
-              <th className="px-5 py-4 text-left font-bold">Última visita</th>
-              <th className="px-5 py-4 text-left font-bold">Próximo agendamento</th>
+              <th className="px-5 py-4 text-left font-bold">Ãšltima visita</th>
+              <th className="px-5 py-4 text-left font-bold">PrÃ³ximo agendamento</th>
               <th className="px-5 py-4 text-left font-bold">Status</th>
-              <th className="px-5 py-4 text-right font-bold">Ações</th>
+              <th className="px-5 py-4 text-right font-bold">AÃ§Ãµes</th>
             </tr>
           </thead>
 
@@ -241,7 +241,7 @@ export default function ClienteTable({
                   <span className="line-clamp-2">
                     {cliente.procedimentoInteresse ||
                       cliente.procedimento ||
-                      "Não informado"}
+                      "NÃ£o informado"}
                   </span>
                 </td>
 
@@ -277,7 +277,7 @@ export default function ClienteTable({
                 <td className="px-5 py-4">
                   <div className="flex justify-end gap-1.5">
                     <Button type="button" size="icon-sm" variant="outline" asChild>
-                      <Link href={`/clientes/${cliente.id}`} aria-label="Ver prontuário">
+                      <Link href={`/clientes/${cliente.id}`} aria-label="Ver prontuÃ¡rio">
                         <Eye size={16} />
                       </Link>
                     </Button>
@@ -323,7 +323,7 @@ export default function ClienteTable({
         {clientes.map((cliente) => (
           <article
             key={cliente.id}
-            className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.035]"
+            className="rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.035]"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
@@ -354,7 +354,7 @@ export default function ClienteTable({
               />
             </div>
 
-            <div className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-white/[0.04]">
+            <div className="mt-3 space-y-2 rounded-xl border border-violet-100 bg-violet-50/60 p-3 dark:border-violet-400/20 dark:bg-violet-500/10">
               <div className="flex min-w-0 items-start gap-2.5">
                 <CalendarClock
                   size={15}
@@ -363,7 +363,7 @@ export default function ClienteTable({
 
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                    Próximo agendamento
+                    PrÃ³ximo agendamento
                   </p>
 
                   <div className="mt-0.5 text-sm text-slate-800 dark:text-slate-200">
@@ -379,7 +379,7 @@ export default function ClienteTable({
                 />
 
                 <p className="min-w-0 text-xs text-slate-500 dark:text-slate-400">
-                  <span className="font-semibold">Última visita:</span>{" "}
+                  <span className="font-semibold">Ãšltima visita:</span>{" "}
                   <span className="text-slate-700 dark:text-slate-200">
                     {formatarData(cliente.ultimaVisita)}
                   </span>
@@ -397,7 +397,7 @@ export default function ClienteTable({
               >
                 <Link href={`/clientes/${cliente.id}`}>
                   <Eye size={15} />
-                  <span className="truncate">Prontuário</span>
+                  <span className="truncate">ProntuÃ¡rio</span>
                 </Link>
               </Button>
 
@@ -406,7 +406,7 @@ export default function ClienteTable({
                 size="sm"
                 variant="outline"
                 onClick={() => onMensagem(cliente)}
-                className="min-w-0 px-2"
+                className="min-w-0 border-emerald-200 bg-emerald-50 px-2 text-emerald-700 hover:bg-emerald-100"
               >
                 <MessageCircle size={15} />
                 <span className="truncate">WhatsApp</span>
@@ -414,11 +414,11 @@ export default function ClienteTable({
 
               <details className="relative">
                 <summary
-                  className="flex h-9 w-11 cursor-pointer list-none items-center justify-center rounded-xl border border-slate-200 bg-white text-base font-black tracking-[0.08em] text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 [&::-webkit-details-marker]:hidden"
-                  aria-label="Mais opções da cliente"
-                  title="Mais opções"
+                  className="flex h-9 w-11 cursor-pointer list-none items-center justify-center rounded-xl border border-slate-200 bg-slate-100 text-base font-black tracking-[0.08em] text-slate-700 shadow-sm transition hover:bg-slate-200 dark:border-white/10 dark:bg-white/[0.08] dark:text-slate-200 [&::-webkit-details-marker]:hidden"
+                  aria-label="Mais opÃ§Ãµes da cliente"
+                  title="Mais opÃ§Ãµes"
                 >
-                  •••
+                  â€¢â€¢â€¢
                 </summary>
 
                 <div className="absolute bottom-[calc(100%+0.4rem)] right-0 z-30 w-40 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-white/10 dark:bg-slate-900">
@@ -448,3 +448,7 @@ export default function ClienteTable({
     </section>
   );
 }
+
+
+
+

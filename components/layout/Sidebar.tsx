@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, type ComponentType } from "react";
 import Link from "next/link";
@@ -34,7 +34,7 @@ const mainMenus = [
     permissao: "dashboard.visualizar",
   },
   {
-    nome: "Gestão",
+    nome: "GestÃ£o",
     icon: Gauge,
     href: "/gestao",
     permissao: "relatorios.visualizar",
@@ -70,7 +70,7 @@ const mainMenus = [
     permissao: "estoque.visualizar",
   },
   {
-    nome: "Relatórios",
+    nome: "RelatÃ³rios",
     icon: FileBarChart2,
     href: "/relatorios",
     permissao: "relatorios.visualizar",
@@ -82,7 +82,7 @@ const mainMenus = [
     permissao: "marketing.visualizar",
   },
   {
-    nome: "Comunicação",
+    nome: "ComunicaÃ§Ã£o",
     icon: MessagesSquare,
     href: "/comunicacoes",
     permissao: "marketing.visualizar",
@@ -91,13 +91,13 @@ const mainMenus = [
 
 const adminMenus = [
   {
-    nome: "Usuários",
+    nome: "UsuÃ¡rios",
     icon: ShieldCheck,
     href: "/usuarios",
     permissao: "usuarios.gerenciar",
   },
   {
-    nome: "Permissões",
+    nome: "PermissÃµes",
     icon: KeyRound,
     href: "/permissoes",
     permissao: "permissoes.gerenciar",
@@ -115,13 +115,13 @@ const adminMenus = [
     permissao: "backup.gerenciar",
   },
   {
-    nome: "Automações",
+    nome: "AutomaÃ§Ãµes",
     icon: Bot,
     href: "/automacoes",
     permissao: "automacoes.gerenciar",
   },
   {
-    nome: "Configurações",
+    nome: "ConfiguraÃ§Ãµes",
     icon: Settings,
     href: "/configuracoes",
     permissao: "configuracoes.gerenciar",
@@ -276,10 +276,10 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
 
             <div className="min-w-0">
               <h1 className="truncate text-lg font-bold tracking-tight text-slate-950">
-                Studio Realçar
+                Studio RealÃ§ar
               </h1>
               <p className="text-xs font-medium text-slate-500">
-                Gestão clínica
+                GestÃ£o clÃ­nica
               </p>
             </div>
           </Link>
@@ -287,13 +287,13 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
 
         <nav className="scrollbar-premium flex-1 space-y-6 overflow-y-auto px-4 py-5">
           <MenuSection
-            titulo="Operação"
+            titulo="OperaÃ§Ã£o"
             items={menusPrincipaisVisiveis}
             pathname={pathname}
           />
 
           <MenuSection
-            titulo="Administração"
+            titulo="AdministraÃ§Ã£o"
             items={menusAdminVisiveis}
             pathname={pathname}
           />
@@ -307,7 +307,7 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
                   Sistema operacional
                 </p>
                 <p className="mt-0.5 truncate text-xs text-slate-500">
-                  Permissões por perfil
+                  PermissÃµes por perfil
                 </p>
               </div>
 
@@ -321,7 +321,7 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
 
       {quantidadeColunasMobile > 0 ? (
         <nav
-          className="app-bottom-nav app-bottom-dock fixed inset-x-3 bottom-[calc(0.5rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-[28rem] rounded-[1.35rem] border bg-white/95 p-1 shadow-[0_12px_32px_rgba(15,23,42,0.18)] backdrop-blur-2xl dark:bg-slate-950/95 lg:hidden"
+          className="app-bottom-nav app-bottom-dock fixed inset-x-3 bottom-[calc(0.5rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-[28rem] rounded-[1.35rem] border-slate-200/80 bg-slate-50/95 p-1 shadow-[0_-8px_30px_rgba(15,23,42,0.12)] backdrop-blur-2xl dark:bg-slate-950/95 lg:hidden"
         >
           <div
             className="grid gap-1"
@@ -363,7 +363,7 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
                     ? "bg-violet-600/10 text-violet-800 shadow-sm ring-1 ring-violet-500/10"
                     : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                 }`}
-                aria-label="Abrir outros módulos"
+                aria-label="Abrir outros mÃ³dulos"
                 aria-expanded={mobileMenuOpen}
               >
                 <Menu
@@ -383,11 +383,11 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
           className="fixed inset-0 z-[70] lg:hidden"
           role="dialog"
           aria-modal="true"
-          aria-label="Outros módulos"
+          aria-label="Outros mÃ³dulos"
         >
           <button
             type="button"
-            aria-label="Fechar outros módulos"
+            aria-label="Fechar outros mÃ³dulos"
             onClick={() => setMobileMenuOpen(false)}
             className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
           />
@@ -396,10 +396,10 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
             <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3.5">
               <div>
                 <p className="text-sm font-bold text-slate-950">
-                  Outros módulos
+                  Outros mÃ³dulos
                 </p>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Acesse estoque, relatórios e administração.
+                  Acesse estoque, relatÃ³rios e administraÃ§Ã£o.
                 </p>
               </div>
 
@@ -415,14 +415,14 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
 
             <nav className="scrollbar-premium flex-1 space-y-6 overflow-y-auto px-3 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
               <MenuSection
-                titulo="Operação"
+                titulo="OperaÃ§Ã£o"
                 items={menusMobileExtrasPrincipais}
                 pathname={pathname}
                 onNavigate={() => setMobileMenuOpen(false)}
               />
 
               <MenuSection
-                titulo="Administração"
+                titulo="AdministraÃ§Ã£o"
                 items={menusMobileExtrasAdmin}
                 pathname={pathname}
                 onNavigate={() => setMobileMenuOpen(false)}
