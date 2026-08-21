@@ -2200,11 +2200,37 @@ export async function listarHorariosPublicos(
     }),
     prisma.profissional.findMany({
       where: { status: "Ativa" },
-      select: { id: true },
+      select: { id: true, area: true },
     }),
   ]);
 
-  if (profissionais.length === 0) return [];
+  // Quem realmente atende Limpeza de Pele.
+  //
+  // Sem esse filtro, bastava UMA profissional livre para o horario aparecer -
+  // e como a agenda de cilios/sobrancelhas costuma estar vazia, a pagina
+  // mostrava o dia inteiro livre mesmo com a estetica lotada.
+  //
+  // *** E AQUI QUE SE MUDA QUEM ATENDE PELO LINK PUBLICO ***
+  // Hoje considera quem tem "facial", "corporal" ou "estetica" na area.
+  // Se ninguem casar, cai para todas as ativas, para a pagina nunca ficar
+  // vazia por engano de cadastro.
+  const AREAS_DO_LINK_PUBLICO = ["facial", "corporal", "estetica"];
+
+  const normalizar = (valor?: string | null) =>
+    (valor || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+
+  const habilitadas = profissionais.filter((item) => {
+    const area = normalizar(item.area);
+    return AREAS_DO_LINK_PUBLICO.some((termo) => area.includes(termo));
+  });
+
+  const profissionaisDoLink =
+    habilitadas.length > 0 ? habilitadas : profissionais;
+
+  if (profissionaisDoLink.length === 0) return [];
 
   const intervaloEntreAtendimentos = Math.max(
     0,
@@ -2233,7 +2259,7 @@ export async function listarHorariosPublicos(
 
   const inicioDia = parseLocalDateTime(`${data}T00:00`);
   const fimDia = addMinutes(inicioDia, 24 * 60);
-  const idsProfissionais = profissionais.map((item) => item.id);
+  const idsProfissionais = profissionaisDoLink.map((item) => item.id);
 
   const [agendamentosDoDia, bloqueiosDoDia] = await Promise.all([
     prisma.agendamento.findMany({
