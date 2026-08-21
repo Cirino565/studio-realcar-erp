@@ -34,7 +34,7 @@ const mainMenus = [
     permissao: "dashboard.visualizar",
   },
   {
-    nome: "GestÃ£o",
+    nome: "Gestão",
     icon: Gauge,
     href: "/gestao",
     permissao: "relatorios.visualizar",
@@ -82,7 +82,7 @@ const mainMenus = [
     permissao: "marketing.visualizar",
   },
   {
-    nome: "ComunicaÃ§Ã£o",
+    nome: "Comunicação",
     icon: MessagesSquare,
     href: "/comunicacoes",
     permissao: "marketing.visualizar",
@@ -115,13 +115,13 @@ const adminMenus = [
     permissao: "backup.gerenciar",
   },
   {
-    nome: "AutomaÃ§Ãµes",
+    nome: "Automações",
     icon: Bot,
     href: "/automacoes",
     permissao: "automacoes.gerenciar",
   },
   {
-    nome: "ConfiguraÃ§Ãµes",
+    nome: "Configurações",
     icon: Settings,
     href: "/configuracoes",
     permissao: "configuracoes.gerenciar",
@@ -276,10 +276,10 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
 
             <div className="min-w-0">
               <h1 className="truncate text-lg font-bold tracking-tight text-slate-950">
-                Studio RealÃ§ar
+                Studio Realçar
               </h1>
               <p className="text-xs font-medium text-slate-500">
-                GestÃ£o clÃ­nica
+                Gestão clínica
               </p>
             </div>
           </Link>
@@ -287,13 +287,13 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
 
         <nav className="scrollbar-premium flex-1 space-y-6 overflow-y-auto px-4 py-5">
           <MenuSection
-            titulo="OperaÃ§Ã£o"
+            titulo="Operação"
             items={menusPrincipaisVisiveis}
             pathname={pathname}
           />
 
           <MenuSection
-            titulo="AdministraÃ§Ã£o"
+            titulo="Administração"
             items={menusAdminVisiveis}
             pathname={pathname}
           />
@@ -399,7 +399,7 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
                   Outros mÃ³dulos
                 </p>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Acesse estoque, relatÃ³rios e administraÃ§Ã£o.
+                  Acesse estoque, relatórios e administraÃ§Ã£o.
                 </p>
               </div>
 
@@ -415,14 +415,14 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
 
             <nav className="scrollbar-premium flex-1 space-y-6 overflow-y-auto px-3 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
               <MenuSection
-                titulo="OperaÃ§Ã£o"
+                titulo="Operação"
                 items={menusMobileExtrasPrincipais}
                 pathname={pathname}
                 onNavigate={() => setMobileMenuOpen(false)}
               />
 
               <MenuSection
-                titulo="AdministraÃ§Ã£o"
+                titulo="Administração"
                 items={menusMobileExtrasAdmin}
                 pathname={pathname}
                 onNavigate={() => setMobileMenuOpen(false)}
@@ -434,3 +434,4 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
     </>
   );
 }
+

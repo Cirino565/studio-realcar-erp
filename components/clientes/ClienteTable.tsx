@@ -195,10 +195,10 @@ export default function ClienteTable({
               <th className="px-5 py-4 text-left font-bold">Interesse</th>
               <th className="px-5 py-4 text-left font-bold">Ãreas</th>
               <th className="px-5 py-4 text-left font-bold">Valor gasto</th>
-              <th className="px-5 py-4 text-left font-bold">Ãšltima visita</th>
-              <th className="px-5 py-4 text-left font-bold">PrÃ³ximo agendamento</th>
+              <th className="px-5 py-4 text-left font-bold">Última visita</th>
+              <th className="px-5 py-4 text-left font-bold">Próximo agendamento</th>
               <th className="px-5 py-4 text-left font-bold">Status</th>
-              <th className="px-5 py-4 text-right font-bold">AÃ§Ãµes</th>
+              <th className="px-5 py-4 text-right font-bold">Ações</th>
             </tr>
           </thead>
 
@@ -363,7 +363,7 @@ export default function ClienteTable({
 
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                    PrÃ³ximo agendamento
+                    Próximo agendamento
                   </p>
 
                   <div className="mt-0.5 text-sm text-slate-800 dark:text-slate-200">
@@ -379,7 +379,7 @@ export default function ClienteTable({
                 />
 
                 <p className="min-w-0 text-xs text-slate-500 dark:text-slate-400">
-                  <span className="font-semibold">Ãšltima visita:</span>{" "}
+                  <span className="font-semibold">Última visita:</span>{" "}
                   <span className="text-slate-700 dark:text-slate-200">
                     {formatarData(cliente.ultimaVisita)}
                   </span>
@@ -397,7 +397,7 @@ export default function ClienteTable({
               >
                 <Link href={`/clientes/${cliente.id}`}>
                   <Eye size={15} />
-                  <span className="truncate">ProntuÃ¡rio</span>
+                  <span className="truncate">Prontuário</span>
                 </Link>
               </Button>
 
@@ -415,8 +415,8 @@ export default function ClienteTable({
               <details className="relative">
                 <summary
                   className="flex h-9 w-11 cursor-pointer list-none items-center justify-center rounded-xl border border-slate-200 bg-slate-100 text-base font-black tracking-[0.08em] text-slate-700 shadow-sm transition hover:bg-slate-200 dark:border-white/10 dark:bg-white/[0.08] dark:text-slate-200 [&::-webkit-details-marker]:hidden"
-                  aria-label="Mais opÃ§Ãµes da cliente"
-                  title="Mais opÃ§Ãµes"
+                  aria-label="Mais opções da cliente"
+                  title="Mais opções"
                 >
                   â€¢â€¢â€¢
                 </summary>
@@ -448,7 +448,4 @@ export default function ClienteTable({
     </section>
   );
 }
-
-
-
 
