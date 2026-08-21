@@ -387,13 +387,13 @@ export default function ClienteTable({
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2.75rem] gap-2">
+            <div className="mt-3 grid grid-cols-[1fr_1fr_2.75rem] gap-2">
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
                 asChild
-                className="min-w-0 px-2"
+                className="min-w-0 whitespace-nowrap px-2"
               >
                 <Link href={`/clientes/${cliente.id}`}>
                   <Eye size={15} />
@@ -406,7 +406,7 @@ export default function ClienteTable({
                 size="sm"
                 variant="outline"
                 onClick={() => onMensagem(cliente)}
-                className="min-w-0 border-emerald-200 bg-emerald-50 px-2 text-emerald-700 hover:bg-emerald-100"
+                className="min-w-0 whitespace-nowrap border-emerald-200 bg-emerald-50 px-2 text-emerald-700 hover:bg-emerald-100"
               >
                 <MessageCircle size={15} />
                 <span className="truncate">WhatsApp</span>
@@ -448,7 +448,3 @@ export default function ClienteTable({
     </section>
   );
 }
-
-
-
-
