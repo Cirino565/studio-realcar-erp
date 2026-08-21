@@ -321,7 +321,7 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
 
       {quantidadeColunasMobile > 0 ? (
         <nav
-          className="app-bottom-nav app-bottom-dock fixed inset-x-3 bottom-[calc(0.5rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-[28rem] rounded-[1.35rem] border p-1 shadow-[0_12px_32px_rgba(15,23,42,0.16)] backdrop-blur-2xl lg:hidden"
+          className="app-bottom-nav app-bottom-dock fixed inset-x-3 bottom-[calc(0.5rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-[28rem] rounded-[1.35rem] border bg-white/95 p-1 shadow-[0_12px_32px_rgba(15,23,42,0.18)] backdrop-blur-2xl dark:bg-slate-950/95 lg:hidden"
         >
           <div
             className="grid gap-1"

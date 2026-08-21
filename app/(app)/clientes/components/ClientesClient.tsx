@@ -259,35 +259,45 @@ export default function ClientesClient({
 
   return (
     <>
-      <div className="app-mobile-safe space-y-5 sm:space-y-6">
-        <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.06] sm:p-7">
+      <div className="app-mobile-safe space-y-3 pb-6 sm:space-y-6 sm:pb-0">
+        <section className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.06] sm:rounded-3xl sm:p-7">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,0.14),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(13,148,136,0.09),transparent_34%)]" />
 
-          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="relative flex items-center justify-between gap-3 sm:gap-5 lg:items-end">
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 dark:border-violet-400/20 dark:bg-violet-500/15 dark:text-violet-200">
+              <div className="hidden items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 dark:border-violet-400/20 dark:bg-violet-500/15 dark:text-violet-200 sm:inline-flex">
                 <UsersRound size={14} />
                 CRM de relacionamento
               </div>
 
-              <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+              <h1 className="mt-0 text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:mt-3 sm:text-3xl">
                 Clientes
               </h1>
 
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400">
+              <p className="mt-2 hidden max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400 sm:block">
                 Cadastros, histórico, oportunidades de retorno e mensagens de
                 WhatsApp organizados em uma única central.
               </p>
             </div>
 
-            <Button size="lg" type="button" onClick={novoCliente}>
+            <Button
+              size="lg"
+              type="button"
+              onClick={novoCliente}
+              className="h-10 shrink-0 px-4 sm:h-11"
+            >
               <Plus size={18} />
               Nova cliente
             </Button>
           </div>
         </section>
 
-        <ClienteResumo clientes={clientesFiltrados} totalGeral={clientes.length} />
+        <div className="hidden sm:block">
+          <ClienteResumo
+            clientes={clientesFiltrados}
+            totalGeral={clientes.length}
+          />
+        </div>
 
         <ClienteSearch
           value={busca}

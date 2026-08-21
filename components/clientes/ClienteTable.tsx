@@ -323,7 +323,7 @@ export default function ClienteTable({
         {clientes.map((cliente) => (
           <article
             key={cliente.id}
-            className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.035]"
+            className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.035]"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
@@ -354,45 +354,50 @@ export default function ClienteTable({
               />
             </div>
 
-            <div className="mt-4 grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-sm dark:border-white/10 dark:bg-white/[0.04] sm:grid-cols-3">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-slate-500">Interesse</p>
-                <p className="mt-1 line-clamp-2 text-slate-800 dark:text-slate-200">
-                  {cliente.procedimentoInteresse ||
-                    cliente.procedimento ||
-                    "Não informado"}
-                </p>
+            <div className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-white/[0.04]">
+              <div className="flex min-w-0 items-start gap-2.5">
+                <CalendarClock
+                  size={15}
+                  className="mt-0.5 shrink-0 text-violet-600"
+                />
+
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                    Próximo agendamento
+                  </p>
+
+                  <div className="mt-0.5 text-sm text-slate-800 dark:text-slate-200">
+                    <ProximoAgendamento cliente={cliente} />
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <p className="text-xs font-semibold text-slate-500">Valor gasto</p>
-                <p className="mt-1 font-bold text-emerald-700 dark:text-emerald-300">
-                  {formatarMoeda(cliente.valorGasto)}
-                </p>
-              </div>
+              <div className="flex min-w-0 items-center gap-2.5 border-t border-slate-100 pt-2 dark:border-white/10">
+                <CalendarDays
+                  size={15}
+                  className="shrink-0 text-slate-400"
+                />
 
-              <div>
-                <p className="text-xs font-semibold text-slate-500">Última visita</p>
-                <p className="mt-1 text-slate-800 dark:text-slate-200">
-                  {formatarData(cliente.ultimaVisita)}
-                </p>
-              </div>
-
-              <div className="col-span-2">
-                <p className="text-xs font-semibold text-slate-500">
-                  Próximo agendamento
-                </p>
-                <p className="mt-1 text-slate-800 dark:text-slate-200">
-                  <ProximoAgendamento cliente={cliente} />
+                <p className="min-w-0 text-xs text-slate-500 dark:text-slate-400">
+                  <span className="font-semibold">Última visita:</span>{" "}
+                  <span className="text-slate-700 dark:text-slate-200">
+                    {formatarData(cliente.ultimaVisita)}
+                  </span>
                 </p>
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
-              <Button type="button" size="sm" variant="outline" asChild>
+            <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2.75rem] gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                asChild
+                className="min-w-0 px-2"
+              >
                 <Link href={`/clientes/${cliente.id}`}>
                   <Eye size={15} />
-                  Prontuário
+                  <span className="truncate">Prontuário</span>
                 </Link>
               </Button>
 
@@ -401,30 +406,41 @@ export default function ClienteTable({
                 size="sm"
                 variant="outline"
                 onClick={() => onMensagem(cliente)}
+                className="min-w-0 px-2"
               >
                 <MessageCircle size={15} />
-                WhatsApp
+                <span className="truncate">WhatsApp</span>
               </Button>
 
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => onEditar(cliente)}
-              >
-                <Pencil size={15} />
-                Editar
-              </Button>
+              <details className="relative">
+                <summary
+                  className="flex h-9 w-11 cursor-pointer list-none items-center justify-center rounded-xl border border-slate-200 bg-white text-base font-black tracking-[0.08em] text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 [&::-webkit-details-marker]:hidden"
+                  aria-label="Mais opções da cliente"
+                  title="Mais opções"
+                >
+                  •••
+                </summary>
 
-              <Button
-                type="button"
-                size="sm"
-                variant="destructive"
-                onClick={() => onExcluir(cliente.id)}
-              >
-                <Trash2 size={15} />
-                Excluir
-              </Button>
+                <div className="absolute bottom-[calc(100%+0.4rem)] right-0 z-30 w-40 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-white/10 dark:bg-slate-900">
+                  <button
+                    type="button"
+                    onClick={() => onEditar(cliente)}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/[0.06]"
+                  >
+                    <Pencil size={14} />
+                    Editar cliente
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onExcluir(cliente.id)}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                  >
+                    <Trash2 size={14} />
+                    Excluir cliente
+                  </button>
+                </div>
+              </details>
             </div>
           </article>
         ))}
