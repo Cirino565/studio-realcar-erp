@@ -2155,6 +2155,163 @@ export async function buscarAgendamentosAgendaPorClientes(
   }));
 }
 
+/**
+ * DISPONIBILIDADE PUBLICA - usada pela pagina /agendar, que a cliente abre
+ * pelo link do WhatsApp SEM login.
+ *
+ * Por ser publica, ela e deliberadamente limitada:
+ *  - devolve APENAS os horarios livres, nunca os ocupados. Isso evita
+ *    expor nome de cliente, motivo de bloqueio ou a rotina do estudio;
+ *  - so aceita datas de hoje ate 60 dias a frente;
+ *  - considera todas as profissionais ativas: se QUALQUER uma estiver
+ *    livre naquele horario, ele aparece. Quem decide qual profissional
+ *    vai atender e voce, na hora de confirmar.
+ *
+ * A regra de horario de funcionamento, bloqueios e intervalo entre
+ * atendimentos e exatamente a mesma da agenda interna - reaproveita as
+ * mesmas funcoes, entao nao ha risco de divergir do que voce ve no CRM.
+ */
+export async function listarHorariosPublicos(
+  data: string,
+  duracao = 60,
+): Promise<string[]> {
+  if (!data) return [];
+
+  const hoje = new Date();
+  const inicioHoje = new Date(
+    hoje.getFullYear(),
+    hoje.getMonth(),
+    hoje.getDate(),
+  );
+
+  const dataAlvo = parseLocalDateTime(`${data}T00:00`);
+  if (Number.isNaN(dataAlvo.getTime())) return [];
+
+  const limite = addMinutes(inicioHoje, 60 * 24 * 60);
+  if (dataAlvo < inicioHoje || dataAlvo > limite) return [];
+
+  const [configuracaoClinica, profissionais] = await Promise.all([
+    prisma.configuracaoClinica.findFirst({
+      select: {
+        horarioAtendimento: true,
+        intervaloAgenda: true,
+        intervaloEntreAtendimentos: true,
+      },
+    }),
+    prisma.profissional.findMany({
+      where: { status: "Ativa" },
+      select: { id: true },
+    }),
+  ]);
+
+  if (profissionais.length === 0) return [];
+
+  const intervaloEntreAtendimentos = Math.max(
+    0,
+    configuracaoClinica?.intervaloEntreAtendimentos ?? 30,
+  );
+
+  const configuracaoHorario = parseHorarioFuncionamento(
+    configuracaoClinica?.horarioAtendimento,
+    configuracaoClinica?.intervaloAgenda || 30,
+  );
+
+  const diaSemana = getDiaSemana(data);
+  const funcionamento =
+    diaSemana === 0
+      ? configuracaoHorario.domingo
+      : diaSemana === 6
+        ? configuracaoHorario.sabado
+        : configuracaoHorario.semana;
+
+  const slots = gerarSlotsDisponibilidade(
+    funcionamento,
+    configuracaoHorario.intervalo,
+  );
+
+  if (slots.length === 0) return [];
+
+  const inicioDia = parseLocalDateTime(`${data}T00:00`);
+  const fimDia = addMinutes(inicioDia, 24 * 60);
+  const idsProfissionais = profissionais.map((item) => item.id);
+
+  const [agendamentosDoDia, bloqueiosDoDia] = await Promise.all([
+    prisma.agendamento.findMany({
+      where: {
+        profissionalId: { in: idsProfissionais },
+        data: { gte: inicioDia, lt: fimDia },
+        status: { notIn: ["Cancelado"] },
+      },
+      select: { profissionalId: true, data: true, duracao: true },
+    }),
+    prisma.bloqueioAgenda.findMany({
+      where: {
+        profissionalId: { in: idsProfissionais },
+        data: { gte: inicioDia, lt: fimDia },
+        status: "Ativo",
+      },
+      select: { profissionalId: true, data: true, duracao: true },
+    }),
+  ]);
+
+  const agora = new Date();
+
+  return slots.filter((hora) => {
+    const inicioNovo = montarHorario(data, hora);
+    const fimNovo = addMinutes(inicioNovo, duracao);
+
+    // Nao oferece horario que ja passou.
+    if (inicioNovo <= agora) return false;
+
+    // Basta UMA profissional livre para o horario ser oferecido.
+    return idsProfissionais.some((profissionalId) => {
+      const ocupada = agendamentosDoDia.some((agendamento) => {
+        if (agendamento.profissionalId !== profissionalId) return false;
+        const inicioExistente = new Date(agendamento.data);
+        const fimExistente = addMinutes(inicioExistente, agendamento.duracao);
+        return inicioExistente < fimNovo && fimExistente > inicioNovo;
+      });
+
+      if (ocupada) return false;
+
+      const bloqueada = bloqueiosDoDia.some((bloqueio) => {
+        if (bloqueio.profissionalId !== profissionalId) return false;
+        const inicioExistente = new Date(bloqueio.data);
+        const fimExistente = addMinutes(inicioExistente, bloqueio.duracao);
+
+        return (
+          (inicioExistente < fimNovo && fimExistente > inicioNovo) ||
+          conflitaComIntervaloEntreAtendimentos(
+            inicioNovo,
+            fimNovo,
+            inicioExistente,
+            fimExistente,
+            intervaloEntreAtendimentos,
+          )
+        );
+      });
+
+      if (bloqueada) return false;
+
+      const semIntervalo = agendamentosDoDia.some((agendamento) => {
+        if (agendamento.profissionalId !== profissionalId) return false;
+        const inicioExistente = new Date(agendamento.data);
+        const fimExistente = addMinutes(inicioExistente, agendamento.duracao);
+
+        return conflitaComIntervaloEntreAtendimentos(
+          inicioNovo,
+          fimNovo,
+          inicioExistente,
+          fimExistente,
+          intervaloEntreAtendimentos,
+        );
+      });
+
+      return !semIntervalo;
+    });
+  });
+}
+
 export async function buscarDisponibilidadeAgenda({
   profissionalId,
   data,
