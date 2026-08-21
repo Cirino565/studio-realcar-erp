@@ -23,6 +23,7 @@ export type SalvarConfiguracaoInput = {
   especialidadePrincipal?: string;
   horarioAtendimento?: string;
   intervaloAgenda: number;
+  intervaloEntreAtendimentos: number;
   antecedenciaLembrete: number;
   toleranciaAtraso: number;
   moeda: string;
@@ -73,6 +74,10 @@ export async function salvarConfiguracaoClinica(dados: SalvarConfiguracaoInput) 
     especialidadePrincipal: toNullableText(dados.especialidadePrincipal),
     horarioAtendimento: toNullableText(dados.horarioAtendimento),
     intervaloAgenda: toSafeInteger(dados.intervaloAgenda, 30),
+    intervaloEntreAtendimentos: toSafeInteger(
+      dados.intervaloEntreAtendimentos,
+      30,
+    ),
     antecedenciaLembrete: toSafeInteger(dados.antecedenciaLembrete, 24),
     toleranciaAtraso: toSafeInteger(dados.toleranciaAtraso, 10),
     moeda: dados.moeda.trim() || "BRL",

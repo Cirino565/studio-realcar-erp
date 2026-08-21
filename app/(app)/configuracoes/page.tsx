@@ -26,6 +26,7 @@ function buildDefaultConfiguracao(): ConfiguracaoClinicaView {
     especialidadePrincipal: null,
     horarioAtendimento: null,
     intervaloAgenda: 30,
+    intervaloEntreAtendimentos: 30,
     antecedenciaLembrete: 24,
     toleranciaAtraso: 10,
     moeda: "BRL",

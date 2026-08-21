@@ -598,6 +598,7 @@ model ConfiguracaoClinica {
   especialidadePrincipal String?
   horarioAtendimento   String?
   intervaloAgenda       Int      @default(30)
+  intervaloEntreAtendimentos Int @default(30)
   antecedenciaLembrete  Int      @default(24)
   toleranciaAtraso      Int      @default(10)
   moeda                 String   @default("BRL")

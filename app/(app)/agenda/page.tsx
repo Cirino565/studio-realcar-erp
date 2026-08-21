@@ -262,6 +262,7 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
     prisma.configuracaoClinica.findFirst({
       select: {
         horarioAtendimento: true,
+        intervaloEntreAtendimentos: true,
       },
     }),
   ]);
@@ -388,6 +389,9 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
         initialAgendamentoId={agendamentoIdParam}
         initialView={viewMode}
         horarioAtendimento={configuracaoClinica?.horarioAtendimento || null}
+        intervaloEntreAtendimentos={
+          configuracaoClinica?.intervaloEntreAtendimentos ?? 30
+        }
         podeEditarCliente={podeEditarCliente}
         podeRegistrarEvolucao={podeRegistrarEvolucao}
         driveConfigurado={isGoogleDriveConfigured()}

@@ -109,6 +109,7 @@ type Props = {
   initialAgendamentoId?: string | null;
   initialView: "day" | "week";
   horarioAtendimento?: string | null;
+  intervaloEntreAtendimentos: number;
   podeEditarCliente: boolean;
   podeRegistrarEvolucao: boolean;
   driveConfigurado?: boolean;
@@ -190,6 +191,7 @@ export default function AgendaClient({
   initialAgendamentoId,
   initialView,
   horarioAtendimento,
+  intervaloEntreAtendimentos,
   podeEditarCliente,
   podeRegistrarEvolucao,
   driveConfigurado,
@@ -470,6 +472,7 @@ export default function AgendaClient({
         origensCliente={origensCliente}
         servicos={servicos}
         areaPadraoAgendamento={areaPadraoAgendamento}
+        intervaloEntreAtendimentos={intervaloEntreAtendimentos}
         initialPayload={novoHorario}
       />
 

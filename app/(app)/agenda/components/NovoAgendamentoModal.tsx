@@ -93,6 +93,7 @@ type Props = {
   origensCliente: OpcaoAuxiliar[];
   servicos: ServicoAgenda[];
   areaPadraoAgendamento: "estetica" | "cilios" | null;
+  intervaloEntreAtendimentos: number;
   initialPayload: NovoAgendamentoPayload | null;
 };
 
@@ -224,6 +225,7 @@ export default function NovoAgendamentoModal({
   origensCliente,
   servicos,
   areaPadraoAgendamento,
+  intervaloEntreAtendimentos,
   initialPayload,
 }: Props) {
   const [tipoAtendimento, setTipoAtendimento] = useState<"agendamento" | "bloqueio">("agendamento");
@@ -251,6 +253,14 @@ export default function NovoAgendamentoModal({
   const [excecaoHorario, setExcecaoHorario] = useState(false);
   const [permitirEncaixeSemIntervalo, setPermitirEncaixeSemIntervalo] =
     useState(false);
+
+  const quantidadeOpcoesAvancadasAtivas =
+    Number(excecaoHorario) +
+    Number(
+      tipoAtendimento === "agendamento" &&
+        intervaloEntreAtendimentos > 0 &&
+        permitirEncaixeSemIntervalo,
+    );
   const [duracao, setDuracao] = useState("1 hora");
   const [valor, setValor] = useState("");
   const [status, setStatus] = useState("Agendado");
@@ -666,7 +676,7 @@ export default function NovoAgendamentoModal({
       if (horarioSelecionado.tipo === "intervalo") {
         setErroTitulo("Intervalo entre atendimentos");
         setErro(
-          `${horarioSelecionado.motivo || "Este horário está dentro do intervalo padrão de 30 minutos entre clientes."} Ative “Permitir encaixe sem intervalo” se quiser usar este horário excepcionalmente.`,
+          `${horarioSelecionado.motivo || `Este horário está dentro do intervalo padrão de ${intervaloEntreAtendimentos} minutos entre compromissos.`} Ative “Permitir encaixe sem intervalo” se quiser usar este horário excepcionalmente.`,
         );
       } else {
         setErroTitulo("Horário indisponível");
@@ -1024,30 +1034,6 @@ export default function NovoAgendamentoModal({
             </div>
           ) : null}
 
-          <label className="flex items-start gap-3 rounded-2xl border border-amber-300/40 bg-amber-50/60 p-3 text-sm dark:border-amber-400/20 dark:bg-amber-400/10">
-            <input
-              type="checkbox"
-              checked={excecaoHorario}
-              onChange={(event) => {
-                setExcecaoHorario(event.target.checked);
-                setHora("");
-                setErro("");
-                setErroAcaoHorario(false);
-              }}
-              className="mt-0.5"
-            />
-            <span>
-              <span className="block font-bold text-amber-900 dark:text-amber-100">
-                Atendimento fora do horário de funcionamento (exceção)
-              </span>
-              <span className="mt-1 block text-xs leading-5 text-amber-800/80 dark:text-amber-100/70">
-                Use só para um caso pontual, sem mudar o horário de funcionamento
-                geral da clínica. Marcando aqui, você digita a hora livremente,
-                mesmo fora da faixa normal.
-              </span>
-            </span>
-          </label>
-
           <div className="grid grid-cols-2 gap-x-4 gap-y-4">
             <label className="min-w-0">
               <span className={labelClassName()}>Data</span>
@@ -1168,33 +1154,91 @@ export default function NovoAgendamentoModal({
             </label>
           </div>
 
-          {tipoAtendimento === "agendamento" ? (
-            <label className="mt-4 flex items-start justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-3.5 text-sm dark:border-amber-400/20 dark:bg-amber-400/10">
-              <span className="min-w-0">
-                <span className="block font-bold text-amber-950 dark:text-amber-100">
-                  Permitir encaixe sem intervalo de 30 min
-                </span>
-                <span className="mt-1 block text-xs leading-5 text-amber-800 dark:text-amber-100/70">
-                  O padrão reserva 30 minutos entre clientes. Ative apenas quando quiser atender um cliente logo após o outro. Sobreposição real continua bloqueada.
-                </span>
+          <details className="group mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-800/40">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-3 text-sm font-bold text-slate-700 outline-none transition hover:bg-slate-100/80 dark:text-slate-200 dark:hover:bg-slate-800 [&::-webkit-details-marker]:hidden">
+              <span className="flex min-w-0 items-center gap-2">
+                <Clock3 size={16} className="shrink-0 text-amber-600 dark:text-amber-300" />
+                <span>Opções avançadas</span>
               </span>
-              <input
-                type="checkbox"
-                checked={permitirEncaixeSemIntervalo}
-                onChange={(event) => {
-                  setPermitirEncaixeSemIntervalo(event.target.checked);
-                  setHora("");
-                  setErro("");
-                  setErroAcaoHorario(false);
-                }}
-                className="mt-0.5 size-5 shrink-0 accent-amber-600"
-              />
-            </label>
-          ) : null}
+
+              <span className="flex shrink-0 items-center gap-2">
+                {quantidadeOpcoesAvancadasAtivas > 0 ? (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800 dark:bg-amber-400/15 dark:text-amber-200">
+                    {quantidadeOpcoesAvancadasAtivas}{" "}
+                    {quantidadeOpcoesAvancadasAtivas === 1 ? "ativa" : "ativas"}
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-medium text-slate-400">
+                    Opcional
+                  </span>
+                )}
+
+                <ChevronDown
+                  size={16}
+                  className="text-slate-400 transition-transform group-open:rotate-180"
+                />
+              </span>
+            </summary>
+
+            <div className="space-y-2.5 border-t border-slate-200 p-3 dark:border-slate-700">
+              <label className="flex cursor-pointer items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-sm dark:border-amber-400/20 dark:bg-amber-400/10">
+                <span className="min-w-0">
+                  <span className="block font-bold text-amber-950 dark:text-amber-100">
+                    Atendimento fora do horário
+                  </span>
+                  <span className="mt-0.5 block text-xs leading-5 text-amber-800/80 dark:text-amber-100/70">
+                    Use somente para uma exceção pontual fora do horário normal da clínica.
+                  </span>
+                </span>
+
+                <input
+                  type="checkbox"
+                  checked={excecaoHorario}
+                  onChange={(event) => {
+                    setExcecaoHorario(event.target.checked);
+                    setHora("");
+                    setErro("");
+                    setErroAcaoHorario(false);
+                  }}
+                  className="mt-0.5 size-5 shrink-0 accent-amber-600"
+                />
+              </label>
+
+              {tipoAtendimento === "agendamento" &&
+              intervaloEntreAtendimentos > 0 ? (
+                <label className="flex cursor-pointer items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-sm dark:border-amber-400/20 dark:bg-amber-400/10">
+                  <span className="min-w-0">
+                    <span className="block font-bold text-amber-950 dark:text-amber-100">
+                      Permitir encaixe sem intervalo de{" "}
+                      {intervaloEntreAtendimentos} min
+                    </span>
+                    <span className="mt-0.5 block text-xs leading-5 text-amber-800/80 dark:text-amber-100/70">
+                      O padrão reserva {intervaloEntreAtendimentos} minutos entre
+                      compromissos. Ative somente para um encaixe excepcional.
+                      Sobreposição real continua bloqueada.
+                    </span>
+                  </span>
+
+                  <input
+                    type="checkbox"
+                    checked={permitirEncaixeSemIntervalo}
+                    onChange={(event) => {
+                      setPermitirEncaixeSemIntervalo(event.target.checked);
+                      setHora("");
+                      setErro("");
+                      setErroAcaoHorario(false);
+                    }}
+                    className="mt-0.5 size-5 shrink-0 accent-amber-600"
+                  />
+                </label>
+              ) : null}
+            </div>
+          </details>
 
           {horarioSelecionadoNaDisponibilidade?.encaixe ? (
             <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100">
-              Encaixe selecionado: este horário não terá o intervalo padrão de 30 minutos entre clientes.
+              Encaixe selecionado: este horário não terá o intervalo padrão de{" "}
+              {intervaloEntreAtendimentos} minutos entre compromissos.
             </div>
           ) : null}
 

@@ -18,6 +18,7 @@ export type ConfiguracaoClinicaView = {
   especialidadePrincipal: string | null;
   horarioAtendimento: string | null;
   intervaloAgenda: number;
+  intervaloEntreAtendimentos: number;
   antecedenciaLembrete: number;
   toleranciaAtraso: number;
   moeda: string;

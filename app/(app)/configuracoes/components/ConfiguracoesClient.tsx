@@ -203,6 +203,8 @@ function buildInitialForm(
     especialidadePrincipal: toText(configuracao.especialidadePrincipal),
     horarioAtendimento: serializarHorariosAgenda(parseHorariosAgenda(configuracao.horarioAtendimento)),
     intervaloAgenda: configuracao.intervaloAgenda,
+    intervaloEntreAtendimentos:
+      configuracao.intervaloEntreAtendimentos ?? 30,
     antecedenciaLembrete: configuracao.antecedenciaLembrete,
     toleranciaAtraso: configuracao.toleranciaAtraso,
     moeda: configuracao.moeda || "BRL",
@@ -819,6 +821,7 @@ export default function ConfiguracoesClient({
       ...current,
       [name]: [
         "intervaloAgenda",
+        "intervaloEntreAtendimentos",
         "antecedenciaLembrete",
         "toleranciaAtraso",
       ].includes(name)
@@ -1302,11 +1305,19 @@ export default function ConfiguracoesClient({
                   </div>
                 </div>
                 <Field
-                  label="Intervalo padrão da agenda"
+                  label="Intervalo da grade de horários"
                   name="intervaloAgenda"
                   value={form.intervaloAgenda}
                   type="number"
                   min={5}
+                  onChange={handleChange}
+                />
+                <Field
+                  label="Intervalo entre atendimentos"
+                  name="intervaloEntreAtendimentos"
+                  value={form.intervaloEntreAtendimentos}
+                  type="number"
+                  min={0}
                   onChange={handleChange}
                 />
                 <Field
