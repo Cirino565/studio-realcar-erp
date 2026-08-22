@@ -41,18 +41,7 @@ export async function middleware(req: NextRequest) {
   // liberar somente este caminho exato.
   const isExportarConversoes = pathname === "/api/marketing/exportar-conversoes";
 
-  // O middleware não exige cookie de sessão nestas rotas específicas.
-  // A validação do segredo continua sendo feita dentro de cada rota.
-  // Pagina publica de agendamento: a cliente abre pelo link do WhatsApp,
-  // sem login. Ela nao le nem expoe dado de nenhuma cliente - so devolve
-  // a lista de horarios livres.
-  //
-  // IMPORTANTE:
-  // liberar somente este caminho exato e o que vier abaixo dele.
-  const isAgendamentoPublico =
-    pathname === "/agendar" || pathname.startsWith("/agendar/");
-
-  if (isBackupAutomatico || isCapturaClique || isExportarConversoes || isAgendamentoPublico) {
+  if (isBackupAutomatico || isCapturaClique || isExportarConversoes) {
     return securityHeaders(NextResponse.next());
   }
 
