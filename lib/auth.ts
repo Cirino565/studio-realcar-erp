@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -37,7 +38,12 @@ export type UsuarioComPermissoes = {
   } | null;
 };
 
-export async function getCurrentUser() {
+// cache() faz com que, dentro da MESMA navegação, não importa quantas vezes
+// getCurrentUser() seja chamado (uma vez no layout, outra vez em cada
+// página) - a busca no banco roda só na primeira chamada; as demais
+// reaproveitam o resultado. É o que elimina a busca duplicada em toda troca
+// de aba.
+export const getCurrentUser = cache(async function getCurrentUser() {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
 
@@ -69,7 +75,7 @@ export async function getCurrentUser() {
   }
 
   return usuario;
-}
+});
 
 export type CurrentUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
 
