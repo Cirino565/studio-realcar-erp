@@ -216,7 +216,7 @@ export default function AgendaSearch({
   }
 
   return (
-    <div className="relative z-[200] mb-3 px-1 sm:mb-4">
+    <div className="relative z-[60] mb-3 px-1 sm:mb-4">
       <div className="relative">
         <Search
           size={17}
@@ -248,7 +248,7 @@ export default function AgendaSearch({
       </div>
 
       {aberta && buscaValida ? (
-        <div className="absolute left-1 right-1 z-[210] top-[calc(100%+0.35rem)] max-h-[min(30rem,70vh)] overflow-y-auto rounded-2xl border border-slate-300 bg-white p-2 shadow-2xl shadow-slate-950/25 sm:right-auto sm:w-[720px] sm:max-w-[calc(100vw-6rem)] dark:border-slate-700 dark:bg-slate-950">
+        <div className="absolute left-1 right-1 z-[70] top-[calc(100%+0.35rem)] max-h-[min(30rem,70vh)] overflow-y-auto rounded-2xl border border-slate-300 bg-white p-2 shadow-2xl shadow-slate-950/25 sm:right-auto sm:w-[720px] sm:max-w-[calc(100vw-6rem)] dark:border-slate-700 dark:bg-slate-950">
 
           {carregando ? (
             <div className="flex items-center justify-center gap-2 px-4 py-6 text-sm text-slate-500 dark:text-slate-400">
