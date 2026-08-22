@@ -4,6 +4,7 @@ import {
   CalendarDays,
   Eye,
   MessageCircle,
+  MoreHorizontal,
   Pencil,
   Phone,
   Trash2,
@@ -418,7 +419,7 @@ export default function ClienteTable({
                   aria-label="Mais opções da cliente"
                   title="Mais opções"
                 >
-                  â€¢â€¢â€¢
+                  <MoreHorizontal size={18} />
                 </summary>
 
                 <div className="absolute bottom-[calc(100%+0.4rem)] right-0 z-30 w-40 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-white/10 dark:bg-slate-900">
