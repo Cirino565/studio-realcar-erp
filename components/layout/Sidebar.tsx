@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, type ComponentType } from "react";
 import Link from "next/link";
@@ -70,7 +70,7 @@ const mainMenus = [
     permissao: "estoque.visualizar",
   },
   {
-    nome: "RelatÃ³rios",
+    nome: "Relatórios",
     icon: FileBarChart2,
     href: "/relatorios",
     permissao: "relatorios.visualizar",
@@ -91,13 +91,13 @@ const mainMenus = [
 
 const adminMenus = [
   {
-    nome: "UsuÃ¡rios",
+    nome: "Usuários",
     icon: ShieldCheck,
     href: "/usuarios",
     permissao: "usuarios.gerenciar",
   },
   {
-    nome: "PermissÃµes",
+    nome: "Permissões",
     icon: KeyRound,
     href: "/permissoes",
     permissao: "permissoes.gerenciar",
@@ -307,7 +307,7 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
                   Sistema operacional
                 </p>
                 <p className="mt-0.5 truncate text-xs text-slate-500">
-                  PermissÃµes por perfil
+                  Permissões por perfil
                 </p>
               </div>
 
@@ -363,7 +363,7 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
                     ? "bg-violet-600/10 text-violet-800 shadow-sm ring-1 ring-violet-500/10"
                     : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                 }`}
-                aria-label="Abrir outros mÃ³dulos"
+                aria-label="Abrir outros módulos"
                 aria-expanded={mobileMenuOpen}
               >
                 <Menu
@@ -383,11 +383,11 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
           className="fixed inset-0 z-[70] lg:hidden"
           role="dialog"
           aria-modal="true"
-          aria-label="Outros mÃ³dulos"
+          aria-label="Outros módulos"
         >
           <button
             type="button"
-            aria-label="Fechar outros mÃ³dulos"
+            aria-label="Fechar outros módulos"
             onClick={() => setMobileMenuOpen(false)}
             className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
           />
@@ -396,10 +396,10 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
             <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3.5">
               <div>
                 <p className="text-sm font-bold text-slate-950">
-                  Outros mÃ³dulos
+                  Outros módulos
                 </p>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Acesse estoque, relatórios e administraÃ§Ã£o.
+                  Acesse estoque, relatórios e administração.
                 </p>
               </div>
 
@@ -434,4 +434,3 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
     </>
   );
 }
-

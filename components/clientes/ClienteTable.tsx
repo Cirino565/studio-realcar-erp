@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import {
   CalendarClock,
   CalendarDays,
@@ -125,7 +125,7 @@ function AreaBadges({
   if (areaEstetica) {
     return (
       <span className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[0.68rem] font-bold text-violet-700 dark:border-violet-400/20 dark:bg-violet-400/10 dark:text-violet-300">
-        EstÃ©tica
+        Estética
       </span>
     );
   }
@@ -133,14 +133,14 @@ function AreaBadges({
   if (areaCilios) {
     return (
       <span className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[0.68rem] font-bold text-sky-700 dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-300">
-        CÃ­lios
+        Cílios
       </span>
     );
   }
 
   return (
     <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[0.68rem] font-bold text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400">
-      Sem Ã¡rea definida
+      Sem área definida
     </span>
   );
 }
@@ -193,7 +193,7 @@ export default function ClienteTable({
               <th className="px-5 py-4 text-left font-bold">Cliente</th>
               <th className="px-5 py-4 text-left font-bold">Contato</th>
               <th className="px-5 py-4 text-left font-bold">Interesse</th>
-              <th className="px-5 py-4 text-left font-bold">Ãreas</th>
+              <th className="px-5 py-4 text-left font-bold">Áreas</th>
               <th className="px-5 py-4 text-left font-bold">Valor gasto</th>
               <th className="px-5 py-4 text-left font-bold">Última visita</th>
               <th className="px-5 py-4 text-left font-bold">Próximo agendamento</th>
@@ -241,7 +241,7 @@ export default function ClienteTable({
                   <span className="line-clamp-2">
                     {cliente.procedimentoInteresse ||
                       cliente.procedimento ||
-                      "NÃ£o informado"}
+                      "Não informado"}
                   </span>
                 </td>
 
@@ -277,7 +277,7 @@ export default function ClienteTable({
                 <td className="px-5 py-4">
                   <div className="flex justify-end gap-1.5">
                     <Button type="button" size="icon-sm" variant="outline" asChild>
-                      <Link href={`/clientes/${cliente.id}`} aria-label="Ver prontuÃ¡rio">
+                      <Link href={`/clientes/${cliente.id}`} aria-label="Ver prontuário">
                         <Eye size={16} />
                       </Link>
                     </Button>
@@ -448,4 +448,3 @@ export default function ClienteTable({
     </section>
   );
 }
-
