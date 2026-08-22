@@ -171,12 +171,18 @@ export async function editarVendaAdministrativa(
       statusPagamento: true,
       observacoes: true,
       data: true,
+      conversaoAdsEnviadaEm: true,
     },
   });
 
   if (!venda) throw new Error("Venda não encontrada.");
   if (venda.situacao === "CANCELADA") {
     throw new Error("Uma venda cancelada não pode ser editada. Use Refazer venda para criar um novo registro.");
+  }
+  if (venda.conversaoAdsEnviadaEm && venda.data.getTime() !== data.getTime()) {
+    throw new Error(
+      "Esta venda já teve a conversão enviada ao Google Ads e não pode ter a data alterada, pois isso pode gerar uma conversão duplicada. Se precisar corrigir, registre um ajuste financeiro em vez de editar esta venda.",
+    );
   }
 
   const formaPagamento = textoOpcional(dados.formaPagamento) || "Não informado";

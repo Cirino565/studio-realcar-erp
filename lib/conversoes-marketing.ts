@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 
 export type LinhaConversaoGerada = {
+  vendaId: number;
   gclid: string;
   nomeConversao: string;
   dataHora: string;
@@ -42,6 +43,12 @@ function formatarDataConversao(data: Date) {
  * que tem um GCLID guardado (o clique original que trouxe esse cliente para
  * aquela campanha específica). Se não encontrar, a venda fica de fora - é
  * melhor não reportar do que reportar uma conversão com origem incerta.
+ *
+ * Só entram vendas com "conversaoAdsEnviadaEm" vazio - ou seja, que ainda
+ * não foram confirmadas como enviadas. Isso é o que evita a planilha subir
+ * sempre inteira, do zero, todo dia. Depois que o envio é confirmado com
+ * sucesso, quem chama esta função é responsável por marcar essas vendas
+ * como enviadas (ver marcarVendasComoEnviadasAds).
  */
 export async function gerarConversoesGoogleAds(
   diasJanela = 90,
@@ -55,6 +62,7 @@ export async function gerarConversoesGoogleAds(
       campanhaId: { not: null },
       clienteId: { not: null },
       data: { gte: limite },
+      conversaoAdsEnviadaEm: null,
     },
     select: {
       id: true,
@@ -84,6 +92,7 @@ export async function gerarConversoesGoogleAds(
     if (!lead?.gclid) continue;
 
     resultado.push({
+      vendaId: venda.id,
       gclid: lead.gclid,
       nomeConversao: NOME_CONVERSAO,
       dataHora: formatarDataConversao(venda.data),
@@ -93,4 +102,19 @@ export async function gerarConversoesGoogleAds(
   }
 
   return resultado;
+}
+
+/**
+ * Marca as vendas como "conversão já enviada ao Google Ads" - só deve ser
+ * chamada depois que a planilha foi atualizada com sucesso. Se o envio
+ * falhar antes disso, as vendas continuam com conversaoAdsEnviadaEm vazio
+ * e entram automaticamente na próxima tentativa.
+ */
+export async function marcarVendasComoEnviadasAds(vendaIds: number[]) {
+  if (vendaIds.length === 0) return;
+
+  await prisma.venda.updateMany({
+    where: { id: { in: vendaIds } },
+    data: { conversaoAdsEnviadaEm: new Date() },
+  });
 }

@@ -2,7 +2,10 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-import { gerarConversoesGoogleAds } from "@/lib/conversoes-marketing";
+import {
+  gerarConversoesGoogleAds,
+  marcarVendasComoEnviadasAds,
+} from "@/lib/conversoes-marketing";
 import { atualizarPlanilhaConversoesAds, isGoogleDriveConfigured } from "@/lib/google-drive";
 import { prisma } from "@/lib/prisma";
 
@@ -71,7 +74,23 @@ async function executar(request: NextRequest) {
 
   try {
     const linhas = await gerarConversoesGoogleAds(JANELA_DIAS);
+
+    // Nada novo desde o último envio - não sobe planilha nenhuma.
+    if (linhas.length === 0) {
+      return NextResponse.json({
+        ok: true,
+        linhas: 0,
+        planilha: null,
+        mensagem: "Nenhuma conversão nova. Nada foi enviado.",
+      });
+    }
+
     const resultado = await atualizarPlanilhaConversoesAds(linhas);
+
+    // Só marca como enviado DEPOIS da confirmação de sucesso acima. Se a
+    // linha anterior tivesse falhado, o código nunca chegaria aqui, e essas
+    // vendas continuariam disponíveis para a próxima tentativa.
+    await marcarVendasComoEnviadasAds(linhas.map((linha) => linha.vendaId));
 
     await prisma.auditoria.create({
       data: {
@@ -79,7 +98,7 @@ async function executar(request: NextRequest) {
         acao: "Exportação de conversões atualizada",
         entidade: "CampanhaMarketing",
         usuario: "Sistema (exportação de conversões)",
-        detalhes: `${linhas.length} conversão(ões) na janela de ${JANELA_DIAS} dias.`,
+        detalhes: `${linhas.length} conversão(ões) nova(s) na janela de ${JANELA_DIAS} dias.`,
       },
     });
 
