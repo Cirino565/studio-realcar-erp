@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Plus, UsersRound } from "lucide-react";
 import { useRouter } from "next/navigation";
-import type { CampanhaMarketing, OrigemCliente, ProcedimentoInteresse } from "@prisma/client";
+import type {
+  CampanhaMarketing,
+  OrigemCliente,
+  ProcedimentoInteresse,
+} from "@prisma/client";
 
 import {
   atualizarCliente,
@@ -19,26 +23,6 @@ import type { Cliente } from "@/lib/types";
 
 import ClienteQuickMessageModal from "./ClienteQuickMessageModal";
 
-
-// Busca tolerante: ignora acento e maiuscula/minuscula, para que "joao"
-// encontre "Joao" e vice-versa.
-//
-// A busca por texto olha SO nome e procedimento de interesse. Endereco ficou
-// de fora de proposito: como muita rua se chama "Joao", "Maria" etc., buscar
-// no endereco trazia cliente sem nenhuma relacao com o nome digitado.
-// Telefone e CPF sao comparados so pelos digitos, a partir de 3 numeros.
-function normalizarBusca(valor?: string | null) {
-  return (valor ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .toLowerCase();
-}
-
-function somenteDigitos(valor?: string | null) {
-  return (valor ?? "").replace(/\D/g, "");
-}
-
 type ClienteAgendamentoResumo = {
   id: number;
   procedimento: string;
@@ -50,11 +34,33 @@ type ClienteComHistorico = Cliente & {
   agendamentos?: ClienteAgendamentoResumo[];
 };
 
+type Filtros = {
+  busca: string;
+  status: string;
+  procedimento: string;
+  retorno: string;
+  area: string;
+  ordenacao: string;
+};
+
+type Resumo = {
+  totalGeral: number;
+  totalFiltrado: number;
+  ativos: number;
+  faturamento: number;
+  oportunidadesRetorno: number;
+};
+
 type Props = {
   clientes: ClienteComHistorico[];
   origens: OrigemCliente[];
   procedimentosInteresse: ProcedimentoInteresse[];
   campanhas: CampanhaMarketing[];
+  procedimentosRealizados: string[];
+  filtros: Filtros;
+  paginaAtual: number;
+  totalPaginas: number;
+  resumo: Resumo;
 };
 
 type ClienteFormData = {
@@ -79,156 +85,77 @@ type ClienteFormData = {
   campanhaAquisicaoId: number | null;
 };
 
+function montarQueryString(filtros: Filtros, pagina?: number) {
+  const params = new URLSearchParams();
+
+  if (filtros.busca.trim()) params.set("busca", filtros.busca.trim());
+  if (filtros.status !== "todos") params.set("status", filtros.status);
+  if (filtros.procedimento !== "todos")
+    params.set("procedimento", filtros.procedimento);
+  if (filtros.retorno !== "todos") params.set("retorno", filtros.retorno);
+  if (filtros.area !== "todas") params.set("area", filtros.area);
+  if (filtros.ordenacao !== "nome-asc")
+    params.set("ordenacao", filtros.ordenacao);
+  if (pagina && pagina > 1) params.set("pagina", String(pagina));
+
+  return params.toString();
+}
+
 export default function ClientesClient({
   clientes,
   origens,
   procedimentosInteresse,
   campanhas,
+  procedimentosRealizados,
+  filtros,
+  paginaAtual,
+  totalPaginas,
+  resumo,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  const [busca, setBusca] = useState("");
-  const [status, setStatus] = useState("todos");
-  const [ordenacao, setOrdenacao] = useState("nome-asc");
-  const [procedimentoFiltro, setProcedimentoFiltro] = useState("todos");
-  const [retornoFiltro, setRetornoFiltro] = useState("todos");
-  const [areaFiltro, setAreaFiltro] = useState("todas");
-  const [quantidadeVisivel, setQuantidadeVisivel] = useState(10);
+  // Estado local dos filtros: começa igual ao que veio do servidor, e o
+  // usuário pode digitar/mudar livremente aqui antes de a busca de fato
+  // ser enviada (com um pequeno atraso, pra não recarregar a cada letra).
+  const [filtrosState, setFiltrosState] = useState<Filtros>(filtros);
+
   const [modalAberto, setModalAberto] = useState(false);
   const [mensagemAberta, setMensagemAberta] = useState(false);
   const [clienteSelecionado, setClienteSelecionado] =
     useState<Cliente | null>(null);
   const [clienteMensagem, setClienteMensagem] = useState<Cliente | null>(null);
 
-  const procedimentosRealizados = useMemo(() => {
-    const nomes = new Set<string>();
+  // Sempre que o servidor confirma novos filtros (após navegar), realinha
+  // o estado local com o que realmente está valendo na URL.
+  useEffect(() => {
+    setFiltrosState(filtros);
+  }, [filtros]);
 
-    clientes.forEach((cliente) => {
-      cliente.agendamentos?.forEach((agendamento) => {
-        if (agendamento.status !== "Cancelado" && agendamento.procedimento) {
-          nomes.add(agendamento.procedimento);
-        }
-      });
-
-      if (cliente.procedimentoInteresse) nomes.add(cliente.procedimentoInteresse);
-      if (cliente.procedimento) nomes.add(cliente.procedimento);
-    });
-
-    return Array.from(nomes).sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [clientes]);
-
-  const clientesFiltrados = useMemo(() => {
-    const texto = normalizarBusca(busca);
-    const textoDigitos = somenteDigitos(busca);
-    const temDigitos = textoDigitos.length >= 3;
-
-    const filtrados = clientes.filter((cliente) => {
-      const atendeTexto =
-        !texto ||
-        normalizarBusca(cliente.nome).includes(texto) ||
-        normalizarBusca(cliente.procedimentoInteresse).includes(texto) ||
-        (temDigitos &&
-          (somenteDigitos(cliente.telefone).includes(textoDigitos) ||
-            somenteDigitos(cliente.whatsapp).includes(textoDigitos) ||
-            somenteDigitos(cliente.cpf).includes(textoDigitos)));
-
-      const atendeStatus = status === "todos" || cliente.status === status;
-
-      const atendeArea =
-        areaFiltro === "todas" ||
-        (areaFiltro === "estetica" && cliente.areaEstetica && !cliente.areaCilios) ||
-        (areaFiltro === "cilios" && cliente.areaCilios && !cliente.areaEstetica) ||
-        (areaFiltro === "ambas" && cliente.areaEstetica && cliente.areaCilios) ||
-        (areaFiltro === "sem-area" && !cliente.areaEstetica && !cliente.areaCilios);
-
-      const agendamentosValidos = (cliente.agendamentos ?? []).filter(
-        (agendamento) => agendamento.status !== "Cancelado",
-      );
-
-      const agendamentosDoProcedimento =
-        procedimentoFiltro === "todos"
-          ? agendamentosValidos
-          : agendamentosValidos.filter(
-              (agendamento) =>
-                agendamento.procedimento.toLowerCase() ===
-                procedimentoFiltro.toLowerCase(),
-            );
-
-      const atendeProcedimento =
-        procedimentoFiltro === "todos" ||
-        agendamentosDoProcedimento.length > 0 ||
-        (cliente.procedimentoInteresse ?? "").toLowerCase() ===
-          procedimentoFiltro.toLowerCase() ||
-        (cliente.procedimento ?? "").toLowerCase() ===
-          procedimentoFiltro.toLowerCase();
-
-      let atendeRetorno = true;
-
-      if (retornoFiltro !== "todos") {
-        const dias = Number(retornoFiltro);
-        const hoje = new Date();
-        const limite = new Date(hoje);
-        limite.setDate(hoje.getDate() - dias);
-
-        const historicoBase =
-          agendamentosDoProcedimento.length > 0
-            ? agendamentosDoProcedimento
-            : agendamentosValidos;
-
-        const ultimoAtendimento = historicoBase
-          .filter((agendamento) => new Date(agendamento.data) <= hoje)
-          .sort(
-            (a, b) =>
-              new Date(b.data).getTime() - new Date(a.data).getTime(),
-          )[0];
-
-        const possuiRetornoFuturo = historicoBase.some(
-          (agendamento) => new Date(agendamento.data) > hoje,
-        );
-
-        atendeRetorno = Boolean(
-          ultimoAtendimento &&
-            new Date(ultimoAtendimento.data) <= limite &&
-            !possuiRetornoFuturo,
-        );
-      }
-
-      return atendeTexto && atendeStatus && atendeArea && atendeProcedimento && atendeRetorno;
-    });
-
-    return [...filtrados].sort((a, b) => {
-      if (ordenacao === "recentes") {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      }
-
-      if (ordenacao === "maior-valor") {
-        return b.valorGasto - a.valorGasto;
-      }
-
-      if (ordenacao === "ultima-visita") {
-        return (
-          new Date(b.ultimaVisita ?? 0).getTime() -
-          new Date(a.ultimaVisita ?? 0).getTime()
-        );
-      }
-
-      return a.nome.localeCompare(b.nome, "pt-BR");
-    });
-  }, [clientes, busca, status, areaFiltro, ordenacao, procedimentoFiltro, retornoFiltro]);
-
-  const clientesExibidos = clientesFiltrados.slice(0, quantidadeVisivel);
+  const filtrosRef = useRef(filtrosState);
+  filtrosRef.current = filtrosState;
 
   useEffect(() => {
-    setQuantidadeVisivel(10);
-  }, [
-    busca,
-    status,
-    areaFiltro,
-    ordenacao,
-    procedimentoFiltro,
-    retornoFiltro,
-  ]);
+    const atual = filtrosRef.current;
+
+    if (JSON.stringify(atual) === JSON.stringify(filtros)) return;
+
+    const timer = setTimeout(() => {
+      const query = montarQueryString(atual);
+      router.push(query ? `/clientes?${query}` : "/clientes");
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [filtrosState, filtros, router]);
+
+  function mudarFiltro<K extends keyof Filtros>(campo: K, valor: Filtros[K]) {
+    setFiltrosState((atualState) => ({ ...atualState, [campo]: valor }));
+  }
+
+  function irParaPagina(pagina: number) {
+    const query = montarQueryString(filtros, pagina);
+    router.push(query ? `/clientes?${query}` : "/clientes");
+  }
 
   function novoCliente() {
     setClienteSelecionado(null);
@@ -308,51 +235,63 @@ export default function ClientesClient({
 
         <div className="hidden sm:block">
           <ClienteResumo
-            clientes={clientesFiltrados}
-            totalGeral={clientes.length}
+            totalGeral={resumo.totalGeral}
+            totalFiltrado={resumo.totalFiltrado}
+            ativos={resumo.ativos}
+            faturamento={resumo.faturamento}
+            oportunidadesRetorno={resumo.oportunidadesRetorno}
           />
         </div>
 
         <ClienteSearch
-          value={busca}
-          onChange={setBusca}
-          status={status}
-          onStatusChange={setStatus}
-          ordenacao={ordenacao}
-          onOrdenacaoChange={setOrdenacao}
-          procedimento={procedimentoFiltro}
-          onProcedimentoChange={setProcedimentoFiltro}
+          value={filtrosState.busca}
+          onChange={(valor) => mudarFiltro("busca", valor)}
+          status={filtrosState.status}
+          onStatusChange={(valor) => mudarFiltro("status", valor)}
+          ordenacao={filtrosState.ordenacao}
+          onOrdenacaoChange={(valor) => mudarFiltro("ordenacao", valor)}
+          procedimento={filtrosState.procedimento}
+          onProcedimentoChange={(valor) => mudarFiltro("procedimento", valor)}
           procedimentos={procedimentosRealizados}
-          retorno={retornoFiltro}
-          onRetornoChange={setRetornoFiltro}
-          area={areaFiltro}
-          onAreaChange={setAreaFiltro}
+          retorno={filtrosState.retorno}
+          onRetornoChange={(valor) => mudarFiltro("retorno", valor)}
+          area={filtrosState.area}
+          onAreaChange={(valor) => mudarFiltro("area", valor)}
         />
 
         <ClienteTable
-          clientes={clientesExibidos}
+          clientes={clientes}
           onEditar={editarCliente}
           onExcluir={removerCliente}
           onMensagem={abrirMensagem}
         />
 
-        {clientesFiltrados.length > quantidadeVisivel ? (
-          <div className="flex flex-col items-center gap-2 py-4">
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Mostrando {clientesExibidos.length} de {clientesFiltrados.length} clientes
-            </p>
+        <div className="flex flex-col items-center gap-2 py-4 sm:flex-row sm:justify-between">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Página {paginaAtual} de {totalPaginas} — {resumo.totalFiltrado}{" "}
+            cliente(s) encontrado(s)
+          </p>
+
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={paginaAtual <= 1}
+              onClick={() => irParaPagina(paginaAtual - 1)}
+            >
+              Anterior
+            </Button>
 
             <Button
               type="button"
               variant="outline"
-              onClick={() =>
-                setQuantidadeVisivel((atual) => atual + 10)
-              }
+              disabled={paginaAtual >= totalPaginas}
+              onClick={() => irParaPagina(paginaAtual + 1)}
             >
-              Carregar mais 10
+              Próxima
             </Button>
           </div>
-        ) : null}
+        </div>
       </div>
 
       <NovoClienteModal

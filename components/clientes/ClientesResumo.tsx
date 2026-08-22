@@ -7,11 +7,13 @@ import {
 } from "lucide-react";
 
 import { formatarMoeda } from "@/lib/format";
-import type { Cliente } from "@/lib/types";
 
 type Props = {
-  clientes: Cliente[];
   totalGeral: number;
+  totalFiltrado: number;
+  ativos: number;
+  faturamento: number;
+  oportunidadesRetorno: number;
 };
 
 type CardTone = "cyan" | "emerald" | "amber" | "pink";
@@ -34,60 +36,35 @@ const toneStyles: Record<
 > = {
   cyan: {
     accent: "bg-cyan-500",
-    icon:
-      "bg-cyan-50 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300",
+    icon: "bg-cyan-50 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300",
     value: "text-cyan-700 dark:text-cyan-300",
   },
   emerald: {
     accent: "bg-emerald-500",
-    icon:
-      "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+    icon: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
     value: "text-emerald-700 dark:text-emerald-300",
   },
   amber: {
     accent: "bg-amber-500",
-    icon:
-      "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+    icon: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
     value: "text-amber-700 dark:text-amber-300",
   },
   pink: {
     accent: "bg-pink-500",
-    icon:
-      "bg-pink-50 text-pink-700 dark:bg-pink-500/15 dark:text-pink-300",
+    icon: "bg-pink-50 text-pink-700 dark:bg-pink-500/15 dark:text-pink-300",
     value: "text-pink-700 dark:text-pink-300",
   },
 };
 
 export default function ClientesResumo({
-  clientes,
   totalGeral,
+  totalFiltrado,
+  ativos,
+  faturamento,
+  oportunidadesRetorno,
 }: Props) {
-  const totalFiltrado = clientes.length;
-
-  const ativos = clientes.filter(
-    (cliente) => cliente.status === "Ativa",
-  ).length;
-
-  const faturamento = clientes.reduce(
-    (totalAtual, cliente) =>
-      totalAtual + cliente.valorGasto,
-    0,
-  );
-
-  const limiteRetorno = new Date();
-  limiteRetorno.setDate(limiteRetorno.getDate() - 60);
-
-  const oportunidadesRetorno = clientes.filter((cliente) => {
-    if (cliente.status !== "Ativa") return false;
-    if (!cliente.ultimaVisita) return true;
-
-    return new Date(cliente.ultimaVisita) <= limiteRetorno;
-  }).length;
-
   const taxaAtivos =
-    totalFiltrado > 0
-      ? Math.round((ativos / totalFiltrado) * 100)
-      : 0;
+    totalFiltrado > 0 ? Math.round((ativos / totalFiltrado) * 100) : 0;
 
   const cards: CardResumo[] = [
     {
@@ -103,14 +80,14 @@ export default function ClientesResumo({
     {
       titulo: "Clientes ativos",
       valor: ativos.toString(),
-      detalhe: `${taxaAtivos}% dos resultados exibidos`,
+      detalhe: `${taxaAtivos}% dos resultados filtrados`,
       icon: Sparkles,
       tone: "emerald",
     },
     {
       titulo: "Valor acumulado",
       valor: formatarMoeda(faturamento),
-      detalhe: "Considerando os resultados atuais",
+      detalhe: "Considerando os resultados filtrados",
       icon: TrendingUp,
       tone: "amber",
     },
@@ -158,9 +135,7 @@ export default function ClientesResumo({
             <p
               title={card.valor}
               className={`mt-3 min-w-0 break-words font-bold leading-tight tracking-tight tabular-nums ${styles.value} ${
-                valorLongo
-                  ? "text-base sm:text-xl"
-                  : "text-xl sm:text-2xl"
+                valorLongo ? "text-base sm:text-xl" : "text-xl sm:text-2xl"
               }`}
             >
               {card.valor}
