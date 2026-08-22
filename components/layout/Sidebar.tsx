@@ -20,7 +20,6 @@ import {
   Settings,
   ShieldCheck,
   ShoppingCart,
-  Sparkles,
   Users,
   Wallet,
   X,
@@ -270,8 +269,15 @@ export default function Sidebar({ permissoes, isAdmin = false }: SidebarProps) {
             href={menusPrincipaisVisiveis[0]?.href ?? "/agenda"}
             className="flex items-center gap-3"
           >
-            <div className="flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 via-fuchsia-600 to-rose-500 text-white shadow-lg shadow-violet-600/20">
-              <Sparkles className="size-5" />
+            <div className="relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <span className="relative block size-8 overflow-hidden">
+                <img
+                  src="/studio-realcar-logo.png"
+                  alt=""
+                  className="absolute max-w-none"
+                  style={{ width: "207.9%", left: "-50.3%", top: "-1.2%" }}
+                />
+              </span>
             </div>
 
             <div className="min-w-0">

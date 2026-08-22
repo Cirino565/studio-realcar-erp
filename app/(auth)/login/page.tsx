@@ -9,7 +9,6 @@ import {
   LockKeyhole,
   UserRound,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 
 import { login, type LoginState } from "@/actions/auth.actions";
@@ -37,9 +36,12 @@ export default function LoginPage() {
           <div className="pointer-events-none absolute -bottom-32 -left-24 h-80 w-80 rounded-full border border-white/10 bg-white/10" />
 
           <div className="relative">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold backdrop-blur">
-              <Sparkles size={14} />
-              Studio Realçar
+            <div className="inline-flex items-center rounded-2xl bg-white px-5 py-4 shadow-lg shadow-slate-950/20">
+              <img
+                src="/studio-realcar-logo.png"
+                alt="Studio Realçar"
+                className="h-14 w-auto object-contain"
+              />
             </div>
 
             <h1 className="mt-8 max-w-sm text-4xl font-bold leading-tight tracking-tight">
@@ -74,8 +76,15 @@ export default function LoginPage() {
         <section className="flex min-h-[540px] items-center bg-white px-5 py-7 sm:px-10 sm:py-10 md:min-h-[560px] lg:px-12">
           <div className="mx-auto w-full max-w-sm">
             <div className="mb-7 md:hidden">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-lg shadow-violet-600/20">
-                <Sparkles size={21} />
+              <div className="relative flex size-14 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <span className="relative block size-10 overflow-hidden">
+                  <img
+                    src="/studio-realcar-logo.png"
+                    alt=""
+                    className="absolute max-w-none"
+                    style={{ width: "207.9%", left: "-50.3%", top: "-1.2%" }}
+                  />
+                </span>
               </div>
 
               <p className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-violet-600">

@@ -44,6 +44,25 @@ function somenteDigitos(valor?: string | null) {
   return (valor ?? "").replace(/\D/g, "");
 }
 
+// Mesmas cores de status usadas no resto da Agenda, para dar identidade
+// visual imediata a cada agendamento listado na busca.
+function statusBadgeClass(status: string) {
+  switch (status) {
+    case "Confirmado":
+      return "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300";
+    case "Em atendimento":
+      return "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300";
+    case "Atendido":
+      return "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300";
+    case "Faltou":
+      return "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300";
+    case "Cancelado":
+      return "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300";
+    default:
+      return "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300";
+  }
+}
+
 function formatarDataHora(value: string) {
   const data = new Date(value);
 
@@ -259,7 +278,11 @@ export default function AgendaSearch({
                 }) => (
                   <div
                     key={cliente.id}
-                    className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                    className={`overflow-hidden rounded-xl border-y border-r border-l-4 border-slate-200 bg-white shadow-sm dark:border-y-slate-800 dark:border-r-slate-800 dark:bg-slate-900 ${
+                      proximos.length > 0
+                        ? "border-l-emerald-400 dark:border-l-emerald-500"
+                        : "border-l-slate-200 dark:border-l-slate-700"
+                    }`}
                   >
                     <div className="flex items-center gap-2 border-b border-violet-100 bg-violet-50 px-3 py-2.5 dark:border-violet-500/20 dark:bg-violet-500/10">
                       <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
@@ -281,7 +304,7 @@ export default function AgendaSearch({
                     {proximos.length === 0 &&
                     historico.length === 0 ? (
                       <div className="px-3 py-4">
-                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                        <p className="text-sm text-slate-400 dark:text-slate-500">
                           Cliente cadastrado, mas sem agendamentos.
                         </p>
                       </div>
@@ -335,11 +358,20 @@ export default function AgendaSearch({
                                         }
                                       </p>
 
-                                      <p className="mt-0.5 truncate text-[11px] text-slate-500 dark:text-slate-400">
-                                        {resultado.profissionalNome ||
-                                          "Profissional não definida"}{" "}
-                                        • {resultado.status}
-                                      </p>
+                                      <div className="mt-1 flex items-center gap-1.5">
+                                        <p className="min-w-0 truncate text-[11px] text-slate-500 dark:text-slate-400">
+                                          {resultado.profissionalNome ||
+                                            "Profissional não definida"}
+                                        </p>
+
+                                        <span
+                                          className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${statusBadgeClass(
+                                            resultado.status,
+                                          )}`}
+                                        >
+                                          {resultado.status}
+                                        </span>
+                                      </div>
                                     </div>
                                   </button>
                                 );
@@ -389,12 +421,19 @@ export default function AgendaSearch({
                                           {dia} • {hora}
                                         </p>
 
-                                        <p className="mt-0.5 truncate text-[11px] text-slate-500 dark:text-slate-400">
-                                          {
-                                            resultado.procedimento
-                                          }{" "}
-                                          • {resultado.status}
-                                        </p>
+                                        <div className="mt-0.5 flex items-center gap-1.5">
+                                          <p className="min-w-0 truncate text-[11px] text-slate-500 dark:text-slate-400">
+                                            {resultado.procedimento}
+                                          </p>
+
+                                          <span
+                                            className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${statusBadgeClass(
+                                              resultado.status,
+                                            )}`}
+                                          >
+                                            {resultado.status}
+                                          </span>
+                                        </div>
                                       </div>
                                     </button>
                                   );
