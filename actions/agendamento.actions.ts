@@ -1631,6 +1631,10 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
     throw new Error("Somente administradores podem autorizar estoque negativo.");
   }
 
+  // Tempo limite ampliado: a finalizacao grava atendimento, venda, financeiro,
+  // estoque, historico, funil e auditoria numa unica operacao. Com produtos ou
+  // kits incluidos, sao varias gravacoes seguidas e o limite padrao do Prisma
+  // (5 segundos) nao dava conta, fazendo a operacao ser cortada no meio.
   await prisma.$transaction(async (tx) => {
     const reservaFinalizacao = await tx.agendamento.updateMany({
       where: {
@@ -1812,7 +1816,7 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
         detalhes: `${atendimentoRetorno ? "Retorno" : "Atendimento"} finalizado para ${agendamento.cliente.nome}. Evolução: ${evolucaoClinica ? "registrada" : "pendente"}. Serviço: R$ ${venda.totalServicos.toFixed(2)}. Produtos e kits: R$ ${venda.totalProdutos.toFixed(2)}. Total bruto: R$ ${venda.valorTotal.toFixed(2)}. Taxa: R$ ${venda.taxaPagamento.toFixed(2)}. Líquido: R$ ${venda.valorLiquido.toFixed(2)}. Custo direto: R$ ${venda.custoTotal.toFixed(2)}. Forma: ${venda.formaPagamento}. Pagamento: ${statusPagamento}.${venda.estoqueNegativoAutorizado ? ` Estoque negativo autorizado por ${usuarioAtual.email}.` : ""}`,
       },
     });
-  });
+  }, { maxWait: 15000, timeout: 30000 });
 
   revalidatePath("/agenda");
   revalidatePath("/vendas");

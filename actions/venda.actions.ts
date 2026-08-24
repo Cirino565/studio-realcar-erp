@@ -116,7 +116,7 @@ export async function criarVendaProdutos(dados: CriarVendaProdutosInput) {
     });
 
     return venda;
-  });
+  }, { maxWait: 15000, timeout: 30000 });
 
   revalidarVenda(cliente.id);
 
