@@ -114,6 +114,11 @@ export default function ClientesClient({
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  // Transição só para a navegação da busca/filtros. Navegar dentro de uma
+  // transição impede o Next.js de trocar a tela pela de carregamento -
+  // é isso que mantém o campo de texto vivo (e o cursor no lugar)
+  // enquanto a nova lista é buscada no servidor.
+  const [navegando, iniciarNavegacao] = useTransition();
 
   // Estado local dos filtros: começa igual ao que veio do servidor, e o
   // usuário pode digitar/mudar livremente aqui antes de a busca de fato
@@ -137,11 +142,9 @@ export default function ClientesClient({
   // o estado local com o que realmente está valendo na URL.
   useEffect(() => {
     setFiltrosState(filtros);
-    // Só reposiciona o texto do campo se o usuário não estiver digitando
-    // naquele instante - senão o cursor "pularia" ao chegar a resposta.
-    if (!digitando.current) {
-      setBuscaTexto(filtros.busca);
-    }
+    // O texto digitado é do usuário e de mais ninguém: nunca é reescrito
+    // com a resposta do servidor, que pode chegar atrasada e apagar letras
+    // digitadas depois. Só os demais filtros são realinhados aqui.
   }, [filtros]);
 
   const filtrosRef = useRef(filtrosState);
@@ -176,11 +179,13 @@ export default function ClientesClient({
 
     const timer = setTimeout(() => {
       const query = montarQueryString(atual);
-      router.push(query ? `/clientes?${query}` : "/clientes");
+      iniciarNavegacao(() => {
+        router.push(query ? `/clientes?${query}` : "/clientes");
+      });
     }, 150);
 
     return () => clearTimeout(timer);
-  }, [filtrosState, filtros, router]);
+  }, [filtrosState, filtros, router, iniciarNavegacao]);
 
   function mudarFiltro<K extends keyof Filtros>(campo: K, valor: Filtros[K]) {
     setFiltrosState((atualState) => ({ ...atualState, [campo]: valor }));
@@ -188,7 +193,9 @@ export default function ClientesClient({
 
   function irParaPagina(pagina: number) {
     const query = montarQueryString(filtros, pagina);
-    router.push(query ? `/clientes?${query}` : "/clientes");
+    iniciarNavegacao(() => {
+      router.push(query ? `/clientes?${query}` : "/clientes");
+    });
   }
 
   function novoCliente() {
@@ -293,12 +300,18 @@ export default function ClientesClient({
           onAreaChange={(valor) => mudarFiltro("area", valor)}
         />
 
-        <ClienteTable
-          clientes={clientes}
-          onEditar={editarCliente}
-          onExcluir={removerCliente}
-          onMensagem={abrirMensagem}
-        />
+        <div
+          className={
+            navegando ? "opacity-60 transition-opacity" : "transition-opacity"
+          }
+        >
+          <ClienteTable
+            clientes={clientes}
+            onEditar={editarCliente}
+            onExcluir={removerCliente}
+            onMensagem={abrirMensagem}
+          />
+        </div>
 
         <div className="flex flex-col items-center gap-2 py-4 sm:flex-row sm:justify-between">
           <p className="text-xs text-slate-500 dark:text-slate-400">
