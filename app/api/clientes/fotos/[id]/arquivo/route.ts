@@ -11,7 +11,7 @@ type RouteContext = {
   params: Promise<{ id: string }> | { id: string };
 };
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   const usuario = await getCurrentUser();
 
   if (!usuario) {
@@ -53,9 +53,16 @@ export async function GET(_request: Request, context: RouteContext) {
     headers.set("Content-Type", foto.mimeType || "application/octet-stream");
     headers.set("Cache-Control", "private, no-store, max-age=0");
     headers.set("X-Content-Type-Options", "nosniff");
+    // Com ?download=1 o navegador salva o arquivo em vez de so exibir.
+    // Sem o parametro, segue funcionando exatamente como antes.
+    const querBaixar =
+      new URL(request.url).searchParams.get("download") === "1";
+
     headers.set(
       "Content-Disposition",
-      `inline; filename*=UTF-8''${encodeURIComponent(foto.nomeArquivo || "foto-clinica")}`,
+      `${querBaixar ? "attachment" : "inline"}; filename*=UTF-8''${encodeURIComponent(
+        foto.nomeArquivo || "foto-clinica",
+      )}`,
     );
 
     return new Response(driveResponse.body, {

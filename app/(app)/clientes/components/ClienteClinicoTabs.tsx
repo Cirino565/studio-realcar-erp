@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   ChevronDown,
   ClipboardList,
+  Download,
   FileText,
   ImageIcon,
   Loader2,
@@ -228,6 +229,41 @@ function DeleteButton({
   );
 }
 
+// Agrupa as fotos por dia (mais recente primeiro) para exibi-las em blocos
+// com um cabecalho de data, em vez de uma grade unica onde tudo se mistura
+// quando a cliente tem varios retornos.
+function agruparFotosPorData(fotos: ClienteFotoData[]) {
+  const grupos = new Map<string, { rotulo: string; fotos: ClienteFotoData[] }>();
+
+  for (const foto of fotos) {
+    const data = new Date(foto.dataRegistro);
+    const valido = !Number.isNaN(data.getTime());
+    const chave = valido
+      ? `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}-${String(
+          data.getDate(),
+        ).padStart(2, "0")}`
+      : "sem-data";
+
+    const rotulo = valido
+      ? new Intl.DateTimeFormat("pt-BR", {
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        }).format(data)
+      : "Sem data registrada";
+
+    if (!grupos.has(chave)) {
+      grupos.set(chave, { rotulo, fotos: [] });
+    }
+
+    grupos.get(chave)!.fotos.push(foto);
+  }
+
+  return Array.from(grupos.entries())
+    .sort((a, b) => (a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0))
+    .map(([chave, valor]) => ({ chave, ...valor }));
+}
+
 export function ClienteClinicoTabs({
   data,
   initialTab = "anamnese",
@@ -237,6 +273,19 @@ export function ClienteClinicoTabs({
   const [resumoMobileAberto, setResumoMobileAberto] =
     useState(false);
   const [fotoAberta, setFotoAberta] = useState<ClienteFotoData | null>(null);
+
+  // Guarda apenas as datas que a usuaria FECHOU. Assim, por padrao, o grupo
+  // mais recente ja aparece aberto e os demais tambem - e o que ela fechar
+  // continua fechado enquanto estiver na ficha.
+  const [gruposFechados, setGruposFechados] = useState<string[]>([]);
+
+  function alternarGrupo(chave: string) {
+    setGruposFechados((atual) =>
+      atual.includes(chave)
+        ? atual.filter((item) => item !== chave)
+        : [...atual, chave],
+    );
+  }
   const [evolucaoPendenteSelecionada, setEvolucaoPendenteSelecionada] =
     useState<number | null>(null);
   const [evolucoesPendentesResolvidas, setEvolucoesPendentesResolvidas] =
@@ -562,9 +611,40 @@ export function ClienteClinicoTabs({
                 driveConfigurado={data.driveConfigurado}
               />
 
-              <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {data.fotos.length > 0 ? (
-                  data.fotos.map((foto) => (
+              {data.fotos.length > 0 ? (
+                <div className="space-y-8">
+                  {agruparFotosPorData(data.fotos).map((grupo) => (
+                    <section key={grupo.chave} className="min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => alternarGrupo(grupo.chave)}
+                        aria-expanded={!gruposFechados.includes(grupo.chave)}
+                        className="mb-3 flex w-full items-center gap-3 rounded-xl px-1 py-1 text-left transition hover:bg-slate-50 dark:hover:bg-white/[0.04]"
+                      >
+                        <ChevronDown
+                          size={18}
+                          className={`shrink-0 text-slate-400 transition-transform ${
+                            gruposFechados.includes(grupo.chave)
+                              ? "-rotate-90"
+                              : ""
+                          }`}
+                        />
+
+                        <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                          {grupo.rotulo}
+                        </h3>
+
+                        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-500 dark:bg-white/[0.06] dark:text-slate-400">
+                          {grupo.fotos.length}{" "}
+                          {grupo.fotos.length === 1 ? "foto" : "fotos"}
+                        </span>
+
+                        <div className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
+                      </button>
+
+                      {!gruposFechados.includes(grupo.chave) ? (
+                      <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                        {grupo.fotos.map((foto) => (
                     <article
                       key={foto.id}
                       className="min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.04]"
@@ -606,11 +686,27 @@ export function ClienteClinicoTabs({
                             ) : null}
                           </div>
 
-                          <DeleteButton
-                            clienteId={data.id}
-                            tipo="foto"
-                            id={foto.id}
-                          />
+                          <div className="flex shrink-0 items-center gap-1">
+                            <a
+                              href={
+                                foto.armazenamento === "GOOGLE_DRIVE"
+                                  ? `/api/clientes/fotos/${foto.id}/arquivo?download=1`
+                                  : foto.url
+                              }
+                              download={foto.nomeArquivo || undefined}
+                              title="Baixar foto"
+                              aria-label={`Baixar foto ${foto.titulo}`}
+                              className="flex size-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/[0.06]"
+                            >
+                              <Download size={16} />
+                            </a>
+
+                            <DeleteButton
+                              clienteId={data.id}
+                              tipo="foto"
+                              id={foto.id}
+                            />
+                          </div>
                         </div>
 
                         <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
@@ -631,15 +727,19 @@ export function ClienteClinicoTabs({
                         ) : null}
                       </div>
                     </article>
-                  ))
-                ) : (
-                  <EmptyState
-                    icon={ImageIcon}
-                    title="Nenhuma foto registrada"
-                    text="Tire uma foto ou escolha uma imagem da galeria. O arquivo será armazenado de forma privada no Google Drive."
-                  />
-                )}
-              </div>
+                        ))}
+                      </div>
+                      ) : null}
+                    </section>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  icon={ImageIcon}
+                  title="Nenhuma foto registrada"
+                  text="Tire uma foto ou escolha uma imagem da galeria. O arquivo será armazenado de forma privada no Google Drive."
+                />
+              )}
             </div>
           </div>
         )}
@@ -1069,14 +1169,30 @@ export function ClienteClinicoTabs({
                   {fotoAberta.procedimento ? ` • ${fotoAberta.procedimento}` : ""}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setFotoAberta(null)}
-                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
-                aria-label="Fechar foto"
-              >
-                <X size={20} />
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                <a
+                  href={
+                    fotoAberta.armazenamento === "GOOGLE_DRIVE"
+                      ? `/api/clientes/fotos/${fotoAberta.id}/arquivo?download=1`
+                      : fotoAberta.url
+                  }
+                  download={fotoAberta.nomeArquivo || undefined}
+                  className="flex size-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+                  aria-label="Baixar foto"
+                  title="Baixar foto"
+                >
+                  <Download size={19} />
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() => setFotoAberta(null)}
+                  className="flex size-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+                  aria-label="Fechar foto"
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-black p-2 sm:p-4">

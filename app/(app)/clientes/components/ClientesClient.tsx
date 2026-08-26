@@ -120,6 +120,13 @@ export default function ClientesClient({
   // ser enviada (com um pequeno atraso, pra não recarregar a cada letra).
   const [filtrosState, setFiltrosState] = useState<Filtros>(filtros);
 
+  // O texto digitado na busca vive SEPARADO do resto. Assim ele nunca é
+  // sobrescrito por uma resposta do servidor no meio da digitação - que era
+  // o que fazia o cursor voltar e a letra sumir. O texto aparece na hora
+  // (buscaTexto) e só depois de uma pequena pausa vira uma busca de verdade.
+  const [buscaTexto, setBuscaTexto] = useState(filtros.busca);
+  const digitando = useRef(false);
+
   const [modalAberto, setModalAberto] = useState(false);
   const [mensagemAberta, setMensagemAberta] = useState(false);
   const [clienteSelecionado, setClienteSelecionado] =
@@ -130,11 +137,38 @@ export default function ClientesClient({
   // o estado local com o que realmente está valendo na URL.
   useEffect(() => {
     setFiltrosState(filtros);
+    // Só reposiciona o texto do campo se o usuário não estiver digitando
+    // naquele instante - senão o cursor "pularia" ao chegar a resposta.
+    if (!digitando.current) {
+      setBuscaTexto(filtros.busca);
+    }
   }, [filtros]);
 
   const filtrosRef = useRef(filtrosState);
   filtrosRef.current = filtrosState;
 
+  // Passo 1: o texto digitado (buscaTexto) leva 500ms parado para virar
+  // filtro de busca. Enquanto digita, "digitando" fica ligado, o que impede
+  // qualquer resposta do servidor de mexer no campo.
+  useEffect(() => {
+    if (buscaTexto === filtrosState.busca) {
+      digitando.current = false;
+      return;
+    }
+
+    digitando.current = true;
+
+    const timer = setTimeout(() => {
+      digitando.current = false;
+      setFiltrosState((atualState) => ({ ...atualState, busca: buscaTexto }));
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [buscaTexto, filtrosState.busca]);
+
+  // Passo 2: quando os filtros (já incluindo a busca com pausa) diferem do
+  // que o servidor tem, recarrega a lista. Como isso só roda depois da pausa,
+  // não acontece a cada tecla.
   useEffect(() => {
     const atual = filtrosRef.current;
 
@@ -143,7 +177,7 @@ export default function ClientesClient({
     const timer = setTimeout(() => {
       const query = montarQueryString(atual);
       router.push(query ? `/clientes?${query}` : "/clientes");
-    }, 350);
+    }, 150);
 
     return () => clearTimeout(timer);
   }, [filtrosState, filtros, router]);
@@ -244,8 +278,8 @@ export default function ClientesClient({
         </div>
 
         <ClienteSearch
-          value={filtrosState.busca}
-          onChange={(valor) => mudarFiltro("busca", valor)}
+          value={buscaTexto}
+          onChange={(valor) => setBuscaTexto(valor)}
           status={filtrosState.status}
           onStatusChange={(valor) => mudarFiltro("status", valor)}
           ordenacao={filtrosState.ordenacao}
