@@ -913,7 +913,11 @@ export async function agendarAvaliacaoLead(dados: AgendarAvaliacaoLeadInput) {
       duracao,
       valor,
       status: "Agendado",
-      observacoes: `Originado do CRM comercial. Lead #${lead.id}.`,
+      // Não repete "veio de campanha/lead" aqui: essa origem já fica
+      // registrada em campanhaAquisicaoId do cliente e no próprio Lead.
+      // O campo de observação do agendamento fica livre para anotações
+      // reais sobre o atendimento (ex.: "trouxe foto de referência").
+      observacoes: null,
     };
 
     const agendamento = agendamentoEditavel

@@ -51,6 +51,12 @@ const mainMenus = [
     permissao: "agenda.visualizar",
   },
   {
+    nome: "Evoluções",
+    icon: Activity,
+    href: "/evolucoes-pendentes",
+    permissao: "clientes.clinico",
+  },
+  {
     nome: "Financeiro",
     icon: Wallet,
     href: "/financeiro",

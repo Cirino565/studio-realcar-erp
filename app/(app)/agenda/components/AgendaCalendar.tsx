@@ -388,6 +388,13 @@ function getAppointmentNote(appointment: AgendamentoAgenda) {
   return appointment.status;
 }
 
+// A observação de verdade (o texto que a Vivian digitou), separada do
+// fallback acima - usada para decidir se ela aparece já nos horários
+// curtos, tipo uma avaliação de 30-40 minutos.
+function getObservacaoReal(appointment: AgendamentoAgenda) {
+  return appointment.observacoes?.split("\n").find(Boolean)?.trim() || null;
+}
+
 export default function AgendaCalendar({
   selectedDate,
   onDateChange,
@@ -1934,6 +1941,7 @@ export default function AgendaCalendar({
                         (visibleEnd - visibleStart) * MINUTE_HEIGHT - 4,
                       );
                       const note = getAppointmentNote(appointment);
+                      const observacaoReal = getObservacaoReal(appointment);
                       const statusPalette = getStatusPalette(appointment.status);
                       const isCompactAppointment = height < 70;
                       const isNextAppointment = nextAppointmentIds.has(appointment.id);
@@ -2076,8 +2084,9 @@ export default function AgendaCalendar({
                                   isCompactAppointment ? "mt-0.5" : "mt-1"
                                 } line-clamp-1 text-[0.64rem] font-semibold leading-tight sm:text-[0.7rem]`}
                                 style={{ color: statusPalette.mutedText }}
+                                title={observacaoReal || undefined}
                               >
-                                {appointment.procedimento}
+                                {observacaoReal || appointment.procedimento}
                               </p>
                             ) : null}
 
@@ -2087,7 +2096,10 @@ export default function AgendaCalendar({
                                 style={{ color: statusPalette.mutedText }}
                               >
                                 {appointment.status}
-                                {note !== appointment.status ? ` · ${note}` : ""}
+                                {!observacaoReal && note !== appointment.status
+                                  ? ` · ${note}`
+                                  : ""}
+                                {observacaoReal ? ` · ${appointment.procedimento}` : ""}
                               </p>
                             ) : null}
                           </div>
