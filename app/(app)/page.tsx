@@ -197,7 +197,13 @@ export default async function Home() {
 
   const UM_DIA_MS = 24 * 60 * 60 * 1000;
   const limiteNegociacaoParada = new Date(inicioHoje.getTime() - 3 * UM_DIA_MS);
-  const limiteAvaliacoesProximas = new Date(inicioHoje.getTime() + 8 * UM_DIA_MS);
+  // Antes eram 8 dias, e o aviso de "sem confirmação" aparecia assim que o
+  // agendamento era criado - bem antes de fazer sentido, já que o lembrete
+  // de confirmação só é enviado na véspera. Agora só entra na fila a partir
+  // de amanhã (a partir de quando o lembrete da véspera já foi mandado) e
+  // continua aparecendo no dia do atendimento, caso ainda não tenha
+  // confirmado.
+  const limiteAvaliacoesProximas = new Date(inicioHoje.getTime() + 1 * UM_DIA_MS);
 
   const [
     agendaHoje,
