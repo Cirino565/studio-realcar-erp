@@ -529,10 +529,10 @@ export default function AgendaCalendar({
   const dateStripScrollFrameRef = useRef<number | null>(null);
   const agendaScrollRef = useRef<HTMLDivElement | null>(null);
 
-  // No computador a agenda nao tem rolagem propria (quem rola e a pagina
-  // inteira, com uma barra so). No celular ela mantem a rolagem interna.
-  // Estes ajudantes fazem o "ir para agora" e a rolagem automatica
-  // funcionarem nos dois casos.
+  // No computador (ate 2 profissionais) a agenda nao tem rolagem propria:
+  // quem rola e a pagina inteira, com uma barra so. No celular a rolagem
+  // interna e mantida. Estes ajudantes fazem o "ir para agora" e a rolagem
+  // automatica funcionarem nos dois casos.
   function agendaRolaNaPagina() {
     const container = agendaScrollRef.current;
     if (!container) return false;
@@ -551,7 +551,6 @@ export default function AgendaCalendar({
 
     if (!agendaRolaNaPagina()) return container.scrollTop;
 
-    // Quanto do topo da agenda ja passou para cima da janela.
     const topoNaPagina = container.getBoundingClientRect().top + window.scrollY;
     return Math.max(0, window.scrollY - topoNaPagina);
   }
@@ -561,10 +560,7 @@ export default function AgendaCalendar({
     if (!container) return;
 
     if (!agendaRolaNaPagina()) {
-      container.scrollTo({
-        top: destino,
-        behavior: suave ? "smooth" : "auto",
-      });
+      container.scrollTo({ top: destino, behavior: suave ? "smooth" : "auto" });
       return;
     }
 
@@ -1126,10 +1122,7 @@ export default function AgendaCalendar({
 
     const alturaVisivel = alturaVisivelAgenda();
 
-    const espacoSuperior = Math.min(
-      140,
-      alturaVisivel * 0.28,
-    );
+    const espacoSuperior = Math.min(140, alturaVisivel * 0.28);
 
     const maxScrollTop = Math.max(
       0,
@@ -1232,10 +1225,7 @@ export default function AgendaCalendar({
       const inicioVisivel = posicaoAtualAgenda();
       const fimVisivel = inicioVisivel + alturaVisivel;
 
-      const margem = Math.min(
-        70,
-        alturaVisivel * 0.15,
-      );
+      const margem = Math.min(70, alturaVisivel * 0.15);
 
       const linhaEstaVisivel =
         currentTimeLine >= inicioVisivel + margem &&
@@ -1246,39 +1236,36 @@ export default function AgendaCalendar({
 
     verificarHorarioAtualVisivel();
 
-    container.addEventListener(
-      "scroll",
-      verificarHorarioAtualVisivel,
-      { passive: true },
-    );
+    // IMPORTANTE: a verificacao acima mede posicoes na tela, e medir posicao
+    // obriga o navegador a recalcular o layout. O evento de rolagem dispara
+    // dezenas de vezes por segundo - fazer essa conta em todas elas trava a
+    // rolagem. Aqui limitamos a no maximo UMA vez por quadro de video, que
+    // e o suficiente para o botao aparecer na hora certa sem pesar.
+    let quadroAgendado: number | null = null;
+
+    function agendarVerificacao() {
+      if (quadroAgendado !== null) return;
+
+      quadroAgendado = window.requestAnimationFrame(() => {
+        quadroAgendado = null;
+        verificarHorarioAtualVisivel();
+      });
+    }
+
+    container.addEventListener("scroll", agendarVerificacao, { passive: true });
 
     // No computador quem rola e a pagina, entao tambem escutamos a janela.
-    window.addEventListener(
-      "scroll",
-      verificarHorarioAtualVisivel,
-      { passive: true },
-    );
-
-    window.addEventListener(
-      "resize",
-      verificarHorarioAtualVisivel,
-    );
+    window.addEventListener("scroll", agendarVerificacao, { passive: true });
+    window.addEventListener("resize", agendarVerificacao);
 
     return () => {
-      container.removeEventListener(
-        "scroll",
-        verificarHorarioAtualVisivel,
-      );
+      if (quadroAgendado !== null) {
+        window.cancelAnimationFrame(quadroAgendado);
+      }
 
-      window.removeEventListener(
-        "scroll",
-        verificarHorarioAtualVisivel,
-      );
-
-      window.removeEventListener(
-        "resize",
-        verificarHorarioAtualVisivel,
-      );
+      container.removeEventListener("scroll", agendarVerificacao);
+      window.removeEventListener("scroll", agendarVerificacao);
+      window.removeEventListener("resize", agendarVerificacao);
     };
   }, [
     currentTimeLine,
@@ -1289,7 +1276,7 @@ export default function AgendaCalendar({
 
   return (
     <>
-      <section className="relative w-full max-w-full overflow-hidden border border-slate-300 bg-white text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:rounded-xl lg:overflow-visible lg:rounded-xl">
+      <section className="relative w-full max-w-full overflow-hidden border border-slate-300 bg-white text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:rounded-xl lg:overflow-visible">
       <div className="border-b border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-900">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-1.5 gap-y-1 px-2 py-1.5 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:gap-4 lg:px-3 lg:py-2">
           <div className="flex min-w-0 items-center gap-1.5">
@@ -1764,24 +1751,22 @@ export default function AgendaCalendar({
           onTouchStart={handleAgendaTouchStart}
           onTouchEnd={handleAgendaTouchEnd}
           className={
-            // No computador (lg) a agenda deixa de ter altura fixa e rolagem
-            // propria: a pagina inteira rola de uma vez so, com uma barra
-            // unica. Antes havia duas barras e a interna cortava o ultimo
-            // horario do dia.
+            // Espaco extra no final da agenda para que o ultimo horario do
+            // dia nao fique escondido: no celular, atras da barra de
+            // navegacao de baixo; no computador, colado na borda.
             //
-            // No celular a rolagem interna e mantida: la ela e necessaria
-            // para o cabecalho e a barra inferior ficarem sempre visiveis.
+            // A rolagem propria da agenda e mantida nos dois casos - foi o
+            // que sempre funcionou bem, sem travar.
             shouldEnableHorizontalScroll
               ? // Com 3+ profissionais a rolagem horizontal e necessaria,
-                // entao aqui a rolagem interna permanece tambem no
-                // computador (nao da para ter um eixo rolando e o outro
-                // livre: o navegador converte "visible" em "auto").
-                "max-h-[calc(100dvh-165px)] w-full max-w-full overflow-auto overscroll-contain pb-[calc(78px+env(safe-area-inset-bottom))]"
-              : // Ate 2 profissionais nao existe rolagem horizontal, entao
-                // no computador liberamos os DOIS eixos e quem rola passa a
-                // ser a pagina inteira - uma barra so, e o ultimo horario
-                // aparece completo.
-                "max-h-[calc(100dvh-165px)] w-full max-w-full touch-pan-y overflow-y-auto overflow-x-hidden overscroll-contain pb-[calc(78px+env(safe-area-inset-bottom))] lg:max-h-none lg:overflow-visible lg:pb-0"
+                // entao a rolagem interna permanece (nao da para ter um eixo
+                // rolando e o outro livre: o navegador converte "livre" em
+                // "com rolagem" sozinho).
+                "max-h-[calc(100dvh-165px)] w-full max-w-full overflow-auto overscroll-contain pb-[calc(170px+env(safe-area-inset-bottom))] lg:pb-24"
+              : // Ate 2 profissionais (o caso normal) nao ha rolagem
+                // horizontal: no computador liberamos os DOIS eixos e quem
+                // rola passa a ser a pagina, com uma barra so.
+                "max-h-[calc(100dvh-165px)] w-full max-w-full touch-pan-y overflow-y-auto overflow-x-hidden overscroll-contain pb-[calc(170px+env(safe-area-inset-bottom))] lg:max-h-none lg:overflow-visible lg:pb-24"
           }
         >
           <div
