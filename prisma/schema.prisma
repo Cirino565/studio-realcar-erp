@@ -337,6 +337,7 @@ model Venda {
   origem              String    @default("Venda")
   observacoes         String?
   data                DateTime  @default(now())
+  conversaoAdsEnviadaEm DateTime?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
@@ -351,6 +352,7 @@ model Venda {
   @@index([campanhaId, data])
   @@index([formaPagamentoConfigId])
   @@index([recebimentoPrevistoEm, statusPagamento])
+  @@index([conversaoAdsEnviadaEm])
 }
 
 model VendaItem {
