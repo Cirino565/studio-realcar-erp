@@ -268,11 +268,20 @@ export type ProcedimentoServicoInput = {
   categoria?: string;
   descricao?: string;
   duracaoPadrao?: number;
+  // De quantos em quantos dias este procedimento deve ser repetido.
+  // Vazio = nao gera lembrete de retorno.
+  intervaloRetornoDias?: number | null;
   valorPadrao?: number;
   custoPadrao?: number;
   status?: string;
   ordem?: number;
 };
+
+function toIntervaloRetorno(value: unknown) {
+  const numero = Number(value);
+  if (!Number.isFinite(numero) || numero <= 0) return null;
+  return Math.min(3650, Math.trunc(numero));
+}
 
 export async function criarProcedimentoServico(dados: ProcedimentoServicoInput) {
   await requirePermission("configuracoes.gerenciar");
@@ -286,6 +295,7 @@ export async function criarProcedimentoServico(dados: ProcedimentoServicoInput) 
         categoria: toNullableText(dados.categoria),
         descricao: toNullableText(dados.descricao),
         duracaoPadrao: toSafeOrder(dados.duracaoPadrao) || 60,
+        intervaloRetornoDias: toIntervaloRetorno(dados.intervaloRetornoDias),
         valorPadrao: Number.isFinite(dados.valorPadrao) ? Number(dados.valorPadrao) : 0,
         custoPadrao: Number.isFinite(dados.custoPadrao) ? Math.max(0, Number(dados.custoPadrao)) : 0,
         status: dados.status || "Ativo",
@@ -315,6 +325,7 @@ export async function atualizarProcedimentoServico(dados: ProcedimentoServicoInp
         categoria: toNullableText(dados.categoria),
         descricao: toNullableText(dados.descricao),
         duracaoPadrao: toSafeOrder(dados.duracaoPadrao) || 60,
+        intervaloRetornoDias: toIntervaloRetorno(dados.intervaloRetornoDias),
         valorPadrao: Number.isFinite(dados.valorPadrao) ? Number(dados.valorPadrao) : 0,
         custoPadrao: Number.isFinite(dados.custoPadrao) ? Math.max(0, Number(dados.custoPadrao)) : 0,
         status: dados.status || "Ativo",

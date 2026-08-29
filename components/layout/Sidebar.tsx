@@ -8,6 +8,7 @@ import {
   Archive,
   Bot,
   Calendar,
+  CalendarClock,
   ChevronRight,
   FileBarChart2,
   Gauge,
@@ -55,6 +56,12 @@ const mainMenus = [
     icon: Activity,
     href: "/evolucoes-pendentes",
     permissao: "clientes.clinico",
+  },
+  {
+    nome: "Retornos",
+    icon: CalendarClock,
+    href: "/retornos",
+    permissao: "clientes.visualizar",
   },
   {
     nome: "Financeiro",

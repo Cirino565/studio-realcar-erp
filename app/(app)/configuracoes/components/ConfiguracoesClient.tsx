@@ -495,6 +495,9 @@ function ServicoCardEditor({
   onExcluir: (id: number) => void;
 }) {
   const [duracao, setDuracao] = useState(formatarDuracao(item.duracaoPadrao || 60));
+  const [intervaloRetorno, setIntervaloRetorno] = useState(
+    item.intervaloRetornoDias ? String(item.intervaloRetornoDias) : "",
+  );
   const [valor, setValor] = useState(currencyFromNumber(item.valorPadrao));
   const [custo, setCusto] = useState(currencyFromNumber(item.custoPadrao));
   const [salvo, setSalvo] = useState(false);
@@ -515,6 +518,9 @@ function ServicoCardEditor({
         categoria: item.categoria || undefined,
         descricao: item.descricao || undefined,
         duracaoPadrao: interpretarDuracao(duracao),
+        intervaloRetornoDias: intervaloRetorno.trim()
+          ? Number(intervaloRetorno)
+          : null,
         valorPadrao: valorNumero,
         custoPadrao: custoNumero,
         status: item.status,
@@ -545,7 +551,7 @@ function ServicoCardEditor({
         </button>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="space-y-1.5">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             Duração
@@ -595,6 +601,29 @@ function ServicoCardEditor({
               className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm text-white outline-none"
             />
           </div>
+        </label>
+
+        <label className="space-y-1.5">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Lembrar retorno após
+          </span>
+          <div className="flex h-11 items-center overflow-hidden rounded-2xl border border-white/[0.10] bg-white/[0.06]">
+            <input
+              type="number"
+              min={0}
+              max={3650}
+              value={intervaloRetorno}
+              onChange={(event) => setIntervaloRetorno(event.target.value)}
+              placeholder="Ex: 90"
+              className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm text-white outline-none"
+            />
+            <span className="border-l border-white/[0.10] px-3 text-sm font-semibold text-slate-300">
+              dias
+            </span>
+          </div>
+          <span className="block text-[11px] leading-4 text-slate-500">
+            Deixe vazio se este procedimento não precisa de retorno.
+          </span>
         </label>
       </div>
 
