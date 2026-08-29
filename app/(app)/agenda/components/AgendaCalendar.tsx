@@ -528,6 +528,52 @@ export default function AgendaCalendar({
   const centeredDateStripRef = useRef(false);
   const dateStripScrollFrameRef = useRef<number | null>(null);
   const agendaScrollRef = useRef<HTMLDivElement | null>(null);
+
+  // No computador a agenda nao tem rolagem propria (quem rola e a pagina
+  // inteira, com uma barra so). No celular ela mantem a rolagem interna.
+  // Estes ajudantes fazem o "ir para agora" e a rolagem automatica
+  // funcionarem nos dois casos.
+  function agendaRolaNaPagina() {
+    const container = agendaScrollRef.current;
+    if (!container) return false;
+    return container.scrollHeight <= container.clientHeight + 1;
+  }
+
+  function alturaVisivelAgenda() {
+    const container = agendaScrollRef.current;
+    if (!container) return 0;
+    return agendaRolaNaPagina() ? window.innerHeight : container.clientHeight;
+  }
+
+  function posicaoAtualAgenda() {
+    const container = agendaScrollRef.current;
+    if (!container) return 0;
+
+    if (!agendaRolaNaPagina()) return container.scrollTop;
+
+    // Quanto do topo da agenda ja passou para cima da janela.
+    const topoNaPagina = container.getBoundingClientRect().top + window.scrollY;
+    return Math.max(0, window.scrollY - topoNaPagina);
+  }
+
+  function rolarAgendaPara(destino: number, suave: boolean) {
+    const container = agendaScrollRef.current;
+    if (!container) return;
+
+    if (!agendaRolaNaPagina()) {
+      container.scrollTo({
+        top: destino,
+        behavior: suave ? "smooth" : "auto",
+      });
+      return;
+    }
+
+    const topoNaPagina = container.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo({
+      top: topoNaPagina + destino,
+      behavior: suave ? "smooth" : "auto",
+    });
+  }
   const autoScrolledAgendaKeyRef = useRef<string | null>(null);
   const focusAgendamentoConsumidoRef = useRef<number | null>(null);
   const [agendamentoDestacadoId, setAgendamentoDestacadoId] =
@@ -977,17 +1023,15 @@ export default function AgendaCalendar({
     const markerTop = clampedMinutes * MINUTE_HEIGHT;
 
     const frame = window.requestAnimationFrame(() => {
-      const breathingRoom = Math.min(140, container.clientHeight * 0.28);
-      const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+      const alturaVisivel = alturaVisivelAgenda();
+      const breathingRoom = Math.min(140, alturaVisivel * 0.28);
+      const maxScrollTop = Math.max(0, container.scrollHeight - alturaVisivel);
       const targetScrollTop = Math.min(
         maxScrollTop,
         Math.max(0, markerTop - breathingRoom),
       );
 
-      container.scrollTo({
-        top: targetScrollTop,
-        behavior: "auto",
-      });
+      rolarAgendaPara(targetScrollTop, false);
 
       autoScrolledAgendaKeyRef.current = autoScrollKey;
     });
@@ -1080,14 +1124,16 @@ export default function AgendaCalendar({
 
     const markerTop = clampedMinutes * MINUTE_HEIGHT;
 
+    const alturaVisivel = alturaVisivelAgenda();
+
     const espacoSuperior = Math.min(
       140,
-      container.clientHeight * 0.28,
+      alturaVisivel * 0.28,
     );
 
     const maxScrollTop = Math.max(
       0,
-      container.scrollHeight - container.clientHeight,
+      container.scrollHeight - alturaVisivel,
     );
 
     const destino = Math.min(
@@ -1095,10 +1141,7 @@ export default function AgendaCalendar({
       Math.max(0, markerTop - espacoSuperior),
     );
 
-    container.scrollTo({
-      top: destino,
-      behavior: "smooth",
-    });
+    rolarAgendaPara(destino, true);
   }
 
   function handleAgendaTouchStart(event: TouchEvent<HTMLDivElement>) {
@@ -1185,13 +1228,13 @@ export default function AgendaCalendar({
     function verificarHorarioAtualVisivel() {
       if (!container || currentTimeLine === null) return;
 
-      const inicioVisivel = container.scrollTop;
-      const fimVisivel =
-        container.scrollTop + container.clientHeight;
+      const alturaVisivel = alturaVisivelAgenda();
+      const inicioVisivel = posicaoAtualAgenda();
+      const fimVisivel = inicioVisivel + alturaVisivel;
 
       const margem = Math.min(
         70,
-        container.clientHeight * 0.15,
+        alturaVisivel * 0.15,
       );
 
       const linhaEstaVisivel =
@@ -1209,6 +1252,13 @@ export default function AgendaCalendar({
       { passive: true },
     );
 
+    // No computador quem rola e a pagina, entao tambem escutamos a janela.
+    window.addEventListener(
+      "scroll",
+      verificarHorarioAtualVisivel,
+      { passive: true },
+    );
+
     window.addEventListener(
       "resize",
       verificarHorarioAtualVisivel,
@@ -1216,6 +1266,11 @@ export default function AgendaCalendar({
 
     return () => {
       container.removeEventListener(
+        "scroll",
+        verificarHorarioAtualVisivel,
+      );
+
+      window.removeEventListener(
         "scroll",
         verificarHorarioAtualVisivel,
       );
@@ -1709,9 +1764,16 @@ export default function AgendaCalendar({
           onTouchStart={handleAgendaTouchStart}
           onTouchEnd={handleAgendaTouchEnd}
           className={
+            // No computador (lg) a agenda deixa de ter altura fixa e rolagem
+            // propria: a pagina inteira rola de uma vez so, com uma barra
+            // unica. Antes havia duas barras e a interna cortava o ultimo
+            // horario do dia.
+            //
+            // No celular a rolagem interna e mantida: la ela e necessaria
+            // para o cabecalho e a barra inferior ficarem sempre visiveis.
             shouldEnableHorizontalScroll
-              ? "max-h-[calc(100dvh-165px)] w-full max-w-full overflow-auto overscroll-contain pb-[calc(78px+env(safe-area-inset-bottom))] lg:pb-0"
-              : "max-h-[calc(100dvh-165px)] w-full max-w-full touch-pan-y overflow-y-auto overflow-x-hidden overscroll-contain pb-[calc(78px+env(safe-area-inset-bottom))] lg:pb-0"
+              ? "max-h-[calc(100dvh-165px)] w-full max-w-full overflow-auto overscroll-contain pb-[calc(78px+env(safe-area-inset-bottom))] lg:max-h-none lg:overflow-x-auto lg:overflow-y-visible lg:pb-0"
+              : "max-h-[calc(100dvh-165px)] w-full max-w-full touch-pan-y overflow-y-auto overflow-x-hidden overscroll-contain pb-[calc(78px+env(safe-area-inset-bottom))] lg:max-h-none lg:overflow-y-visible lg:pb-0"
           }
         >
           <div
