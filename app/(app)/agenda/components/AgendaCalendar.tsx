@@ -1289,7 +1289,7 @@ export default function AgendaCalendar({
 
   return (
     <>
-      <section className="relative w-full max-w-full overflow-hidden border border-slate-300 bg-white text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:rounded-xl">
+      <section className="relative w-full max-w-full overflow-hidden border border-slate-300 bg-white text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:rounded-xl lg:overflow-visible lg:rounded-xl">
       <div className="border-b border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-900">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-1.5 gap-y-1 px-2 py-1.5 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:gap-4 lg:px-3 lg:py-2">
           <div className="flex min-w-0 items-center gap-1.5">
@@ -1772,8 +1772,16 @@ export default function AgendaCalendar({
             // No celular a rolagem interna e mantida: la ela e necessaria
             // para o cabecalho e a barra inferior ficarem sempre visiveis.
             shouldEnableHorizontalScroll
-              ? "max-h-[calc(100dvh-165px)] w-full max-w-full overflow-auto overscroll-contain pb-[calc(78px+env(safe-area-inset-bottom))] lg:max-h-none lg:overflow-x-auto lg:overflow-y-visible lg:pb-0"
-              : "max-h-[calc(100dvh-165px)] w-full max-w-full touch-pan-y overflow-y-auto overflow-x-hidden overscroll-contain pb-[calc(78px+env(safe-area-inset-bottom))] lg:max-h-none lg:overflow-y-visible lg:pb-0"
+              ? // Com 3+ profissionais a rolagem horizontal e necessaria,
+                // entao aqui a rolagem interna permanece tambem no
+                // computador (nao da para ter um eixo rolando e o outro
+                // livre: o navegador converte "visible" em "auto").
+                "max-h-[calc(100dvh-165px)] w-full max-w-full overflow-auto overscroll-contain pb-[calc(78px+env(safe-area-inset-bottom))]"
+              : // Ate 2 profissionais nao existe rolagem horizontal, entao
+                // no computador liberamos os DOIS eixos e quem rola passa a
+                // ser a pagina inteira - uma barra so, e o ultimo horario
+                // aparece completo.
+                "max-h-[calc(100dvh-165px)] w-full max-w-full touch-pan-y overflow-y-auto overflow-x-hidden overscroll-contain pb-[calc(78px+env(safe-area-inset-bottom))] lg:max-h-none lg:overflow-visible lg:pb-0"
           }
         >
           <div
