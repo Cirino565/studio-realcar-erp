@@ -275,6 +275,9 @@ export default function NovoAgendamentoModal({
     "dias" | "semanas" | "meses"
   >("semanas");
   const [recorrenciaOcorrencias, setRecorrenciaOcorrencias] = useState("4");
+  // Bloqueio por período: em vez de "repetir a cada 1 dia, N vezes", a
+  // pessoa escolhe só a data final e o sistema calcula os dias sozinho.
+  const [bloqueioAteData, setBloqueioAteData] = useState("");
   const [erro, setErro] = useState("");
   const [erroTitulo, setErroTitulo] = useState("Verifique os dados");
   const [erroAcaoHorario, setErroAcaoHorario] = useState(false);
@@ -381,6 +384,7 @@ export default function NovoAgendamentoModal({
     );
     setMotivoBloqueio(initialPayload?.motivoBloqueio || "Almoço");
     setRecorrenciaTipo("nenhuma");
+    setBloqueioAteData("");
     setRecorrenciaIntervalo("1");
     setRecorrenciaUnidade("semanas");
     setRecorrenciaOcorrencias("4");
@@ -593,6 +597,7 @@ export default function NovoAgendamentoModal({
       setValor("");
       setSinalPago(false);
       setRecorrenciaTipo("nenhuma");
+      setBloqueioAteData("");
       return;
     }
 
@@ -704,6 +709,46 @@ export default function NovoAgendamentoModal({
         return;
       }
 
+      // Bloqueio por período: converte "de 3 a 8" na repetição diária que o
+      // servidor já sabe criar (a cada 1 dia, N ocorrências).
+      let recorrenciaBloqueio: typeof recorrencia | { tipo: "nenhuma" } =
+        recorrencia;
+
+      if (!modoEdicaoBloqueio && bloqueioAteData) {
+        const diaInicial = new Date(`${data}T12:00:00`);
+        const diaFinal = new Date(`${bloqueioAteData}T12:00:00`);
+
+        if (Number.isNaN(diaFinal.getTime())) {
+          setErro("Data final do bloqueio inválida.");
+          return;
+        }
+
+        if (diaFinal < diaInicial) {
+          setErro("A data final do bloqueio deve ser igual ou depois da inicial.");
+          return;
+        }
+
+        const totalDias =
+          Math.round(
+            (diaFinal.getTime() - diaInicial.getTime()) / (24 * 60 * 60 * 1000),
+          ) + 1;
+
+        if (totalDias > 60) {
+          setErro("O período do bloqueio não pode passar de 60 dias.");
+          return;
+        }
+
+        recorrenciaBloqueio =
+          totalDias > 1
+            ? {
+                tipo: "personalizada" as const,
+                intervalo: 1,
+                unidade: "dias" as const,
+                ocorrencias: totalDias,
+              }
+            : { tipo: "nenhuma" as const };
+      }
+
       setSalvando(true);
 
       try {
@@ -713,7 +758,9 @@ export default function NovoAgendamentoModal({
           duracao: duracaoNumerica,
           motivo: motivoBloqueio,
           observacoes,
-          recorrencia: modoEdicaoBloqueio ? { tipo: "nenhuma" as const } : recorrencia,
+          recorrencia: modoEdicaoBloqueio
+            ? { tipo: "nenhuma" as const }
+            : recorrenciaBloqueio,
         };
 
         const resultadoBloqueio =
@@ -1943,6 +1990,26 @@ export default function NovoAgendamentoModal({
               </label>
 
             {!modoEdicaoBloqueio ? (
+              <label className="mt-4 block">
+                <span className={labelClassName()}>
+                  Bloquear até o dia (opcional)
+                </span>
+                <input
+                  type="date"
+                  value={bloqueioAteData}
+                  min={data}
+                  onChange={(event) => setBloqueioAteData(event.target.value)}
+                  className={fieldClassName()}
+                />
+                <span className="mt-1 block text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+                  {bloqueioAteData && bloqueioAteData !== data
+                    ? "O mesmo bloqueio será criado em todos os dias do período, incluindo o primeiro e o último."
+                    : "Deixe em branco para bloquear só o dia escolhido acima. Para férias ou viagem, informe o último dia."}
+                </span>
+              </label>
+            ) : null}
+
+            {!modoEdicaoBloqueio && !bloqueioAteData ? (
               <div className="mt-4 rounded-md border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-800/40">
                 <div className="flex items-center gap-2">
                   <Repeat2 size={16} className="text-violet-600 dark:text-violet-300" />
