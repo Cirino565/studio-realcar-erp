@@ -1545,6 +1545,20 @@ export type FinalizarAtendimentoInput = {
   evolucao?: string;
   observacoes?: string;
   dataAtendimento?: string;
+  // Procedimentos fechados durante o proprio atendimento (ex.: veio para
+  // limpeza de pele e fechou um botox na hora). Cada um vira um atendimento
+  // proprio, ja finalizado, com evolucao clinica separada - e entra como
+  // uma linha a mais na MESMA venda, porque a cliente paga uma vez so.
+  procedimentosAdicionais?: ProcedimentoAdicionalInput[];
+};
+
+export type ProcedimentoAdicionalInput = {
+  nome: string;
+  procedimentoServicoId?: number | null;
+  valor: number;
+  custo?: number;
+  duracao?: number;
+  evolucao?: string;
 };
 
 export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
@@ -1624,6 +1638,50 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
   const kits = (dados.kits || []).filter(
     (item) => item.kitId > 0 && item.quantidade > 0,
   );
+  // Procedimentos fechados durante o atendimento. Diferente do procedimento
+  // principal, estes NAO sao zerados quando o atendimento e um retorno: um
+  // retorno nao se cobra, mas um procedimento novo fechado durante ele sim.
+  const procedimentosAdicionaisEntrada = (dados.procedimentosAdicionais || [])
+    .map((item) => ({
+      nome: (item?.nome || "").trim(),
+      procedimentoServicoId: item?.procedimentoServicoId || null,
+      valor: Number.isFinite(Number(item?.valor))
+        ? Math.max(0, Number(item.valor))
+        : 0,
+      custo: Number.isFinite(Number(item?.custo))
+        ? Math.max(0, Number(item.custo))
+        : null,
+      duracao:
+        Number.isFinite(Number(item?.duracao)) && Number(item.duracao) > 0
+          ? Math.trunc(Number(item.duracao))
+          : null,
+      evolucao: item?.evolucao?.trim() || null,
+    }))
+    .filter((item) => item.nome.length > 0);
+
+  // Busca o cadastro de cada procedimento adicional para completar custo e
+  // duracao padrao quando nao foram informados na tela.
+  const procedimentosAdicionais = await Promise.all(
+    procedimentosAdicionaisEntrada.map(async (item) => {
+      const servico = item.procedimentoServicoId
+        ? await prisma.procedimentoServico.findUnique({
+            where: { id: item.procedimentoServicoId },
+            select: { id: true, custoPadrao: true, duracaoPadrao: true },
+          })
+        : await prisma.procedimentoServico.findUnique({
+            where: { nome: item.nome },
+            select: { id: true, custoPadrao: true, duracaoPadrao: true },
+          });
+
+      return {
+        ...item,
+        procedimentoServicoId: servico?.id || null,
+        custo: item.custo ?? Math.max(0, servico?.custoPadrao || 0),
+        duracao: item.duracao ?? Math.max(15, servico?.duracaoPadrao || 30),
+      };
+    }),
+  );
+
   const permitirEstoqueNegativo =
     Boolean(dados.permitirEstoqueNegativo) && isAdminUser(usuarioAtual);
 
@@ -1687,6 +1745,74 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
       });
     }
 
+    // ---- Procedimentos fechados durante o atendimento ----
+    //
+    // Cada um vira um atendimento proprio, ja finalizado, posicionado logo
+    // APOS o atendimento principal - que e o que de fato aconteceu (a
+    // cliente veio para um procedimento e fechou outro na sequencia).
+    //
+    // Ter atendimento proprio e o que garante:
+    //   - evolucao clinica separada (o banco so aceita uma evolucao por
+    //     atendimento, entao sem isso o procedimento novo ficaria sem
+    //     registro clinico proprio);
+    //   - entrada propria na fila de evolucoes pendentes;
+    //   - contagem correta nos relatorios ("quantos botox fiz no mes").
+    //
+    // O pagamento continua sendo UM SO: os valores entram como linhas a
+    // mais na mesma venda, mais abaixo.
+    let deslocamentoMinutos = Math.max(0, agendamento.duracao || 60);
+
+    for (const adicional of procedimentosAdicionais) {
+      const inicioAdicional = new Date(
+        agendamento.data.getTime() + deslocamentoMinutos * 60 * 1000,
+      );
+
+      const agendamentoAdicional = await tx.agendamento.create({
+        data: {
+          clienteId: agendamento.clienteId,
+          profissionalId: agendamento.profissionalId,
+          procedimento: adicional.nome,
+          data: inicioAdicional,
+          duracao: adicional.duracao,
+          valor: adicional.valor,
+          status: "Atendido",
+          naturezaAtendimento: "PROCEDIMENTO",
+          observacoes: `Fechado durante o atendimento de ${procedimentoRealizado} em ${formatDateSaoPaulo(agendamento.data)}.`,
+          evolucaoStatus: adicional.evolucao ? "CONCLUIDA" : "PENDENTE",
+          evolucaoPendenteDesde: adicional.evolucao ? null : dataAtendimento,
+          evolucaoRegistradaEm: adicional.evolucao ? dataAtendimento : null,
+          evolucaoRegistradaPor: adicional.evolucao ? profissional : null,
+        },
+      });
+
+      await tx.clienteProcedimento.create({
+        data: {
+          clienteId: agendamento.clienteId,
+          nome: adicional.nome,
+          profissional,
+          valor: adicional.valor,
+          status: "Realizado",
+          dataProcedimento: inicioAdicional,
+          observacoes: `Fechado durante o atendimento de ${procedimentoRealizado}.`,
+        },
+      });
+
+      if (adicional.evolucao) {
+        await tx.clienteEvolucao.create({
+          data: {
+            clienteId: agendamento.clienteId,
+            agendamentoId: agendamentoAdicional.id,
+            titulo: `Atendimento - ${adicional.nome}`,
+            descricao: adicional.evolucao,
+            profissional,
+            dataRegistro: inicioAdicional,
+          },
+        });
+      }
+
+      deslocamentoMinutos += adicional.duracao;
+    }
+
     const venda = await criarVendaNoTx(tx, {
       clienteId: agendamento.clienteId,
       agendamentoId: agendamento.id,
@@ -1702,6 +1828,14 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
         valorUnitario: valorCobrado,
         custoUnitario: custoServico,
       },
+      // A cliente paga uma vez so: cada procedimento fechado durante o
+      // atendimento entra como uma linha propria da MESMA venda.
+      servicosAdicionais: procedimentosAdicionais.map((item) => ({
+        procedimentoServicoId: item.procedimentoServicoId,
+        descricao: item.nome,
+        valorUnitario: item.valor,
+        custoUnitario: item.custo,
+      })),
       produtos,
       kits,
       permitirEstoqueNegativo,
@@ -1813,7 +1947,7 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
         entidade: "Venda",
         entidadeId: String(venda.vendaId),
         usuario: profissional,
-        detalhes: `${atendimentoRetorno ? "Retorno" : "Atendimento"} finalizado para ${agendamento.cliente.nome}. Evolução: ${evolucaoClinica ? "registrada" : "pendente"}. Serviço: R$ ${venda.totalServicos.toFixed(2)}. Produtos e kits: R$ ${venda.totalProdutos.toFixed(2)}. Total bruto: R$ ${venda.valorTotal.toFixed(2)}. Taxa: R$ ${venda.taxaPagamento.toFixed(2)}. Líquido: R$ ${venda.valorLiquido.toFixed(2)}. Custo direto: R$ ${venda.custoTotal.toFixed(2)}. Forma: ${venda.formaPagamento}. Pagamento: ${statusPagamento}.${venda.estoqueNegativoAutorizado ? ` Estoque negativo autorizado por ${usuarioAtual.email}.` : ""}`,
+        detalhes: `${atendimentoRetorno ? "Retorno" : "Atendimento"} finalizado para ${agendamento.cliente.nome}. Evolução: ${evolucaoClinica ? "registrada" : "pendente"}.${procedimentosAdicionais.length > 0 ? ` Procedimentos fechados no atendimento: ${procedimentosAdicionais.map((item) => item.nome).join(", ")}.` : ""} Serviço: R$ ${venda.totalServicos.toFixed(2)}. Produtos e kits: R$ ${venda.totalProdutos.toFixed(2)}. Total bruto: R$ ${venda.valorTotal.toFixed(2)}. Taxa: R$ ${venda.taxaPagamento.toFixed(2)}. Líquido: R$ ${venda.valorLiquido.toFixed(2)}. Custo direto: R$ ${venda.custoTotal.toFixed(2)}. Forma: ${venda.formaPagamento}. Pagamento: ${statusPagamento}.${venda.estoqueNegativoAutorizado ? ` Estoque negativo autorizado por ${usuarioAtual.email}.` : ""}`,
       },
     });
   }, { maxWait: 15000, timeout: 30000 });
@@ -2157,6 +2291,189 @@ export async function buscarAgendamentosAgendaPorClientes(
     profissionalNome:
       agendamento.profissional?.nome ?? null,
   }));
+}
+
+/**
+ * DISPONIBILIDADE PUBLICA - usada pela pagina /agendar, que a cliente abre
+ * pelo link do WhatsApp SEM login.
+ *
+ * Por ser publica, ela e deliberadamente limitada:
+ *  - devolve APENAS os horarios livres, nunca os ocupados. Isso evita
+ *    expor nome de cliente, motivo de bloqueio ou a rotina do estudio;
+ *  - so aceita datas de hoje ate 60 dias a frente;
+ *  - considera todas as profissionais ativas: se QUALQUER uma estiver
+ *    livre naquele horario, ele aparece. Quem decide qual profissional
+ *    vai atender e voce, na hora de confirmar.
+ *
+ * A regra de horario de funcionamento, bloqueios e intervalo entre
+ * atendimentos e exatamente a mesma da agenda interna - reaproveita as
+ * mesmas funcoes, entao nao ha risco de divergir do que voce ve no CRM.
+ */
+export async function listarHorariosPublicos(
+  data: string,
+  duracao = 60,
+): Promise<string[]> {
+  if (!data) return [];
+
+  const hoje = new Date();
+  const inicioHoje = new Date(
+    hoje.getFullYear(),
+    hoje.getMonth(),
+    hoje.getDate(),
+  );
+
+  const dataAlvo = parseLocalDateTime(`${data}T00:00`);
+  if (Number.isNaN(dataAlvo.getTime())) return [];
+
+  const limite = addMinutes(inicioHoje, 60 * 24 * 60);
+  if (dataAlvo < inicioHoje || dataAlvo > limite) return [];
+
+  const [configuracaoClinica, profissionais] = await Promise.all([
+    prisma.configuracaoClinica.findFirst({
+      select: {
+        horarioAtendimento: true,
+        intervaloAgenda: true,
+        intervaloEntreAtendimentos: true,
+      },
+    }),
+    prisma.profissional.findMany({
+      where: { status: "Ativa" },
+      select: { id: true, area: true },
+    }),
+  ]);
+
+  // Quem realmente atende Limpeza de Pele.
+  //
+  // Sem esse filtro, bastava UMA profissional livre para o horario aparecer -
+  // e como a agenda de cilios/sobrancelhas costuma estar vazia, a pagina
+  // mostrava o dia inteiro livre mesmo com a estetica lotada.
+  //
+  // *** E AQUI QUE SE MUDA QUEM ATENDE PELO LINK PUBLICO ***
+  // Hoje considera quem tem "facial", "corporal" ou "estetica" na area.
+  // Se ninguem casar, cai para todas as ativas, para a pagina nunca ficar
+  // vazia por engano de cadastro.
+  const AREAS_DO_LINK_PUBLICO = ["facial", "corporal", "estetica"];
+
+  const normalizar = (valor?: string | null) =>
+    (valor || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+
+  const habilitadas = profissionais.filter((item) => {
+    const area = normalizar(item.area);
+    return AREAS_DO_LINK_PUBLICO.some((termo) => area.includes(termo));
+  });
+
+  const profissionaisDoLink =
+    habilitadas.length > 0 ? habilitadas : profissionais;
+
+  if (profissionaisDoLink.length === 0) return [];
+
+  const intervaloEntreAtendimentos = Math.max(
+    0,
+    configuracaoClinica?.intervaloEntreAtendimentos ?? 30,
+  );
+
+  const configuracaoHorario = parseHorarioFuncionamento(
+    configuracaoClinica?.horarioAtendimento,
+    configuracaoClinica?.intervaloAgenda || 30,
+  );
+
+  const diaSemana = getDiaSemana(data);
+  const funcionamento =
+    diaSemana === 0
+      ? configuracaoHorario.domingo
+      : diaSemana === 6
+        ? configuracaoHorario.sabado
+        : configuracaoHorario.semana;
+
+  const slots = gerarSlotsDisponibilidade(
+    funcionamento,
+    configuracaoHorario.intervalo,
+  );
+
+  if (slots.length === 0) return [];
+
+  const inicioDia = parseLocalDateTime(`${data}T00:00`);
+  const fimDia = addMinutes(inicioDia, 24 * 60);
+  const idsProfissionais = profissionaisDoLink.map((item) => item.id);
+
+  const [agendamentosDoDia, bloqueiosDoDia] = await Promise.all([
+    prisma.agendamento.findMany({
+      where: {
+        profissionalId: { in: idsProfissionais },
+        data: { gte: inicioDia, lt: fimDia },
+        status: { notIn: ["Cancelado"] },
+      },
+      select: { profissionalId: true, data: true, duracao: true },
+    }),
+    prisma.bloqueioAgenda.findMany({
+      where: {
+        profissionalId: { in: idsProfissionais },
+        data: { gte: inicioDia, lt: fimDia },
+        status: "Ativo",
+      },
+      select: { profissionalId: true, data: true, duracao: true },
+    }),
+  ]);
+
+  const agora = new Date();
+
+  return slots.filter((hora) => {
+    const inicioNovo = montarHorario(data, hora);
+    const fimNovo = addMinutes(inicioNovo, duracao);
+
+    // Nao oferece horario que ja passou.
+    if (inicioNovo <= agora) return false;
+
+    // Basta UMA profissional livre para o horario ser oferecido.
+    return idsProfissionais.some((profissionalId) => {
+      const ocupada = agendamentosDoDia.some((agendamento) => {
+        if (agendamento.profissionalId !== profissionalId) return false;
+        const inicioExistente = new Date(agendamento.data);
+        const fimExistente = addMinutes(inicioExistente, agendamento.duracao);
+        return inicioExistente < fimNovo && fimExistente > inicioNovo;
+      });
+
+      if (ocupada) return false;
+
+      const bloqueada = bloqueiosDoDia.some((bloqueio) => {
+        if (bloqueio.profissionalId !== profissionalId) return false;
+        const inicioExistente = new Date(bloqueio.data);
+        const fimExistente = addMinutes(inicioExistente, bloqueio.duracao);
+
+        return (
+          (inicioExistente < fimNovo && fimExistente > inicioNovo) ||
+          conflitaComIntervaloEntreAtendimentos(
+            inicioNovo,
+            fimNovo,
+            inicioExistente,
+            fimExistente,
+            intervaloEntreAtendimentos,
+          )
+        );
+      });
+
+      if (bloqueada) return false;
+
+      const semIntervalo = agendamentosDoDia.some((agendamento) => {
+        if (agendamento.profissionalId !== profissionalId) return false;
+        const inicioExistente = new Date(agendamento.data);
+        const fimExistente = addMinutes(inicioExistente, agendamento.duracao);
+
+        return conflitaComIntervaloEntreAtendimentos(
+          inicioNovo,
+          fimNovo,
+          inicioExistente,
+          fimExistente,
+          intervaloEntreAtendimentos,
+        );
+      });
+
+      return !semIntervalo;
+    });
+  });
 }
 
 export async function buscarDisponibilidadeAgenda({

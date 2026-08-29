@@ -12,8 +12,10 @@ import {
   ClipboardCheck,
   LoaderCircle,
   Package,
+  Plus,
   RotateCcw,
   Sparkles,
+  Trash2,
   UserRound,
   WalletCards,
   X,
@@ -44,6 +46,19 @@ type ServicoFinalizacao = {
   duracaoPadrao: number;
   valorPadrao: number;
   custoPadrao: number;
+};
+
+// Procedimento fechado durante o proprio atendimento (ex.: veio para uma
+// limpeza de pele e fechou um botox na hora). Vira um atendimento proprio,
+// com evolucao clinica separada, e entra na mesma venda.
+type ProcedimentoExtraDraft = {
+  chave: string;
+  servicoId: number | null;
+  nome: string;
+  valor: number;
+  custo: number;
+  duracao: number;
+  evolucao: string;
 };
 
 export type FormaPagamentoFinalizacao = {
@@ -165,6 +180,9 @@ export default function FinalizarAtendimentoModal({
   const [evolucao, setEvolucao] = useState("");
   const [valorServico, setValorServico] = useState(0);
   const [custoServico, setCustoServico] = useState(0);
+  const [procedimentosExtras, setProcedimentosExtras] = useState<
+    ProcedimentoExtraDraft[]
+  >([]);
   const [itensProdutos, setItensProdutos] = useState<ItemProdutoVendaDraft[]>([]);
   const [itensKits, setItensKits] = useState<ItemKitVendaDraft[]>([]);
   const [permitirEstoqueNegativo, setPermitirEstoqueNegativo] = useState(false);
@@ -203,6 +221,7 @@ export default function FinalizarAtendimentoModal({
       setEvolucao("");
       setValorServico(0);
       setCustoServico(0);
+      setProcedimentosExtras([]);
       setItensProdutos([]);
       setItensKits([]);
       setPermitirEstoqueNegativo(false);
@@ -238,6 +257,7 @@ export default function FinalizarAtendimentoModal({
     setCustoServico(
       atendimentoRetornoAtual ? 0 : Number(servico?.custoPadrao || 0),
     );
+    setProcedimentosExtras([]);
     setItensProdutos([]);
     setItensKits([]);
     setPermitirEstoqueNegativo(false);
@@ -268,19 +288,35 @@ export default function FinalizarAtendimentoModal({
     );
     const totalProdutos = totalProdutosAvulsos + totalKits;
     const custoProdutos = custoProdutosAvulsos + custoKits;
-    const total = valorServico + totalProdutos;
-    const custo = custoServico + custoProdutos;
+    const totalExtras = procedimentosExtras.reduce(
+      (total, item) => total + Math.max(0, item.valor),
+      0,
+    );
+    const custoExtras = procedimentosExtras.reduce(
+      (total, item) => total + Math.max(0, item.custo),
+      0,
+    );
+    const total = valorServico + totalExtras + totalProdutos;
+    const custo = custoServico + custoExtras + custoProdutos;
     const margem = total - custo;
 
     return {
       totalProdutos,
       custoProdutos,
+      totalExtras,
+      custoExtras,
       total,
       custo,
       margem,
       margemPercentual: total > 0 ? (margem / total) * 100 : 0,
     };
-  }, [itensProdutos, itensKits, valorServico, custoServico]);
+  }, [
+    itensProdutos,
+    itensKits,
+    procedimentosExtras,
+    valorServico,
+    custoServico,
+  ]);
 
   const pagamentoPrevisto = useMemo(() => {
     const valorBruto = Math.max(0, arredondarMoeda(totais.total));
@@ -325,6 +361,62 @@ export default function FinalizarAtendimentoModal({
     onClose();
   }
 
+  // ---- Procedimentos fechados durante o atendimento ----
+
+  function adicionarProcedimentoExtra() {
+    setProcedimentosExtras((atuais) => [
+      ...atuais,
+      {
+        chave: `extra-${Date.now()}-${atuais.length}`,
+        servicoId: null,
+        nome: "",
+        valor: 0,
+        custo: 0,
+        duracao: 30,
+        evolucao: "",
+      },
+    ]);
+    setError(null);
+  }
+
+  function removerProcedimentoExtra(chave: string) {
+    setProcedimentosExtras((atuais) =>
+      atuais.filter((item) => item.chave !== chave),
+    );
+  }
+
+  function alterarProcedimentoExtra(
+    chave: string,
+    mudanca: Partial<ProcedimentoExtraDraft>,
+  ) {
+    setProcedimentosExtras((atuais) =>
+      atuais.map((item) =>
+        item.chave === chave ? { ...item, ...mudanca } : item,
+      ),
+    );
+    setError(null);
+  }
+
+  // Ao escolher um procedimento da lista, já preenche valor, custo e
+  // duração com o que está cadastrado - a Vivian só ajusta se precisar.
+  function escolherServicoExtra(chave: string, servicoIdTexto: string) {
+    const servicoId = Number(servicoIdTexto);
+    const servico = servicos.find((item) => item.id === servicoId);
+
+    if (!servico) {
+      alterarProcedimentoExtra(chave, { servicoId: null, nome: "" });
+      return;
+    }
+
+    alterarProcedimentoExtra(chave, {
+      servicoId: servico.id,
+      nome: servico.nome,
+      valor: Number(servico.valorPadrao || 0),
+      custo: Number(servico.custoPadrao || 0),
+      duracao: Math.max(15, Number(servico.duracaoPadrao || 30)),
+    });
+  }
+
   function atualizarProcedimento(value: string) {
     setProcedimentoRealizado(value);
     setError(null);
@@ -352,6 +444,13 @@ export default function FinalizarAtendimentoModal({
     if (estoqueInsuficiente.length > 0 && !permitirEstoqueNegativo) {
       setError(
         "Há estoque insuficiente. Ajuste os itens ou solicite autorização de um administrador.",
+      );
+      return;
+    }
+
+    if (procedimentosExtras.some((item) => !item.nome.trim())) {
+      setError(
+        "Escolha o procedimento em todos os itens adicionados, ou remova os que estiverem em branco.",
       );
       return;
     }
@@ -385,6 +484,16 @@ export default function FinalizarAtendimentoModal({
           profissional: undefined,
           valorCobrado: Math.max(0, valorServico),
           custoServico: Math.max(0, custoServico),
+          procedimentosAdicionais: procedimentosExtras
+            .filter((item) => item.nome.trim())
+            .map((item) => ({
+              nome: item.nome.trim(),
+              procedimentoServicoId: item.servicoId,
+              valor: Math.max(0, item.valor),
+              custo: Math.max(0, item.custo),
+              duracao: Math.max(15, item.duracao),
+              evolucao: item.evolucao.trim() || undefined,
+            })),
           produtos: itensProdutos.map((item) => ({
             produtoId: item.produtoId,
             quantidade: item.quantidade,
@@ -755,6 +864,162 @@ export default function FinalizarAtendimentoModal({
                   </div>
                 </section>
 
+                <section className="rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm">
+                  <div className="mb-3 flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2">
+                      <Sparkles size={16} className="mt-0.5 text-emerald-600" />
+                      <div>
+                        <p className="text-xs font-bold text-slate-900">
+                          Outros procedimentos fechados agora
+                        </p>
+                        <p className="mt-0.5 text-[11px] leading-4 text-slate-500">
+                          Para quando a cliente fecha outro procedimento durante
+                          o atendimento. Cada um vira um atendimento próprio, com
+                          evolução clínica separada, e entra no mesmo pagamento.
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={adicionarProcedimentoExtra}
+                      className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                    >
+                      <Plus size={14} />
+                      Adicionar
+                    </button>
+                  </div>
+
+                  {procedimentosExtras.length === 0 ? (
+                    <p className="rounded-xl border border-dashed border-slate-200 px-3 py-3 text-center text-[11px] text-slate-400">
+                      Nenhum procedimento extra. Use o botão acima se a cliente
+                      fechou algo a mais hoje.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {procedimentosExtras.map((extra) => (
+                        <div
+                          key={extra.chave}
+                          className="rounded-xl border border-slate-200 bg-slate-50 p-3"
+                        >
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={extra.servicoId ?? ""}
+                              onChange={(event) =>
+                                escolherServicoExtra(
+                                  extra.chave,
+                                  event.target.value,
+                                )
+                              }
+                              className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-400"
+                            >
+                              <option value="">Escolha o procedimento</option>
+                              {servicos.map((servico) => (
+                                <option key={servico.id} value={servico.id}>
+                                  {servico.nome}
+                                </option>
+                              ))}
+                            </select>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                removerProcedimentoExtra(extra.chave)
+                              }
+                              aria-label="Remover procedimento"
+                              className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+
+                          <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                            <label>
+                              <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                Valor cobrado
+                              </span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={extra.valor}
+                                onChange={(event) =>
+                                  alterarProcedimentoExtra(extra.chave, {
+                                    valor: Math.max(
+                                      0,
+                                      Number(event.target.value) || 0,
+                                    ),
+                                  })
+                                }
+                                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-400"
+                              />
+                            </label>
+
+                            <label>
+                              <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                Custo direto
+                              </span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={extra.custo}
+                                onChange={(event) =>
+                                  alterarProcedimentoExtra(extra.chave, {
+                                    custo: Math.max(
+                                      0,
+                                      Number(event.target.value) || 0,
+                                    ),
+                                  })
+                                }
+                                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-400"
+                              />
+                            </label>
+
+                            <label>
+                              <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                Duração (min)
+                              </span>
+                              <input
+                                type="number"
+                                min="15"
+                                step="5"
+                                value={extra.duracao}
+                                onChange={(event) =>
+                                  alterarProcedimentoExtra(extra.chave, {
+                                    duracao: Math.max(
+                                      15,
+                                      Number(event.target.value) || 30,
+                                    ),
+                                  })
+                                }
+                                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-400"
+                              />
+                            </label>
+                          </div>
+
+                          <label className="mt-2 block">
+                            <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                              Evolução deste procedimento (opcional agora)
+                            </span>
+                            <textarea
+                              rows={2}
+                              value={extra.evolucao}
+                              onChange={(event) =>
+                                alterarProcedimentoExtra(extra.chave, {
+                                  evolucao: event.target.value,
+                                })
+                              }
+                              placeholder="Se deixar em branco, fica na fila de evoluções pendentes."
+                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-emerald-400"
+                            />
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
                 <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="mb-3 flex items-center gap-2">
                     <Package size={16} className="text-violet-600" />
@@ -863,6 +1128,12 @@ export default function FinalizarAtendimentoModal({
 
                   <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                     <ResumoValor label="Serviço" value={valorServico} />
+                    {totais.totalExtras > 0 ? (
+                      <ResumoValor
+                        label="Outros procedimentos"
+                        value={totais.totalExtras}
+                      />
+                    ) : null}
                     <ResumoValor label="Produtos" value={totais.totalProdutos} />
                     <ResumoValor label="Custo direto" value={totais.custo} />
                     <ResumoValor label="Total da venda" value={totais.total} destaque />

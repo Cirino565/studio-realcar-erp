@@ -36,6 +36,11 @@ export type CriarVendaNoTxInput = {
   origem: string;
   observacoes?: string | null;
   servico?: VendaServicoInput | null;
+  // Serviços extras fechados no mesmo atendimento (ex.: a cliente veio para
+  // uma limpeza de pele e acabou fechando um botox na hora). Entram como
+  // linhas próprias da mesma venda - a cliente paga uma vez só, mas cada
+  // procedimento fica registrado e contabilizado separadamente.
+  servicosAdicionais?: VendaServicoInput[];
   produtos?: VendaProdutoInput[];
   kits?: VendaKitInput[];
   permitirEstoqueNegativo?: boolean;
@@ -362,8 +367,28 @@ export async function criarVendaNoTx(
       }
     : null;
 
-  const totalServicos = servico?.valorUnitario || 0;
-  const custoServicos = servico?.custoUnitario || 0;
+  // Lista final de serviços da venda: o principal (quando existe) mais os
+  // que foram fechados durante o atendimento.
+  const servicos = [
+    ...(servico ? [servico] : []),
+    ...(dados.servicosAdicionais || [])
+      .filter((item) => item?.descricao?.trim())
+      .map((item) => ({
+        procedimentoServicoId: item.procedimentoServicoId || null,
+        descricao: item.descricao.trim(),
+        valorUnitario: dinheiroSeguro(item.valorUnitario),
+        custoUnitario: dinheiroSeguro(item.custoUnitario),
+      })),
+  ];
+
+  const totalServicos = servicos.reduce(
+    (total, item) => total + item.valorUnitario,
+    0,
+  );
+  const custoServicos = servicos.reduce(
+    (total, item) => total + item.custoUnitario,
+    0,
+  );
   const totalProdutosAvulsos = produtosNormalizados.reduce(
     (total, item) => total + item.valorTotal,
     0,
@@ -433,18 +458,18 @@ export async function criarVendaNoTx(
     },
   });
 
-  if (servico) {
+  for (const itemServico of servicos) {
     await tx.vendaItem.create({
       data: {
         vendaId: venda.id,
         tipo: "SERVICO",
-        procedimentoServicoId: servico.procedimentoServicoId,
-        descricao: servico.descricao,
+        procedimentoServicoId: itemServico.procedimentoServicoId,
+        descricao: itemServico.descricao,
         quantidade: 1,
-        valorUnitario: servico.valorUnitario,
-        custoUnitario: servico.custoUnitario,
-        valorTotal: servico.valorUnitario,
-        custoTotal: servico.custoUnitario,
+        valorUnitario: itemServico.valorUnitario,
+        custoUnitario: itemServico.custoUnitario,
+        valorTotal: itemServico.valorUnitario,
+        custoTotal: itemServico.custoUnitario,
       },
     });
   }
