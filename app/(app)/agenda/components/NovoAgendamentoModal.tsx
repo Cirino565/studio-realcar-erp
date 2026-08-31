@@ -283,6 +283,7 @@ export default function NovoAgendamentoModal({
   const [erroAcaoHorario, setErroAcaoHorario] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [sucesso, setSucesso] = useState(false);
+  const [avisoSucesso, setAvisoSucesso] = useState<string | null>(null);
   const router = useRouter();
   const [mostrarMaisCampos, setMostrarMaisCampos] = useState(false);
   const [horarios, setHorarios] = useState<HorarioDisponivelAgenda[]>([]);
@@ -369,6 +370,7 @@ export default function NovoAgendamentoModal({
     setExcecaoHorario(false);
     setPermitirEncaixeSemIntervalo(false);
     setSucesso(false);
+    setAvisoSucesso(null);
     setDuracao(formatarDuracao(initialPayload?.duracao || 60));
     setValor(
       naturezaInicial === "RETORNO"
@@ -789,11 +791,15 @@ export default function NovoAgendamentoModal({
         // instante para comecar.
         setSalvando(false);
         setSucesso(true);
+        setAvisoSucesso(resultadoBloqueio.aviso || null);
         router.refresh();
 
-        setTimeout(() => {
-          onClose();
-        }, 1400);
+        setTimeout(
+          () => {
+            onClose();
+          },
+          resultadoBloqueio.aviso ? 4000 : 1400,
+        );
       } catch (error) {
         setSalvando(false);
         setErroTitulo("Não foi possível salvar o bloqueio");
@@ -2172,9 +2178,17 @@ export default function NovoAgendamentoModal({
         </div>
 
         {sucesso ? (
-          <footer className="flex shrink-0 items-center justify-center gap-2 border-t border-emerald-200 bg-emerald-50 px-4 py-4 text-sm font-bold uppercase text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-950/30 dark:text-emerald-200 sm:px-5">
-            <CheckCircle2 size={20} />
-            Salvo com sucesso
+          <footer className="flex shrink-0 flex-col items-center gap-1.5 border-t border-emerald-200 bg-emerald-50 px-4 py-4 text-center dark:border-emerald-500/30 dark:bg-emerald-950/30 sm:px-5">
+            <div className="flex items-center gap-2 text-sm font-bold uppercase text-emerald-800 dark:text-emerald-200">
+              <CheckCircle2 size={20} />
+              Salvo com sucesso
+            </div>
+
+            {avisoSucesso ? (
+              <p className="max-w-md text-xs normal-case leading-5 text-emerald-700 dark:text-emerald-300">
+                {avisoSucesso}
+              </p>
+            ) : null}
           </footer>
         ) : (
           <footer className="grid shrink-0 grid-cols-2 gap-3 border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900 sm:px-5">

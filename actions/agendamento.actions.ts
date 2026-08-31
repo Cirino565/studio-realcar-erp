@@ -53,6 +53,9 @@ type NovoAgendamento = {
 export type ResultadoSalvarAgenda =
   | {
       ok: true;
+      // Aviso não bloqueante - ex.: "domingo foi ignorado por já estar
+      // fechado". A operação foi concluída mesmo assim.
+      aviso?: string;
     }
   | {
       ok: false;
@@ -713,6 +716,65 @@ async function validarDatasNoHorarioFuncionamento(datas: Date[]) {
   }
 }
 
+// Usada só para BLOQUEIO (não para agendamento real): em vez de rejeitar a
+// série inteira quando ela cai num dia em que a clínica já está fechada,
+// simplesmente ignora esse dia - bloquear um dia que já está fechado não
+// muda nada. Continua rejeitando quando o HORÁRIO em si está fora do
+// expediente (isso normalmente indica erro de digitação, não um dia de
+// folga esperado).
+async function filtrarDatasBloqueioValidas(datas: Date[]) {
+  const configuracaoClinica = await prisma.configuracaoClinica.findFirst({
+    select: {
+      horarioAtendimento: true,
+      intervaloAgenda: true,
+    },
+  });
+
+  const configuracaoHorario = parseHorarioFuncionamento(
+    configuracaoClinica?.horarioAtendimento,
+    configuracaoClinica?.intervaloAgenda || 30,
+  );
+
+  const datasValidas: Date[] = [];
+  const diasFechadosIgnorados: string[] = [];
+
+  for (const data of datas) {
+    const dataTexto = formatDateSaoPaulo(data);
+    const diaSemana = getDiaSemana(dataTexto);
+    const funcionamento =
+      diaSemana === 0
+        ? configuracaoHorario.domingo
+        : diaSemana === 6
+          ? configuracaoHorario.sabado
+          : configuracaoHorario.semana;
+
+    if (!funcionamento) {
+      diasFechadosIgnorados.push(dataTexto);
+      continue;
+    }
+
+    const inicio = minutosDoHorario(formatHourMinute(data));
+    const abertura = minutosDoHorario(funcionamento.abertura);
+    const ultimoInicio = minutosDoHorario(funcionamento.fechamento);
+
+    if (inicio < abertura || inicio > ultimoInicio) {
+      throw new Error(
+        `O horário de ${dataTexto} fica fora da faixa permitida para iniciar bloqueios (${funcionamento.abertura} às ${funcionamento.fechamento}). Ajuste o horário antes de salvar.`,
+      );
+    }
+
+    datasValidas.push(data);
+  }
+
+  return { datasValidas, diasFechadosIgnorados };
+}
+
+function formatarListaDias(dias: string[]) {
+  if (dias.length === 1) return dias[0];
+  if (dias.length === 2) return `${dias[0]} e ${dias[1]}`;
+  return `${dias.slice(0, -1).join(", ")} e ${dias[dias.length - 1]}`;
+}
+
 export async function criarAgendamento(
   dados: NovoAgendamento,
 ): Promise<ResultadoSalvarAgenda> {
@@ -1226,9 +1288,23 @@ export async function criarBloqueioAgenda(
 
   const dataBase = parseLocalDateTime(dados.data);
   const duracao = Math.max(5, dados.duracao || 60);
-  const { regra, datas } = gerarDatasRecorrencia(dataBase, dados.recorrencia);
+  const { regra, datas: datasSolicitadas } = gerarDatasRecorrencia(
+    dataBase,
+    dados.recorrencia,
+  );
 
-  await validarDatasNoHorarioFuncionamento(datas);
+  const { datasValidas: datas, diasFechadosIgnorados } =
+    await filtrarDatasBloqueioValidas(datasSolicitadas);
+
+  if (datas.length === 0) {
+    return {
+      ok: false,
+      codigo: "CONFLITO_BLOQUEIO",
+      titulo: "Não foi possível criar o bloqueio",
+      mensagem: `${formatarListaDias(diasFechadosIgnorados)} a clínica já está fechada, então não há o que bloquear neste período. Ajuste as datas ou verifique a configuração de horário de funcionamento.`,
+      campo: "hora",
+    };
+  }
 
   for (const data of datas) {
     const conflito = await obterConflitoAgenda({
@@ -1279,7 +1355,13 @@ export async function criarBloqueioAgenda(
   revalidatePath("/agenda");
   revalidatePath("/");
 
-  return { ok: true };
+  return {
+    ok: true,
+    aviso:
+      diasFechadosIgnorados.length > 0
+        ? `${formatarListaDias(diasFechadosIgnorados)} a clínica já estava fechada, então ${diasFechadosIgnorados.length === 1 ? "esse dia foi ignorado" : "esses dias foram ignorados"}. Os demais dias do período foram bloqueados normalmente.`
+        : undefined,
+  };
 }
 
 export async function atualizarBloqueioAgenda({
@@ -1303,7 +1385,18 @@ export async function atualizarBloqueioAgenda({
   const data = parseLocalDateTime(dados.data);
   const duracao = Math.max(5, dados.duracao || 60);
 
-  await validarDatasNoHorarioFuncionamento([data]);
+  const { datasValidas, diasFechadosIgnorados } =
+    await filtrarDatasBloqueioValidas([data]);
+
+  if (datasValidas.length === 0) {
+    return {
+      ok: false,
+      codigo: "CONFLITO_BLOQUEIO",
+      titulo: "Não foi possível salvar o bloqueio",
+      mensagem: `${formatarListaDias(diasFechadosIgnorados)} a clínica já está fechada. Escolha outra data.`,
+      campo: "hora",
+    };
+  }
 
   const conflito = await obterConflitoAgenda({
     profissionalId: dados.profissionalId,
