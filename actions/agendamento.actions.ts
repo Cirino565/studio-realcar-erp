@@ -1953,17 +1953,43 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
     // - atendimento sem venda -> Aguardando resposta
     //
     // Convertido e Perdido nunca sao reabertos automaticamente.
-    const leadVinculado = await tx.lead.findUnique({
+    const camposLead = {
+      id: true,
+      nome: true,
+      etapa: true,
+      clienteId: true,
+      chamouWhatsapp: true,
+      proximoContatoEm: true,
+    } as const;
+
+    // 1a tentativa: o lead ligado diretamente a ESTE agendamento.
+    let leadVinculado = await tx.lead.findUnique({
       where: { agendamentoId: agendamento.id },
-      select: {
-        id: true,
-        nome: true,
-        etapa: true,
-        clienteId: true,
-        chamouWhatsapp: true,
-        proximoContatoEm: true,
-      },
+      select: camposLead,
     });
+
+    // 2a tentativa: nenhum lead ligado a este agendamento especifico, mas a
+    // cliente pode ter um lead em aberto vindo de outro agendamento.
+    //
+    // Isso acontece no caso comum de a cliente vir de campanha para uma
+    // avaliacao, e o procedimento de verdade ser marcado depois direto pela
+    // agenda (e nao pelo botao "Reagendar" do cartao do lead). Sem esta
+    // segunda tentativa, ela ficava para sempre como lead nao convertido -
+    // mesmo tendo comprado -, o que distorce a leitura de retorno das
+    // campanhas.
+    //
+    // Convertido e Perdido continuam intocados: leads ja encerrados nunca
+    // sao reabertos nem sobrescritos aqui.
+    if (!leadVinculado) {
+      leadVinculado = await tx.lead.findFirst({
+        where: {
+          clienteId: agendamento.clienteId,
+          etapa: { notIn: ["Convertido", "Perdido"] },
+        },
+        select: camposLead,
+        orderBy: { createdAt: "desc" },
+      });
+    }
 
     if (
       leadVinculado &&
