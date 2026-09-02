@@ -9,6 +9,7 @@ import {
   Bot,
   Calendar,
   CalendarClock,
+  CalendarX,
   ChevronRight,
   FileBarChart2,
   Gauge,
@@ -62,6 +63,12 @@ const mainMenus = [
     icon: CalendarClock,
     href: "/retornos",
     permissao: "clientes.visualizar",
+  },
+  {
+    nome: "Em aberto",
+    icon: CalendarX,
+    href: "/atendimentos-abertos",
+    permissao: "agenda.visualizar",
   },
   {
     nome: "Financeiro",
