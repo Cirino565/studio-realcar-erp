@@ -30,6 +30,15 @@ type UploadClienteFotoInput = {
 
 let accessTokenCache: AccessTokenCache | null = null;
 
+// Cache em memoria das pastas do Drive (cliente e ano), no mesmo espirito
+// do cache do token de acesso acima. Sem isso, toda foto enviada fazia
+// duas buscas no Drive antes de comecar o envio - mesmo quando a pasta ja
+// existia, que e o caso normal depois da primeira foto de cada cliente.
+// Some quando o servidor reinicia, e é recriado sozinho na proxima busca -
+// sem risco de ficar desatualizado de forma prejudicial.
+const clientFolderIdCache = new Map<number, string>();
+const yearFolderIdCache = new Map<string, string>();
+
 function getDriveCredentials() {
   const clientId = process.env.GOOGLE_DRIVE_CLIENT_ID?.trim();
   const clientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET?.trim();
@@ -206,13 +215,19 @@ async function getOrCreateRootFolder() {
 }
 
 async function getOrCreateClientFolder(rootFolderId: string, clienteId: number) {
+  const emCache = clientFolderIdCache.get(clienteId);
+  if (emCache) return emCache;
+
   const clienteKey = String(clienteId);
   const existing = await findFolder([
     `'${escapeDriveQueryValue(rootFolderId)}' in parents`,
     `appProperties has { key='clienteId' and value='${escapeDriveQueryValue(clienteKey)}' }`,
   ]);
 
-  if (existing) return existing.id;
+  if (existing) {
+    clientFolderIdCache.set(clienteId, existing.id);
+    return existing.id;
+  }
 
   const folder = await createFolder(
     `cliente_${String(clienteId).padStart(6, "0")}`,
@@ -224,17 +239,25 @@ async function getOrCreateClientFolder(rootFolderId: string, clienteId: number) 
     },
   );
 
+  clientFolderIdCache.set(clienteId, folder.id);
   return folder.id;
 }
 
 async function getOrCreateYearFolder(clientFolderId: string, year: number) {
   const yearKey = String(year);
+  const chaveCache = `${clientFolderId}:${yearKey}`;
+  const emCache = yearFolderIdCache.get(chaveCache);
+  if (emCache) return emCache;
+
   const existing = await findFolder([
     `'${escapeDriveQueryValue(clientFolderId)}' in parents`,
     `appProperties has { key='ano' and value='${escapeDriveQueryValue(yearKey)}' }`,
   ]);
 
-  if (existing) return existing.id;
+  if (existing) {
+    yearFolderIdCache.set(chaveCache, existing.id);
+    return existing.id;
+  }
 
   const folder = await createFolder(yearKey, clientFolderId, {
     sistema: "studio-realcar",
@@ -242,6 +265,7 @@ async function getOrCreateYearFolder(clientFolderId: string, year: number) {
     tipoRegistro: "ano-clinico",
   });
 
+  yearFolderIdCache.set(chaveCache, folder.id);
   return folder.id;
 }
 
