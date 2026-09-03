@@ -1669,10 +1669,6 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
     ? Math.max(0, Number(dados.valorCobrado))
     : 0;
 
-  const dataAtendimento = dados.dataAtendimento
-    ? new Date(dados.dataAtendimento)
-    : new Date();
-
   const statusPagamento = dados.statusPagamento || "Pago";
   const formaPagamento = dados.formaPagamento || "Não informado";
 
@@ -1695,6 +1691,16 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
   if (agendamento.status === "Atendido") {
     throw new Error("Este atendimento já foi finalizado.");
   }
+
+  // A data do atendimento é a data em que ele ACONTECEU (a do agendamento),
+  // não a data em que foi finalizado no sistema. Sem isso, finalizar hoje um
+  // atendimento de ontem gravava tudo (venda, procedimento na ficha da
+  // cliente, evolução clínica, financeiro) com a data de hoje.
+  //
+  // Só usa outra data quando ela é informada explicitamente na chamada.
+  const dataAtendimento = dados.dataAtendimento
+    ? new Date(dados.dataAtendimento)
+    : agendamento.data;
 
   const atendimentoRetorno =
     agendamento.naturezaAtendimento === "RETORNO";
