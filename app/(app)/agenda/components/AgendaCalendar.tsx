@@ -2134,14 +2134,24 @@ export default function AgendaCalendar({
                             </div>
 
                             {height >= 52 ? (
+                              // O PROCEDIMENTO vem sempre primeiro: e o que
+                              // precisa ser visto de imediato. A observacao
+                              // entra logo depois, na mesma linha, e e
+                              // cortada se nao couber - assim horarios curtos
+                              // (40-45 min) nao perdem mais o procedimento.
                               <p
                                 className={`${
                                   isCompactAppointment ? "mt-0.5" : "mt-1"
                                 } line-clamp-1 text-[0.64rem] font-semibold leading-tight sm:text-[0.7rem]`}
                                 style={{ color: statusPalette.mutedText }}
-                                title={observacaoReal || undefined}
+                                title={
+                                  observacaoReal
+                                    ? `${appointment.procedimento} · ${observacaoReal}`
+                                    : appointment.procedimento
+                                }
                               >
-                                {observacaoReal || appointment.procedimento}
+                                {appointment.procedimento}
+                                {observacaoReal ? ` · ${observacaoReal}` : ""}
                               </p>
                             ) : null}
 
@@ -2154,7 +2164,6 @@ export default function AgendaCalendar({
                                 {!observacaoReal && note !== appointment.status
                                   ? ` · ${note}`
                                   : ""}
-                                {observacaoReal ? ` · ${appointment.procedimento}` : ""}
                               </p>
                             ) : null}
                           </div>
