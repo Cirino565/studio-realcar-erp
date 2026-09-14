@@ -154,15 +154,15 @@ export default function NovoLancamentoModal({ open, contas, formasPagamento, cam
             <span>Cliente relacionada (opcional)</span>
 
             {clienteSelecionado ? (
-              <div className="flex items-center justify-between rounded-xl border border-violet-400/30 bg-violet-500/10 px-3 py-2.5">
+              <div className="flex items-center justify-between rounded-xl border border-violet-300 bg-violet-50 px-3 py-2.5">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-white">{clienteSelecionado.nome}</p>
-                  <p className="text-xs text-slate-400">{clienteSelecionado.telefone}</p>
+                  <p className="truncate text-sm font-semibold text-slate-900">{clienteSelecionado.nome}</p>
+                  <p className="text-xs text-slate-500">{clienteSelecionado.telefone}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => { setClienteId(null); setBuscaCliente(""); }}
-                  className="shrink-0 rounded-lg border border-white/10 px-2 py-1 text-xs text-slate-300 hover:bg-white/5"
+                  className="shrink-0 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-white"
                 >
                   Trocar
                 </button>
@@ -178,7 +178,7 @@ export default function NovoLancamentoModal({ open, contas, formasPagamento, cam
                 />
 
                 {buscaClienteAberta && clientesFiltrados.length > 0 ? (
-                  <div className="absolute top-full z-10 mt-1 w-full overflow-hidden rounded-xl border border-white/10 bg-slate-900 shadow-xl">
+                  <div className="absolute top-full z-10 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
                     {clientesFiltrados.map((item) => (
                       <button
                         key={item.id}
@@ -188,10 +188,10 @@ export default function NovoLancamentoModal({ open, contas, formasPagamento, cam
                           setBuscaCliente("");
                           setBuscaClienteAberta(false);
                         }}
-                        className="flex w-full flex-col items-start px-3 py-2 text-left text-sm hover:bg-white/5"
+                        className="flex w-full flex-col items-start bg-white px-3 py-2 text-left text-sm hover:bg-slate-50"
                       >
-                        <span className="font-medium text-white">{item.nome}</span>
-                        <span className="text-xs text-slate-400">{item.telefone}</span>
+                        <span className="font-medium text-slate-900">{item.nome}</span>
+                        <span className="text-xs text-slate-500">{item.telefone}</span>
                       </button>
                     ))}
                   </div>
