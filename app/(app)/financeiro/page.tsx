@@ -9,7 +9,7 @@ function lancamentoCancelado(item: { statusPagamento: string; venda: { situacao:
 
 export default async function FinanceiroPage() {
   await requirePagePermission("financeiro.visualizar");
-  const [lancamentos, contasBase, formasPagamento, campanhas] = await Promise.all([
+  const [lancamentos, contasBase, formasPagamento, campanhas, clientes] = await Promise.all([
     prisma.lancamento.findMany({
       include: {
         contaFinanceira: { select: { id: true, nome: true } },
@@ -36,6 +36,15 @@ export default async function FinanceiroPage() {
     prisma.campanhaMarketing.findMany({
       orderBy: [{ status: "asc" }, { nome: "asc" }],
       select: { id: true, nome: true, canal: true, status: true },
+    }),
+    // Lista leve para vincular um lançamento manual a uma cliente (ex.:
+    // adiantamento de pacote fechado na avaliação). Mesmo padrão já usado
+    // no seletor de cliente da Agenda - so os campos necessarios para a
+    // busca, sem o historico de agendamentos.
+    prisma.cliente.findMany({
+      where: { status: { not: "Inativa" } },
+      select: { id: true, nome: true, telefone: true, whatsapp: true },
+      orderBy: { nome: "asc" },
     }),
   ]);
 
@@ -75,6 +84,7 @@ export default async function FinanceiroPage() {
       contas={contas}
       formasPagamento={formasPagamento}
       campanhas={campanhas}
+      clientes={clientes}
     />
   );
 }

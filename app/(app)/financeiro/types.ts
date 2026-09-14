@@ -42,6 +42,13 @@ export type CampanhaFinanceiroOption = {
   status: string;
 };
 
+export type ClienteFinanceiroOption = {
+  id: number;
+  nome: string;
+  telefone: string;
+  whatsapp: string | null;
+};
+
 export type LancamentoFinanceiro = {
   id: number;
   descricao: string;

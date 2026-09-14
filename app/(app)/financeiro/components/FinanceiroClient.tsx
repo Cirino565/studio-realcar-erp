@@ -25,6 +25,7 @@ import LancamentosTable from "./LancamentosTable";
 import NovoLancamentoModal from "./NovoLancamentoModal";
 import type {
   CampanhaFinanceiroOption,
+  ClienteFinanceiroOption,
   ContaFinanceiraData,
   FinanceiroResumoData,
   FormaPagamentoConfigData,
@@ -37,6 +38,7 @@ type Props = {
   contas: ContaFinanceiraData[];
   formasPagamento: FormaPagamentoConfigData[];
   campanhas: CampanhaFinanceiroOption[];
+  clientes: ClienteFinanceiroOption[];
 };
 
 type SituacaoFiltro = "ativos" | "cancelados" | "todos";
@@ -194,7 +196,7 @@ function baixarCsv(
   URL.revokeObjectURL(url);
 }
 
-export default function FinanceiroClient({ lancamentos, contas, formasPagamento, campanhas }: Props) {
+export default function FinanceiroClient({ lancamentos, contas, formasPagamento, campanhas, clientes }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [modalAberto, setModalAberto] = useState(false);
@@ -488,6 +490,7 @@ export default function FinanceiroClient({ lancamentos, contas, formasPagamento,
         contas={contas}
         formasPagamento={formasPagamento}
         campanhas={campanhas}
+        clientes={clientes}
         onClose={() => setModalAberto(false)}
         onSaved={() => router.refresh()}
       />
