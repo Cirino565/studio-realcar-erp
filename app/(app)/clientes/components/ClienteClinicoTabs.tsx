@@ -16,6 +16,7 @@ import {
   Plus,
   Stethoscope,
   Trash2,
+  Wallet,
   X,
 } from "lucide-react";
 
@@ -25,6 +26,11 @@ import {
   criarProcedimentoCliente,
   excluirRegistroClinico,
 } from "@/actions/cliente-clinico.actions";
+import {
+  cancelarPacoteCliente,
+  criarPacoteCliente,
+  registrarPagamentoPacote,
+} from "@/actions/pacote.actions";
 import RegistrarEvolucaoPendenteModal from "@/components/atendimento/RegistrarEvolucaoPendenteModal";
 import { Button } from "@/components/ui/button";
 import AnamneseMobileForm from "./AnamneseMobileForm";
@@ -37,6 +43,7 @@ type AbaClinica =
   | "fotos"
   | "evolucao"
   | "procedimentos"
+  | "pacotes"
   | "documentos";
 
 type Props = {
@@ -78,6 +85,7 @@ const abas: { id: AbaClinica; label: string; icon: LucideIcon }[] = [
   { id: "fotos", label: "Fotos", icon: ImageIcon },
   { id: "evolucao", label: "Evolução", icon: Activity },
   { id: "procedimentos", label: "Procedimentos", icon: Stethoscope },
+  { id: "pacotes", label: "Pacotes", icon: Wallet },
   { id: "documentos", label: "Documentos", icon: FileText },
 ];
 
@@ -225,6 +233,36 @@ function DeleteButton({
       ) : (
         <Trash2 />
       )}
+    </Button>
+  );
+}
+
+function CancelarPacoteButton({ pacoteId }: { pacoteId: number }) {
+  const [isPending, startTransition] = useTransition();
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      disabled={isPending}
+      onClick={() => {
+        if (!window.confirm("Cancelar este pacote? O dinheiro já recebido continua no Financeiro normalmente.")) {
+          return;
+        }
+
+        startTransition(() => {
+          const formData = new FormData();
+          formData.set("pacoteId", String(pacoteId));
+
+          void cancelarPacoteCliente(formData).catch((error) => {
+            window.alert(
+              error instanceof Error ? error.message : "Não foi possível cancelar o pacote.",
+            );
+          });
+        });
+      }}
+    >
+      {isPending ? <Loader2 className="size-4 animate-spin" /> : "Cancelar"}
     </Button>
   );
 }
@@ -1006,6 +1044,238 @@ export function ClienteClinicoTabs({
                     icon={Stethoscope}
                     title="Nenhum procedimento registrado"
                     text="Cadastre procedimentos clínicos diretamente no perfil da cliente."
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "pacotes" && (
+          <div id="pacotes">
+            <SectionHeader
+              icon={Wallet}
+              title="Pacotes"
+              description="Pacotes fechados com a cliente e o saldo que ainda falta receber."
+            />
+
+            <div className="grid min-w-0 gap-5 p-4 sm:p-6 lg:grid-cols-[minmax(280px,380px)_minmax(0,1fr)]">
+              <form
+                action={criarPacoteCliente}
+                className="h-fit space-y-4 rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/[0.04]"
+              >
+                <input type="hidden" name="clienteId" value={data.id} />
+
+                <Field
+                  label="Descrição do pacote"
+                  name="descricao"
+                  required
+                  placeholder="Ex: Pacote Criolipólise 5 sessões"
+                />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Field
+                    label="Valor total"
+                    name="valorTotal"
+                    type="text"
+                    required
+                    placeholder="0,00"
+                  />
+
+                  <Field
+                    label="Adiantado agora"
+                    name="valorAdiantado"
+                    type="text"
+                    placeholder="0,00"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="space-y-1.5">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      Forma de pagamento
+                    </span>
+                    <select
+                      name="formaPagamentoConfigId"
+                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
+                    >
+                      <option value="">Não informada</option>
+                      {data.formasPagamento.map((forma) => (
+                        <option key={forma.id} value={forma.id}>
+                          {forma.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="space-y-1.5">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      Conta
+                    </span>
+                    <select
+                      name="contaFinanceiraId"
+                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
+                    >
+                      <option value="">Conta principal</option>
+                      {data.contas.map((conta) => (
+                        <option key={conta.id} value={conta.id}>
+                          {conta.nome}
+                          {conta.principal ? " · principal" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <Field label="Data do adiantamento" name="data" type="date" defaultValue={dateInputValue(null)} />
+
+                <TextArea
+                  label="Observações (opcional)"
+                  name="observacoes"
+                  placeholder="Ex: pacote combinado na avaliação de hoje"
+                />
+
+                <p className="text-[11px] leading-4 text-slate-500">
+                  Se preencher &quot;Adiantado agora&quot;, esse valor já entra
+                  como uma entrada de verdade no Financeiro, na categoria
+                  Pacotes. Deixe em branco se ainda não recebeu nada.
+                </p>
+
+                <Button type="submit" className="w-full">
+                  Criar pacote
+                </Button>
+              </form>
+
+              <div className="min-w-0 space-y-3">
+                {data.pacotes.length > 0 ? (
+                  data.pacotes.map((pacote) => {
+                    const saldo = Math.max(0, pacote.valorTotal - pacote.valorPago);
+                    const quitado = pacote.status === "Quitado";
+                    const cancelado = pacote.status === "Cancelado";
+
+                    return (
+                      <article
+                        key={pacote.id}
+                        className={`rounded-2xl border p-4 ${
+                          cancelado
+                            ? "border-slate-200 bg-slate-50 opacity-60 dark:border-white/10 dark:bg-white/[0.02]"
+                            : quitado
+                              ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-400/20 dark:bg-emerald-500/5"
+                              : "border-amber-200 bg-amber-50/60 dark:border-amber-400/20 dark:bg-amber-500/5"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-slate-900 dark:text-white">
+                              {pacote.descricao}
+                            </p>
+                            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                              Total {pacote.valorTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                              {" · "}
+                              Pago {pacote.valorPago.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                            </p>
+                          </div>
+
+                          <span
+                            className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
+                              cancelado
+                                ? "bg-slate-200 text-slate-600 dark:bg-white/10 dark:text-slate-300"
+                                : quitado
+                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+                                  : "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
+                            }`}
+                          >
+                            {pacote.status}
+                          </span>
+                        </div>
+
+                        {!cancelado ? (
+                          <p
+                            className={`mt-2 text-lg font-bold ${
+                              quitado
+                                ? "text-emerald-700 dark:text-emerald-300"
+                                : "text-amber-700 dark:text-amber-300"
+                            }`}
+                          >
+                            {quitado
+                              ? "Quitado"
+                              : `Falta ${saldo.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`}
+                          </p>
+                        ) : null}
+
+                        {pacote.observacoes ? (
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{pacote.observacoes}</p>
+                        ) : null}
+
+                        {pacote.status === "Aberto" ? (
+                          <details className="mt-3 group">
+                            <summary className="cursor-pointer list-none rounded-xl border border-slate-200 px-3 py-2 text-center text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5">
+                              Registrar pagamento
+                            </summary>
+
+                            <form action={registrarPagamentoPacote} className="mt-3 space-y-3 rounded-xl border border-slate-200 p-3 dark:border-white/10">
+                              <input type="hidden" name="pacoteId" value={pacote.id} />
+
+                              <div className="grid grid-cols-2 gap-3">
+                                <Field label="Valor" name="valor" type="text" required placeholder="0,00" />
+                                <Field label="Data" name="data" type="date" defaultValue={dateInputValue(null)} />
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-3">
+                                <label className="space-y-1.5">
+                                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                    Forma de pagamento
+                                  </span>
+                                  <select
+                                    name="formaPagamentoConfigId"
+                                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
+                                  >
+                                    <option value="">Não informada</option>
+                                    {data.formasPagamento.map((forma) => (
+                                      <option key={forma.id} value={forma.id}>
+                                        {forma.nome}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+
+                                <label className="space-y-1.5">
+                                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                    Conta
+                                  </span>
+                                  <select
+                                    name="contaFinanceiraId"
+                                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
+                                  >
+                                    <option value="">Conta principal</option>
+                                    {data.contas.map((conta) => (
+                                      <option key={conta.id} value={conta.id}>
+                                        {conta.nome}
+                                        {conta.principal ? " · principal" : ""}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                              </div>
+
+                              <div className="flex gap-2">
+                                <Button type="submit" className="flex-1">
+                                  Salvar pagamento
+                                </Button>
+
+                                <CancelarPacoteButton pacoteId={pacote.id} />
+                              </div>
+                            </form>
+                          </details>
+                        ) : null}
+                      </article>
+                    );
+                  })
+                ) : (
+                  <EmptyState
+                    icon={Wallet}
+                    title="Nenhum pacote registrado"
+                    text="Use o formulário ao lado quando a cliente fechar um pacote com adiantamento, para acompanhar o saldo que ainda falta."
                   />
                 )}
               </div>

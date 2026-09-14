@@ -54,6 +54,7 @@ model Cliente {
   leads          Lead[]
   comunicacoes   ComunicacaoRegistro[]
   vendas          Venda[]
+  pacotes         PacoteCliente[]
 
   @@index([campanhaAquisicaoId])
 }
@@ -209,7 +210,11 @@ model Lancamento {
 
   venda                    Venda?
 
+  pacoteClienteId          Int?
+  pacoteCliente            PacoteCliente? @relation(fields: [pacoteClienteId], references: [id], onDelete: SetNull)
+
   @@index([contaFinanceiraId, data])
+  @@index([pacoteClienteId])
   @@index([campanhaId, data])
   @@index([formaPagamentoConfigId])
   @@index([recebimentoPrevistoEm, statusPagamento])
@@ -480,6 +485,29 @@ model CampanhaMarketing {
   updatedAt         DateTime @updatedAt
 
   @@index([status, inicio])
+}
+
+// Pacote fechado com a cliente onde o valor total é pago aos poucos - por
+// exemplo, um pacote de sessões combinado na avaliação, com um adiantamento
+// hoje e o restante ao longo dos próximos atendimentos. "valorPago" soma
+// tudo que já foi recebido (cada pagamento também vira um Lancamento
+// normal, aparecendo no Financeiro); "saldo" (valorTotal - valorPago) é
+// calculado na hora de mostrar, não fica guardado.
+model PacoteCliente {
+  id          Int      @id @default(autoincrement())
+  clienteId   Int
+  cliente     Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  descricao   String
+  valorTotal  Float
+  valorPago   Float    @default(0)
+  status      String   @default("Aberto") // Aberto | Quitado | Cancelado
+  observacoes String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lancamentos Lancamento[]
+
+  @@index([clienteId, status])
 }
 
 

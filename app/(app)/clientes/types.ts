@@ -94,6 +94,30 @@ export type ClienteClinicoData = {
   anamneseModelos: ClienteAnamneseModeloData[];
   anamneseRespostas: ClienteAnamneseRespostaData[];
   driveConfigurado: boolean;
+  pacotes: ClientePacoteData[];
+  formasPagamento: ClienteFormaPagamentoOption[];
+  contas: ClienteContaFinanceiraOption[];
+};
+
+export type ClientePacoteData = {
+  id: number;
+  descricao: string;
+  valorTotal: number;
+  valorPago: number;
+  status: string;
+  observacoes: string | null;
+  createdAt: string;
+};
+
+export type ClienteFormaPagamentoOption = {
+  id: number;
+  nome: string;
+};
+
+export type ClienteContaFinanceiraOption = {
+  id: number;
+  nome: string;
+  principal: boolean;
 };
 
 export type ClienteAnamnesePerguntaModelo = {

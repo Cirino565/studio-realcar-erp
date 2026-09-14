@@ -124,19 +124,34 @@ export default async function ClientePage({
     );
   }
 
-  const [cliente, anamneseModelos] = await Promise.all([
-    getClienteClinico(clienteId),
-    prisma.anamneseModelo.findMany({
-      where: { status: "Ativo" },
-      orderBy: [{ ordem: "asc" }, { nome: "asc" }],
-      include: {
-        perguntas: {
-          where: { ativa: true },
-          orderBy: [{ ordem: "asc" }, { id: "asc" }],
+  const [cliente, anamneseModelos, pacotes, formasPagamento, contas] =
+    await Promise.all([
+      getClienteClinico(clienteId),
+      prisma.anamneseModelo.findMany({
+        where: { status: "Ativo" },
+        orderBy: [{ ordem: "asc" }, { nome: "asc" }],
+        include: {
+          perguntas: {
+            where: { ativa: true },
+            orderBy: [{ ordem: "asc" }, { id: "asc" }],
+          },
         },
-      },
-    }),
-  ]);
+      }),
+      prisma.pacoteCliente.findMany({
+        where: { clienteId },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.formaPagamentoConfig.findMany({
+        where: { status: "Ativa" },
+        orderBy: [{ ordem: "asc" }, { nome: "asc" }],
+        select: { id: true, nome: true },
+      }),
+      prisma.contaFinanceira.findMany({
+        where: { status: "Ativa" },
+        orderBy: [{ principal: "desc" }, { nome: "asc" }],
+        select: { id: true, nome: true, principal: true },
+      }),
+    ]);
 
   if (!cliente) {
     return (
@@ -234,6 +249,24 @@ export default async function ClientePage({
       observacao: resposta.observacao,
       profissional: resposta.profissional,
       dataResposta: toIsoString(resposta.dataResposta),
+    })),
+    pacotes: pacotes.map((pacote) => ({
+      id: pacote.id,
+      descricao: pacote.descricao,
+      valorTotal: pacote.valorTotal,
+      valorPago: pacote.valorPago,
+      status: pacote.status,
+      observacoes: pacote.observacoes,
+      createdAt: toIsoString(pacote.createdAt),
+    })),
+    formasPagamento: formasPagamento.map((forma) => ({
+      id: forma.id,
+      nome: forma.nome,
+    })),
+    contas: contas.map((conta) => ({
+      id: conta.id,
+      nome: conta.nome,
+      principal: conta.principal,
     })),
   };
 
