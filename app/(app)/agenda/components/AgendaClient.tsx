@@ -167,6 +167,14 @@ function toTimeInput(value: Date | string) {
   return `${hour}:${minute}`;
 }
 
+function normalizarTextoSimples(value?: string | null) {
+  return (value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
 function formatarDataCurta(value: Date | string) {
   return new Intl.DateTimeFormat("pt-BR", {
     day: "2-digit",
@@ -327,16 +335,52 @@ export default function AgendaClient({
 
   function abrirReagendamento(appointment: AgendamentoAgenda) {
     const dataBase = new Date(appointment.data);
-    const dataRetorno = new Date(dataBase);
 
-    dataRetorno.setDate(dataRetorno.getDate() + 30);
+    // Depois de uma AVALIACAO, o que vem em seguida quase sempre e o
+    // procedimento de verdade (pago) - nao um retorno. Depois de um
+    // procedimento, ai sim o normal e o retorno de acompanhamento.
+    //
+    // O formulario abre ja no tipo mais provavel, mas tudo continua
+    // editavel antes de salvar.
+    const veioDeAvaliacao = normalizarTextoSimples(
+      appointment.procedimento,
+    ).includes("avaliacao");
+
+    const servicoDoProcedimento = servicos.find(
+      (item) =>
+        normalizarTextoSimples(item.nome) ===
+        normalizarTextoSimples(appointment.procedimento),
+    );
+
+    const dataSugerida = new Date(dataBase);
+    // Apos avaliacao a sessao costuma ser logo em seguida (sugere 7 dias);
+    // apos procedimento, o retorno costuma ser mais espacado (30 dias).
+    dataSugerida.setDate(dataSugerida.getDate() + (veioDeAvaliacao ? 7 : 30));
 
     setSelectedAppointment(null);
     setFinishAppointment(null);
 
+    if (veioDeAvaliacao) {
+      setNovoHorario({
+        modo: "novo",
+        data: toSaoPauloDateInput(dataSugerida),
+        hora: toTimeInput(dataBase),
+        profissionalId: appointment.profissionalId || undefined,
+        clienteId: appointment.clienteId,
+        procedimento: "",
+        duracao: servicoDoProcedimento?.duracaoPadrao || 60,
+        valor: 0,
+        status: "Agendado",
+        sinalPago: false,
+        naturezaAtendimento: "PROCEDIMENTO",
+      });
+
+      return;
+    }
+
     setNovoHorario({
       modo: "retorno",
-      data: toSaoPauloDateInput(dataRetorno),
+      data: toSaoPauloDateInput(dataSugerida),
       hora: toTimeInput(dataBase),
       profissionalId: appointment.profissionalId || undefined,
       clienteId: appointment.clienteId,

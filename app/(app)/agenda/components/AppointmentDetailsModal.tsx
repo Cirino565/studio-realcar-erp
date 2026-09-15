@@ -522,8 +522,8 @@ export default function AppointmentDetailsModal({
                 <Button type="button" variant="outline" onClick={() => onWhatsApp(currentAppointment)} className="h-10 rounded-xl border-emerald-200 text-xs text-emerald-700 hover:bg-emerald-50">
                   <MessageCircle size={15} /> Mensagem
                 </Button>
-                <Button type="button" variant="outline" onClick={() => onReagendar(currentAppointment)} className="h-10 rounded-xl border-slate-200 text-xs text-slate-700 hover:bg-slate-50">
-                  <CalendarClock size={15} /> Retorno
+                <Button type="button" variant="outline" onClick={() => onReagendar(currentAppointment)} className="h-10 rounded-xl border-slate-200 text-xs text-slate-700 hover:bg-slate-50" title="Agenda o próximo atendimento desta cliente, com os dados dela já preenchidos">
+                  <CalendarClock size={15} /> Agendar próximo
                 </Button>
                 <Button type="button" variant="outline" onClick={() => onEditar(currentAppointment)} disabled={!podeGerenciarAgendamento || isDeleting} className="h-10 rounded-xl border-slate-200 text-xs text-slate-700 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-50">
                   <Pencil size={15} /> Editar agenda

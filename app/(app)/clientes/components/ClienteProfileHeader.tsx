@@ -50,10 +50,15 @@ export default function ClienteProfileHeader({
 }: Props) {
   const totalProcedimentos = data.procedimentos.length;
 
-  const valorInvestido = data.procedimentos.reduce(
-    (total, procedimento) => total + procedimento.valor,
-    0,
-  );
+  // Inclui o que já foi pago em pacotes (mesmo antes da sessão acontecer) -
+  // sem isso, um adiantamento de pacote ficava fora do "Investimento",
+  // mostrando R$ 0,00 mesmo com dinheiro já recebido de verdade.
+  const valorInvestido =
+    data.procedimentos.reduce(
+      (total, procedimento) => total + procedimento.valor,
+      0,
+    ) +
+    data.pacotes.reduce((total, pacote) => total + pacote.valorPago, 0);
 
   const ultimoProcedimento = data.procedimentos[0];
   const ultimaEvolucao = data.evolucoes[0];
