@@ -66,6 +66,8 @@ export type ClienteEvolucaoData = {
   descricao: string;
   profissional: string | null;
   dataRegistro: string;
+  // Quantas vezes esta evolução já foi editada depois de salva.
+  totalVersoes: number;
 };
 
 export type ClienteEvolucaoPendenteData = {

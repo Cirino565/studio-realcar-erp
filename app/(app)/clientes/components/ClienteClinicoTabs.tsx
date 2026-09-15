@@ -13,6 +13,7 @@ import {
   ImageIcon,
   Loader2,
   Maximize2,
+  Pencil,
   Plus,
   Stethoscope,
   Trash2,
@@ -24,6 +25,7 @@ import {
   criarDocumentoCliente,
   criarEvolucaoCliente,
   criarProcedimentoCliente,
+  editarEvolucaoCliente,
   excluirRegistroClinico,
 } from "@/actions/cliente-clinico.actions";
 import {
@@ -36,7 +38,11 @@ import { Button } from "@/components/ui/button";
 import AnamneseMobileForm from "./AnamneseMobileForm";
 import { ClienteFotoUploadForm } from "./ClienteFotoUploadForm";
 import { formatarData, formatarMoeda } from "@/lib/format";
-import type { ClienteClinicoData, ClienteFotoData } from "../types";
+import type {
+  ClienteClinicoData,
+  ClienteEvolucaoData,
+  ClienteFotoData,
+} from "../types";
 
 type AbaClinica =
   | "anamnese"
@@ -264,6 +270,151 @@ function CancelarPacoteButton({ pacoteId }: { pacoteId: number }) {
     >
       {isPending ? <Loader2 className="size-4 animate-spin" /> : "Cancelar"}
     </Button>
+  );
+}
+
+function EvolucaoCard({
+  clienteId,
+  evolucao,
+}: {
+  clienteId: number;
+  evolucao: ClienteEvolucaoData;
+}) {
+  const [editando, setEditando] = useState(false);
+  const [titulo, setTitulo] = useState(evolucao.titulo);
+  const [descricao, setDescricao] = useState(evolucao.descricao);
+  const [isPending, startTransition] = useTransition();
+  const [erro, setErro] = useState<string | null>(null);
+
+  function salvar() {
+    setErro(null);
+
+    startTransition(() => {
+      const formData = new FormData();
+      formData.set("evolucaoId", String(evolucao.id));
+      formData.set("titulo", titulo);
+      formData.set("descricao", descricao);
+
+      void editarEvolucaoCliente(formData)
+        .then(() => setEditando(false))
+        .catch((error) => {
+          setErro(
+            error instanceof Error
+              ? error.message
+              : "Não foi possível salvar a alteração.",
+          );
+        });
+    });
+  }
+
+  return (
+    <article className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:p-5">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0 flex-1">
+          {editando ? (
+            <input
+              value={titulo}
+              onChange={(event) => setTitulo(event.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-violet-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
+            />
+          ) : (
+            <p className="break-words font-semibold text-slate-900 dark:text-white">
+              {evolucao.titulo}
+            </p>
+          )}
+
+          <p className="mt-1 text-xs text-slate-500">
+            {formatarData(evolucao.dataRegistro)}{" "}
+            {evolucao.profissional ? `• ${evolucao.profissional}` : ""}
+            {evolucao.totalVersoes > 0 ? (
+              <span
+                className="ml-1 text-amber-600 dark:text-amber-400"
+                title="Esta evolução foi editada depois de salva. O texto anterior fica guardado no histórico do sistema."
+              >
+                · editada {evolucao.totalVersoes}{" "}
+                {evolucao.totalVersoes === 1 ? "vez" : "vezes"}
+              </span>
+            ) : null}
+          </p>
+        </div>
+
+        {!editando ? (
+          <div className="flex shrink-0 items-center gap-1">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setTitulo(evolucao.titulo);
+                setDescricao(evolucao.descricao);
+                setErro(null);
+                setEditando(true);
+              }}
+              className="h-9 px-3 text-xs"
+            >
+              <Pencil className="size-3.5" />
+              Editar
+            </Button>
+
+            <DeleteButton clienteId={clienteId} tipo="evolucao" id={evolucao.id} />
+          </div>
+        ) : null}
+      </div>
+
+      {editando ? (
+        <div className="mt-3 space-y-3">
+          <textarea
+            rows={6}
+            value={descricao}
+            onChange={(event) => setDescricao(event.target.value)}
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-slate-900 outline-none focus:border-violet-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
+          />
+
+          {erro ? (
+            <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+              {erro}
+            </p>
+          ) : null}
+
+          <p className="text-[11px] leading-4 text-slate-500">
+            O texto atual será guardado no histórico antes de salvar, para o
+            registro clínico continuar rastreável.
+          </p>
+
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              onClick={salvar}
+              disabled={isPending || !titulo.trim() || !descricao.trim()}
+              className="flex-1"
+            >
+              {isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                "Salvar alteração"
+              )}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPending}
+              onClick={() => {
+                setTitulo(evolucao.titulo);
+                setDescricao(evolucao.descricao);
+                setErro(null);
+                setEditando(false);
+              }}
+            >
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-300">
+          {evolucao.descricao}
+        </p>
+      )}
+    </article>
   );
 }
 
@@ -879,37 +1030,9 @@ export function ClienteClinicoTabs({
               <div className="min-w-0 space-y-4">
                 {data.evolucoes.length > 0 ? (
                   data.evolucoes.map((evolucao) => (
-                    <article
-                      key={evolucao.id}
-                      className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:p-5"
-                    >
-                      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                        <div className="min-w-0">
-                          <p className="break-words font-semibold text-slate-900 dark:text-white">
-                            {evolucao.titulo}
-                          </p>
-
-                          <p className="mt-1 text-xs text-slate-500">
-                            {formatarData(
-                              evolucao.dataRegistro,
-                            )}{" "}
-                            {evolucao.profissional
-                              ? `• ${evolucao.profissional}`
-                              : ""}
-                          </p>
-                        </div>
-
-                        <DeleteButton
-                          clienteId={data.id}
-                          tipo="evolucao"
-                          id={evolucao.id}
-                        />
-                      </div>
-
-                      <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-300">
-                        {evolucao.descricao}
-                      </p>
-                    </article>
+                    <div key={evolucao.id} className="min-w-0">
+                      <EvolucaoCard clienteId={data.id} evolucao={evolucao} />
+                    </div>
                   ))
                 ) : (
                   <EmptyState

@@ -83,6 +83,11 @@ async function getClienteClinico(clienteId: number) {
       },
       evolucoes: {
         orderBy: { dataRegistro: "desc" },
+        include: {
+          // Só a contagem: serve para marcar "editada X vezes" sem carregar
+          // o texto de todas as versões anteriores.
+          _count: { select: { versoes: true } },
+        },
       },
       agendamentos: {
         where: {
@@ -208,6 +213,7 @@ export default async function ClientePage({
       descricao: evolucao.descricao,
       profissional: evolucao.profissional,
       dataRegistro: toIsoString(evolucao.dataRegistro),
+      totalVersoes: evolucao._count?.versoes ?? 0,
     })),
     evolucoesPendentes: cliente.agendamentos.map((agendamento) => ({
       id: agendamento.id,

@@ -822,6 +822,25 @@ model ClienteEvolucao {
   dataRegistro  DateTime @default(now())
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  versoes       ClienteEvolucaoVersao[]
+}
+
+// Guarda o texto ANTERIOR de uma evolução sempre que ela é editada.
+// Evolução clínica é registro de procedimento estético: poder corrigir é
+// necessário no dia a dia, mas o texto original precisa continuar
+// recuperável para o registro seguir servindo como comprovação do que foi
+// feito. Cada edição gera uma linha aqui, com o texto de antes.
+model ClienteEvolucaoVersao {
+  id           Int      @id @default(autoincrement())
+  evolucaoId   Int
+  evolucao     ClienteEvolucao @relation(fields: [evolucaoId], references: [id], onDelete: Cascade)
+  titulo       String
+  descricao    String
+  editadoPor   String?
+  editadoEm    DateTime @default(now())
+
+  @@index([evolucaoId, editadoEm])
 }
 
 

@@ -168,6 +168,82 @@ export async function criarEvolucaoCliente(formData: FormData) {
   revalidatePath(`/clientes/${clienteId}`);
 }
 
+/**
+ * Edita uma evolução clínica já salva, guardando o texto anterior.
+ *
+ * Evolução clínica é registro de procedimento estético: corrigir ou
+ * complementar é necessário no dia a dia (esqueceu um detalhe, errou uma
+ * palavra), mas o texto original precisa continuar recuperável para o
+ * registro seguir valendo como comprovação do que foi feito. Por isso cada
+ * edição guarda a versão anterior em vez de sobrescrever direto.
+ */
+export async function editarEvolucaoCliente(formData: FormData) {
+  const usuario = await requirePermission("clientes.clinico");
+
+  const evolucaoId = Number(formData.get("evolucaoId"));
+  if (!Number.isInteger(evolucaoId) || evolucaoId <= 0) {
+    throw new Error("Evolução inválida.");
+  }
+
+  const titulo = getString(formData, "titulo");
+  const descricao = getString(formData, "descricao");
+
+  if (!titulo || !descricao) {
+    throw new Error("Informe o procedimento e a evolução clínica.");
+  }
+
+  const clienteId = await prisma.$transaction(async (tx) => {
+    const atual = await tx.clienteEvolucao.findUnique({
+      where: { id: evolucaoId },
+      select: {
+        id: true,
+        clienteId: true,
+        titulo: true,
+        descricao: true,
+        profissional: true,
+      },
+    });
+
+    if (!atual) {
+      throw new Error("Evolução não encontrada.");
+    }
+
+    // Nada mudou de fato - não gera versão à toa.
+    if (atual.titulo === titulo && atual.descricao === descricao) {
+      return atual.clienteId;
+    }
+
+    await tx.clienteEvolucaoVersao.create({
+      data: {
+        evolucaoId: atual.id,
+        titulo: atual.titulo,
+        descricao: atual.descricao,
+        editadoPor: usuario?.email || null,
+      },
+    });
+
+    await tx.clienteEvolucao.update({
+      where: { id: atual.id },
+      data: { titulo, descricao },
+    });
+
+    await tx.auditoria.create({
+      data: {
+        modulo: "Clientes",
+        acao: "Editou evolução clínica",
+        entidade: "ClienteEvolucao",
+        entidadeId: String(atual.id),
+        usuario: usuario?.email || "Equipe Studio Realçar",
+        detalhes: `Evolução "${atual.titulo}" editada. A versão anterior foi preservada no histórico.`,
+      },
+    });
+
+    return atual.clienteId;
+  });
+
+  revalidatePath(`/clientes/${clienteId}`);
+}
+
 export async function criarProcedimentoCliente(formData: FormData) {
   await requirePermission("clientes.clinico");
   const clienteId = getClienteId(formData);
