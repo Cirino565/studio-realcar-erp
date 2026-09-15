@@ -159,6 +159,7 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
     kits,
     formasPagamento,
     configuracaoClinica,
+    pacotesAbertos,
   ] = await Promise.all([
     prisma.cliente.findMany({
       orderBy: { nome: "asc" },
@@ -263,6 +264,20 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
       select: {
         horarioAtendimento: true,
         intervaloEntreAtendimentos: true,
+      },
+    }),
+
+    // Pacotes com saldo em aberto, para avisar na finalizacao quando a
+    // cliente ja tem credito pago. Sao poucos registros por natureza (so os
+    // que ainda nao foram quitados), entao nao pesa na agenda.
+    prisma.pacoteCliente.findMany({
+      where: { status: "Aberto" },
+      select: {
+        id: true,
+        clienteId: true,
+        descricao: true,
+        valorTotal: true,
+        valorPago: true,
       },
     }),
   ]);
@@ -381,6 +396,7 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
         produtos={produtos}
         kits={kits}
         formasPagamento={formasPagamento}
+        pacotesAbertos={pacotesAbertos}
         podeAutorizarEstoqueNegativo={usuarioAdmin}
         areaPadraoAgendamento={areaPadraoAgendamento}
         initialDate={toDateInput(dataSelecionada)}

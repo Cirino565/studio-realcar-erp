@@ -69,6 +69,14 @@ export type FormaPagamentoFinalizacao = {
   prazoDias: number;
 };
 
+export type PacoteAbertoFinalizacao = {
+  id: number;
+  clienteId: number;
+  descricao: string;
+  valorTotal: number;
+  valorPago: number;
+};
+
 export type AtendimentoFinalizadoPayload = {
   agendamentoId: number;
   procedimento: string;
@@ -81,6 +89,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   appointment: AppointmentDetails | null;
+  pacotesAbertos?: PacoteAbertoFinalizacao[];
   driveConfigurado?: boolean;
   servicos: ServicoFinalizacao[];
   produtos: ProdutoVendaOption[];
@@ -169,6 +178,7 @@ export default function FinalizarAtendimentoModal({
   produtos,
   kits,
   formasPagamento,
+  pacotesAbertos = [],
   podeAutorizarEstoqueNegativo,
   onAgendarRetorno,
   onFinalizado,
@@ -351,6 +361,17 @@ export default function FinalizarAtendimentoModal({
   const currentAppointment = appointment;
   const atendimentoRetorno =
     currentAppointment.naturezaAtendimento === "RETORNO";
+
+  // Pacotes em aberto desta cliente. Se existir algum, ela ja adiantou
+  // dinheiro que ainda nao foi usado - cobrar o valor cheio aqui contaria a
+  // mesma grana duas vezes no faturamento.
+  const pacotesDaCliente = pacotesAbertos.filter(
+    (pacote) => pacote.clienteId === currentAppointment.clienteId,
+  );
+  const creditoDisponivel = pacotesDaCliente.reduce(
+    (total, pacote) => total + pacote.valorPago,
+    0,
+  );
   const procedimentoFinal =
     procedimentoRealizado.trim() || currentAppointment.procedimento || "Atendimento";
 
@@ -826,6 +847,60 @@ export default function FinalizarAtendimentoModal({
                     {atendimentoRetorno ? (
                       <div className="mb-3 rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2.5 text-[11px] leading-4 text-cyan-800">
                         O serviço deste retorno permanece em R$ 0,00 e não gera receita. Produtos ou kits adicionados abaixo continuam sendo registrados normalmente.
+                      </div>
+                    ) : null}
+
+                    {!atendimentoRetorno && pacotesDaCliente.length > 0 ? (
+                      <div className="mb-3 rounded-xl border-2 border-amber-300 bg-amber-50 px-3 py-3">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle
+                            size={16}
+                            className="mt-0.5 shrink-0 text-amber-700"
+                          />
+
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-amber-900">
+                              Esta cliente tem pacote em aberto
+                            </p>
+
+                            {pacotesDaCliente.map((pacote) => (
+                              <p
+                                key={pacote.id}
+                                className="mt-1 text-[11px] leading-4 text-amber-800"
+                              >
+                                <strong>{pacote.descricao}</strong>: já pagou{" "}
+                                {formatCurrency(pacote.valorPago)} de{" "}
+                                {formatCurrency(pacote.valorTotal)}
+                                {pacote.valorTotal - pacote.valorPago > 0
+                                  ? ` (faltam ${formatCurrency(pacote.valorTotal - pacote.valorPago)})`
+                                  : ""}
+                                .
+                              </p>
+                            ))}
+
+                            <p className="mt-2 text-[11px] leading-4 text-amber-800">
+                              Se esta sessão faz parte do pacote, deixe o valor
+                              em R$ 0,00 - o dinheiro dela já entrou pelo
+                              pacote. Cobrar de novo aqui contaria a mesma
+                              quantia duas vezes no faturamento.
+                            </p>
+
+                            {valorServico > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => setValorServico(0)}
+                                className="mt-2 inline-flex min-h-9 items-center justify-center rounded-lg bg-amber-600 px-3 text-[11px] font-bold text-white transition hover:bg-amber-700"
+                              >
+                                Zerar valor (faz parte do pacote)
+                              </button>
+                            ) : (
+                              <p className="mt-2 text-[11px] font-bold text-emerald-700">
+                                Valor já está em R$ 0,00 - nada será cobrado
+                                nesta sessão.
+                              </p>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     ) : null}
                     <div className="grid gap-3 sm:grid-cols-2">

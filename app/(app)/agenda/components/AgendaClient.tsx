@@ -17,6 +17,7 @@ import AppointmentMessageModal from "./AppointmentMessageModal";
 import FinalizarAtendimentoModal, {
   type AtendimentoFinalizadoPayload,
   type FormaPagamentoFinalizacao,
+  type PacoteAbertoFinalizacao,
 } from "./FinalizarAtendimentoModal";
 import NovoAgendamentoModal from "./NovoAgendamentoModal";
 
@@ -102,6 +103,7 @@ type Props = {
   produtos: ProdutoVendaOption[];
   kits: KitVendaOption[];
   formasPagamento: FormaPagamentoFinalizacao[];
+  pacotesAbertos: PacoteAbertoFinalizacao[];
   podeAutorizarEstoqueNegativo: boolean;
   areaPadraoAgendamento: "estetica" | "cilios" | null;
   initialDate: string;
@@ -184,6 +186,7 @@ export default function AgendaClient({
   produtos,
   kits,
   formasPagamento,
+  pacotesAbertos,
   podeAutorizarEstoqueNegativo,
   areaPadraoAgendamento,
   initialDate,
@@ -528,6 +531,7 @@ export default function AgendaClient({
         produtos={produtos}
         kits={kits}
         formasPagamento={formasPagamento}
+        pacotesAbertos={pacotesAbertos}
         podeAutorizarEstoqueNegativo={podeAutorizarEstoqueNegativo}
         driveConfigurado={driveConfigurado}
         onClose={() => setFinishAppointment(null)}
