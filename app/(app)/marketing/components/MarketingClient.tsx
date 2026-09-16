@@ -90,8 +90,16 @@ type Props = {
   receitasSemCampanha: MarketingReceitaOption[];
   profissionais: MarketingProfissional[];
   servicos: MarketingServico[];
+  motivosPerda: MotivoPerdaOption[];
   podeGerenciarMarketing: boolean;
   podeGerenciarAgenda: boolean;
+};
+
+export type MotivoPerdaOption = {
+  id: number;
+  nome: string;
+  descricao: string | null;
+  naoChamou: boolean;
 };
 
 type TabKey = "pipeline" | "campanhas" | "mensagens";
@@ -511,6 +519,7 @@ export default function MarketingClient({
   receitasSemCampanha,
   profissionais,
   servicos,
+  motivosPerda,
   podeGerenciarMarketing,
   podeGerenciarAgenda,
 }: Props) {
@@ -1560,6 +1569,7 @@ export default function MarketingClient({
       <PerdaLeadModal
         lead={leadPerdaModal}
         disabled={isPending}
+        motivosCadastrados={motivosPerda}
         onClose={() => setLeadPerdaModal(null)}
         onSubmit={confirmarPerdaLead}
       />
@@ -2221,11 +2231,13 @@ function TemplatesView() {
 function PerdaLeadModal({
   lead,
   disabled,
+  motivosCadastrados,
   onClose,
   onSubmit,
 }: {
   lead: MarketingLead | null;
   disabled: boolean;
+  motivosCadastrados: MotivoPerdaOption[];
   onClose: () => void;
   onSubmit: (
     motivo: string,
@@ -2246,36 +2258,20 @@ function PerdaLeadModal({
 
   if (!lead) return null;
 
+  // Os motivos vem do cadastro em Configuracoes. "Outro" fica sempre por
+  // ultimo e nao e cadastravel - e a saida para o caso que nao se encaixa
+  // em nenhum motivo existente.
   const motivos = [
-    {
-      value: "Preço",
-      description:
-        "Valor foi o principal motivo para não fechar.",
-    },
-    {
-      value: "Sem resposta",
-      description:
-        "Parou de responder e a oportunidade será encerrada.",
-    },
-    {
-      value: "Escolheu concorrente",
-      description:
-        "Informou que decidiu realizar em outro local.",
-    },
-    {
-      value: "Desistiu",
-      description:
-        "Desistiu de realizar o procedimento neste momento.",
-    },
-    {
-      value: "Sem interesse",
-      description:
-        "Não demonstrou interesse em continuar a negociação.",
-    },
+    ...motivosCadastrados.map((item) => ({
+      value: item.nome,
+      description: item.descricao || "",
+      naoChamou: item.naoChamou,
+    })),
     {
       value: "Outro",
       description:
         "Use quando nenhum dos motivos acima representar o caso.",
+      naoChamou: false,
     },
   ];
 

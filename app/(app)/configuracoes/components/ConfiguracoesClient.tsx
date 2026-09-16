@@ -33,6 +33,8 @@ import {
   criarCadastrosAuxiliaresPadrao,
   criarOrigemCliente,
   criarProcedimentoInteresse,
+  criarMotivoPerda,
+  excluirMotivoPerda,
   criarProcedimentoServico,
   atualizarProcedimentoServico,
   excluirOrigemCliente,
@@ -57,6 +59,7 @@ type Props = {
   procedimentosInteresse: CadastroAuxiliarView[];
   servicos: ProcedimentoServicoView[];
   anamneseModelos: AnamneseModeloView[];
+  motivosPerda: CadastroAuxiliarView[];
 };
 
 type FieldProps = {
@@ -817,6 +820,7 @@ export default function ConfiguracoesClient({
   procedimentosInteresse,
   servicos,
   anamneseModelos,
+  motivosPerda,
 }: Props) {
   const [activeTab, setActiveTab] = useState<ConfiguracoesTab>("clinica");
   const [form, setForm] = useState<SalvarConfiguracaoInput>(() =>
@@ -1598,6 +1602,16 @@ export default function ConfiguracoesClient({
                     criarProcedimentoInteresse({ nome, status: "Ativo" })
                   }
                   onDelete={excluirProcedimentoInteresse}
+                />
+
+                <AuxiliarList
+                  title="Motivos de perda de oportunidade"
+                  description="Opções que aparecem ao encerrar uma oportunidade perdida no funil. Cadastre os motivos que realmente acontecem no seu dia a dia."
+                  items={motivosPerda}
+                  placeholder="Ex: Cliente não chamou"
+                  statusLabel="Status"
+                  onCreate={(nome) => criarMotivoPerda({ nome, status: "Ativo" })}
+                  onDelete={excluirMotivoPerda}
                 />
 
                 <ServicosList

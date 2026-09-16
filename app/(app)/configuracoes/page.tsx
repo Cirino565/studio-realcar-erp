@@ -46,7 +46,7 @@ function buildDefaultConfiguracao(): ConfiguracaoClinicaView {
 
 export default async function ConfiguracoesPage() {
   await requirePagePermission("configuracoes.gerenciar");
-  const [configuracao, origens, procedimentosInteresse, servicos, anamneseModelos] = await Promise.all([
+  const [configuracao, origens, procedimentosInteresse, servicos, anamneseModelos, motivosPerda] = await Promise.all([
     prisma.configuracaoClinica.findFirst(),
     prisma.origemCliente.findMany({ orderBy: [{ ordem: "asc" }, { nome: "asc" }] }),
     prisma.procedimentoInteresse.findMany({ orderBy: [{ nome: "asc" }, { id: "asc" }] }),
@@ -57,6 +57,7 @@ export default async function ConfiguracoesPage() {
       },
       orderBy: [{ ordem: "asc" }, { nome: "asc" }],
     }),
+    prisma.motivoPerdaLead.findMany({ orderBy: [{ ordem: "asc" }, { nome: "asc" }] }),
   ]);
 
   return (
@@ -66,6 +67,7 @@ export default async function ConfiguracoesPage() {
       procedimentosInteresse={procedimentosInteresse}
       servicos={servicos}
       anamneseModelos={anamneseModelos}
+      motivosPerda={motivosPerda}
     />
   );
 }

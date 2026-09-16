@@ -149,6 +149,75 @@ export async function excluirOrigemCliente(id: number) {
   revalidatePath("/clientes");
 }
 
+// ---- Motivos de perda de oportunidade ----
+//
+// Configuraveis para que a equipe cadastre os motivos que realmente
+// aparecem no dia a dia, em vez de depender de uma lista fixa no codigo.
+
+export type MotivoPerdaInput = CadastroAuxiliarInput & {
+  naoChamou?: boolean;
+};
+
+export async function criarMotivoPerda(dados: MotivoPerdaInput) {
+  await requirePermission("configuracoes.gerenciar");
+  const nome = normalizarNome(dados.nome);
+  if (!nome) return;
+
+  await prisma.motivoPerdaLead.create({
+    data: {
+      nome,
+      descricao: toNullableText(dados.descricao),
+      naoChamou: Boolean(dados.naoChamou),
+      status: dados.status || "Ativo",
+      ordem: toSafeOrder(dados.ordem),
+    },
+  });
+
+  await registrarAuditoria("Criou motivo de perda", "MotivoPerdaLead", nome);
+  revalidatePath("/configuracoes");
+  revalidatePath("/marketing");
+}
+
+export async function atualizarMotivoPerda(dados: MotivoPerdaInput) {
+  await requirePermission("configuracoes.gerenciar");
+  if (!dados.id) return;
+  const nome = normalizarNome(dados.nome);
+  if (!nome) return;
+
+  await prisma.motivoPerdaLead.update({
+    where: { id: dados.id },
+    data: {
+      nome,
+      descricao: toNullableText(dados.descricao),
+      naoChamou: Boolean(dados.naoChamou),
+      status: dados.status || "Ativo",
+      ordem: toSafeOrder(dados.ordem),
+    },
+  });
+
+  await registrarAuditoria("Atualizou motivo de perda", "MotivoPerdaLead", nome);
+  revalidatePath("/configuracoes");
+  revalidatePath("/marketing");
+}
+
+export async function excluirMotivoPerda(id: number) {
+  await requirePermission("configuracoes.gerenciar");
+  const motivo = await prisma.motivoPerdaLead.findUnique({ where: { id } });
+  if (!motivo) return;
+
+  // Nao apaga de verdade: leads antigos guardam o motivo como texto, e
+  // apagar o cadastro nao os afeta - mas desativar mantem a lista limpa
+  // sem perder a opcao de reativar depois.
+  await prisma.motivoPerdaLead.update({
+    where: { id },
+    data: { status: "Inativo" },
+  });
+
+  await registrarAuditoria("Desativou motivo de perda", "MotivoPerdaLead", motivo.nome);
+  revalidatePath("/configuracoes");
+  revalidatePath("/marketing");
+}
+
 export async function criarProcedimentoInteresse(dados: CadastroAuxiliarInput) {
   await requirePermission("configuracoes.gerenciar");
   const nome = normalizarNome(dados.nome);
