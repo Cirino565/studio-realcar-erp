@@ -83,6 +83,7 @@ export default function EnderecoClienteFields({
   const valuesRef = useRef(values);
   const requisicaoRef = useRef(0);
   const ultimoCepConsultadoRef = useRef("");
+  const controladorRef = useRef<AbortController | null>(null);
   const [consultando, setConsultando] = useState(false);
   const [mensagem, setMensagem] = useState("");
   const [sucesso, setSucesso] = useState(false);
@@ -105,6 +106,22 @@ export default function EnderecoClienteFields({
     aplicar(next);
   }
 
+  // Limite de espera do lado de quem está preenchendo. Sem isso, se o
+  // servidor demorasse (ele "dorme" quando fica sem uso e leva um tempo
+  // para acordar), a tela ficava travada sem fim e a única saída era
+  // fechar o app - perdendo tudo que já tinha sido digitado.
+  const TEMPO_LIMITE_CONSULTA_MS = 8_000;
+
+  function cancelarConsultaCep() {
+    controladorRef.current?.abort();
+    controladorRef.current = null;
+    setConsultando(false);
+    setMensagem(
+      "Busca cancelada. Você pode preencher o endereço manualmente abaixo.",
+    );
+    setSucesso(false);
+  }
+
   async function consultarCep(forcar = false) {
     const cep = somenteDigitos(valuesRef.current.cep);
 
@@ -124,6 +141,16 @@ export default function EnderecoClienteFields({
 
     ultimoCepConsultadoRef.current = cep;
     const requisicao = ++requisicaoRef.current;
+
+    // Cancela qualquer consulta anterior ainda pendurada.
+    controladorRef.current?.abort();
+    const controlador = new AbortController();
+    controladorRef.current = controlador;
+
+    const timer = window.setTimeout(() => {
+      controlador.abort();
+    }, TEMPO_LIMITE_CONSULTA_MS);
+
     setConsultando(true);
     setMensagem("");
     setSucesso(false);
@@ -133,6 +160,7 @@ export default function EnderecoClienteFields({
         method: "GET",
         headers: { Accept: "application/json" },
         cache: "no-store",
+        signal: controlador.signal,
       });
       const dados = (await resposta.json()) as RespostaCep;
 
@@ -156,13 +184,25 @@ export default function EnderecoClienteFields({
       setSucesso(true);
     } catch (causa) {
       if (requisicao !== requisicaoRef.current) return;
+
+      // Quando o tempo estoura (ou a busca é cancelada), a mensagem
+      // orienta a seguir manualmente em vez de deixar a pessoa travada.
+      const foiCancelada =
+        causa instanceof DOMException && causa.name === "AbortError";
+
       setMensagem(
-        causa instanceof Error
-          ? causa.message
-          : "A consulta de CEP falhou. Preencha o endereço manualmente.",
+        foiCancelada
+          ? "A busca demorou demais e foi interrompida. Preencha o endereço manualmente abaixo - nada do que você digitou foi perdido."
+          : causa instanceof Error
+            ? causa.message
+            : "A consulta de CEP falhou. Preencha o endereço manualmente.",
       );
       setSucesso(false);
     } finally {
+      window.clearTimeout(timer);
+      if (controladorRef.current === controlador) {
+        controladorRef.current = null;
+      }
       if (requisicao === requisicaoRef.current) setConsultando(false);
     }
   }
@@ -208,20 +248,30 @@ export default function EnderecoClienteFields({
               autoComplete="postal-code"
               maxLength={9}
             />
-            <button
-              type="button"
-              onClick={() => void consultarCep(true)}
-              disabled={consultando || somenteDigitos(values.cep).length !== 8}
-              className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-violet-300 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200 dark:hover:border-violet-400/30 dark:hover:text-violet-200"
-              aria-label="Buscar endereço pelo CEP"
-            >
-              {consultando ? (
+            {consultando ? (
+              // Enquanto busca, o botão vira "Parar": assim ninguém fica
+              // esperando sem saída se a consulta estiver lenta.
+              <button
+                type="button"
+                onClick={cancelarConsultaCep}
+                className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 text-sm font-semibold text-amber-800 shadow-sm transition hover:bg-amber-100 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-200"
+                aria-label="Parar a busca do CEP e preencher manualmente"
+              >
                 <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
+                <span className="hidden sm:inline">Parar</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void consultarCep(true)}
+                disabled={somenteDigitos(values.cep).length !== 8}
+                className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-violet-300 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200 dark:hover:border-violet-400/30 dark:hover:text-violet-200"
+                aria-label="Buscar endereço pelo CEP"
+              >
                 <Search className="h-4 w-4" />
-              )}
-              <span className="hidden sm:inline">Buscar</span>
-            </button>
+                <span className="hidden sm:inline">Buscar</span>
+              </button>
+            )}
           </div>
           {mensagem ? (
             <p

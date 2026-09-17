@@ -2,6 +2,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import type { ReactNode } from "react";
+import { useFormStatus } from "react-dom";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
@@ -269,6 +271,34 @@ function CancelarPacoteButton({ pacoteId }: { pacoteId: number }) {
       }}
     >
       {isPending ? <Loader2 className="size-4 animate-spin" /> : "Cancelar"}
+    </Button>
+  );
+}
+
+// Botão de envio que sabe sozinho quando o formulário está salvando.
+// Sem isso, clicar não dava sinal nenhum na tela - e a pessoa acabava
+// clicando várias vezes, criando registros repetidos.
+function BotaoSalvar({
+  children,
+  salvandoLabel = "Salvando...",
+  className = "w-full",
+}: {
+  children: ReactNode;
+  salvandoLabel?: string;
+  className?: string;
+}) {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button type="submit" className={className} disabled={pending}>
+      {pending ? (
+        <>
+          <Loader2 className="size-4 animate-spin" />
+          {salvandoLabel}
+        </>
+      ) : (
+        children
+      )}
     </Button>
   );
 }
@@ -1021,10 +1051,10 @@ export function ClienteClinicoTabs({
                   rows={5}
                 />
 
-                <Button type="submit" className="w-full">
+                <BotaoSalvar salvandoLabel="Salvando evolução...">
                   <Plus size={17} />
                   Registrar evolução
-                </Button>
+                </BotaoSalvar>
               </form>
 
               <div className="min-w-0 space-y-4">
@@ -1105,10 +1135,10 @@ export function ClienteClinicoTabs({
                   rows={3}
                 />
 
-                <Button type="submit" className="w-full">
+                <BotaoSalvar salvandoLabel="Salvando procedimento...">
                   <Plus size={17} />
                   Registrar procedimento
-                </Button>
+                </BotaoSalvar>
               </form>
 
               <div className="min-w-0 space-y-4">
@@ -1264,9 +1294,9 @@ export function ClienteClinicoTabs({
                   Pacotes. Deixe em branco se ainda não recebeu nada.
                 </p>
 
-                <Button type="submit" className="w-full">
+                <BotaoSalvar salvandoLabel="Criando pacote...">
                   Criar pacote
-                </Button>
+                </BotaoSalvar>
               </form>
 
               <div className="min-w-0 space-y-3">
@@ -1382,9 +1412,12 @@ export function ClienteClinicoTabs({
                               </div>
 
                               <div className="flex gap-2">
-                                <Button type="submit" className="flex-1">
+                                <BotaoSalvar
+                                  className="flex-1"
+                                  salvandoLabel="Salvando..."
+                                >
                                   Salvar pagamento
-                                </Button>
+                                </BotaoSalvar>
 
                                 <CancelarPacoteButton pacoteId={pacote.id} />
                               </div>
@@ -1459,10 +1492,10 @@ export function ClienteClinicoTabs({
                   rows={4}
                 />
 
-                <Button type="submit" className="w-full">
+                <BotaoSalvar salvandoLabel="Salvando documento...">
                   <Plus size={17} />
                   Adicionar documento
-                </Button>
+                </BotaoSalvar>
               </form>
 
               <div className="min-w-0 space-y-4">
