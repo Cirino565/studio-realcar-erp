@@ -275,15 +275,18 @@ function CancelarPacoteButton({ pacoteId }: { pacoteId: number }) {
   );
 }
 
-// Botão de envio que sabe sozinho quando o formulário está salvando.
-// Sem isso, clicar não dava sinal nenhum na tela - e a pessoa acabava
-// clicando várias vezes, criando registros repetidos.
 // Baixa a foto de verdade num clique só.
 //
-// O Safari do iPhone ignora o pedido de download em links normais e abre
-// uma tela intermediária ("Abrir com...", "Mais..."), obrigando a um
-// segundo toque. Aqui buscamos o arquivo primeiro e entregamos já pronto,
-// o que faz o navegador salvar direto.
+// O iPhone/iPad trata IMAGEM de um jeito à parte: mesmo entregando o
+// arquivo pronto para download, o Safari ainda mostra uma tela de
+// pré-visualização antes de salvar (algo próprio do sistema, não do link
+// em si). O caminho que realmente funciona sem tela extra nesses
+// aparelhos é abrir o menu nativo de COMPARTILHAR, que já oferece "Salvar
+// imagem" direto na galeria de fotos.
+//
+// Por isso: no iPhone/iPad, abre o menu de compartilhar. Em qualquer outro
+// aparelho (computador, a maioria dos Android), continua baixando direto,
+// como já funcionava bem.
 function BotaoBaixarFoto({
   url,
   nomeArquivo,
@@ -302,23 +305,44 @@ function BotaoBaixarFoto({
     setBaixando(true);
 
     try {
-      const resposta = await fetch(url, { cache: "no-store" });
+      // Sem "no-store": a foto muito provavelmente já foi carregada pelo
+      // navegador para exibir na tela, então isso reaproveita o que já
+      // está em memória em vez de baixar tudo de novo - mais rápido, e
+      // importante para o compartilhar nativo, que só funciona bem quando
+      // chamado logo em seguida ao toque da pessoa.
+      const resposta = await fetch(url);
       if (!resposta.ok) throw new Error("Falha ao baixar a foto.");
 
       const blob = await resposta.blob();
+      const nomeFinal = nomeArquivo || `${titulo || "foto"}.jpg`;
+      const arquivo = new File([blob], nomeFinal, {
+        type: blob.type || "image/jpeg",
+      });
+
+      if (navigator.canShare?.({ files: [arquivo] })) {
+        await navigator.share({ files: [arquivo] });
+        return;
+      }
+
       const urlTemporaria = URL.createObjectURL(blob);
 
       const link = document.createElement("a");
       link.href = urlTemporaria;
-      link.download = nomeArquivo || `${titulo || "foto"}.jpg`;
+      link.download = nomeFinal;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
 
       // Libera a memória depois que o navegador já pegou o arquivo.
       window.setTimeout(() => URL.revokeObjectURL(urlTemporaria), 10_000);
-    } catch {
-      // Se algo falhar, abre do jeito antigo em vez de deixar sem saída.
+    } catch (erro) {
+      // A pessoa cancelou o menu de compartilhar - não é uma falha, só
+      // desistiu. Não faz sentido abrir outra coisa nesse caso.
+      if (erro instanceof DOMException && erro.name === "AbortError") {
+        return;
+      }
+
+      // Qualquer outra falha: abre do jeito antigo em vez de deixar sem saída.
       window.open(url, "_blank", "noopener");
     } finally {
       setBaixando(false);
@@ -348,6 +372,9 @@ function BotaoBaixarFoto({
   );
 }
 
+// Botão de envio que sabe sozinho quando o formulário está salvando.
+// Sem isso, clicar não dava sinal nenhum na tela - e a pessoa acabava
+// clicando várias vezes, criando registros repetidos.
 function BotaoSalvar({
   children,
   salvandoLabel = "Salvando...",
