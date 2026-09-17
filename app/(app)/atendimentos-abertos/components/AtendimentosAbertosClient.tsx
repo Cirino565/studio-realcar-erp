@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { AlertTriangle, CalendarX, CheckCircle2, Search } from "lucide-react";
+import { IndicadorNavegacao } from "@/components/ui/indicador-navegacao";
 
 type AtendimentoAberto = {
   id: number;
@@ -198,19 +200,23 @@ export default function AtendimentosAbertosClient({ itens }: Props) {
                   </div>
 
                   <div className="mt-3 flex gap-2">
-                    <a
+                    <Link
                       href={`/agenda?data=${item.data.slice(0, 10)}&agendamento=${item.id}`}
                       className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-violet-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-violet-700"
                     >
-                      Abrir na agenda
-                    </a>
+                      <IndicadorNavegacao modo="preceder" className="size-3.5 animate-spin">
+                        Abrir na agenda
+                      </IndicadorNavegacao>
+                    </Link>
 
-                    <a
+                    <Link
                       href={`/clientes/${item.clienteId}`}
-                      className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/[0.06]"
+                      className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/[0.06]"
                     >
-                      Ver ficha
-                    </a>
+                      <IndicadorNavegacao modo="preceder" className="size-3.5 animate-spin">
+                        Ver ficha
+                      </IndicadorNavegacao>
+                    </Link>
                   </div>
                 </div>
               ))}

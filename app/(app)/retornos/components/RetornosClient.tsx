@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { CalendarClock, CheckCircle2, MessageCircle, Search } from "lucide-react";
+import { IndicadorNavegacao } from "@/components/ui/indicador-navegacao";
 
 type ProcedimentoAtrasado = {
   nome: string;
@@ -222,12 +224,14 @@ export default function RetornosClient({ itens, semConfiguracao }: Props) {
                         </span>
                       )}
 
-                      <a
+                      <Link
                         href={`/clientes/${cliente.clienteId}`}
-                        className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/[0.06]"
+                        className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/[0.06]"
                       >
-                        Ver ficha
-                      </a>
+                        <IndicadorNavegacao modo="preceder" className="size-3.5 animate-spin">
+                          Ver ficha
+                        </IndicadorNavegacao>
+                      </Link>
                     </div>
                   </div>
                 );

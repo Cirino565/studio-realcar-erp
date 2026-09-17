@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { IndicadorNavegacao } from "@/components/ui/indicador-navegacao";
 import { formatarData, formatarMoeda } from "@/lib/format";
 import type { Cliente } from "@/lib/types";
 
@@ -279,7 +280,9 @@ export default function ClienteTable({
                   <div className="flex justify-end gap-1.5">
                     <Button type="button" size="icon-sm" variant="outline" asChild>
                       <Link href={`/clientes/${cliente.id}`} aria-label="Ver prontuário">
-                        <Eye size={16} />
+                        <IndicadorNavegacao>
+                          <Eye size={16} />
+                        </IndicadorNavegacao>
                       </Link>
                     </Button>
 
