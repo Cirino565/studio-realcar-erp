@@ -278,6 +278,76 @@ function CancelarPacoteButton({ pacoteId }: { pacoteId: number }) {
 // Botão de envio que sabe sozinho quando o formulário está salvando.
 // Sem isso, clicar não dava sinal nenhum na tela - e a pessoa acabava
 // clicando várias vezes, criando registros repetidos.
+// Baixa a foto de verdade num clique só.
+//
+// O Safari do iPhone ignora o pedido de download em links normais e abre
+// uma tela intermediária ("Abrir com...", "Mais..."), obrigando a um
+// segundo toque. Aqui buscamos o arquivo primeiro e entregamos já pronto,
+// o que faz o navegador salvar direto.
+function BotaoBaixarFoto({
+  url,
+  nomeArquivo,
+  titulo,
+  variante = "cartao",
+}: {
+  url: string;
+  nomeArquivo: string | null;
+  titulo: string;
+  variante?: "cartao" | "ampliada";
+}) {
+  const [baixando, setBaixando] = useState(false);
+
+  async function baixar() {
+    if (baixando) return;
+    setBaixando(true);
+
+    try {
+      const resposta = await fetch(url, { cache: "no-store" });
+      if (!resposta.ok) throw new Error("Falha ao baixar a foto.");
+
+      const blob = await resposta.blob();
+      const urlTemporaria = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = urlTemporaria;
+      link.download = nomeArquivo || `${titulo || "foto"}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Libera a memória depois que o navegador já pegou o arquivo.
+      window.setTimeout(() => URL.revokeObjectURL(urlTemporaria), 10_000);
+    } catch {
+      // Se algo falhar, abre do jeito antigo em vez de deixar sem saída.
+      window.open(url, "_blank", "noopener");
+    } finally {
+      setBaixando(false);
+    }
+  }
+
+  const estiloCartao =
+    "flex size-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 disabled:opacity-50 dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/[0.06]";
+  const estiloAmpliada =
+    "flex size-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 disabled:opacity-50";
+
+  return (
+    <button
+      type="button"
+      onClick={() => void baixar()}
+      disabled={baixando}
+      title="Baixar foto"
+      aria-label={`Baixar foto ${titulo}`}
+      className={variante === "ampliada" ? estiloAmpliada : estiloCartao}
+    >
+      {baixando ? (
+        <Loader2 className={variante === "ampliada" ? "size-5 animate-spin" : "size-4 animate-spin"} />
+      ) : (
+        <Download size={variante === "ampliada" ? 19 : 16} />
+      )}
+    </button>
+  );
+}
+
 function BotaoSalvar({
   children,
   salvandoLabel = "Salvando...",
@@ -496,14 +566,29 @@ export function ClienteClinicoTabs({
   // Guarda apenas as datas que a usuaria FECHOU. Assim, por padrao, o grupo
   // mais recente ja aparece aberto e os demais tambem - e o que ela fechar
   // continua fechado enquanto estiver na ficha.
-  const [gruposFechados, setGruposFechados] = useState<string[]>([]);
+  // Guarda quais grupos de data estão ABERTOS. Antes guardava os fechados,
+  // ou seja, tudo abria de uma vez - com várias visitas a página ficava
+  // enorme e era preciso rolar muito. Agora só o grupo mais recente abre
+  // sozinho, e os demais ficam recolhidos até você clicar.
+  // Guarda o estado de CADA grupo individualmente (aberto ou fechado),
+  // só para os que a pessoa já tocou. Os que nunca foram tocados usam o
+  // padrão: só o primeiro (visita mais recente) começa aberto.
+  //
+  // Antes isso era um único array de "abertos", e assim que qualquer
+  // grupo era tocado, todos os outros paravam de usar o padrão - o
+  // primeiro grupo podia fechar sozinho, ou tudo podia parecer abrir de
+  // uma vez, dependendo da ordem dos cliques.
+  const [estadoGrupos, setEstadoGrupos] = useState<Record<string, boolean>>(
+    {},
+  );
 
-  function alternarGrupo(chave: string) {
-    setGruposFechados((atual) =>
-      atual.includes(chave)
-        ? atual.filter((item) => item !== chave)
-        : [...atual, chave],
-    );
+  function alternarGrupo(chave: string, abertoAtual: boolean) {
+    setEstadoGrupos((atual) => ({ ...atual, [chave]: !abertoAtual }));
+  }
+
+  function grupoEstaAberto(chave: string, indice: number) {
+    if (chave in estadoGrupos) return estadoGrupos[chave];
+    return indice === 0;
   }
   const [evolucaoPendenteSelecionada, setEvolucaoPendenteSelecionada] =
     useState<number | null>(null);
@@ -832,20 +917,23 @@ export function ClienteClinicoTabs({
 
               {data.fotos.length > 0 ? (
                 <div className="space-y-8">
-                  {agruparFotosPorData(data.fotos).map((grupo) => (
+                  {agruparFotosPorData(data.fotos).map((grupo, indiceGrupo) => {
+                    const aberto = grupoEstaAberto(grupo.chave, indiceGrupo);
+
+                    return (
                     <section key={grupo.chave} className="min-w-0">
                       <button
                         type="button"
-                        onClick={() => alternarGrupo(grupo.chave)}
-                        aria-expanded={!gruposFechados.includes(grupo.chave)}
+                        onClick={() => alternarGrupo(grupo.chave, aberto)}
+                        aria-expanded={aberto}
                         className="mb-3 flex w-full items-center gap-3 rounded-xl px-1 py-1 text-left transition hover:bg-slate-50 dark:hover:bg-white/[0.04]"
                       >
                         <ChevronDown
                           size={18}
                           className={`shrink-0 text-slate-400 transition-transform ${
-                            gruposFechados.includes(grupo.chave)
-                              ? "-rotate-90"
-                              : ""
+                            aberto
+                              ? ""
+                              : "-rotate-90"
                           }`}
                         />
 
@@ -861,7 +949,7 @@ export function ClienteClinicoTabs({
                         <div className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
                       </button>
 
-                      {!gruposFechados.includes(grupo.chave) ? (
+                      {aberto ? (
                       <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                         {grupo.fotos.map((foto) => (
                     <article
@@ -906,19 +994,15 @@ export function ClienteClinicoTabs({
                           </div>
 
                           <div className="flex shrink-0 items-center gap-1">
-                            <a
-                              href={
+                            <BotaoBaixarFoto
+                              url={
                                 foto.armazenamento === "GOOGLE_DRIVE"
                                   ? `/api/clientes/fotos/${foto.id}/arquivo?download=1`
                                   : foto.url
                               }
-                              download={foto.nomeArquivo || undefined}
-                              title="Baixar foto"
-                              aria-label={`Baixar foto ${foto.titulo}`}
-                              className="flex size-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/[0.06]"
-                            >
-                              <Download size={16} />
-                            </a>
+                              nomeArquivo={foto.nomeArquivo}
+                              titulo={foto.titulo}
+                            />
 
                             <DeleteButton
                               clienteId={data.id}
@@ -950,7 +1034,8 @@ export function ClienteClinicoTabs({
                       </div>
                       ) : null}
                     </section>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <EmptyState
@@ -1596,19 +1681,16 @@ export function ClienteClinicoTabs({
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                <a
-                  href={
+                <BotaoBaixarFoto
+                  url={
                     fotoAberta.armazenamento === "GOOGLE_DRIVE"
                       ? `/api/clientes/fotos/${fotoAberta.id}/arquivo?download=1`
                       : fotoAberta.url
                   }
-                  download={fotoAberta.nomeArquivo || undefined}
-                  className="flex size-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
-                  aria-label="Baixar foto"
-                  title="Baixar foto"
-                >
-                  <Download size={19} />
-                </a>
+                  nomeArquivo={fotoAberta.nomeArquivo}
+                  titulo={fotoAberta.titulo}
+                  variante="ampliada"
+                />
 
                 <button
                   type="button"
