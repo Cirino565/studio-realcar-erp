@@ -215,6 +215,7 @@ export default function AppointmentDetailsModal({
   const [editandoCliente, setEditandoCliente] = useState(false);
   const [abrindoAnamnese, setAbrindoAnamnese] = useState(false);
   const [registrandoEvolucao, setRegistrandoEvolucao] = useState(false);
+  const [adiantandoEvolucao, setAdiantandoEvolucao] = useState(false);
 
   useLockBodyScroll(open);
 
@@ -225,6 +226,7 @@ export default function AppointmentDetailsModal({
     setEditandoCliente(false);
     setAbrindoAnamnese(false);
     setRegistrandoEvolucao(false);
+    setAdiantandoEvolucao(false);
   }, [open, appointment?.id]);
 
   if (!open || !appointment) return null;
@@ -245,6 +247,10 @@ export default function AppointmentDetailsModal({
   const atendimentoCancelado = currentAppointment.status === "Cancelado";
   const atendimentoEmAndamento = currentAppointment.status === "Em atendimento";
   const evolucaoPendente = currentAppointment.evolucaoStatus === "PENDENTE";
+  // Reflete o mesmo campo que o fluxo de pendência já usa - assim que a
+  // evolução é adiantada e salva, este valor atualiza sozinho (o mecanismo
+  // onEvolucaoRegistrada já cuida disso), sem precisar de estado próprio.
+  const temEvolucaoRegistrada = currentAppointment.evolucaoStatus === "CONCLUIDA";
   const pendenciasCadastro = cadastroPendente(currentAppointment.cliente);
   const podeGerenciarAgendamento = !atendimentoFinalizado && !atendimentoEmAndamento;
 
@@ -429,6 +435,27 @@ export default function AppointmentDetailsModal({
                   <span className="text-[10px] font-semibold text-violet-600">abre sobre o atendimento</span>
                 </button>
 
+                {!atendimentoFinalizado && !atendimentoCancelado && !temEvolucaoRegistrada ? (
+                  <button
+                    type="button"
+                    onClick={() => setAdiantandoEvolucao(true)}
+                    disabled={!podeRegistrarEvolucao}
+                    className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <span className="flex items-center gap-2"><Activity size={17} />Adiantar evolução clínica</span>
+                    <span className="text-[10px] font-semibold text-slate-400">
+                      {podeRegistrarEvolucao ? "escreva antes de finalizar" : "sem permissão clínica"}
+                    </span>
+                  </button>
+                ) : null}
+
+                {temEvolucaoRegistrada && !atendimentoFinalizado ? (
+                  <div className="flex min-h-11 items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-bold text-emerald-800">
+                    <CheckCircle2 size={17} />
+                    Evolução já registrada para este atendimento
+                  </div>
+                ) : null}
+
                 {!atendimentoFinalizado && !atendimentoCancelado ? (
                   <button
                     type="button"
@@ -579,6 +606,24 @@ export default function AppointmentDetailsModal({
         onClose={() => setRegistrandoEvolucao(false)}
         onSaved={(agendamentoId) => {
           setRegistrandoEvolucao(false);
+          onEvolucaoRegistrada(agendamentoId);
+        }}
+      />
+
+      <RegistrarEvolucaoPendenteModal
+        open={adiantandoEvolucao}
+        modo="antecipada"
+        item={{
+          id: currentAppointment.id,
+          clienteId: currentAppointment.clienteId,
+          cliente: currentAppointment.cliente.nome,
+          procedimento: currentAppointment.procedimento,
+          profissional: currentAppointment.profissional?.nome || null,
+          data: currentAppointment.data,
+        }}
+        onClose={() => setAdiantandoEvolucao(false)}
+        onSaved={(agendamentoId) => {
+          setAdiantandoEvolucao(false);
           onEvolucaoRegistrada(agendamentoId);
         }}
       />

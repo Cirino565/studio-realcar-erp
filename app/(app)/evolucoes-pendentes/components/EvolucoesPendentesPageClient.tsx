@@ -20,7 +20,9 @@ function normalizarBusca(valor: string) {
     .toLowerCase();
 }
 
-function tempoPendente(value: string) {
+function tempoPendente(value: string | undefined) {
+  if (!value) return "há pouco tempo";
+
   const diff = Math.max(0, Date.now() - new Date(value).getTime());
   const horas = Math.floor(diff / (60 * 60 * 1000));
   if (horas < 1) return "há menos de 1 hora";
@@ -41,7 +43,14 @@ function formatarDataAtendimento(value: string) {
 
 // Depois de 3 dias sem registrar, o atraso vira destaque mais forte -
 // ajuda a bater o olho e saber o que já passou do razoável.
-function estaAtrasada(pendenteDesde: string) {
+//
+// "pendenteDesde" é opcional no tipo compartilhado (o modal também serve
+// para adiantar evolução, caso sem essa data) - mas nesta tela só aparecem
+// pendências de verdade, que sempre têm essa data preenchida. O `?? ""`
+// abaixo é só para o TypeScript aceitar, sem mudar o comportamento real.
+function estaAtrasada(pendenteDesde: string | undefined) {
+  if (!pendenteDesde) return false;
+
   const dias = (Date.now() - new Date(pendenteDesde).getTime()) / (24 * 60 * 60 * 1000);
   return dias >= 3;
 }

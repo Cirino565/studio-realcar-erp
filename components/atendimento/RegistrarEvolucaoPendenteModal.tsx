@@ -15,13 +15,18 @@ export type EvolucaoPendenteItem = {
   procedimento: string;
   profissional: string | null;
   data: string;
-  pendenteDesde: string;
+  // Só existe no caso de pendência (atendimento já finalizado). Ao
+  // adiantar a evolução antes de finalizar, não existe "pendente desde".
+  pendenteDesde?: string;
 };
 
 type Props = {
   open: boolean;
   item: EvolucaoPendenteItem | null;
   temProxima?: boolean;
+  // "pendente" (padrão): atendimento já finalizado, faltando a evolução.
+  // "antecipada": escrever antes mesmo de finalizar, com a memória fresca.
+  modo?: "pendente" | "antecipada";
   onClose: () => void;
   onSaved: (agendamentoId: number) => void;
 };
@@ -41,6 +46,7 @@ export default function RegistrarEvolucaoPendenteModal({
   open,
   item,
   temProxima = false,
+  modo = "pendente",
   onClose,
   onSaved,
 }: Props) {
@@ -123,12 +129,22 @@ export default function RegistrarEvolucaoPendenteModal({
         <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-3 sm:px-5">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+              <div
+                className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${
+                  modo === "antecipada"
+                    ? "bg-violet-100 text-violet-700"
+                    : "bg-amber-100 text-amber-700"
+                }`}
+              >
                 <Activity size={18} />
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-700">
-                  Evolução pendente
+                <p
+                  className={`text-[10px] font-bold uppercase tracking-[0.14em] ${
+                    modo === "antecipada" ? "text-violet-700" : "text-amber-700"
+                  }`}
+                >
+                  {modo === "antecipada" ? "Adiantar evolução" : "Evolução pendente"}
                 </p>
                 <h2
                   id="titulo-evolucao-pendente"
@@ -184,16 +200,26 @@ export default function RegistrarEvolucaoPendenteModal({
                     {formatarDataHora(item.data)}
                   </dd>
                 </div>
-                <div>
-                  <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                    Pendente desde
-                  </dt>
-                  <dd className="mt-1 font-semibold text-amber-700">
-                    {formatarDataHora(item.pendenteDesde)}
-                  </dd>
-                </div>
+                {item.pendenteDesde ? (
+                  <div>
+                    <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                      Pendente desde
+                    </dt>
+                    <dd className="mt-1 font-semibold text-amber-700">
+                      {formatarDataHora(item.pendenteDesde)}
+                    </dd>
+                  </div>
+                ) : null}
               </dl>
             </section>
+
+            {modo === "antecipada" ? (
+              <p className="rounded-2xl border border-violet-200 bg-violet-50 px-3 py-2.5 text-xs leading-5 text-violet-800">
+                Escreva agora, com os detalhes ainda frescos. Quando este
+                atendimento for finalizado, o sistema já vai reconhecer que a
+                evolução foi registrada e não vai pedir de novo.
+              </p>
+            ) : null}
 
             <label className="block rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <span className="mb-2 block text-xs font-bold text-slate-900">

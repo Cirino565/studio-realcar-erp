@@ -12,7 +12,9 @@ type Props = {
   podeRegistrar: boolean;
 };
 
-function tempoPendente(value: string) {
+function tempoPendente(value: string | undefined) {
+  if (!value) return "há pouco tempo";
+
   const diff = Math.max(0, Date.now() - new Date(value).getTime());
   const horas = Math.floor(diff / (60 * 60 * 1000));
   if (horas < 1) return "há menos de 1 hora";

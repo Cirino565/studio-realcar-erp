@@ -1677,6 +1677,10 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
     include: {
       cliente: { select: { id: true, nome: true } },
       profissional: { select: { nome: true } },
+      // Se a evolução já foi registrada ANTES da finalização (agora é
+      // possível adiantar isso), precisamos saber para não tentar criar
+      // uma segunda - o banco só aceita uma por atendimento.
+      evolucao: { select: { id: true, titulo: true, descricao: true } },
     },
   });
 
@@ -1714,6 +1718,14 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
   const procedimentoRealizado = dados.procedimentoRealizado.trim();
   const observacoes = dados.observacoes?.trim() || null;
   const evolucaoClinica = dados.evolucao?.trim() || null;
+
+  // Considera "tem evolução" tanto o texto digitado agora quanto uma
+  // evolução já registrada antes da finalização (adiantada). Sem isso, um
+  // atendimento com evolução já escrita ficaria marcado como "pendente"
+  // de novo só porque o campo desta tela ficou em branco.
+  const temEvolucaoRegistrada = Boolean(
+    evolucaoClinica || agendamento.evolucao,
+  );
 
   const servicoBase = dados.procedimentoServicoId
     ? await prisma.procedimentoServico.findUnique({
@@ -1801,10 +1813,10 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
       data: {
         status: "Atendido",
         statusAntesAtendimento: null,
-        evolucaoStatus: evolucaoClinica ? "CONCLUIDA" : "PENDENTE",
-        evolucaoPendenteDesde: evolucaoClinica ? null : dataAtendimento,
-        evolucaoRegistradaEm: evolucaoClinica ? dataAtendimento : null,
-        evolucaoRegistradaPor: evolucaoClinica ? profissional : null,
+        evolucaoStatus: temEvolucaoRegistrada ? "CONCLUIDA" : "PENDENTE",
+        evolucaoPendenteDesde: temEvolucaoRegistrada ? null : dataAtendimento,
+        evolucaoRegistradaEm: temEvolucaoRegistrada ? dataAtendimento : null,
+        evolucaoRegistradaPor: temEvolucaoRegistrada ? profissional : null,
         procedimento: procedimentoRealizado,
         valor: valorCobrado,
         observacoes: [agendamento.observacoes, observacoes]
@@ -1832,16 +1844,40 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
     });
 
     if (evolucaoClinica) {
-      await tx.clienteEvolucao.create({
-        data: {
-          clienteId: agendamento.clienteId,
-          agendamentoId: agendamento.id,
-          titulo: `Atendimento - ${procedimentoRealizado}`,
-          descricao: evolucaoClinica,
-          profissional,
-          dataRegistro: dataAtendimento,
-        },
-      });
+      if (agendamento.evolucao) {
+        // Já existe uma evolução (registrada antes da finalização). O
+        // banco só aceita uma por atendimento, então nunca criamos uma
+        // segunda aqui. Se o texto digitado agora for diferente do que já
+        // estava salvo, atualiza guardando a versão anterior - do mesmo
+        // jeito que a edição manual de evolução já faz - em vez de
+        // simplesmente descartar o que foi digitado nesta tela.
+        if (agendamento.evolucao.descricao !== evolucaoClinica) {
+          await tx.clienteEvolucaoVersao.create({
+            data: {
+              evolucaoId: agendamento.evolucao.id,
+              titulo: agendamento.evolucao.titulo,
+              descricao: agendamento.evolucao.descricao,
+              editadoPor: profissional,
+            },
+          });
+
+          await tx.clienteEvolucao.update({
+            where: { id: agendamento.evolucao.id },
+            data: { descricao: evolucaoClinica },
+          });
+        }
+      } else {
+        await tx.clienteEvolucao.create({
+          data: {
+            clienteId: agendamento.clienteId,
+            agendamentoId: agendamento.id,
+            titulo: `Atendimento - ${procedimentoRealizado}`,
+            descricao: evolucaoClinica,
+            profissional,
+            dataRegistro: dataAtendimento,
+          },
+        });
+      }
     }
 
     // ---- Procedimentos fechados durante o atendimento ----
@@ -2108,6 +2144,11 @@ export type RegistrarEvolucaoPendenteInput = {
   dataRegistro?: string;
 };
 
+// Registra a evolução clínica de um atendimento específico - tanto para
+// PENDÊNCIAS (atendimento já finalizado, evolução ficou faltando) quanto
+// para ADIANTAR (escrever antes mesmo de finalizar, com os detalhes ainda
+// frescos). Nos dois casos, quando o atendimento for finalizado depois,
+// a finalização respeita o que já foi escrito aqui e não pede de novo.
 export async function registrarEvolucaoPendente(
   dados: RegistrarEvolucaoPendenteInput,
 ) {
@@ -2144,16 +2185,12 @@ export async function registrarEvolucaoPendente(
     throw new Error("Atendimento não encontrado.");
   }
 
-  if (agendamento.status !== "Atendido") {
-    throw new Error("A evolução posterior só pode ser registrada em atendimento finalizado.");
+  if (agendamento.status === "Cancelado") {
+    throw new Error("Não é possível registrar evolução para um agendamento cancelado.");
   }
 
   if (agendamento.evolucao || agendamento.evolucaoStatus === "CONCLUIDA") {
     throw new Error("Este atendimento já possui evolução registrada.");
-  }
-
-  if (agendamento.evolucaoStatus !== "PENDENTE") {
-    throw new Error("Este atendimento não está marcado com evolução pendente.");
   }
 
   const profissional =
