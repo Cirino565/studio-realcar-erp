@@ -10,6 +10,7 @@ import {
   ClipboardList,
   Download,
   FileText,
+  History,
   ImageIcon,
   Loader2,
   Maximize2,
@@ -34,6 +35,7 @@ import type { ClienteClinicoData, ClienteFotoData } from "../types";
 
 type AbaClinica =
   | "anamnese"
+  | "historico"
   | "fotos"
   | "evolucao"
   | "procedimentos"
@@ -75,6 +77,7 @@ const procedimentosAnamnesePadrao = [
 
 const abas: { id: AbaClinica; label: string; icon: LucideIcon }[] = [
   { id: "anamnese", label: "Anamnese", icon: ClipboardList },
+  { id: "historico", label: "Histórico", icon: History },
   { id: "fotos", label: "Fotos", icon: ImageIcon },
   { id: "evolucao", label: "Evolução", icon: Activity },
   { id: "procedimentos", label: "Procedimentos", icon: Stethoscope },
@@ -592,6 +595,62 @@ export function ClienteClinicoTabs({
                 respostas={data.anamneseRespostas}
                 onSelecionarVersao={setVersaoAnamneseSelecionadaId}
               />
+            </div>
+          </div>
+        )}
+
+        {activeTab === "historico" && (
+          <div id="historico">
+            <SectionHeader
+              icon={History}
+              title="Histórico de visitas"
+              description="Todos os dias em que a cliente já esteve na clínica, do mais recente para o mais antigo."
+            />
+
+            <div className="p-4 sm:p-6">
+              {data.historicoVisitas.length > 0 ? (
+                <>
+                  <p className="mb-4 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                    {(() => {
+                      const dias = new Set(
+                        data.historicoVisitas.map((visita) => visita.data.slice(0, 10)),
+                      );
+                      const totalDias = dias.size;
+                      const totalVisitas = data.historicoVisitas.length;
+                      return `${totalDias} ${totalDias === 1 ? "dia" : "dias"} de visita registrados (${totalVisitas} ${totalVisitas === 1 ? "atendimento" : "atendimentos"})`;
+                    })()}
+                  </p>
+
+                  <div className="space-y-3">
+                    {data.historicoVisitas.map((visita) => (
+                      <div
+                        key={visita.id}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.04]"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-900 dark:text-white">
+                            {formatarData(visita.data)}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {visita.procedimento}
+                            {visita.profissional ? ` • ${visita.profissional}` : ""}
+                          </p>
+                        </div>
+
+                        <p className="shrink-0 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                          {formatarMoeda(visita.valor)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <EmptyState
+                  icon={History}
+                  title="Nenhuma visita registrada"
+                  text="Assim que um atendimento for finalizado para esta cliente, ele aparece aqui."
+                />
+              )}
             </div>
           </div>
         )}

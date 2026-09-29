@@ -80,6 +80,14 @@ export type ClienteEvolucaoPendenteData = {
   pendenteDesde: string;
 };
 
+export type ClienteHistoricoVisitaData = {
+  id: number;
+  data: string;
+  procedimento: string;
+  profissional: string | null;
+  valor: number;
+};
+
 export type ClienteClinicoData = {
   id: number;
   nome: string;
@@ -92,6 +100,7 @@ export type ClienteClinicoData = {
   procedimentos: ClienteProcedimentoData[];
   evolucoes: ClienteEvolucaoData[];
   evolucoesPendentes: ClienteEvolucaoPendenteData[];
+  historicoVisitas: ClienteHistoricoVisitaData[];
   podeRegistrarEvolucao: boolean;
   anamneseModelos: ClienteAnamneseModeloData[];
   anamneseRespostas: ClienteAnamneseRespostaData[];

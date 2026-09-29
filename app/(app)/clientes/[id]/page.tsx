@@ -166,6 +166,12 @@ export default async function ClientePage({
     );
   }
 
+  const visitasAtendidas = await prisma.agendamento.findMany({
+    where: { clienteId, status: "Atendido" },
+    orderBy: { data: "desc" },
+    include: { profissional: { select: { nome: true } } },
+  });
+
   const anamneses = cliente.anamneses.map(mapAnamnese);
 
   const data: ClienteClinicoData = {
@@ -225,6 +231,13 @@ export default async function ClientePage({
       pendenteDesde: toIsoString(
         agendamento.evolucaoPendenteDesde || agendamento.updatedAt,
       ),
+    })),
+    historicoVisitas: visitasAtendidas.map((visita) => ({
+      id: visita.id,
+      data: toIsoString(visita.data),
+      procedimento: visita.procedimento,
+      profissional: visita.profissional?.nome || null,
+      valor: visita.valor,
     })),
     podeRegistrarEvolucao: canAccess(usuario, "clientes.clinico"),
     anamneseModelos: anamneseModelos.map((modelo) => ({
