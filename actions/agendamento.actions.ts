@@ -2874,3 +2874,81 @@ export async function buscarDisponibilidadeAgenda({
     };
   });
 }
+
+/**
+ * HISTORICO DE VISITAS NA BUSCA DA AGENDA
+ *
+ * Usada quando a pessoa busca uma cliente na Agenda e clica em
+ * "Histórico de visitas". So roda nesse clique (nao na hora de digitar),
+ * entao a busca continua leve: o historico de cada cliente so e carregado
+ * se alguem realmente pedir para ver.
+ *
+ * Traz os atendimentos finalizados ("Atendido") e as faltas ("Faltou"),
+ * do mais recente para o mais antigo.
+ */
+export type HistoricoVisitasCliente = {
+  visitas: ResultadoBuscaAgendamentoAgenda[];
+  totalAtendidas: number;
+  totalFaltas: number;
+};
+
+export async function buscarHistoricoVisitasCliente(
+  clienteId: number,
+): Promise<HistoricoVisitasCliente> {
+  await requirePermission("agenda.visualizar");
+
+  const id = Number(clienteId);
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return { visitas: [], totalAtendidas: 0, totalFaltas: 0 };
+  }
+
+  const [agendamentos, totalAtendidas, totalFaltas] = await Promise.all([
+    prisma.agendamento.findMany({
+      where: {
+        clienteId: id,
+        status: { in: ["Atendido", "Faltou"] },
+      },
+      select: {
+        id: true,
+        clienteId: true,
+        procedimento: true,
+        data: true,
+        status: true,
+        profissionalId: true,
+        cliente: {
+          select: { nome: true, telefone: true, whatsapp: true },
+        },
+        profissional: {
+          select: { nome: true },
+        },
+      },
+      orderBy: { data: "desc" },
+      take: 200,
+    }),
+    prisma.agendamento.count({
+      where: { clienteId: id, status: "Atendido" },
+    }),
+    prisma.agendamento.count({
+      where: { clienteId: id, status: "Faltou" },
+    }),
+  ]);
+
+  return {
+    totalAtendidas,
+    totalFaltas,
+    visitas: agendamentos.map((agendamento) => ({
+      id: agendamento.id,
+      clienteId: agendamento.clienteId,
+      clienteNome: agendamento.cliente.nome,
+      clienteTelefone: agendamento.cliente.telefone,
+      clienteWhatsapp: agendamento.cliente.whatsapp,
+      procedimento: agendamento.procedimento,
+      data: agendamento.data.toISOString(),
+      dataAgenda: formatDateSaoPaulo(agendamento.data),
+      status: agendamento.status,
+      profissionalId: agendamento.profissionalId,
+      profissionalNome: agendamento.profissional?.nome ?? null,
+    })),
+  };
+}

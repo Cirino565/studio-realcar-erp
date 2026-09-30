@@ -2,6 +2,8 @@
 
 import {
   CalendarDays,
+  ChevronDown,
+  History,
   Loader2,
   Search,
   UserRound,
@@ -15,6 +17,8 @@ import {
 
 import {
   buscarAgendamentosAgendaPorClientes,
+  buscarHistoricoVisitasCliente,
+  type HistoricoVisitasCliente,
   type ResultadoBuscaAgendamentoAgenda,
 } from "@/actions/agendamento.actions";
 
@@ -83,6 +87,87 @@ function formatarDataHora(value: string) {
   return { dia, hora };
 }
 
+type EstadoHistorico =
+  | HistoricoVisitasCliente
+  | "carregando"
+  | "erro"
+  | undefined;
+
+// Lista do historico completo, mostrada so quando a pessoa clica em
+// "Histórico de visitas" dentro do resultado da busca.
+function HistoricoVisitasLista({
+  estado,
+  onSelect,
+}: {
+  estado: EstadoHistorico;
+  onSelect: (resultado: ResultadoBuscaAgendamentoAgenda) => void;
+}) {
+  if (estado === undefined || estado === "carregando") {
+    return (
+      <div className="flex items-center gap-2 px-3 pb-3 text-xs text-slate-500 dark:text-slate-400">
+        <Loader2 size={14} className="animate-spin" />
+        Carregando histórico...
+      </div>
+    );
+  }
+
+  if (estado === "erro") {
+    return (
+      <p className="px-3 pb-3 text-xs text-rose-600 dark:text-rose-400">
+        Não foi possível carregar o histórico. Feche e abra de novo para tentar outra vez.
+      </p>
+    );
+  }
+
+  if (estado.visitas.length === 0) {
+    return (
+      <p className="px-3 pb-3 text-xs text-slate-500 dark:text-slate-400">
+        Nenhum atendimento finalizado ainda.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-1 px-1.5 pb-2">
+      {estado.visitas.map((resultado) => {
+        const { dia, hora } = formatarDataHora(resultado.data);
+
+        return (
+          <button
+            key={resultado.id}
+            type="button"
+            onClick={() => onSelect(resultado)}
+            className="flex w-full items-start gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
+            <CalendarDays size={14} className="mt-0.5 shrink-0 text-slate-400" />
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  {dia} • {hora}
+                </p>
+
+                <span
+                  className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${statusBadgeClass(
+                    resultado.status,
+                  )}`}
+                >
+                  {resultado.status}
+                </span>
+              </div>
+
+              <p className="mt-0.5 truncate text-[11px] text-slate-600 dark:text-slate-300">
+                {resultado.procedimento}
+                {resultado.profissionalNome ? ` • ${resultado.profissionalNome}` : ""}
+              </p>
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function AgendaSearch({
   clientes,
   onSelect,
@@ -95,6 +180,55 @@ export default function AgendaSearch({
     useState<ClienteBusca[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [aberta, setAberta] = useState(false);
+
+  // Historico de cada cliente: fica fechado ate alguem clicar. Na primeira
+  // vez que abre, busca no servidor; depois fica guardado enquanto a
+  // busca estiver aberta, entao abrir e fechar de novo e instantaneo.
+  const [historicoAberto, setHistoricoAberto] = useState<
+    Record<number, boolean>
+  >({});
+  const [historicoCache, setHistoricoCache] = useState<
+    Record<number, EstadoHistorico>
+  >({});
+
+  function alternarHistorico(clienteId: number) {
+    const abrir = !historicoAberto[clienteId];
+
+    setHistoricoAberto((atual) => ({ ...atual, [clienteId]: abrir }));
+
+    if (!abrir) return;
+
+    const atual = historicoCache[clienteId];
+    if (atual !== undefined && atual !== "erro") return;
+
+    setHistoricoCache((cache) => ({ ...cache, [clienteId]: "carregando" }));
+
+    buscarHistoricoVisitasCliente(clienteId)
+      .then((resposta) => {
+        setHistoricoCache((cache) => ({ ...cache, [clienteId]: resposta }));
+      })
+      .catch((error) => {
+        console.error("Erro ao buscar histórico da cliente:", error);
+        setHistoricoCache((cache) => ({ ...cache, [clienteId]: "erro" }));
+      });
+  }
+
+  function resumoHistorico(clienteId: number) {
+    const estado = historicoCache[clienteId];
+    if (!estado || typeof estado === "string") return "";
+
+    const partes = [
+      `${estado.totalAtendidas} ${estado.totalAtendidas === 1 ? "visita" : "visitas"}`,
+    ];
+
+    if (estado.totalFaltas > 0) {
+      partes.push(
+        `${estado.totalFaltas} ${estado.totalFaltas === 1 ? "falta" : "faltas"}`,
+      );
+    }
+
+    return ` · ${partes.join(" · ")}`;
+  }
 
   const versaoBuscaRef = useRef(0);
 
@@ -213,6 +347,8 @@ export default function AgendaSearch({
     setClientesEncontrados([]);
     setCarregando(false);
     setAberta(false);
+    setHistoricoAberto({});
+    setHistoricoCache({});
   }
 
   return (
@@ -387,60 +523,35 @@ export default function AgendaSearch({
                         )}
 
                         {historico.length > 0 ? (
-                          <>
-                            <div className="border-t border-slate-100 px-3 pb-1 pt-3 dark:border-slate-800">
-                              <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
-                                Histórico recente
-                              </p>
-                            </div>
+                          <div className="border-t border-slate-100 dark:border-slate-800">
+                            <button
+                              type="button"
+                              onClick={() => alternarHistorico(cliente.id)}
+                              aria-expanded={Boolean(historicoAberto[cliente.id])}
+                              className="flex w-full items-center gap-2 px-3 py-2.5 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800"
+                            >
+                              <History size={14} className="shrink-0 text-slate-400" />
 
-                            <div className="space-y-1 px-1.5 pb-2">
-                              {historico.map(
-                                (resultado) => {
-                                  const { dia, hora } =
-                                    formatarDataHora(
-                                      resultado.data,
-                                    );
+                              <span className="min-w-0 flex-1 text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                                Histórico de visitas
+                                {resumoHistorico(cliente.id)}
+                              </span>
 
-                                  return (
-                                    <button
-                                      key={resultado.id}
-                                      type="button"
-                                      onClick={() =>
-                                        onSelect(resultado)
-                                      }
-                                      className="flex w-full items-start gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800"
-                                    >
-                                      <CalendarDays
-                                        size={14}
-                                        className="mt-0.5 shrink-0 text-slate-400"
-                                      />
+                              <ChevronDown
+                                size={15}
+                                className={`shrink-0 text-slate-400 transition-transform ${
+                                  historicoAberto[cliente.id] ? "" : "-rotate-90"
+                                }`}
+                              />
+                            </button>
 
-                                      <div className="min-w-0 flex-1">
-                                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                                          {dia} • {hora}
-                                        </p>
-
-                                        <div className="mt-0.5 flex items-center gap-1.5">
-                                          <p className="min-w-0 truncate text-[11px] text-slate-500 dark:text-slate-400">
-                                            {resultado.procedimento}
-                                          </p>
-
-                                          <span
-                                            className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${statusBadgeClass(
-                                              resultado.status,
-                                            )}`}
-                                          >
-                                            {resultado.status}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </button>
-                                  );
-                                },
-                              )}
-                            </div>
-                          </>
+                            {historicoAberto[cliente.id] ? (
+                              <HistoricoVisitasLista
+                                estado={historicoCache[cliente.id]}
+                                onSelect={onSelect}
+                              />
+                            ) : null}
+                          </div>
                         ) : null}
                       </>
                     )}
