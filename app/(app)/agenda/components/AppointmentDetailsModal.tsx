@@ -21,6 +21,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 import {
   cancelarSerieAgendamento,
@@ -109,6 +110,7 @@ type Props = {
   onReagendar: (appointment: AppointmentDetails) => void;
   onClienteUpdated: (cliente: ClienteAtendimentoDetalhes) => void;
   onEvolucaoRegistrada: (agendamentoId: number) => void;
+  procedimentosAdicionais?: AppointmentDetails[];
 };
 
 function useLockBodyScroll(open: boolean) {
@@ -196,6 +198,38 @@ function cadastroPendente(cliente: ClienteAtendimentoDetalhes) {
   return pendencias;
 }
 
+// Botão das ações rápidas que ficam fixas no topo da janela - no celular
+// elas ficavam lá embaixo e era preciso rolar para achar.
+function AcaoRapida({
+  icon: Icone,
+  label,
+  onClick,
+  disabled,
+  destaque,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  destaque?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex min-h-[3.4rem] flex-col items-center justify-center gap-1 rounded-xl border px-1 py-1.5 text-center text-[10px] font-bold leading-tight transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${
+        destaque
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+          : "border-slate-200 bg-white text-slate-700 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700"
+      }`}
+    >
+      <Icone size={17} />
+      <span>{label}</span>
+    </button>
+  );
+}
+
 export default function AppointmentDetailsModal({
   open,
   appointment,
@@ -208,6 +242,7 @@ export default function AppointmentDetailsModal({
   onReagendar,
   onClienteUpdated,
   onEvolucaoRegistrada,
+  procedimentosAdicionais = [],
 }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -216,6 +251,8 @@ export default function AppointmentDetailsModal({
   const [abrindoAnamnese, setAbrindoAnamnese] = useState(false);
   const [registrandoEvolucao, setRegistrandoEvolucao] = useState(false);
   const [adiantandoEvolucao, setAdiantandoEvolucao] = useState(false);
+  const [evolucaoAdicional, setEvolucaoAdicional] =
+    useState<AppointmentDetails | null>(null);
 
   useLockBodyScroll(open);
 
@@ -227,6 +264,7 @@ export default function AppointmentDetailsModal({
     setAbrindoAnamnese(false);
     setRegistrandoEvolucao(false);
     setAdiantandoEvolucao(false);
+    setEvolucaoAdicional(null);
   }, [open, appointment?.id]);
 
   if (!open || !appointment) return null;
@@ -366,6 +404,32 @@ export default function AppointmentDetailsModal({
             >
               <X size={17} />
             </button>
+          </div>
+
+          <div className="mt-3 grid grid-cols-4 gap-1.5">
+            <AcaoRapida
+              icon={MessageCircle}
+              label="Mensagem"
+              destaque
+              onClick={() => onWhatsApp(currentAppointment)}
+            />
+            <AcaoRapida
+              icon={CalendarClock}
+              label="Agendar próximo"
+              onClick={() => onReagendar(currentAppointment)}
+            />
+            <AcaoRapida
+              icon={Pencil}
+              label="Editar agenda"
+              disabled={!podeGerenciarAgendamento || isDeleting}
+              onClick={() => onEditar(currentAppointment)}
+            />
+            <AcaoRapida
+              icon={UserRound}
+              label="Editar cliente"
+              disabled={!podeEditarCliente}
+              onClick={() => setEditandoCliente(true)}
+            />
           </div>
         </header>
 
@@ -536,6 +600,67 @@ export default function AppointmentDetailsModal({
               </div>
             </section>
 
+            {procedimentosAdicionais.length > 0 ? (
+              <section className="rounded-2xl border border-violet-200 bg-violet-50/60 p-3 shadow-sm">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-violet-700">
+                  Também feito neste atendimento
+                </p>
+
+                <div className="mt-2 space-y-2">
+                  {procedimentosAdicionais.map((adicional) => {
+                    const pendente = adicional.evolucaoStatus === "PENDENTE";
+
+                    return (
+                      <div
+                        key={adicional.id}
+                        className="rounded-xl border border-violet-100 bg-white p-2.5"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="min-w-0 text-sm font-bold text-slate-900">
+                            {adicional.procedimento}
+                          </p>
+                          <p className="shrink-0 text-xs font-bold text-violet-700">
+                            {formatCurrency(adicional.valor)}
+                          </p>
+                        </div>
+
+                        {pendente ? (
+                          <button
+                            type="button"
+                            onClick={() => setEvolucaoAdicional(adicional)}
+                            disabled={!podeRegistrarEvolucao}
+                            className="mt-2 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-amber-600 px-3 text-xs font-bold text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+                          >
+                            <Activity size={14} />
+                            {podeRegistrarEvolucao
+                              ? "Registrar evolução deste procedimento"
+                              : "Evolução pendente"}
+                          </button>
+                        ) : (
+                          <p className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
+                            <CheckCircle2 size={12} /> Evolução registrada
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-2 flex items-center justify-between border-t border-violet-100 pt-2 text-xs font-bold text-slate-700">
+                  <span>Total do atendimento</span>
+                  <span>
+                    {formatCurrency(
+                      currentAppointment.valor +
+                        procedimentosAdicionais.reduce(
+                          (total, adicional) => total + adicional.valor,
+                          0,
+                        ),
+                    )}
+                  </span>
+                </div>
+              </section>
+            ) : null}
+
             {currentAppointment.observacoes ? (
               <section className="rounded-2xl border border-amber-200 bg-amber-50 p-3">
                 <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700">Observações do agendamento</p>
@@ -543,20 +668,14 @@ export default function AppointmentDetailsModal({
               </section>
             ) : null}
 
+            {podeGerenciarAgendamento ? (
             <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Ações complementares</p>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <Button type="button" variant="outline" onClick={() => onWhatsApp(currentAppointment)} className="h-10 rounded-xl border-emerald-200 text-xs text-emerald-700 hover:bg-emerald-50">
-                  <MessageCircle size={15} /> Mensagem
-                </Button>
-                <Button type="button" variant="outline" onClick={() => onReagendar(currentAppointment)} className="h-10 rounded-xl border-slate-200 text-xs text-slate-700 hover:bg-slate-50" title="Agenda o próximo atendimento desta cliente, com os dados dela já preenchidos">
-                  <CalendarClock size={15} /> Agendar próximo
-                </Button>
-                <Button type="button" variant="outline" onClick={() => onEditar(currentAppointment)} disabled={!podeGerenciarAgendamento || isDeleting} className="h-10 rounded-xl border-slate-200 text-xs text-slate-700 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-50">
-                  <Pencil size={15} /> Editar agenda
-                </Button>
-                <Button type="button" variant="outline" onClick={handleExcluir} disabled={!podeGerenciarAgendamento || isDeleting} className="h-10 rounded-xl border-rose-200 text-xs text-rose-700 hover:bg-rose-50 disabled:opacity-50">
-                  <Trash2 size={15} /> {isDeleting ? "Excluindo" : "Excluir"}
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Outras ações</p>
+              {/* Mensagem, Agendar próximo e Editar ficam fixos no topo.
+                  Aqui embaixo fica só o que apaga, para não ser tocado sem querer. */}
+              <div className="mt-2">
+                <Button type="button" variant="outline" onClick={handleExcluir} disabled={isDeleting} className="h-10 w-full rounded-xl border-rose-200 text-xs text-rose-700 hover:bg-rose-50 disabled:opacity-50">
+                  <Trash2 size={15} /> {isDeleting ? "Excluindo" : "Excluir agendamento"}
                 </Button>
               </div>
 
@@ -570,6 +689,7 @@ export default function AppointmentDetailsModal({
                 </div>
               ) : null}
             </section>
+            ) : null}
           </div>
         </div>
       </aside>
@@ -627,6 +747,29 @@ export default function AppointmentDetailsModal({
           onEvolucaoRegistrada(agendamentoId);
         }}
       />
+
+      {evolucaoAdicional ? (
+        <RegistrarEvolucaoPendenteModal
+          open
+          item={{
+            id: evolucaoAdicional.id,
+            clienteId: evolucaoAdicional.clienteId,
+            cliente: evolucaoAdicional.cliente.nome,
+            procedimento: evolucaoAdicional.procedimento,
+            profissional: evolucaoAdicional.profissional?.nome || null,
+            data: evolucaoAdicional.data,
+            pendenteDesde:
+              evolucaoAdicional.evolucaoPendenteDesde ||
+              evolucaoAdicional.updatedAt ||
+              evolucaoAdicional.data,
+          }}
+          onClose={() => setEvolucaoAdicional(null)}
+          onSaved={(agendamentoId) => {
+            setEvolucaoAdicional(null);
+            onEvolucaoRegistrada(agendamentoId);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

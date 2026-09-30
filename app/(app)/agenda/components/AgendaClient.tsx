@@ -184,6 +184,100 @@ function formatarDataCurta(value: Date | string) {
   }).format(new Date(value));
 }
 
+// Procedimentos fechados DURANTE a finalização (ex.: veio fazer
+// Microagulhamento e fechou um Jato de Plasma na hora) continuam sendo
+// registros próprios - é isso que garante evolução clínica e relatórios
+// separados. Mas na AGENDA eles aparecem dentro do atendimento principal,
+// sem ocupar outro horário e sem ficar por cima da próxima cliente.
+const MARCADOR_PROCEDIMENTO_ADICIONAL = "Fechado durante o atendimento de ";
+
+function diaSaoPauloAgenda(valor: string) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(valor));
+}
+
+function ehProcedimentoAdicional(item: AgendamentoAgenda) {
+  return (
+    item.status === "Atendido" &&
+    Boolean(item.observacoes?.startsWith(MARCADOR_PROCEDIMENTO_ADICIONAL))
+  );
+}
+
+function agruparProcedimentosAdicionais(lista: AgendamentoAgenda[]) {
+  const adicionaisPorPrincipal = new Map<number, AgendamentoAgenda[]>();
+  const principalDoAdicional = new Map<number, number>();
+
+  const principais = lista.filter(
+    (item) => item.status === "Atendido" && !ehProcedimentoAdicional(item),
+  );
+
+  for (const adicional of lista) {
+    if (!ehProcedimentoAdicional(adicional)) continue;
+
+    const dia = diaSaoPauloAgenda(adicional.data);
+    const inicio = new Date(adicional.data).getTime();
+    const texto = adicional.observacoes || "";
+
+    const candidatos = principais.filter(
+      (principal) =>
+        principal.clienteId === adicional.clienteId &&
+        diaSaoPauloAgenda(principal.data) === dia &&
+        new Date(principal.data).getTime() <= inicio,
+    );
+
+    if (candidatos.length === 0) continue;
+
+    const pontuar = (principal: AgendamentoAgenda) =>
+      (texto.startsWith(
+        `${MARCADOR_PROCEDIMENTO_ADICIONAL}${principal.procedimento} em`,
+      )
+        ? 2
+        : 0) + (principal.profissionalId === adicional.profissionalId ? 1 : 0);
+
+    candidatos.sort(
+      (a, b) =>
+        pontuar(b) - pontuar(a) ||
+        new Date(b.data).getTime() - new Date(a.data).getTime(),
+    );
+
+    const principal = candidatos[0];
+    const doPrincipal = adicionaisPorPrincipal.get(principal.id) || [];
+    doPrincipal.push(adicional);
+    adicionaisPorPrincipal.set(principal.id, doPrincipal);
+    principalDoAdicional.set(adicional.id, principal.id);
+  }
+
+  for (const adicionais of adicionaisPorPrincipal.values()) {
+    adicionais.sort(
+      (a, b) => new Date(a.data).getTime() - new Date(b.data).getTime(),
+    );
+  }
+
+  const naGrade = lista
+    .filter((item) => !principalDoAdicional.has(item.id))
+    .map((item) => {
+      const adicionais = adicionaisPorPrincipal.get(item.id);
+      if (!adicionais) return item;
+
+      return {
+        ...item,
+        procedimento: [
+          item.procedimento,
+          ...adicionais.map((adicional) => adicional.procedimento),
+        ].join(" + "),
+        valor:
+          item.valor +
+          adicionais.reduce((total, adicional) => total + adicional.valor, 0),
+      };
+    });
+
+  return { naGrade, adicionaisPorPrincipal, principalDoAdicional };
+}
+
 export default function AgendaClient({
   clientes,
   agendamentos,
@@ -234,6 +328,27 @@ export default function AgendaClient({
   useEffect(() => {
     setAgendamentosAtuais(agendamentos);
   }, [agendamentos]);
+
+  const agendaAgrupada = useMemo(
+    () => agruparProcedimentosAdicionais(agendamentosAtuais),
+    [agendamentosAtuais],
+  );
+
+  // Se o link pedir para focar um procedimento extra, foca o atendimento
+  // principal, que é o que aparece na agenda.
+  const focoNaGrade = useMemo(() => {
+    if (!initialAgendamentoId) return initialAgendamentoId;
+    const principal = agendaAgrupada.principalDoAdicional.get(
+      Number(initialAgendamentoId),
+    );
+    return principal ? String(principal) : initialAgendamentoId;
+  }, [initialAgendamentoId, agendaAgrupada]);
+
+  // O cartão da agenda mostra "A + B" e a soma dos valores; ao clicar,
+  // abre o atendimento principal com os dados originais dele.
+  function registroOriginal(item: AgendamentoAgenda) {
+    return agendamentosAtuais.find((atual) => atual.id === item.id) ?? item;
+  }
 
   const [selectedAppointment, setSelectedAppointment] =
     useState<AgendamentoAgenda | null>(null);
@@ -522,13 +637,15 @@ export default function AgendaClient({
             onProfissionalFiltroChange={handleProfissionalFiltroChange}
             profissionais={profissionaisVisiveis}
             todosProfissionais={profissionais}
-            agendamentos={agendamentosAtuais}
-            focusAgendamentoId={initialAgendamentoId}
+            agendamentos={agendaAgrupada.naGrade}
+            focusAgendamentoId={focoNaGrade}
             bloqueios={bloqueios}
             onNovoHorario={abrirNovoHorario}
-            onSelectAppointment={setSelectedAppointment}
+            onSelectAppointment={(item) =>
+              setSelectedAppointment(registroOriginal(item))
+            }
             onSelectBlock={abrirEdicaoBloqueio}
-            onMessage={abrirWhatsApp}
+            onMessage={(item) => abrirWhatsApp(registroOriginal(item))}
             horarioAtendimento={horarioAtendimento}
             viewMode={initialView}
           />
@@ -560,6 +677,11 @@ export default function AgendaClient({
         onReagendar={abrirReagendamento}
         onClienteUpdated={atualizarClienteNoFluxo}
         onEvolucaoRegistrada={marcarEvolucaoConcluida}
+        procedimentosAdicionais={
+          selectedAppointment
+            ? agendaAgrupada.adicionaisPorPrincipal.get(selectedAppointment.id) ?? []
+            : []
+        }
       />
 
       <AppointmentMessageModal
