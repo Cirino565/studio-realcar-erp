@@ -5,6 +5,8 @@ import {
 } from "@/lib/auth";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
+import BarraNavegacao from "@/components/layout/BarraNavegacao";
+import { Suspense } from "react";
 
 export default async function AppLayout({
   children,
@@ -17,6 +19,10 @@ export default async function AppLayout({
   return (
     <div className="app-shell min-h-[100dvh] w-full overflow-x-hidden bg-background text-foreground">
       <div className="flex min-h-[100dvh] w-full overflow-x-hidden">
+        <Suspense fallback={null}>
+          <BarraNavegacao />
+        </Suspense>
+
         <Sidebar permissoes={permissoes} isAdmin={isAdminUser(usuario)} />
 
         <div className="flex min-w-0 flex-1 flex-col lg:pl-72">
