@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 
 export type ReativacaoItem = {
   id: number;
@@ -70,20 +70,35 @@ function textoEspera(item: ReativacaoEsperaItem) {
   return `Mensagem enviada · volta à lista em ${item.voltaEm || "breve"}`;
 }
 
+function dataDaVolta(dias: number) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "America/Sao_Paulo",
+  }).format(new Date(Date.now() + dias * 24 * 60 * 60 * 1000));
+}
+
 export default function ReativacaoClient({ clientes, emEspera }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [ocultos, setOcultos] = useState<number[]>([]);
   const [voltaram, setVoltaram] = useState<number[]>([]);
   const [enviando, setEnviando] = useState<number[]>([]);
+  const [novosEspera, setNovosEspera] = useState<ReativacaoEsperaItem[]>([]);
   const [abertoId, setAbertoId] = useState<number | null>(null);
   const [esperaAberta, setEsperaAberta] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const atualizarEm = useRef<number | null>(null);
 
   const visiveis = clientes.filter((item) => !ocultos.includes(item.id));
-  const esperaVisivel = emEspera.filter(
-    (item) => !ocultos.includes(item.id) && !voltaram.includes(item.id),
-  );
+
+  // Quem acabou de ser enviada ja aparece em "Em espera" na hora, sem esperar
+  // a tela recarregar. Se o servidor ja trouxe a cliente, vale o dado dele.
+  const idsDoServidor = new Set(emEspera.map((item) => item.id));
+  const esperaVisivel = [
+    ...emEspera,
+    ...novosEspera.filter((item) => !idsDoServidor.has(item.id)),
+  ].filter((item) => !voltaram.includes(item.id));
 
   function mensagemDeErro(error: unknown) {
     return error instanceof Error
@@ -91,8 +106,33 @@ export default function ReativacaoClient({ clientes, emEspera }: Props) {
       : "Não foi possível salvar. Tente novamente.";
   }
 
+  // Varias clientes seguidas geram uma unica atualizacao da tela, depois que
+  // todas foram salvas.
+  function agendarAtualizacao() {
+    if (atualizarEm.current) window.clearTimeout(atualizarEm.current);
+    atualizarEm.current = window.setTimeout(() => router.refresh(), 1200);
+  }
+
+  function adicionarNaEspera(
+    cliente: { id: number; nome: string; procedimento: string | null },
+    situacao: string,
+    dias: number | null,
+  ) {
+    setNovosEspera((atuais) => [
+      ...atuais.filter((item) => item.id !== cliente.id),
+      {
+        id: cliente.id,
+        nome: cliente.nome,
+        procedimento: cliente.procedimento,
+        situacao,
+        voltaEm: dias === null ? null : dataDaVolta(dias),
+      },
+    ]);
+    setVoltaram((atuais) => atuais.filter((id) => id !== cliente.id));
+  }
+
   function executar(
-    id: number,
+    cliente: { id: number; nome: string; procedimento: string | null },
     acao: AcaoReativacao,
     meses?: number,
   ) {
@@ -100,14 +140,28 @@ export default function ReativacaoClient({ clientes, emEspera }: Props) {
 
     startTransition(async () => {
       try {
-        await registrarReativacao(id, acao, meses);
+        await registrarReativacao(cliente.id, acao, meses);
+
         if (acao === "VOLTAR") {
-          setVoltaram((atuais) => [...atuais, id]);
+          setVoltaram((atuais) => [...atuais, cliente.id]);
+          setOcultos((atuais) => atuais.filter((id) => id !== cliente.id));
+          setEnviando((atuais) => atuais.filter((id) => id !== cliente.id));
+          setNovosEspera((atuais) =>
+            atuais.filter((item) => item.id !== cliente.id),
+          );
         } else {
-          setOcultos((atuais) => [...atuais, id]);
+          setOcultos((atuais) => [...atuais, cliente.id]);
+          if (acao === "VAI_MARCAR") {
+            adicionarNaEspera(cliente, "Vai marcar", 21);
+          } else if (acao === "MAIS_TARDE") {
+            adicionarNaEspera(cliente, "Mais tarde", (meses || 2) * 30);
+          } else {
+            adicionarNaEspera(cliente, "Não quer mais", null);
+          }
         }
+
         setAbertoId(null);
-        router.refresh();
+        agendarAtualizacao();
       } catch (error) {
         setErro(mensagemDeErro(error));
       }
@@ -120,10 +174,11 @@ export default function ReativacaoClient({ clientes, emEspera }: Props) {
 
     registrarReativacao(item.id, "CONTATADA", undefined, item.mensagem)
       .then(() => {
+        adicionarNaEspera(item, "Contatada", 30);
         window.setTimeout(() => {
           setOcultos((atuais) => [...atuais, item.id]);
-          router.refresh();
         }, 900);
+        agendarAtualizacao();
       })
       .catch((error) => {
         setEnviando((atuais) => atuais.filter((id) => id !== item.id));
@@ -137,7 +192,7 @@ export default function ReativacaoClient({ clientes, emEspera }: Props) {
         `Marcar que ${item.nome} não quer mais receber esse contato? Ela sai da lista e só volta se você trouxer de volta.`,
       )
     ) {
-      executar(item.id, "NAO_QUER");
+      executar(item, "NAO_QUER");
     }
   }
 
@@ -217,7 +272,7 @@ export default function ReativacaoClient({ clientes, emEspera }: Props) {
                   <button
                     type="button"
                     disabled={isPending}
-                    onClick={() => executar(cliente.id, "VAI_MARCAR")}
+                    onClick={() => executar(cliente, "VAI_MARCAR")}
                     className="rounded-full border border-cyan-200 bg-white px-3 py-1.5 text-xs font-bold text-cyan-700 hover:bg-cyan-50 disabled:opacity-60"
                   >
                     Vai marcar um dia
@@ -227,7 +282,7 @@ export default function ReativacaoClient({ clientes, emEspera }: Props) {
                       key={meses}
                       type="button"
                       disabled={isPending}
-                      onClick={() => executar(cliente.id, "MAIS_TARDE", meses)}
+                      onClick={() => executar(cliente, "MAIS_TARDE", meses)}
                       className="rounded-full border border-amber-200 bg-white px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-50 disabled:opacity-60"
                     >
                       Agora não · chamar em {meses} {meses === 1 ? "mês" : "meses"}
@@ -296,7 +351,7 @@ export default function ReativacaoClient({ clientes, emEspera }: Props) {
                   <button
                     type="button"
                     disabled={isPending}
-                    onClick={() => executar(item.id, "VOLTAR")}
+                    onClick={() => executar(item, "VOLTAR")}
                     className="inline-flex shrink-0 items-center gap-1 rounded-full border border-violet-200 bg-white px-2.5 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-50 disabled:opacity-60"
                   >
                     <RotateCcw className="size-3" />
