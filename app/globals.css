@@ -1888,3 +1888,48 @@ body {
 .theme-dark .app-shell :is([class*="hover:bg-violet-"], [class*="hover:bg-fuchsia-"]):not([class^="bg-"]):not([class*=" bg-"]):not([class*="dark:bg-"]):hover {
   background-color: rgba(157, 141, 241, 0.08) !important;
 }
+
+/* ======================================================================
+   LIGHT ELEGANT V1
+   Tema claro mais fino: cartoes da Agenda em tom suave (em vez de blocos
+   verdes/roxos chapados), almoco discreto e roxo um pouco mais calmo.
+   O tema escuro nao e alterado por nada daqui.
+   ====================================================================== */
+
+.theme-light {
+  --color-violet-600: #7357d6;
+  --color-violet-700: #6340c2;
+}
+
+.theme-light .agenda-card {
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--ag-solid) 15%, #ffffff),
+      color-mix(in srgb, var(--ag-end) 8%, #ffffff)) !important;
+  border-color: color-mix(in srgb, var(--ag-solid) 28%, #ffffff) !important;
+  box-shadow:
+    inset 4px 0 0 var(--ag-solid),
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 6px 14px rgba(15, 23, 42, 0.06) !important;
+  color: #1b2030 !important;
+}
+
+.theme-light .agenda-card [style*="color"] {
+  color: #1d2231 !important;
+}
+
+.theme-light .agenda-card :is(span, button)[style*="background-color"] {
+  background-color: rgba(15, 23, 42, 0.05) !important;
+  border-color: rgba(15, 23, 42, 0.12) !important;
+}
+
+.theme-light .agenda-card :is(.bg-white, [class*="bg-white/"]) {
+  background-color: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.12) !important;
+}
+
+.theme-light [aria-label^="Intervalo de"] {
+  background: repeating-linear-gradient(135deg,
+    rgba(176, 142, 78, 0.10) 0 6px, rgba(176, 142, 78, 0.04) 6px 12px) !important;
+  border-color: rgba(176, 142, 78, 0.30) !important;
+}
