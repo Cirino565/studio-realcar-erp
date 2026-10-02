@@ -6,6 +6,7 @@ import { useMemo, useState, useTransition } from "react";
 import {
   Building2,
   CalendarClock,
+  ChevronDown,
   CheckCircle2,
   Clock3,
   Copy,
@@ -360,6 +361,7 @@ function AuxiliarList({
 }: AuxiliarListProps) {
   const [nome, setNome] = useState("");
   const [pendingId, setPendingId] = useState<number | null>(null);
+  const [listaAberta, setListaAberta] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   function adicionar() {
@@ -418,7 +420,19 @@ function AuxiliarList({
         </Button>
       </div>
 
-      <div className="mt-5 grid gap-3">
+      <button
+        type="button"
+        onClick={() => setListaAberta((aberta) => !aberta)}
+        aria-expanded={listaAberta}
+        className="mt-5 flex w-full items-center justify-between rounded-2xl border border-white/[0.10] bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.07]"
+      >
+        <span>{listaAberta ? "Ocultar lista" : `Ver lista (${items.length})`}</span>
+        <ChevronDown
+          className={`h-4 w-4 transition-transform ${listaAberta ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      <div className={`mt-3 grid gap-3 ${listaAberta ? "" : "hidden"}`}>
         {items.length > 0 ? (
           (ordenacaoAutomatica ? ordenarPorNome(items) : items).map((item) => (
             <div
@@ -661,6 +675,7 @@ function ServicosList({ items, procedimentosInteresse }: ServicosListProps) {
   const [valor, setValor] = useState("");
   const [custo, setCusto] = useState("");
   const [pendingId, setPendingId] = useState<number | null>(null);
+  const [listaAberta, setListaAberta] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const procedimentosAtivos = ordenarPorNome(
@@ -794,7 +809,21 @@ function ServicosList({ items, procedimentosInteresse }: ServicosListProps) {
         </div>
       ) : null}
 
-      <div className="mt-5 grid gap-3 xl:grid-cols-2">
+      <button
+        type="button"
+        onClick={() => setListaAberta((aberta) => !aberta)}
+        aria-expanded={listaAberta}
+        className="mt-5 flex w-full items-center justify-between rounded-2xl border border-white/[0.10] bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.07]"
+      >
+        <span>{listaAberta ? "Ocultar lista" : `Ver serviços (${items.length})`}</span>
+        <ChevronDown
+          className={`h-4 w-4 transition-transform ${listaAberta ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      <div
+        className={`mt-3 grid gap-3 xl:grid-cols-2 ${listaAberta ? "" : "hidden"}`}
+      >
         {items.length > 0 ? (
           ordenarPorNome(items).map((item) => (
             <ServicoCardEditor key={item.id} item={item} onExcluir={excluir} />
