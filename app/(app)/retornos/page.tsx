@@ -1,5 +1,9 @@
 import { requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import {
+  buildReactivationWhatsAppMessage,
+  buildWhatsAppUrl,
+} from "@/lib/whatsapp";
 
 import RetornosClient from "./components/RetornosClient";
 
@@ -48,6 +52,8 @@ export default async function RetornosPage() {
           whatsapp: true,
           telefone: true,
           status: true,
+          reativacaoSituacao: true,
+          reativacaoVoltaEm: true,
         },
       },
     },
@@ -94,12 +100,20 @@ export default async function RetornosPage() {
       nome: string;
       whatsapp: string | null;
       telefone: string;
+      situacao: string | null;
       procedimentos: Array<{
         nome: string;
         ultimaVez: string;
         diasAtraso: number;
       }>;
     }
+  >();
+
+  // Quem ja recebeu a mensagem, pediu para ser chamada depois ou nao quer mais
+  // contato sai da lista principal e aparece em "Em espera".
+  const pausados = new Map<
+    number,
+    { clienteId: number; nome: string; situacao: string | null; voltaEm: Date | null }
   >();
 
   for (const atendimento of ultimoPorClienteProcedimento.values()) {
@@ -116,11 +130,27 @@ export default async function RetornosPage() {
     const diasAtraso = diasDesde - intervalo;
     if (diasAtraso < 0) continue;
 
+    const { reativacaoSituacao, reativacaoVoltaEm } = atendimento.cliente;
+    const pausada =
+      reativacaoSituacao === "Não quer mais" ||
+      (reativacaoVoltaEm !== null && reativacaoVoltaEm > agora);
+
+    if (pausada) {
+      pausados.set(atendimento.clienteId, {
+        clienteId: atendimento.clienteId,
+        nome: atendimento.cliente.nome,
+        situacao: reativacaoSituacao,
+        voltaEm: reativacaoVoltaEm,
+      });
+      continue;
+    }
+
     const atual = porCliente.get(atendimento.clienteId) || {
       clienteId: atendimento.clienteId,
       nome: atendimento.cliente.nome,
       whatsapp: atendimento.cliente.whatsapp,
       telefone: atendimento.cliente.telefone,
+      situacao: atendimento.cliente.reativacaoSituacao ?? null,
       procedimentos: [],
     };
 
@@ -145,5 +175,36 @@ export default async function RetornosPage() {
     }))
     .sort((a, b) => b.maiorAtraso - a.maiorAtraso);
 
-  return <RetornosClient itens={itens} semConfiguracao={false} />;
+  const itensComMensagem = itens.map((cliente) => {
+    const principal = cliente.procedimentos[0];
+    const mensagem = buildReactivationWhatsAppMessage({
+      clientName: cliente.nome,
+      procedure: principal?.nome,
+      lastVisit: principal?.ultimaVez,
+    });
+    const numero = (cliente.whatsapp || cliente.telefone || "").trim();
+
+    return {
+      ...cliente,
+      mensagem,
+      whatsappUrl: numero ? buildWhatsAppUrl(numero, mensagem) : null,
+    };
+  });
+
+  const emEspera = Array.from(pausados.values())
+    .map((cliente) => ({
+      clienteId: cliente.clienteId,
+      nome: cliente.nome,
+      situacao: cliente.situacao,
+      voltaEm: cliente.voltaEm ? cliente.voltaEm.toISOString() : null,
+    }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+
+  return (
+    <RetornosClient
+      itens={itensComMensagem}
+      pausados={emEspera}
+      semConfiguracao={false}
+    />
+  );
 }
