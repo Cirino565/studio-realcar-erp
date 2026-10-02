@@ -1553,3 +1553,338 @@ body {
 .theme-light .app-shell [class*="text-fuchsia-300/"] {
   color: #6d28d9 !important;
 }
+
+/* ======================================================================
+   DARK PREMIUM V3 (grafite elegante)
+   Camada final do tema escuro: fundos grafite neutros, superficies em
+   degraus de luminosidade, cores suaves e um unico destaque lavanda.
+   O tema claro nao e alterado por nada daqui.
+   ====================================================================== */
+
+.theme-dark {
+  --color-slate-50: #f3f4f6;
+  --color-slate-100: #e7e8ec;
+  --color-slate-200: #d6d8df;
+  --color-slate-300: #b6bac4;
+  --color-slate-400: #9298a5;
+  --color-slate-500: #707584;
+  --color-slate-600: #4b505c;
+  --color-slate-700: #2c2f38;
+  --color-slate-800: #1f2128;
+  --color-slate-900: #17191f;
+  --color-slate-950: #0f1014;
+
+  --color-violet-100: #ebe7fd;
+  --color-violet-200: #d8d0fb;
+  --color-violet-300: #bdb2f7;
+  --color-violet-400: #a090ee;
+  --color-violet-500: #8573e0;
+  --color-violet-600: #6e5cc9;
+  --color-violet-700: #5a4aa8;
+  --color-fuchsia-500: #9b6fd3;
+  --color-fuchsia-600: #8758c0;
+  --color-fuchsia-700: #6f46a1;
+
+  --background: oklch(0.165 0.004 270);
+  --foreground: oklch(0.955 0.004 270);
+  --card: oklch(0.205 0.005 270);
+  --card-foreground: oklch(0.955 0.004 270);
+  --popover: oklch(0.225 0.005 270);
+  --popover-foreground: oklch(0.955 0.004 270);
+  --primary: oklch(0.66 0.13 295);
+  --secondary: oklch(0.27 0.006 270);
+  --muted: oklch(0.255 0.006 270);
+  --muted-foreground: oklch(0.72 0.01 270);
+  --accent: oklch(0.29 0.03 295);
+  --border: oklch(1 0 0 / 0.08);
+  --input: oklch(1 0 0 / 0.1);
+  --ring: oklch(0.66 0.13 295);
+  --sidebar: oklch(0.15 0.004 270);
+  --sidebar-primary: oklch(0.66 0.13 295);
+  --sidebar-accent: oklch(0.25 0.012 290);
+  --sidebar-border: oklch(1 0 0 / 0.07);
+}
+
+.theme-dark,
+.theme-dark body {
+  background-color: #0d0e12;
+}
+
+.theme-dark body {
+  background:
+    radial-gradient(60rem 28rem at 12% -8%, rgba(150, 130, 235, 0.07), transparent 70%),
+    #0d0e12;
+  color: #eceef2;
+}
+
+.theme-dark .app-shell {
+  background:
+    radial-gradient(60rem 28rem at 12% -8%, rgba(150, 130, 235, 0.06), transparent 70%),
+    #0e0f13;
+  color: #eceef2;
+}
+
+.theme-dark .app-header {
+  border-color: rgba(255, 255, 255, 0.06);
+  background-color: rgba(14, 15, 19, 0.82);
+  box-shadow: none;
+}
+
+.theme-dark .app-sidebar {
+  border-color: rgba(255, 255, 255, 0.06);
+  background-color: #0b0c10;
+  box-shadow: none;
+}
+
+.theme-dark .app-bottom-nav {
+  border-color: rgba(255, 255, 255, 0.08);
+  background-color: rgba(18, 19, 24, 0.94);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+.theme-dark .app-bottom-dock {
+  border-color: rgba(255, 255, 255, 0.07);
+  background-color: rgba(18, 19, 24, 0.78);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
+}
+
+.theme-dark .app-header-date-icon {
+  background-color: rgba(157, 141, 241, 0.12);
+  color: #bdb2f7;
+}
+
+.theme-dark .app-header-search,
+.theme-dark .theme-toggle-button,
+.theme-dark .app-header-action {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  background-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+.theme-dark .theme-toggle-button:hover,
+.theme-dark .app-header-action:hover {
+  border-color: rgba(189, 178, 247, 0.28) !important;
+  background-color: rgba(157, 141, 241, 0.10) !important;
+}
+
+.theme-dark .app-logout-button {
+  border-color: rgba(251, 113, 133, 0.16);
+  background-color: rgba(244, 63, 94, 0.07);
+  color: #f3a3b0;
+}
+
+.theme-dark .app-shell .premium-card,
+.theme-dark .app-shell .premium-card-soft,
+.theme-dark .app-shell .premium-table {
+  border-color: rgba(255, 255, 255, 0.07) !important;
+  background: #15171c !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 14px 34px rgba(0, 0, 0, 0.32) !important;
+}
+
+.theme-dark .app-shell .premium-subtitle { color: #9298a5 !important; }
+
+.theme-dark .app-shell .bg-white,
+.theme-dark .app-shell .bg-white\/95,
+.theme-dark .app-shell .bg-white\/90,
+.theme-dark .app-shell .bg-white\/80,
+.theme-dark .app-shell .bg-white\/70,
+.theme-dark .app-shell .bg-slate-50,
+.theme-dark .app-shell .bg-slate-100,
+.theme-dark .app-shell .bg-\[\#eef0f6\],
+.theme-dark .app-shell [class*="bg-[#111827]"],
+.theme-dark .app-shell [class*="bg-[#11131d]"],
+.theme-dark .app-shell [class*="bg-[#151a2a]"],
+.theme-dark .app-shell [class*="bg-[#171d2d]"],
+.theme-dark .app-shell [class*="bg-[#171d2a]"],
+.theme-dark .app-shell [class*="bg-[#1d2437]"],
+.theme-dark .app-shell [class*="bg-[#20283b]"],
+.theme-dark .app-shell [class*="bg-[#0b1220]"] {
+  background-color: #15171c !important;
+}
+
+.theme-dark .app-shell .bg-slate-200 {
+  background-color: #1d1f26 !important;
+}
+
+.theme-dark .app-shell .bg-white\/5,
+.theme-dark .app-shell .bg-white\/10,
+.theme-dark .app-shell [class*="bg-white/["] {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+.theme-dark .app-shell .bg-slate-950\/20,
+.theme-dark .app-shell .bg-slate-950\/25,
+.theme-dark .app-shell .bg-slate-950\/30,
+.theme-dark .app-shell .bg-slate-950\/35,
+.theme-dark .app-shell .bg-slate-950\/40,
+.theme-dark .app-shell .bg-slate-950\/55,
+.theme-dark .app-shell .bg-slate-950\/60,
+.theme-dark .app-shell .bg-slate-950\/70,
+.theme-dark .app-shell .bg-slate-950\/80,
+.theme-dark .app-shell .bg-slate-900\/55,
+.theme-dark .app-shell .bg-slate-900\/60 {
+  background-color: rgba(8, 9, 12, 0.55) !important;
+}
+
+.theme-dark .app-shell .border-slate-100,
+.theme-dark .app-shell .border-slate-200,
+.theme-dark .app-shell .border-slate-300,
+.theme-dark .app-shell .border-white\/10,
+.theme-dark .app-shell .border-white\/15,
+.theme-dark .app-shell .border-white\/20,
+.theme-dark .app-shell [class*="border-white/["] {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.theme-dark .app-shell .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+.theme-dark .app-shell .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+.theme-dark .app-shell [class*="divide-white/["] > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+.theme-dark .app-shell .text-black,
+.theme-dark .app-shell .text-slate-950,
+.theme-dark .app-shell .text-slate-900,
+.theme-dark .app-shell .text-slate-800,
+.theme-dark .app-shell .text-slate-700,
+.theme-dark .app-shell .text-slate-100,
+.theme-dark .app-shell .text-slate-200,
+.theme-dark .app-shell .text-white {
+  color: #eceef2 !important;
+}
+
+.theme-dark .app-shell .text-slate-600,
+.theme-dark .app-shell .text-slate-500 {
+  color: #a3a9b5 !important;
+}
+
+.theme-dark .app-shell .text-slate-400,
+.theme-dark .app-shell .text-slate-300 {
+  color: #b9bec9 !important;
+}
+
+.theme-dark .app-shell .app-modal-backdrop {
+  background-color: rgba(5, 6, 8, 0.74) !important;
+}
+
+/* Campos de formulario */
+.theme-dark .app-shell .premium-input,
+.theme-dark .app-shell input,
+.theme-dark .app-shell select,
+.theme-dark .app-shell textarea {
+  border-color: rgba(255, 255, 255, 0.09) !important;
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  color: #eceef2 !important;
+}
+
+.theme-dark .app-shell input::placeholder,
+.theme-dark .app-shell textarea::placeholder {
+  color: #6f7482 !important;
+}
+
+.theme-dark .app-shell input:focus,
+.theme-dark .app-shell select:focus,
+.theme-dark .app-shell textarea:focus {
+  border-color: rgba(189, 178, 247, 0.5) !important;
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  box-shadow: 0 0 0 3px rgba(157, 141, 241, 0.13) !important;
+}
+
+.theme-dark .app-shell select option,
+.theme-dark .app-shell select optgroup {
+  background-color: #15171c !important;
+  color: #eceef2 !important;
+}
+
+.theme-dark .app-shell select option:checked {
+  background-color: #4b3fa3 !important;
+}
+
+/* Superficies com tom (verde, vermelho, ambar...) ficam mais discretas */
+.theme-dark .app-shell [class*="bg-violet-50"],
+.theme-dark .app-shell [class*="bg-violet-100"] {
+  background-color: rgba(157, 141, 241, 0.10) !important;
+}
+.theme-dark .app-shell [class*="bg-emerald-50"],
+.theme-dark .app-shell [class*="bg-emerald-100"],
+.theme-dark .app-shell [class*="bg-green-50"],
+.theme-dark .app-shell [class*="bg-green-100"] {
+  background-color: rgba(52, 211, 153, 0.08) !important;
+}
+.theme-dark .app-shell [class*="bg-rose-50"],
+.theme-dark .app-shell [class*="bg-rose-100"],
+.theme-dark .app-shell [class*="bg-red-50"],
+.theme-dark .app-shell [class*="bg-red-100"] {
+  background-color: rgba(251, 113, 133, 0.08) !important;
+}
+.theme-dark .app-shell [class*="bg-amber-50"],
+.theme-dark .app-shell [class*="bg-amber-100"],
+.theme-dark .app-shell [class*="bg-yellow-50"],
+.theme-dark .app-shell [class*="bg-yellow-100"],
+.theme-dark .app-shell [class*="bg-orange-50"],
+.theme-dark .app-shell [class*="bg-orange-100"] {
+  background-color: rgba(226, 183, 110, 0.09) !important;
+}
+
+/* Agenda: cartoes de atendimento em vidro escuro, com faixa de cor */
+.theme-dark .agenda-card {
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--ag-solid) 24%, #15171c),
+      color-mix(in srgb, var(--ag-end) 12%, #15171c)) !important;
+  border-color: color-mix(in srgb, var(--ag-end) 26%, transparent) !important;
+  box-shadow:
+    inset 3px 0 0 color-mix(in srgb, var(--ag-solid) 35%, var(--ag-end)),
+    0 6px 16px rgba(0, 0, 0, 0.30) !important;
+  color: #eef0f4 !important;
+}
+
+.theme-dark .agenda-card [style*="color"] {
+  color: rgba(240, 242, 246, 0.94) !important;
+}
+
+.theme-dark .agenda-card :is(span, button)[style*="background-color"] {
+  background-color: rgba(255, 255, 255, 0.07) !important;
+  border-color: rgba(255, 255, 255, 0.13) !important;
+}
+
+.theme-dark .agenda-card :is(.bg-white, [class*="bg-white/"]) {
+  background-color: rgba(10, 11, 15, 0.55) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+}
+
+/* Intervalo de almoco e bloqueios: discretos, sem marrom/laranja forte */
+.theme-dark [aria-label^="Intervalo de"] {
+  background: repeating-linear-gradient(135deg,
+    rgba(214, 182, 120, 0.075) 0 6px, rgba(214, 182, 120, 0.03) 6px 12px) !important;
+  border-color: rgba(214, 182, 120, 0.22) !important;
+}
+
+.theme-dark article[class*="border-slate-400/80"] {
+  background-color: #191b21 !important;
+  background-image: repeating-linear-gradient(135deg,
+    rgba(255, 255, 255, 0.04) 0 6px, transparent 6px 12px) !important;
+  border-color: rgba(255, 255, 255, 0.10) !important;
+}
+
+/* Botoes que so ganham cor ao passar o mouse nao podem ficar tingidos o
+   tempo todo (ex.: horarios vazios da Agenda). */
+.theme-dark .app-shell :is([class*="hover:bg-violet-"], [class*="active:bg-violet-"]):not([class^="bg-"]):not([class*=" bg-"]):not([class*="dark:bg-"]),
+.theme-dark .app-shell :is([class*="hover:bg-fuchsia-"], [class*="active:bg-fuchsia-"]):not([class^="bg-"]):not([class*=" bg-"]):not([class*="dark:bg-"]),
+.theme-dark .app-shell :is([class*="hover:bg-pink-"], [class*="active:bg-pink-"]):not([class^="bg-"]):not([class*=" bg-"]):not([class*="dark:bg-"]),
+.theme-dark .app-shell :is([class*="hover:bg-emerald-"], [class*="active:bg-emerald-"]):not([class^="bg-"]):not([class*=" bg-"]):not([class*="dark:bg-"]),
+.theme-dark .app-shell :is([class*="hover:bg-green-"], [class*="active:bg-green-"]):not([class^="bg-"]):not([class*=" bg-"]):not([class*="dark:bg-"]),
+.theme-dark .app-shell :is([class*="hover:bg-rose-"], [class*="active:bg-rose-"]):not([class^="bg-"]):not([class*=" bg-"]):not([class*="dark:bg-"]),
+.theme-dark .app-shell :is([class*="hover:bg-red-"], [class*="active:bg-red-"]):not([class^="bg-"]):not([class*=" bg-"]):not([class*="dark:bg-"]),
+.theme-dark .app-shell :is([class*="hover:bg-amber-"], [class*="active:bg-amber-"]):not([class^="bg-"]):not([class*=" bg-"]):not([class*="dark:bg-"]),
+.theme-dark .app-shell :is([class*="hover:bg-yellow-"], [class*="active:bg-yellow-"]):not([class^="bg-"]):not([class*=" bg-"]):not([class*="dark:bg-"]),
+.theme-dark .app-shell :is([class*="hover:bg-orange-"], [class*="active:bg-orange-"]):not([class^="bg-"]):not([class*=" bg-"]):not([class*="dark:bg-"]),
+.theme-dark .app-shell :is([class*="hover:bg-blue-"], [class*="active:bg-blue-"]):not([class^="bg-"]):not([class*=" bg-"]):not([class*="dark:bg-"]),
+.theme-dark .app-shell :is([class*="hover:bg-cyan-"], [class*="active:bg-cyan-"]):not([class^="bg-"]):not([class*=" bg-"]):not([class*="dark:bg-"]),
+.theme-dark .app-shell :is([class*="hover:bg-sky-"], [class*="active:bg-sky-"]):not([class^="bg-"]):not([class*=" bg-"]):not([class*="dark:bg-"]),
+.theme-dark .app-shell :is([class*="hover:bg-teal-"], [class*="active:bg-teal-"]):not([class^="bg-"]):not([class*=" bg-"]):not([class*="dark:bg-"]) {
+  background-color: transparent !important;
+}
+
+.theme-dark .app-shell :is([class*="hover:bg-violet-"], [class*="hover:bg-fuchsia-"]):not([class^="bg-"]):not([class*=" bg-"]):not([class*="dark:bg-"]):hover {
+  background-color: rgba(157, 141, 241, 0.08) !important;
+}

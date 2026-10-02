@@ -2015,13 +2015,14 @@ export default function AgendaCalendar({
                               onSelectAppointment(appointment);
                             }
                           }}
-                          className="absolute left-0.5 right-0.5 z-10 cursor-pointer overflow-hidden rounded-sm border text-left shadow-sm transition-all duration-300 hover:brightness-105 hover:shadow-md sm:left-0.5 sm:right-0.5"
+                          className="agenda-card absolute left-0.5 right-0.5 z-10 cursor-pointer overflow-hidden rounded-sm border text-left shadow-sm transition-all duration-300 hover:brightness-105 hover:shadow-md sm:left-0.5 sm:right-0.5"
                           style={{
                             top,
                             height,
                             color: statusPalette.text,
                             borderColor: statusPalette.overlayBorder,
                             background: `linear-gradient(135deg, ${statusPalette.solid}, ${statusPalette.gradientEnd})`,
+                            ...({ "--ag-solid": statusPalette.solid, "--ag-end": statusPalette.gradientEnd } as Record<string, string>),
                             boxShadow: isFocusedAppointment
                               ? `0 0 0 3px rgba(124,58,237,.38), 0 12px 30px rgba(124,58,237,.28), inset 3px 0 0 ${palette.solid}`
                               : `inset 3px 0 0 ${palette.solid}`,
