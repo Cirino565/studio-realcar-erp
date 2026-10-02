@@ -248,6 +248,52 @@ export function buildMarketingWhatsAppMessage({
   return templates[template];
 }
 
+export type WhatsAppReactivationMessageInput = {
+  clientName: string;
+  procedure?: string | null;
+  lastVisit?: Date | string | null;
+  clinicName?: string;
+};
+
+// Mensagem de reativacao pensada para fidelizar: cita ha quanto tempo foi
+// o ultimo atendimento, explica por que repetir faz diferenca e termina com
+// uma pergunta facil de responder (dia e periodo). Para limpeza de pele usa
+// o texto especifico; para os outros procedimentos, um texto geral.
+export function buildReactivationWhatsAppMessage({
+  clientName,
+  procedure,
+  lastVisit,
+  clinicName = "Studio Realçar",
+}: WhatsAppReactivationMessageInput) {
+  const firstName = getFirstName(clientName);
+  const procedimento = (procedure || "").trim();
+  const ehLimpezaDePele = /limpeza/i.test(procedimento);
+
+  let tempo = "";
+  if (lastVisit) {
+    const dias = Math.max(
+      0,
+      Math.floor((Date.now() - new Date(lastVisit).getTime()) / 86400000),
+    );
+    const meses = Math.round(dias / 30);
+    tempo = dias >= 60 ? `cerca de ${meses} meses` : `${dias} dias`;
+  }
+
+  if (ehLimpezaDePele) {
+    const abertura = tempo
+      ? `já faz ${tempo} desde a sua última limpeza de pele aqui no ${clinicName}`
+      : `senti sua falta por aqui no ${clinicName}`;
+
+    return `Oi, ${firstName}! Tudo bem? 😊\n\nPassando para te contar que ${abertura}.\n\nO ideal é repetir a limpeza a cada 30 a 45 dias: é assim que a pele continua limpa, uniforme e com viço, e o resultado vai ficando melhor a cada sessão.\n\nQuer que eu veja um horário para você nesta semana? Me conta qual dia e período (manhã ou tarde) ficam melhores e eu já reservo para você. 💜`;
+  }
+
+  const abertura = tempo
+    ? `já faz ${tempo} desde o seu último atendimento aqui no ${clinicName}${procedimento ? ` (${procedimento})` : ""}`
+    : `senti sua falta por aqui no ${clinicName}`;
+
+  return `Oi, ${firstName}! Tudo bem? 😊\n\nPassando para te contar que ${abertura}.\n\nManter o cuidado com regularidade é o que faz o resultado durar e ficar cada vez melhor.\n\nQuer que eu veja um horário para você? Me conta qual dia e período (manhã ou tarde) ficam melhores e eu já reservo. 💜`;
+}
+
 export function buildWhatsAppUrl(phone: string | null | undefined, message: string) {
   const normalizedPhone = normalizeBrazilianPhone(phone);
   const params = new URLSearchParams();

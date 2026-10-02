@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { decodificarMensagemModelo } from "@/lib/mensagem-modelo.server";
 import {
   buildClientWhatsAppMessage,
+  buildReactivationWhatsAppMessage,
   buildWhatsAppMessage,
   buildWhatsAppUrl,
 } from "@/lib/whatsapp";
@@ -28,6 +29,7 @@ import Link from "next/link";
 import CentralDoDiaClient from "@/components/dashboard/CentralDoDiaClient";
 import EvolucoesPendentesClient from "@/components/dashboard/EvolucoesPendentesClient";
 import FilaComercialClient from "@/components/dashboard/FilaComercialClient";
+import ReativacaoClient from "@/components/dashboard/ReativacaoClient";
 import { WhatsAppLink } from "@/components/ui/whatsapp-link";
 
 const TIMEZONE = "America/Sao_Paulo";
@@ -311,6 +313,22 @@ export default async function Home() {
             status: { not: "Cancelado" },
           },
         },
+        // Quem ja recebeu a mensagem, pediu para ser chamada depois ou nao
+        // quer mais contato fica fora da lista ate a data de volta.
+        AND: [
+          {
+            OR: [
+              { reativacaoSituacao: null },
+              { reativacaoSituacao: { not: "Não quer mais" } },
+            ],
+          },
+          {
+            OR: [
+              { reativacaoVoltaEm: null },
+              { reativacaoVoltaEm: { lte: new Date() } },
+            ],
+          },
+        ],
       },
       select: {
         id: true,
@@ -319,6 +337,7 @@ export default async function Home() {
         telefone: true,
         ultimaVisita: true,
         procedimento: true,
+        reativacaoSituacao: true,
       },
       orderBy: { ultimaVisita: "asc" },
       take: 10,
@@ -397,6 +416,25 @@ export default async function Home() {
       select: { nome: true },
     }),
   ]);
+
+  const clientesEmEspera = await prisma.cliente.findMany({
+    where: {
+      status: { not: "Inativa" },
+      OR: [
+        { reativacaoSituacao: "Não quer mais" },
+        { reativacaoVoltaEm: { gt: new Date() } },
+      ],
+    },
+    select: {
+      id: true,
+      nome: true,
+      procedimento: true,
+      reativacaoSituacao: true,
+      reativacaoVoltaEm: true,
+    },
+    orderBy: [{ reativacaoVoltaEm: "asc" }],
+    take: 60,
+  });
 
   const [anoHoje, mesHoje, diaHoje] = hojeISO.split("-").map(Number);
   const aniversariantesHoje = clientesComNascimento
@@ -1178,44 +1216,46 @@ export default async function Home() {
             <p className="mt-1 text-sm text-slate-500">Sem visita há mais de 60 dias e sem agenda futura.</p>
           </div>
 
-          <div className="mt-4 space-y-2.5">
-            {clientesReativacao.length > 0 ? (
-              clientesReativacao.map((cliente) => (
-                <div key={cliente.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <Link href={`/clientes/${cliente.id}`} className="truncate font-bold text-slate-900 hover:text-violet-700">
-                        {cliente.nome}
-                      </Link>
-                      <p className="mt-0.5 truncate text-sm text-slate-500">
-                        {cliente.procedimento || "Procedimento não informado"}
-                      </p>
-                      <p className="mt-1 text-[11px] font-semibold text-slate-400">
-                        Última visita: {cliente.ultimaVisita ? formatarDataCurta(cliente.ultimaVisita) : "não registrada"}
-                      </p>
-                    </div>
-                    <WhatsAppLink
-                      href={buildWhatsAppUrl(
-                        cliente.whatsapp || cliente.telefone,
-                        buildClientWhatsAppMessage({
-                          template: "reactivation",
-                          clientName: cliente.nome,
-                        }),
-                      )}
-                      className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white hover:bg-emerald-700"
-                      aria-label={`Enviar reativação para ${cliente.nome}`}
-                    >
-                      <MessageCircle className="size-4" />
-                    </WhatsAppLink>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-500">
-                Nenhum cliente elegível para reativação neste momento.
-              </div>
-            )}
-          </div>
+          <ReativacaoClient
+            clientes={clientesReativacao.map((cliente) => {
+              const mensagem = buildReactivationWhatsAppMessage({
+                clientName: cliente.nome,
+                procedure: cliente.procedimento,
+                lastVisit: cliente.ultimaVisita,
+                clinicName: nomeClinica,
+              });
+
+              return {
+                id: cliente.id,
+                nome: cliente.nome,
+                procedimento: cliente.procedimento,
+                ultimaVisita: cliente.ultimaVisita
+                  ? formatarDataCurta(cliente.ultimaVisita)
+                  : null,
+                diasSemVisita: cliente.ultimaVisita
+                  ? Math.floor(
+                      (Date.now() - new Date(cliente.ultimaVisita).getTime()) /
+                        UM_DIA_MS,
+                    )
+                  : null,
+                situacao: cliente.reativacaoSituacao ?? null,
+                mensagem,
+                whatsappUrl: buildWhatsAppUrl(
+                  cliente.whatsapp || cliente.telefone,
+                  mensagem,
+                ),
+              };
+            })}
+            emEspera={clientesEmEspera.map((cliente) => ({
+              id: cliente.id,
+              nome: cliente.nome,
+              procedimento: cliente.procedimento,
+              situacao: cliente.reativacaoSituacao ?? null,
+              voltaEm: cliente.reativacaoVoltaEm
+                ? formatarDataCurta(cliente.reativacaoVoltaEm)
+                : null,
+            }))}
+          />
         </div>
       </section>
 

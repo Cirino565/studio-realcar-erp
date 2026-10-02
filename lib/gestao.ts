@@ -647,6 +647,20 @@ export async function obterDadosGestao(
             status: { not: "Cancelado" },
           },
         },
+        AND: [
+          {
+            OR: [
+              { reativacaoSituacao: null },
+              { reativacaoSituacao: { not: "Não quer mais" } },
+            ],
+          },
+          {
+            OR: [
+              { reativacaoVoltaEm: null },
+              { reativacaoVoltaEm: { lte: new Date() } },
+            ],
+          },
+        ],
       },
     }),
     prisma.lead.count({

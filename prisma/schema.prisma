@@ -36,6 +36,11 @@ model Cliente {
   procedimento String?
   valorGasto   Float    @default(0)
   ultimaVisita DateTime?
+  // Controle da lista de Reativacao do Dashboard: quem ja recebeu a mensagem,
+  // pediu para ser chamada depois ou nao quer mais contato.
+  reativacaoSituacao     String?
+  reativacaoVoltaEm      DateTime?
+  reativacaoAtualizadaEm DateTime?
   status       String   @default("Ativa")
   areaEstetica Boolean  @default(false)
   areaCilios   Boolean  @default(false)
