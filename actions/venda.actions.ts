@@ -30,6 +30,8 @@ export type EditarVendaAdministrativaInput = {
   statusPagamento: "Pago" | "Pendente";
   observacoes?: string;
   data: string;
+  /** Valor cobrado de cada linha (serviço ou produto) que foi corrigida. */
+  itens?: Array<{ id: number; valorTotal: number }>;
 };
 
 export type CancelarVendaAdministrativaInput = {
@@ -172,6 +174,17 @@ export async function editarVendaAdministrativa(
       observacoes: true,
       data: true,
       conversaoAdsEnviadaEm: true,
+      agendamentoId: true,
+      itens: {
+        orderBy: { id: "asc" },
+        select: {
+          id: true,
+          tipo: true,
+          descricao: true,
+          quantidade: true,
+          valorTotal: true,
+        },
+      },
     },
   });
 
@@ -185,15 +198,78 @@ export async function editarVendaAdministrativa(
     );
   }
 
+  // Correção de valor: só linhas de serviço e de produto avulso podem ser
+  // corrigidas (kits e baixa de estoque não mudam).
+  const arredondar = (numero: number) => Math.round(numero * 100) / 100;
+  const novosValores = new Map<number, number>();
+  for (const pedido of dados.itens || []) {
+    const itemId = Math.trunc(Number(pedido?.id));
+    const item = venda.itens.find((linha) => linha.id === itemId);
+    if (!item) throw new Error("Um dos itens informados não pertence a esta venda.");
+    if (item.tipo !== "SERVICO" && item.tipo !== "PRODUTO") {
+      throw new Error(`O valor de "${item.descricao}" não pode ser corrigido por aqui.`);
+    }
+    const valor = arredondar(Number(pedido.valorTotal));
+    if (!Number.isFinite(valor) || valor < 0 || valor > 1_000_000) {
+      throw new Error(`Valor inválido em "${item.descricao}".`);
+    }
+    if (Math.abs(valor - item.valorTotal) >= 0.005) novosValores.set(item.id, valor);
+  }
+
+  const valorMudou = novosValores.size > 0;
+  const linhasNovas = venda.itens.map((linha) => ({
+    ...linha,
+    valorTotal: novosValores.get(linha.id) ?? linha.valorTotal,
+  }));
+  const totalServicosNovo = valorMudou
+    ? arredondar(
+        linhasNovas
+          .filter((linha) => linha.tipo === "SERVICO")
+          .reduce((total, linha) => total + linha.valorTotal, 0),
+      )
+    : venda.totalServicos;
+  const totalProdutosNovo = valorMudou
+    ? arredondar(
+        linhasNovas
+          .filter((linha) => linha.tipo === "PRODUTO" || linha.tipo === "KIT")
+          .reduce((total, linha) => total + linha.valorTotal, 0),
+      )
+    : venda.totalProdutos;
+  const valorTotalNovo = valorMudou
+    ? arredondar(totalServicosNovo + totalProdutosNovo)
+    : venda.valorTotal;
+
+  if (valorMudou && valorTotalNovo <= 0) {
+    throw new Error(
+      "O valor total da venda não pode ficar zerado. Para anular a venda, use Cancelar e estornar.",
+    );
+  }
+  if (valorMudou && !venda.lancamento) {
+    throw new Error(
+      "Esta venda não tem lançamento financeiro para corrigir. Use Refazer venda para criar um novo registro.",
+    );
+  }
+
+  const detalheValores = valorMudou
+    ? ` Valor da venda: R$ ${venda.valorTotal.toFixed(2)} -> R$ ${valorTotalNovo.toFixed(2)}. Linhas corrigidas: ${Array.from(
+        novosValores,
+      )
+        .map(([itemId, valor]) => {
+          const item = venda.itens.find((linha) => linha.id === itemId);
+          return `${item?.descricao || "item"} R$ ${(item?.valorTotal ?? 0).toFixed(2)} -> R$ ${valor.toFixed(2)}`;
+        })
+        .join("; ")}.`
+    : "";
+
   const formaPagamento = textoOpcional(dados.formaPagamento) || "Não informado";
   const statusPagamento = statusPagamentoAdministrativo(dados.statusPagamento);
   const observacoes = textoOpcional(dados.observacoes);
   const categoriaLancamento =
     statusPagamento === "Pendente"
       ? "A receber"
-      : venda.totalServicos > 0 && venda.totalProdutos > 0
+      : totalServicosNovo > 0 && totalProdutosNovo > 0
         ? "Vendas mistas"
-        : venda.totalProdutos > 0
+        : totalProdutosNovo > 0
           ? "Produtos"
           : "Procedimentos";
 
@@ -202,7 +278,7 @@ export async function editarVendaAdministrativa(
       where: { nome: formaPagamento, status: "Ativa" },
     });
     const calculoTaxa = calcularTaxaRecebimento(
-      venda.valorTotal,
+      valorTotalNovo,
       formaConfig?.taxaPercentual || 0,
       formaConfig?.taxaFixa || 0,
     );
@@ -238,6 +314,13 @@ export async function editarVendaAdministrativa(
         statusPagamento,
         observacoes,
         data,
+        ...(valorMudou
+          ? {
+              totalServicos: totalServicosNovo,
+              totalProdutos: totalProdutosNovo,
+              valorTotal: valorTotalNovo,
+            }
+          : {}),
       },
     });
 
@@ -245,6 +328,67 @@ export async function editarVendaAdministrativa(
       throw new Error(
         "A venda foi cancelada ou alterada por outro usuário. Atualize a página antes de continuar.",
       );
+    }
+
+    if (valorMudou) {
+      for (const [itemId, valor] of novosValores) {
+        const item = venda.itens.find((linha) => linha.id === itemId);
+        if (!item) continue;
+        await tx.vendaItem.update({
+          where: { id: itemId },
+          data: {
+            valorTotal: valor,
+            valorUnitario:
+              item.tipo === "PRODUTO" && item.quantidade > 0
+                ? valor / item.quantidade
+                : valor,
+          },
+        });
+      }
+
+      // O total que a cliente já gastou acompanha a correção.
+      const diferenca = arredondar(valorTotalNovo - venda.valorTotal);
+      if (venda.clienteId && diferenca > 0) {
+        await tx.cliente.update({
+          where: { id: venda.clienteId },
+          data: { valorGasto: { increment: diferenca } },
+        });
+      } else if (venda.clienteId && diferenca < 0) {
+        const descontado = await tx.cliente.updateMany({
+          where: { id: venda.clienteId, valorGasto: { gte: -diferenca } },
+          data: { valorGasto: { decrement: -diferenca } },
+        });
+        if (descontado.count !== 1) {
+          await tx.cliente.update({
+            where: { id: venda.clienteId },
+            data: { valorGasto: 0 },
+          });
+        }
+      }
+
+      // Procedimento principal: o valor que aparece na agenda e no histórico
+      // da cliente também é corrigido.
+      const principal = venda.itens.find((linha) => linha.tipo === "SERVICO");
+      const valorPrincipal = principal ? novosValores.get(principal.id) : undefined;
+      if (principal && valorPrincipal !== undefined) {
+        if (venda.agendamentoId) {
+          await tx.agendamento.updateMany({
+            where: { id: venda.agendamentoId },
+            data: { valor: valorPrincipal },
+          });
+        }
+        if (venda.clienteId) {
+          await tx.clienteProcedimento.updateMany({
+            where: {
+              clienteId: venda.clienteId,
+              nome: principal.descricao,
+              valor: principal.valorTotal,
+              dataProcedimento: venda.data,
+            },
+            data: { valor: valorPrincipal },
+          });
+        }
+      }
     }
 
     if (venda.lancamento) {
@@ -264,11 +408,15 @@ export async function editarVendaAdministrativa(
           prazoRecebimentoDias,
           recebimentoPrevistoEm,
           statusPagamento,
+          ...(valorMudou ? { valor: valorTotalNovo } : {}),
           categoria: categoriaLancamento,
           data,
           observacoes: [
             venda.lancamento.observacoes,
             `Venda #${venda.id} atualizada administrativamente por ${usuario.email}.`,
+            valorMudou
+              ? `Valor corrigido de R$ ${venda.valorTotal.toFixed(2)} para R$ ${valorTotalNovo.toFixed(2)}.`
+              : null,
             observacoes,
           ]
             .filter(Boolean)
@@ -290,13 +438,18 @@ export async function editarVendaAdministrativa(
         entidade: "Venda",
         entidadeId: String(venda.id),
         usuario: usuario.email,
-        detalhes: `Pagamento: ${venda.statusPagamento} -> ${statusPagamento}. Forma: ${venda.formaPagamento || "não informada"} -> ${formaPagamento}. Taxa atual: R$ ${calculoTaxa.taxaPagamento.toFixed(2)}. Data anterior: ${venda.data.toISOString()}.`,
+        detalhes: `Pagamento: ${venda.statusPagamento} -> ${statusPagamento}. Forma: ${venda.formaPagamento || "não informada"} -> ${formaPagamento}. Taxa atual: R$ ${calculoTaxa.taxaPagamento.toFixed(2)}. Data anterior: ${venda.data.toISOString()}.${detalheValores}`,
       },
     });
   });
 
   revalidarVenda(venda.clienteId);
-  return { ok: true, mensagem: `Venda #${venda.id} atualizada.` };
+  return {
+    ok: true,
+    mensagem: valorMudou
+      ? `Venda #${venda.id} atualizada. Novo valor: R$ ${valorTotalNovo.toFixed(2).replace(".", ",")}.`
+      : `Venda #${venda.id} atualizada.`,
+  };
 }
 
 export async function cancelarVendaAdministrativa(

@@ -54,6 +54,7 @@ type EditarVendaState = {
   statusPagamento: "Pago" | "Pendente";
   observacoes: string;
   data: string;
+  valores: Record<number, string>;
 };
 
 type CancelarVendaState = {
@@ -81,6 +82,35 @@ function valorDataLocal(value: string) {
   const data = new Date(value);
   const deslocamento = data.getTimezoneOffset() * 60_000;
   return new Date(data.getTime() - deslocamento).toISOString().slice(0, 16);
+}
+
+function itemEditavel(tipo: string) {
+  return tipo === "SERVICO" || tipo === "PRODUTO";
+}
+
+function valorParaCampo(valor: number) {
+  return Number(valor || 0).toFixed(2).replace(".", ",");
+}
+
+function campoParaValor(texto: string) {
+  const limpo = texto.replace(/R\$|\s/g, "");
+  if (!limpo) return null;
+  const normalizado = limpo.includes(",")
+    ? limpo.replace(/\./g, "").replace(",", ".")
+    : limpo;
+  const numero = Number(normalizado);
+  return Number.isFinite(numero) && numero >= 0 ? numero : null;
+}
+
+function totalCorrigido(
+  venda: VendaHistoricoItem,
+  valores: Record<number, string>,
+) {
+  return venda.itens.reduce((total, item) => {
+    if (!itemEditavel(item.tipo)) return total + item.valorTotal;
+    const digitado = campoParaValor(valores[item.id] ?? "");
+    return total + (digitado ?? item.valorTotal);
+  }, 0);
 }
 
 function chaveCliente() {
@@ -251,6 +281,11 @@ export default function VendasClient({
         venda.statusPagamento === "Pendente" ? "Pendente" : "Pago",
       observacoes: venda.observacoes || "",
       data: valorDataLocal(venda.data),
+      valores: Object.fromEntries(
+        venda.itens
+          .filter((item) => itemEditavel(item.tipo))
+          .map((item) => [item.id, valorParaCampo(item.valorTotal)]),
+      ),
     });
   }
 
@@ -258,6 +293,17 @@ export default function VendasClient({
     if (!editarVenda) return;
     setErro("");
     setSucesso("");
+
+    const itensCorrigidos: Array<{ id: number; valorTotal: number }> = [];
+    for (const item of editarVenda.venda.itens) {
+      if (!itemEditavel(item.tipo)) continue;
+      const valor = campoParaValor(editarVenda.valores[item.id] ?? "");
+      if (valor === null) {
+        setErro(`Confira o valor de "${item.descricao}".`);
+        return;
+      }
+      itensCorrigidos.push({ id: item.id, valorTotal: valor });
+    }
 
     startTransition(async () => {
       try {
@@ -267,6 +313,7 @@ export default function VendasClient({
           statusPagamento: editarVenda.statusPagamento,
           observacoes: editarVenda.observacoes,
           data: new Date(editarVenda.data).toISOString(),
+          itens: itensCorrigidos,
         });
         setEditarVenda(null);
         setSucesso(resultado.mensagem);
@@ -660,13 +707,13 @@ export default function VendasClient({
       {editarVenda ? (
         <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm">
           <div className="w-full max-w-xl overflow-hidden rounded-3xl border border-white/10 bg-slate-950 shadow-2xl">
-            <header className="flex items-start justify-between gap-4 border-b border-white/10 p-4">
+            <div className="flex items-start justify-between gap-4 border-b border-white/10 p-4">
               <div>
                 <h3 className="font-bold text-white">
                   Editar venda #{editarVenda.venda.id}
                 </h3>
                 <p className="mt-1 text-xs text-slate-400">
-                  Esta edição não altera produtos, estoque, custo ou cliente.
+                  Corrige valor, pagamento e data. Não mexe no estoque nem no custo.
                 </p>
               </div>
               <button
@@ -676,8 +723,60 @@ export default function VendasClient({
               >
                 <X className="size-4" />
               </button>
-            </header>
+            </div>
             <main className="space-y-3 p-4">
+              {editarVenda.venda.itens.some((item) => itemEditavel(item.tipo)) ? (
+                <div className="rounded-2xl border border-white/10 p-3">
+                  <p className="text-xs font-bold text-slate-300">
+                    Valor cobrado
+                  </p>
+                  <div className="mt-2 space-y-2">
+                    {editarVenda.venda.itens
+                      .filter((item) => itemEditavel(item.tipo))
+                      .map((item) => (
+                        <label
+                          key={item.id}
+                          className="flex items-center justify-between gap-3"
+                        >
+                          <span className="min-w-0 text-xs text-slate-300">
+                            {item.quantidade > 1 ? `${item.quantidade}x ` : ""}
+                            {item.descricao}
+                          </span>
+                          <span className="flex shrink-0 items-center gap-1 text-xs text-slate-400">
+                            R$
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={editarVenda.valores[item.id] ?? ""}
+                              onChange={(event) =>
+                                setEditarVenda({
+                                  ...editarVenda,
+                                  valores: {
+                                    ...editarVenda.valores,
+                                    [item.id]: event.target.value,
+                                  },
+                                })
+                              }
+                              className="premium-input w-28 text-right"
+                            />
+                          </span>
+                        </label>
+                      ))}
+                  </div>
+                  <p className="mt-3 text-xs text-slate-400">
+                    Total da venda:{" "}
+                    <strong className="text-white">
+                      {moeda(totalCorrigido(editarVenda.venda, editarVenda.valores))}
+                    </strong>
+                    {Math.abs(
+                      totalCorrigido(editarVenda.venda, editarVenda.valores) -
+                        editarVenda.venda.valorTotal,
+                    ) >= 0.005
+                      ? ` (era ${moeda(editarVenda.venda.valorTotal)}). O financeiro e o total gasto da cliente serão corrigidos junto.`
+                      : ""}
+                  </p>
+                </div>
+              ) : null}
               <label className="block">
                 <span className="mb-1 block text-xs font-bold text-slate-300">
                   Data e hora
