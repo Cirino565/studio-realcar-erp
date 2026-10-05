@@ -80,6 +80,15 @@ import type {
   MarketingServico,
 } from "../types";
 import { CAMPANHA_CANAIS, CAMPANHA_STATUS, LEAD_ETAPAS } from "../types";
+import {
+  calcularMetricasPeriodo,
+  formatarDiaCurto,
+  limitesDoPeriodo,
+  METRICAS_PERIODO_VAZIAS,
+  periodoDoAtalho,
+  type MovimentosCampanha,
+  type PeriodoAtalho,
+} from "../periodo";
 
 type Props = {
   leads: MarketingLead[];
@@ -88,6 +97,7 @@ type Props = {
   clientes: MarketingClienteOption[];
   contas: MarketingContaOption[];
   receitasSemCampanha: MarketingReceitaOption[];
+  movimentosCampanha: MovimentosCampanha;
   profissionais: MarketingProfissional[];
   servicos: MarketingServico[];
   motivosPerda: MotivoPerdaOption[];
@@ -517,6 +527,7 @@ export default function MarketingClient({
   clientes,
   contas,
   receitasSemCampanha,
+  movimentosCampanha,
   profissionais,
   servicos,
   motivosPerda,
@@ -1560,7 +1571,7 @@ export default function MarketingClient({
         ) : null}
 
         {tab === "campanhas" ? (
-          <CampanhasView campanhas={campanhas} leads={leads} clientes={clientes} contas={contas} receitasSemCampanha={receitasSemCampanha} onDelete={removerCampanha} onEditar={abrirEdicaoCampanha} isPending={isPending} podeGerenciar={podeGerenciarMarketing} />
+          <CampanhasView campanhas={campanhas} leads={leads} clientes={clientes} contas={contas} receitasSemCampanha={receitasSemCampanha} movimentos={movimentosCampanha} onDelete={removerCampanha} onEditar={abrirEdicaoCampanha} isPending={isPending} podeGerenciar={podeGerenciarMarketing} />
         ) : null}
 
         {tab === "mensagens" ? <TemplatesView /> : null}
@@ -1915,6 +1926,7 @@ function CampanhasView({
   clientes,
   contas,
   receitasSemCampanha,
+  movimentos,
   onDelete,
   onEditar,
   isPending,
@@ -1925,6 +1937,7 @@ function CampanhasView({
   clientes: MarketingClienteOption[];
   contas: MarketingContaOption[];
   receitasSemCampanha: MarketingReceitaOption[];
+  movimentos: MovimentosCampanha;
   onDelete: (id: number) => void;
   onEditar: (campanha: MarketingCampanha) => void;
   isPending: boolean;
@@ -1936,9 +1949,49 @@ function CampanhasView({
   const [receita, setReceita] = useState<MarketingCampanha | null>(null);
   const [erroLocal, setErroLocal] = useState<string | null>(null);
   const [pendingLocal, startLocalTransition] = useTransition();
-  const totalClientes = campanhas.reduce((acc, campanha) => acc + campanha.metricas.clientes, 0);
-  const custoReal = campanhas.reduce((acc, campanha) => acc + campanha.metricas.custoReal, 0);
-  const receitaLiquida = campanhas.reduce((acc, campanha) => acc + campanha.metricas.receitaLiquida, 0);
+  // Filtro de periodo: abre sempre em "Ultimos 30 dias".
+  const [atalho, setAtalho] = useState<PeriodoAtalho>("30d");
+  const [periodo, setPeriodo] = useState(() => periodoDoAtalho("30d"));
+
+  function escolherAtalho(proximo: PeriodoAtalho) {
+    setAtalho(proximo);
+    if (proximo !== "custom") setPeriodo(periodoDoAtalho(proximo));
+  }
+
+  function mudarData(campo: "de" | "ate", valor: string) {
+    if (!valor) return;
+    setAtalho("custom");
+    setPeriodo((atual) => {
+      const proximo = { ...atual, [campo]: valor };
+      if (proximo.de > proximo.ate) {
+        if (campo === "de") proximo.ate = valor;
+        else proximo.de = valor;
+      }
+      return proximo;
+    });
+  }
+
+  const metricasPeriodo = useMemo(() => {
+    const { inicio, fim } = limitesDoPeriodo(periodo.de, periodo.ate);
+    return new Map(
+      campanhas.map((campanha) => [
+        campanha.id,
+        calcularMetricasPeriodo({
+          campanhaId: campanha.id,
+          inicio,
+          fim,
+          movimentos,
+          leads,
+          clientes,
+        }),
+      ]),
+    );
+  }, [campanhas, movimentos, leads, clientes, periodo]);
+
+  const totaisPeriodo = Array.from(metricasPeriodo.values());
+  const totalClientes = totaisPeriodo.reduce((acc, item) => acc + item.clientes, 0);
+  const custoReal = totaisPeriodo.reduce((acc, item) => acc + item.custoReal, 0);
+  const receitaLiquida = totaisPeriodo.reduce((acc, item) => acc + item.receitaLiquida, 0);
 
   function executarLocal(tarefa: () => Promise<void>) {
     setErroLocal(null);
@@ -1954,6 +2007,35 @@ function CampanhasView({
 
   return (
     <section className="grid gap-6">
+      <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-white/[0.10] bg-white/[0.055] px-4 py-3">
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Período">
+          {([
+            ["7d", "Últimos 7 dias"],
+            ["30d", "Últimos 30 dias"],
+            ["custom", "Personalizado"],
+          ] as const).map(([chave, rotulo]) => (
+            <button
+              key={chave}
+              type="button"
+              aria-pressed={atalho === chave}
+              onClick={() => escolherAtalho(chave)}
+              className={`rounded-xl border px-3 py-2 text-xs font-semibold ${atalho === chave ? "border-violet-300/15 bg-violet-400/10 text-violet-100" : "border-white/[0.10] bg-white/[0.06] text-slate-300 hover:bg-white/[0.10]"}`}
+            >
+              {rotulo}
+            </button>
+          ))}
+        </div>
+        {atalho === "custom" ? (
+          <div className="flex flex-wrap items-end gap-3">
+            <Input label="Data inicial" type="date" value={periodo.de} onChange={(valor) => mudarData("de", valor)} />
+            <Input label="Data final" type="date" value={periodo.ate} onChange={(valor) => mudarData("ate", valor)} />
+          </div>
+        ) : null}
+        <p className="text-xs text-slate-400 lg:ml-auto">
+          Mostrando de {formatarDiaCurto(periodo.de)} a {formatarDiaCurto(periodo.ate)}. O orçamento é o planejado e não muda com o período.
+        </p>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <CampaignInsight label="Campanhas cadastradas" value={String(campanhas.length)} />
         <CampaignInsight label="Clientes atribuídos" value={String(totalClientes)} />
@@ -1983,18 +2065,18 @@ function CampanhasView({
             {campanhas.length === 0 ? (
               <tr><td colSpan={10} className="px-5 py-10 text-center text-slate-500">Nenhuma campanha cadastrada.</td></tr>
             ) : campanhas.map((campanha) => {
-              const vinculados = leads.filter((lead) => lead.campanhaId === campanha.id);
+              const m = metricasPeriodo.get(campanha.id) ?? METRICAS_PERIODO_VAZIAS;
               return (
                 <tr key={campanha.id} className="text-slate-300 hover:bg-white/[0.035]">
                   <td className="px-5 py-4"><p className="font-semibold text-white">{campanha.nome}</p><p className="mt-1 text-xs text-slate-500">{campanha.canal} · {campanha.status}</p></td>
-                  <td className="px-5 py-4">{campanha.metricas.clientes}</td>
-                  <td className="px-5 py-4">{vinculados.length}</td>
+                  <td className="px-5 py-4">{m.clientes}</td>
+                  <td className="px-5 py-4">{m.leads}</td>
                   <td className="px-5 py-4">{formatarMoeda(campanha.investimento)}</td>
-                  <td className="px-5 py-4 text-rose-200">{formatarMoeda(campanha.metricas.custoReal)}</td>
-                  <td className="px-5 py-4 text-emerald-200">{formatarMoeda(campanha.metricas.receitaBruta)}</td>
-                  <td className="px-5 py-4">{formatarMoeda(campanha.metricas.taxasPagamento)}</td>
-                  <td className={`px-5 py-4 font-semibold ${campanha.metricas.resultado >= 0 ? "text-emerald-300" : "text-rose-300"}`}>{formatarMoeda(campanha.metricas.resultado)}</td>
-                  <td className="px-5 py-4">{campanha.metricas.roas === null ? "Sem custo" : `${campanha.metricas.roas.toFixed(2)}x`}</td>
+                  <td className="px-5 py-4 text-rose-200">{formatarMoeda(m.custoReal)}</td>
+                  <td className="px-5 py-4 text-emerald-200">{formatarMoeda(m.receitaBruta)}</td>
+                  <td className="px-5 py-4">{formatarMoeda(m.taxasPagamento)}</td>
+                  <td className={`px-5 py-4 font-semibold ${m.resultado >= 0 ? "text-emerald-300" : "text-rose-300"}`}>{formatarMoeda(m.resultado)}</td>
+                  <td className="px-5 py-4">{m.roas === null ? "Sem custo" : `${m.roas.toFixed(2)}x`}</td>
                   <td className="px-5 py-4 text-right">
                     {podeGerenciar ? <div className="flex justify-end gap-2">
                       <button type="button" onClick={() => onEditar(campanha)} disabled={isPending || pendingLocal} className="rounded-xl border border-violet-300/15 bg-violet-400/10 px-3 py-2 text-xs font-semibold text-violet-100">Editar</button>

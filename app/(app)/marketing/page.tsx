@@ -71,6 +71,7 @@ export default async function MarketingPage() {
         telefone: true,
         whatsapp: true,
         campanhaAquisicaoId: true,
+        createdAt: true,
       },
       orderBy: { nome: "asc" },
     }),
@@ -87,6 +88,7 @@ export default async function MarketingPage() {
       },
       select: {
         campanhaId: true,
+        data: true,
         valorTotal: true,
         taxaPagamento: true,
         valorLiquido: true,
@@ -99,6 +101,7 @@ export default async function MarketingPage() {
       },
       select: {
         campanhaId: true,
+        data: true,
         tipo: true,
         categoria: true,
         valor: true,
@@ -243,6 +246,18 @@ export default async function MarketingPage() {
       clientes={clientes}
       contas={contas}
       receitasSemCampanha={receitasSemCampanha}
+      movimentosCampanha={{
+        vendas: vendasCampanha,
+        lancamentos: lancamentosCampanha.map((item) => ({
+          campanhaId: item.campanhaId,
+          tipo: item.tipo,
+          data: item.data,
+          valor: item.valor,
+          valorLiquido: item.valorLiquido,
+          taxaPagamento: item.taxaPagamento,
+          temVenda: Boolean(item.venda),
+        })),
+      }}
       profissionais={profissionais}
       servicos={servicos}
       motivosPerda={motivosPerda}

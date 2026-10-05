@@ -46,6 +46,7 @@ export type MarketingClienteOption = {
   telefone: string;
   whatsapp: string | null;
   campanhaAquisicaoId: number | null;
+  createdAt: Date;
 };
 
 
