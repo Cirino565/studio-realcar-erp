@@ -88,6 +88,7 @@ import {
   limitesDoPeriodo,
   METRICAS_PERIODO_VAZIAS,
   periodoDoAtalho,
+  type MetricasPeriodo,
   type MovimentosCampanha,
   type PeriodoAtalho,
 } from "../periodo";
@@ -1963,6 +1964,8 @@ function CampanhasView({
   const [periodo, setPeriodo] = useState(() => periodoDoAtalho("30d"));
   // Filtro de situacao: abre mostrando so as campanhas ativas.
   const [situacao, setSituacao] = useState<SituacaoFiltro>("Ativa");
+  // Visualizacao: abre em cartoes (um por campanha); a tabela continua disponivel.
+  const [visao, setVisao] = useState<"cartoes" | "tabela">("cartoes");
 
   function escolherAtalho(proximo: PeriodoAtalho) {
     setAtalho(proximo);
@@ -2069,6 +2072,25 @@ function CampanhasView({
             <Input label="Data final" type="date" value={periodo.ate} onChange={(valor) => mudarData("ate", valor)} />
           </div>
         ) : null}
+        <div className="grid gap-1.5">
+          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Visualização</span>
+          <div className="flex gap-2" role="group" aria-label="Visualização">
+            {([
+              ["cartoes", "Cartões"],
+              ["tabela", "Tabela"],
+            ] as const).map(([chave, rotulo]) => (
+              <button
+                key={chave}
+                type="button"
+                aria-pressed={visao === chave}
+                onClick={() => setVisao(chave)}
+                className={`rounded-xl border px-3 py-2 text-xs font-semibold ${visao === chave ? "border-violet-300/15 bg-violet-400/10 text-violet-100" : "border-white/[0.10] bg-white/[0.06] text-slate-300 hover:bg-white/[0.10]"}`}
+              >
+                {rotulo}
+              </button>
+            ))}
+          </div>
+        </div>
         <p className="text-xs text-slate-400 lg:ml-auto">
           Mostrando {situacaoAtual.frase} de {formatarDiaCurto(periodo.de)} a {formatarDiaCurto(periodo.ate)}. O orçamento é o planejado e não muda com o período.
         </p>
@@ -2083,6 +2105,34 @@ function CampanhasView({
 
       {erroLocal ? <div className="rounded-2xl border border-rose-300/20 bg-rose-400/10 p-3 text-sm text-rose-100">{erroLocal}</div> : null}
 
+      {visao === "cartoes" ? (
+        visiveis.length === 0 ? (
+          <div className="premium-card-soft p-10 text-center text-slate-500">
+            {campanhas.length === 0
+              ? "Nenhuma campanha cadastrada."
+              : `Nenhuma campanha ${situacaoAtual.rotulo.slice(0, -1).toLowerCase()}. Escolha outra situação acima para ver as demais.`}
+          </div>
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+            {visiveis.map((campanha) => (
+              <CartaoCampanha
+                key={campanha.id}
+                campanha={campanha}
+                m={metricasPeriodo.get(campanha.id) ?? METRICAS_PERIODO_VAZIAS}
+                podeGerenciar={podeGerenciar}
+                disabled={isPending || pendingLocal}
+                onEditar={() => onEditar(campanha)}
+                onVincularCliente={() => setVincular(campanha)}
+                onLancarCusto={() => setCusto(campanha)}
+                onVincularReceita={() => setReceita(campanha)}
+                onExcluir={() => onDelete(campanha.id)}
+              />
+            ))}
+          </div>
+        )
+      ) : null}
+
+      {visao === "tabela" ? (
       <div className="premium-table overflow-x-auto">
         <table className="w-full min-w-[1100px] text-left text-sm">
           <thead className="border-b border-white/[0.10] bg-white/[0.045] text-xs uppercase tracking-[0.18em] text-slate-500">
@@ -2127,13 +2177,13 @@ function CampanhasView({
                   <td className="px-5 py-4">{custoLead === null ? "—" : formatarMoeda(custoLead)}</td>
                   <td className="px-5 py-4 text-emerald-200">{formatarMoeda(m.receitaBruta)}</td>
                   <td className="px-5 py-4">{formatarMoeda(m.taxasPagamento)}</td>
-                  <td className={`px-5 py-4 font-semibold ${m.resultado >= 0 ? "text-emerald-300" : "text-rose-300"}`}>{formatarMoeda(m.resultado)}</td>
+                  <td className={`px-5 py-4 font-semibold ${m.resultado >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{formatarMoeda(m.resultado)}</td>
                   <td className="px-5 py-4">
                     {m.roas === null ? (
                       <span className="text-slate-500">Sem custo</span>
                     ) : (
                       <>
-                        <p className={`font-semibold ${m.roas >= 1 ? "text-emerald-300" : "text-rose-300"}`}>{formatarMoeda(m.roas)}</p>
+                        <p className={`font-semibold ${m.roas >= 1 ? "text-emerald-600" : "text-rose-600"}`}>{formatarMoeda(m.roas)}</p>
                         <p className="text-xs text-slate-500">para cada R$ 1 gasto</p>
                       </>
                     )}
@@ -2156,6 +2206,7 @@ function CampanhasView({
           </tbody>
         </table>
       </div>
+      ) : null}
 
       <VincularClienteCampanhaModal
         campanha={vincular}
@@ -2191,6 +2242,118 @@ function CampanhasView({
         })}
       />
     </section>
+  );
+}
+
+function CartaoCampanha({ campanha, m, podeGerenciar, disabled, onEditar, onVincularCliente, onLancarCusto, onVincularReceita, onExcluir }: {
+  campanha: MarketingCampanha;
+  m: MetricasPeriodo;
+  podeGerenciar: boolean;
+  disabled: boolean;
+  onEditar: () => void;
+  onVincularCliente: () => void;
+  onLancarCusto: () => void;
+  onVincularReceita: () => void;
+  onExcluir: () => void;
+}) {
+  const etiqueta = etiquetaDaCampanha(m);
+  const custoCliente = custoPor(m.custoReal, m.clientes);
+  const custoLead = custoPor(m.custoReal, m.leads);
+  const passouOrcamento = campanha.investimento > 0 && campanha.metricas.custoReal > campanha.investimento;
+  const escala = Math.max(m.receitaBruta, m.custoReal);
+  const largura = (valor: number) => (escala > 0 && valor > 0 ? Math.max(3, Math.round((valor / escala) * 100)) : 0);
+  // Cores direto no estilo para o tema nao alterar o verde/amarelo.
+  const corDaSituacao =
+    campanha.status === "Ativa" ? "#10b981" : campanha.status === "Pausada" ? "#f59e0b" : "#94a3b8";
+
+  return (
+    <article className="premium-card-soft flex flex-col gap-5 p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="line-clamp-2 min-h-[2.75rem] text-base font-semibold leading-snug text-white" title={campanha.nome}>{campanha.nome}</p>
+          <p className="mt-1.5 flex items-center gap-2 text-xs text-slate-500">
+            <span className="size-2 rounded-full" style={{ backgroundColor: corDaSituacao }} />
+            {campanha.canal} · {campanha.status}
+          </p>
+        </div>
+        <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${CLASSE_DA_ETIQUETA[etiqueta.tom]}`}>{etiqueta.texto}</span>
+      </div>
+
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Resultado no período</p>
+          <p className={`mt-1 text-3xl font-bold tracking-tight ${m.resultado >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{formatarMoeda(m.resultado)}</p>
+        </div>
+        <div className="text-right">
+          {m.roas === null ? (
+            <p className="text-xs text-slate-500">Sem custo</p>
+          ) : (
+            <>
+              <p className={`text-lg font-semibold ${m.roas >= 1 ? "text-emerald-600" : "text-rose-600"}`}>{formatarMoeda(m.roas)}</p>
+              <p className="text-[11px] text-slate-500">para cada R$ 1 gasto</p>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="grid gap-2.5">
+        <div className="flex items-center gap-3">
+          <span className="w-12 shrink-0 text-xs text-slate-500">Entrou</span>
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
+            <div className="h-full rounded-full" style={{ width: `${largura(m.receitaBruta)}%`, backgroundColor: "#10b981" }} />
+          </div>
+          <span className="w-28 shrink-0 text-right text-sm font-semibold text-emerald-200">{formatarMoeda(m.receitaBruta)}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="w-12 shrink-0 text-xs text-slate-500">Gastou</span>
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
+            <div className="h-full rounded-full" style={{ width: `${largura(m.custoReal)}%`, backgroundColor: "#fb7185" }} />
+          </div>
+          <span className="w-28 shrink-0 text-right text-sm font-semibold text-rose-200">{formatarMoeda(m.custoReal)}</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-3 gap-y-4 border-t border-white/[0.08] pt-4 sm:grid-cols-4">
+        <div>
+          <p className="text-base font-semibold text-white">{m.clientes}</p>
+          <p className="text-[11px] text-slate-500">Clientes</p>
+        </div>
+        <div>
+          <p className="text-base font-semibold text-white">{m.leads}</p>
+          <p className="text-[11px] text-slate-500">Leads</p>
+        </div>
+        <div>
+          <p className="text-base font-semibold text-white">{custoCliente === null ? "—" : formatarMoeda(custoCliente)}</p>
+          <p className="text-[11px] text-slate-500">Custo por cliente</p>
+        </div>
+        <div>
+          <p className="text-base font-semibold text-white">{custoLead === null ? "—" : formatarMoeda(custoLead)}</p>
+          <p className="text-[11px] text-slate-500">Custo por lead</p>
+        </div>
+      </div>
+
+      <div className="mt-auto flex items-end justify-between gap-3">
+        <div className="min-w-0 text-xs text-slate-500">
+          <p>
+            Orçamento {formatarMoeda(campanha.investimento)}
+            {m.taxasPagamento > 0 ? ` · Taxas ${formatarMoeda(m.taxasPagamento)}` : ""}
+          </p>
+          {passouOrcamento ? <p className="mt-0.5 font-semibold text-amber-600 dark:text-amber-300">Gasto total passou do orçamento</p> : null}
+        </div>
+        {podeGerenciar ? (
+          <div className="flex shrink-0 items-center gap-2">
+            <button type="button" onClick={onEditar} disabled={disabled} className="rounded-xl border border-violet-300/15 bg-violet-400/10 px-3 py-2 text-xs font-semibold text-violet-100">Editar</button>
+            <MenuAcoesCampanha
+              disabled={disabled}
+              onVincularCliente={onVincularCliente}
+              onLancarCusto={onLancarCusto}
+              onVincularReceita={onVincularReceita}
+              onExcluir={onExcluir}
+            />
+          </div>
+        ) : null}
+      </div>
+    </article>
   );
 }
 
