@@ -580,7 +580,7 @@ export default function RelatoriosClient({ data }: Props) {
               Inteligência gerencial
             </div>
             <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">Relatórios Premium</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300 [.theme-light_&]:!text-slate-900">
               Análise consolidada de financeiro, agenda, clientes, estoque e marketing para decisões mais rápidas.
             </p>
           </div>

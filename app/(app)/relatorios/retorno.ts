@@ -6,8 +6,11 @@
 //    procedimentos no mesmo dia contam como uma visita so.
 //  - Atendimentos marcados como "Retorno" (revisao gratuita) nao contam: eles
 //    nao sao a cliente voltando para comprar de novo.
-//  - Cliente "recorrente" = tem 2 ou mais dias de visita.
-//  - Ciclo = dias entre uma visita e a seguinte da mesma cliente.
+//  - Visitas seguidas com menos de N dias entre uma e outra (sessoes de pacote,
+//    revisao em 15 dias...) contam como UM tratamento so. N e escolhido na tela
+//    (padrao 30 dias; 0 = toda visita em outro dia conta).
+//  - Cliente "recorrente" = voltou depois de N dias ou mais da ultima visita.
+//  - Ciclo = dias entre o fim de um tratamento e o comeco do seguinte.
 
 export type VisitaRetorno = {
   clienteId: number;
@@ -71,6 +74,11 @@ export type ResultadoRetorno = {
 
 export const DIAS_PARA_JULGAR = 90;
 
+// Quantos dias precisam passar para uma nova visita contar como "volta".
+// 0 = toda visita em outro dia conta.
+export const JANELAS_RETORNO = [0, 15, 30, 45] as const;
+export const JANELA_PADRAO = 30;
+
 const formatadorDia = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Sao_Paulo",
   year: "numeric",
@@ -113,13 +121,25 @@ function mediana(lista: number[]): number | null {
     : (ordenada[meio - 1] + ordenada[meio]) / 2;
 }
 
-function intervalos(dias: string[]): number[] {
+// Olha os dias de visita de uma cliente e separa em "tratamentos": visitas
+// seguidas com menos de `janela` dias entre uma e outra (sessoes de um pacote,
+// revisao em 15 dias...) contam como um tratamento so. So conta como VOLTA
+// quando a cliente reaparece `janela` dias ou mais depois da ultima visita.
+function analisarDias(dias: string[], janela: number) {
   const unicos = [...new Set(dias)].sort();
-  const lista: number[] = [];
+  const voltas: number[] = [];
+  let fimPrimeiro = unicos[0];
+  let aindaNoPrimeiro = true;
   for (let i = 1; i < unicos.length; i++) {
-    lista.push(diasEntre(unicos[i - 1], unicos[i]));
+    const diferenca = diasEntre(unicos[i - 1], unicos[i]);
+    if (diferenca >= janela) {
+      voltas.push(diferenca);
+      aindaNoPrimeiro = false;
+    } else if (aindaNoPrimeiro) {
+      fimPrimeiro = unicos[i];
+    }
   }
-  return lista;
+  return { primeiro: unicos[0], fimPrimeiro, voltas, voltou: voltas.length > 0 };
 }
 
 type Grupo = {
@@ -131,6 +151,7 @@ type Grupo = {
 function montarLinha(
   grupo: Grupo,
   hoje: string,
+  janela: number,
   gastoTotal: Map<number, number>,
   gastoApos: Map<number, number>,
   comGasto: boolean,
@@ -143,12 +164,12 @@ function montarLinha(
   let somaApos = 0;
 
   for (const [clienteId, dias] of grupo.diasPorCliente) {
-    const unicos = [...new Set(dias)].sort();
-    const voltou = unicos.length >= 2;
+    const analise = analisarDias(dias, janela);
+    const voltou = analise.voltou;
     if (voltou) voltaram++;
-    gaps.push(...intervalos(unicos));
+    gaps.push(...analise.voltas);
 
-    if (diasEntre(unicos[0], hoje) > DIAS_PARA_JULGAR) {
+    if (diasEntre(analise.primeiro, hoje) > DIAS_PARA_JULGAR) {
       baseMadura++;
       if (voltou) voltaramMaduros++;
     }
@@ -176,6 +197,7 @@ function montarLinha(
 
 export function calcularRetorno(
   dados: RetornoDados,
+  janela: number = JANELA_PADRAO,
   hoje: string = diaSaoPaulo(new Date()),
 ): ResultadoRetorno {
   // dias de visita por cliente (geral) e por cliente+servico
@@ -203,16 +225,17 @@ export function calcularRetorno(
     servico.porCliente.set(visita.clienteId, doServico);
   }
 
-  const primeiraVisita = new Map<number, string>();
+  // fim do primeiro tratamento de cada cliente (o que vem depois e "retorno")
+  const fimPrimeiroTratamento = new Map<number, string>();
   for (const [clienteId, dias] of diasPorCliente) {
-    primeiraVisita.set(clienteId, [...dias].sort()[0]);
+    fimPrimeiroTratamento.set(clienteId, analisarDias(dias, janela).fimPrimeiro);
   }
 
   // gasto (vendas) por cliente
   const gastoTotal = new Map<number, number>();
   const gastoApos = new Map<number, number>();
   for (const venda of dados.vendas) {
-    const primeira = primeiraVisita.get(venda.clienteId);
+    const primeira = fimPrimeiroTratamento.get(venda.clienteId);
     if (!primeira) continue; // cliente sem visita registrada: fora da conta
     gastoTotal.set(
       venda.clienteId,
@@ -235,11 +258,11 @@ export function calcularRetorno(
   const gastosUmaVez: number[] = [];
 
   for (const [clienteId, dias] of diasPorCliente) {
-    const unicos = [...new Set(dias)].sort();
-    const voltou = unicos.length >= 2;
+    const analise = analisarDias(dias, janela);
+    const voltou = analise.voltou;
     if (voltou) recorrentes++;
-    todosGaps.push(...intervalos(unicos));
-    if (diasEntre(unicos[0], hoje) > DIAS_PARA_JULGAR) {
+    todosGaps.push(...analise.voltas);
+    if (diasEntre(analise.primeiro, hoje) > DIAS_PARA_JULGAR) {
       baseMadura++;
       if (voltou) voltaramMaduros++;
     }
@@ -286,6 +309,7 @@ export function calcularRetorno(
       return montarLinha(
         { nome, diasPorCliente: servico.porCliente },
         hoje,
+        janela,
         gastoTotal,
         gastoApos,
         false,
@@ -311,7 +335,7 @@ export function calcularRetorno(
     }
     return [...grupos.values()]
       .map((grupo) =>
-        montarLinha(grupo, hoje, gastoTotal, gastoApos, true),
+        montarLinha(grupo, hoje, janela, gastoTotal, gastoApos, true),
       )
       .sort((a, b) => b.clientes - a.clientes || a.nome.localeCompare(b.nome));
   }

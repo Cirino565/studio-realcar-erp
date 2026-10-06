@@ -6,6 +6,8 @@ import { Repeat2 } from "lucide-react";
 import { formatarMoeda } from "@/lib/format";
 import {
   DIAS_PARA_JULGAR,
+  JANELAS_RETORNO,
+  JANELA_PADRAO,
   calcularRetorno,
   type LinhaRetorno,
   type RetornoDados,
@@ -87,11 +89,11 @@ function Tabela({
                 <th className="px-3 py-2 font-medium">
                   Entre quem veio há mais de {DIAS_PARA_JULGAR} dias
                 </th>
-                <th className="px-3 py-2 font-medium">Tempo médio entre visitas</th>
+                <th className="px-3 py-2 font-medium">Tempo médio até voltar</th>
                 {comGasto ? (
                   <>
                     <th className="px-3 py-2 font-medium">Rende por cliente</th>
-                    <th className="px-3 py-2 font-medium">Dos quais depois da 1ª visita</th>
+                    <th className="px-3 py-2 font-medium">Dos quais depois do 1º tratamento</th>
                   </>
                 ) : null}
               </tr>
@@ -142,7 +144,8 @@ function Tabela({
 
 export default function RetornoClientes({ dados }: { dados: RetornoDados }) {
   const [visaoOrigem, setVisaoOrigem] = useState<"origem" | "campanha">("origem");
-  const resultado = useMemo(() => calcularRetorno(dados), [dados]);
+  const [janela, setJanela] = useState<number>(JANELA_PADRAO);
+  const resultado = useMemo(() => calcularRetorno(dados, janela), [dados, janela]);
   const { resumo } = resultado;
 
   if (resumo.atendidos === 0) {
@@ -164,12 +167,37 @@ export default function RetornoClientes({ dados }: { dados: RetornoDados }) {
 
   return (
     <div className="space-y-6">
-      <p className="rounded-2xl border border-white/[0.10] bg-slate-950/25 px-4 py-3 text-sm text-slate-300">
-        Conta cada <strong className="text-white">dia</strong>{" "}
-        em que a cliente foi atendida, desde o começo do uso do
-        sistema (não depende do período escolhido acima). Várias coisas feitas no mesmo dia contam como uma visita só, e
-        as revisões marcadas como &quot;Retorno&quot; não contam.
-      </p>
+      <section className="rounded-2xl border border-white/[0.10] bg-slate-950/25 px-4 py-4">
+        <p className="text-sm text-slate-300">
+          Conta cada <strong className="text-white">dia</strong>{" "}
+          em que a cliente foi atendida, desde o começo do uso do sistema (não depende do período escolhido acima).
+          Várias coisas feitas no mesmo dia contam como uma visita só, e as revisões marcadas como &quot;Retorno&quot;{" "}
+          na agenda não contam.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-sm text-slate-300">Só conta como &quot;voltou&quot; quando passam pelo menos:</span>
+          {JANELAS_RETORNO.map((valor) => (
+            <button
+              key={valor}
+              type="button"
+              onClick={() => setJanela(valor)}
+              style={janela === valor ? { color: "#0f172a" } : undefined}
+              className={`rounded-2xl px-3 py-2 text-xs font-medium transition ${
+                janela === valor
+                  ? "bg-cyan-300 text-slate-950"
+                  : "border border-white/[0.10] bg-slate-950/25 text-slate-300 hover:bg-white/[0.08]"
+              }`}
+            >
+              {valor === 0 ? "Qualquer outro dia" : `${valor} dias`}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-xs leading-5 text-slate-400">
+          {janela === 0
+            ? "Toda visita em um dia diferente conta como volta, inclusive as sessões de um mesmo pacote."
+            : `Visitas com menos de ${janela} dias entre uma e outra (sessões de pacote, revisões) contam como um tratamento só. A cliente só "voltou" quando reaparece ${janela} dias ou mais depois da última visita.`}
+        </p>
+      </section>
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <CartaoNumero
@@ -192,7 +220,7 @@ export default function RetornoClientes({ dados }: { dados: RetornoDados }) {
           texto="Até agora não voltaram (inclui quem ainda está dentro do prazo de voltar)."
         />
         <CartaoNumero
-          titulo="Tempo médio entre visitas"
+          titulo="Tempo médio até voltar"
           valor={dias(resumo.cicloMedio)}
           texto={
             resumo.totalIntervalos > 0
@@ -205,7 +233,7 @@ export default function RetornoClientes({ dados }: { dados: RetornoDados }) {
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <section className={PAINEL}>
           <h2 className="text-lg font-semibold text-white">De quanto em quanto tempo voltam</h2>
-          <p className="mt-1 text-sm text-slate-400">Quantas voltas aconteceram em cada intervalo entre uma visita e a seguinte.</p>
+          <p className="mt-1 text-sm text-slate-400">Quantas voltas aconteceram em cada intervalo, contado da última visita até a volta.</p>
           <div className="mt-5 space-y-3">
             {resumo.distribuicao.map((faixa) => (
               <div key={faixa.label} className="flex items-center gap-3 text-sm">
