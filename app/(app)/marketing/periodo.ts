@@ -8,6 +8,8 @@ export type VendaCampanhaMovimento = {
   campanhaId: number | null;
   data: Date | string;
   valorTotal: number;
+  totalServicos: number;
+  totalProdutos: number;
   taxaPagamento: number;
   valorLiquido: number | null;
 };
@@ -15,6 +17,7 @@ export type VendaCampanhaMovimento = {
 export type LancamentoCampanhaMovimento = {
   campanhaId: number | null;
   tipo: string;
+  categoria: string | null;
   data: Date | string;
   valor: number;
   valorLiquido: number | null;
@@ -34,9 +37,14 @@ export type MetricasPeriodo = {
   receitaBruta: number;
   taxasPagamento: number;
   receitaLiquida: number;
+  receitaServico: number;
+  receitaProduto: number;
+  receitaLiquidaServico: number;
+  receitaLiquidaProduto: number;
   custoReal: number;
   resultado: number;
   roas: number | null;
+  roasServico: number | null;
 };
 
 export const METRICAS_PERIODO_VAZIAS: MetricasPeriodo = {
@@ -46,9 +54,14 @@ export const METRICAS_PERIODO_VAZIAS: MetricasPeriodo = {
   receitaBruta: 0,
   taxasPagamento: 0,
   receitaLiquida: 0,
+  receitaServico: 0,
+  receitaProduto: 0,
+  receitaLiquidaServico: 0,
+  receitaLiquidaProduto: 0,
   custoReal: 0,
   resultado: 0,
   roas: null,
+  roasServico: null,
 };
 
 const FUSO = "America/Sao_Paulo";
@@ -140,14 +153,42 @@ export function calcularMetricasPeriodo({
   const soma = <T,>(lista: T[], valor: (item: T) => number) =>
     lista.reduce((total, item) => total + valor(item), 0);
 
-  const receitaBruta =
-    soma(vendas, (venda) => venda.valorTotal) + soma(manuais, (item) => item.valor);
+  // Cada venda e dividida entre servico e produto pelo que ela tem registrado
+  // (kits contam como produto). A venda continua inteira na mesma campanha.
+  // O valor liquido e dividido na mesma proporcao do valor bruto.
+  const partesDasVendas = vendas.map((venda) => {
+    const produto = Math.min(Math.max(venda.totalProdutos, 0), Math.max(venda.valorTotal, 0));
+    const liquido = venda.valorLiquido ?? venda.valorTotal - venda.taxaPagamento;
+    const fatiaProduto = venda.valorTotal > 0 ? produto / venda.valorTotal : 0;
+    return {
+      servico: venda.valorTotal - produto,
+      produto,
+      liquidoServico: liquido - liquido * fatiaProduto,
+      liquidoProduto: liquido * fatiaProduto,
+    };
+  });
+  // Entradas lancadas a mao so contam como produto quando a categoria e "Produtos".
+  const partesDosManuais = manuais.map((item) => {
+    const liquido = item.valorLiquido ?? item.valor - item.taxaPagamento;
+    const ehProduto = (item.categoria || "").trim().toLowerCase() === "produtos";
+    return {
+      servico: ehProduto ? 0 : item.valor,
+      produto: ehProduto ? item.valor : 0,
+      liquidoServico: ehProduto ? 0 : liquido,
+      liquidoProduto: ehProduto ? liquido : 0,
+    };
+  });
+  const partes = [...partesDasVendas, ...partesDosManuais];
+
+  const receitaServico = soma(partes, (parte) => parte.servico);
+  const receitaProduto = soma(partes, (parte) => parte.produto);
+  const receitaLiquidaServico = soma(partes, (parte) => parte.liquidoServico);
+  const receitaLiquidaProduto = soma(partes, (parte) => parte.liquidoProduto);
+  const receitaBruta = receitaServico + receitaProduto;
+  const receitaLiquida = receitaLiquidaServico + receitaLiquidaProduto;
   const taxasPagamento =
     soma(vendas, (venda) => venda.taxaPagamento) +
     soma(manuais, (item) => item.taxaPagamento);
-  const receitaLiquida =
-    soma(vendas, (venda) => venda.valorLiquido ?? venda.valorTotal - venda.taxaPagamento) +
-    soma(manuais, (item) => item.valorLiquido ?? item.valor - item.taxaPagamento);
   const custoReal = soma(custos, (item) => item.valor);
 
   return {
@@ -157,8 +198,13 @@ export function calcularMetricasPeriodo({
     receitaBruta,
     taxasPagamento,
     receitaLiquida,
+    receitaServico,
+    receitaProduto,
+    receitaLiquidaServico,
+    receitaLiquidaProduto,
     custoReal,
     resultado: receitaLiquida - custoReal,
     roas: custoReal > 0 ? receitaBruta / custoReal : null,
+    roasServico: custoReal > 0 ? receitaServico / custoReal : null,
   };
 }

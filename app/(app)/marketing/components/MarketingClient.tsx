@@ -2014,6 +2014,8 @@ function CampanhasView({
   const totalClientes = totaisPeriodo.reduce((acc, item) => acc + item.clientes, 0);
   const custoReal = totaisPeriodo.reduce((acc, item) => acc + item.custoReal, 0);
   const receitaLiquida = totaisPeriodo.reduce((acc, item) => acc + item.receitaLiquida, 0);
+  const receitaLiquidaServico = totaisPeriodo.reduce((acc, item) => acc + item.receitaLiquidaServico, 0);
+  const receitaLiquidaProduto = totaisPeriodo.reduce((acc, item) => acc + item.receitaLiquidaProduto, 0);
 
   function executarLocal(tarefa: () => Promise<void>) {
     setErroLocal(null);
@@ -2100,7 +2102,11 @@ function CampanhasView({
         <CampaignInsight label={situacaoAtual.titulo} value={String(visiveis.length)} />
         <CampaignInsight label="Clientes atribuídos" value={String(totalClientes)} />
         <CampaignInsight label="Custo real em Ads" value={formatarMoeda(custoReal)} />
-        <CampaignInsight label="Receita líquida atribuída" value={formatarMoeda(receitaLiquida)} />
+        <CampaignInsight
+          label="Receita líquida atribuída"
+          value={formatarMoeda(receitaLiquida)}
+          detail={`Serviço ${formatarMoeda(receitaLiquidaServico)} · Produto ${formatarMoeda(receitaLiquidaProduto)}`}
+        />
       </div>
 
       {erroLocal ? <div className="rounded-2xl border border-rose-300/20 bg-rose-400/10 p-3 text-sm text-rose-100">{erroLocal}</div> : null}
@@ -2134,7 +2140,7 @@ function CampanhasView({
 
       {visao === "tabela" ? (
       <div className="premium-table overflow-x-auto">
-        <table className="w-full min-w-[1100px] text-left text-sm">
+        <table className="w-full min-w-[1500px] text-left text-sm">
           <thead className="border-b border-white/[0.10] bg-white/[0.045] text-xs uppercase tracking-[0.18em] text-slate-500">
             <tr>
               <th className="px-5 py-4">Campanha</th>
@@ -2143,16 +2149,19 @@ function CampanhasView({
               <th className="px-5 py-4">Custo real</th>
               <th className="px-5 py-4">Custo por cliente</th>
               <th className="px-5 py-4">Custo por lead</th>
-              <th className="px-5 py-4">Receita bruta</th>
+              <th className="px-5 py-4">Receita de serviço</th>
+              <th className="px-5 py-4">Receita de produto</th>
+              <th className="px-5 py-4">Receita total</th>
               <th className="px-5 py-4">Taxas</th>
               <th className="px-5 py-4">Resultado</th>
-              <th className="px-5 py-4">Retorno</th>
+              <th className="px-5 py-4">Retorno só serviço</th>
+              <th className="px-5 py-4">Retorno com tudo</th>
               <th className="px-5 py-4 text-right">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/[0.08]">
             {visiveis.length === 0 ? (
-              <tr><td colSpan={11} className="px-5 py-10 text-center text-slate-500">{campanhas.length === 0 ? "Nenhuma campanha cadastrada." : `Nenhuma campanha ${situacaoAtual.rotulo.slice(0, -1).toLowerCase()}. Escolha outra situação acima para ver as demais.`}</td></tr>
+              <tr><td colSpan={14} className="px-5 py-10 text-center text-slate-500">{campanhas.length === 0 ? "Nenhuma campanha cadastrada." : `Nenhuma campanha ${situacaoAtual.rotulo.slice(0, -1).toLowerCase()}. Escolha outra situação acima para ver as demais.`}</td></tr>
             ) : visiveis.map((campanha) => {
               const m = metricasPeriodo.get(campanha.id) ?? METRICAS_PERIODO_VAZIAS;
               const etiqueta = etiquetaDaCampanha(m);
@@ -2175,9 +2184,21 @@ function CampanhasView({
                   </td>
                   <td className="px-5 py-4">{custoCliente === null ? "—" : formatarMoeda(custoCliente)}</td>
                   <td className="px-5 py-4">{custoLead === null ? "—" : formatarMoeda(custoLead)}</td>
-                  <td className="px-5 py-4 text-emerald-200">{formatarMoeda(m.receitaBruta)}</td>
+                  <td className="px-5 py-4 text-emerald-200">{formatarMoeda(m.receitaServico)}</td>
+                  <td className="px-5 py-4 text-cyan-200">{formatarMoeda(m.receitaProduto)}</td>
+                  <td className="px-5 py-4 font-semibold text-emerald-200">{formatarMoeda(m.receitaBruta)}</td>
                   <td className="px-5 py-4">{formatarMoeda(m.taxasPagamento)}</td>
                   <td className={`px-5 py-4 font-semibold ${m.resultado >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{formatarMoeda(m.resultado)}</td>
+                  <td className="px-5 py-4">
+                    {m.roasServico === null ? (
+                      <span className="text-slate-500">Sem custo</span>
+                    ) : (
+                      <>
+                        <p className={`font-semibold ${m.roasServico >= 1 ? "text-emerald-600" : "text-rose-600"}`}>{formatarMoeda(m.roasServico)}</p>
+                        <p className="text-xs text-slate-500">para cada R$ 1 gasto</p>
+                      </>
+                    )}
+                  </td>
                   <td className="px-5 py-4">
                     {m.roas === null ? (
                       <span className="text-slate-500">Sem custo</span>
@@ -2261,6 +2282,16 @@ function CartaoCampanha({ campanha, m, podeGerenciar, disabled, onEditar, onVinc
   const custoLead = custoPor(m.custoReal, m.leads);
   const passouOrcamento = campanha.investimento > 0 && campanha.metricas.custoReal > campanha.investimento;
   const escala = Math.max(m.receitaBruta, m.custoReal);
+  const parteServico = m.receitaBruta > 0 ? (m.receitaServico / m.receitaBruta) * 100 : 0;
+  // Responde: o anuncio se paga so com o servico? Precisa do produto? Nem assim?
+  const veredicto =
+    m.custoReal <= 0
+      ? null
+      : m.roasServico !== null && m.roasServico >= 1
+        ? { texto: "O serviço sozinho já paga o anúncio", classe: "text-emerald-600" }
+        : m.roas !== null && m.roas >= 1
+          ? { texto: "O anúncio só se paga com a venda de produto", classe: "text-amber-600" }
+          : { texto: "Nem com o produto o anúncio se paga ainda", classe: "text-rose-600" };
   const largura = (valor: number) => (escala > 0 && valor > 0 ? Math.max(3, Math.round((valor / escala) * 100)) : 0);
   // Cores direto no estilo para o tema nao alterar o verde/amarelo.
   const corDaSituacao =
@@ -2289,8 +2320,15 @@ function CartaoCampanha({ campanha, m, podeGerenciar, disabled, onEditar, onVinc
             <p className="text-xs text-slate-500">Sem custo</p>
           ) : (
             <>
-              <p className={`text-lg font-semibold ${m.roas >= 1 ? "text-emerald-600" : "text-rose-600"}`}>{formatarMoeda(m.roas)}</p>
-              <p className="text-[11px] text-slate-500">para cada R$ 1 gasto</p>
+              <p className="text-[11px] text-slate-500">Retorno para cada R$ 1 gasto</p>
+              <p className="mt-1 text-sm">
+                <span className="text-slate-500">Só serviço </span>
+                <strong className={`text-lg ${(m.roasServico ?? 0) >= 1 ? "text-emerald-600" : "text-rose-600"}`}>{formatarMoeda(m.roasServico ?? 0)}</strong>
+              </p>
+              <p className="text-sm">
+                <span className="text-slate-500">Com tudo </span>
+                <strong className={`text-lg ${m.roas >= 1 ? "text-emerald-600" : "text-rose-600"}`}>{formatarMoeda(m.roas)}</strong>
+              </p>
             </>
           )}
         </div>
@@ -2300,9 +2338,22 @@ function CartaoCampanha({ campanha, m, podeGerenciar, disabled, onEditar, onVinc
         <div className="flex items-center gap-3">
           <span className="w-12 shrink-0 text-xs text-slate-500">Entrou</span>
           <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
-            <div className="h-full rounded-full" style={{ width: `${largura(m.receitaBruta)}%`, backgroundColor: "#10b981" }} />
+            <div className="flex h-full overflow-hidden rounded-full" style={{ width: `${largura(m.receitaBruta)}%` }}>
+              <div className="h-full" style={{ width: `${parteServico}%`, backgroundColor: "#10b981" }} />
+              <div className="h-full" style={{ width: `${100 - parteServico}%`, backgroundColor: "#38bdf8" }} />
+            </div>
           </div>
           <span className="w-28 shrink-0 text-right text-sm font-semibold text-emerald-200">{formatarMoeda(m.receitaBruta)}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pl-[60px] text-xs">
+          <span className="inline-flex items-center gap-1.5 text-slate-500">
+            <span className="size-2 rounded-full" style={{ backgroundColor: "#10b981" }} />
+            Serviço <strong className="text-emerald-200">{formatarMoeda(m.receitaServico)}</strong>
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-slate-500">
+            <span className="size-2 rounded-full" style={{ backgroundColor: "#38bdf8" }} />
+            Produto <strong className="text-cyan-200">{formatarMoeda(m.receitaProduto)}</strong>
+          </span>
         </div>
         <div className="flex items-center gap-3">
           <span className="w-12 shrink-0 text-xs text-slate-500">Gastou</span>
@@ -2311,6 +2362,7 @@ function CartaoCampanha({ campanha, m, podeGerenciar, disabled, onEditar, onVinc
           </div>
           <span className="w-28 shrink-0 text-right text-sm font-semibold text-rose-200">{formatarMoeda(m.custoReal)}</span>
         </div>
+        {veredicto ? <p className={`pl-[60px] text-xs font-semibold ${veredicto.classe}`}>{veredicto.texto}</p> : null}
       </div>
 
       <div className="grid grid-cols-2 gap-x-3 gap-y-4 border-t border-white/[0.08] pt-4 sm:grid-cols-4">
@@ -2447,8 +2499,16 @@ function MenuAcoesCampanha({ disabled, onVincularCliente, onLancarCusto, onVincu
   );
 }
 
-function CampaignInsight({ label, value }: { label: string; value: string }) {
-  return <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/[0.10] bg-white/[0.055] px-4 py-3"><span className="text-sm text-slate-400">{label}</span><strong className="text-sm text-white">{value}</strong></div>;
+function CampaignInsight({ label, value, detail }: { label: string; value: string; detail?: string }) {
+  return (
+    <div className="flex flex-col justify-center rounded-2xl border border-white/[0.10] bg-white/[0.055] px-4 py-3">
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-sm text-slate-400">{label}</span>
+        <strong className="text-sm text-white">{value}</strong>
+      </div>
+      {detail ? <p className="mt-1 text-xs text-slate-500">{detail}</p> : null}
+    </div>
+  );
 }
 
 function VincularClienteCampanhaModal({ campanha, clientes, disabled, onClose, onSubmit }: {

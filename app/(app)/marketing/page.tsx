@@ -90,6 +90,8 @@ export default async function MarketingPage() {
         campanhaId: true,
         data: true,
         valorTotal: true,
+        totalServicos: true,
+        totalProdutos: true,
         taxaPagamento: true,
         valorLiquido: true,
       },
@@ -251,6 +253,7 @@ export default async function MarketingPage() {
         lancamentos: lancamentosCampanha.map((item) => ({
           campanhaId: item.campanhaId,
           tipo: item.tipo,
+          categoria: item.categoria,
           data: item.data,
           valor: item.valor,
           valorLiquido: item.valorLiquido,
