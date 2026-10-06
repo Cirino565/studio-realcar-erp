@@ -20,6 +20,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { formatarData, formatarMoeda } from "@/lib/format";
+import RetornoClientes from "./RetornoClientes";
 import type {
   AbaRelatorio,
   AgendamentoRelatorio,
@@ -62,6 +63,7 @@ const abas: { value: AbaRelatorio; label: string }[] = [
   { value: "financeiro", label: "Financeiro" },
   { value: "agenda", label: "Agenda" },
   { value: "clientes", label: "Clientes" },
+  { value: "retorno", label: "Retorno" },
   { value: "estoque", label: "Estoque" },
 ];
 
@@ -619,7 +621,7 @@ export default function RelatoriosClient({ data }: Props) {
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-2 sm:flex">
+        <div className={aba === "retorno" ? "hidden" : "grid grid-cols-2 gap-2 sm:flex"}>
           {periodoOptions.map((item) => (
             <button
               key={item.value}
@@ -637,7 +639,7 @@ export default function RelatoriosClient({ data }: Props) {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className={aba === "retorno" ? "hidden" : "grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4"}>
         <MetricCard title="Receita" value={formatarMoeda(resumo.receita)} description={`${resumo.entradas} entrada(s) no período`} icon={TrendingUp} tone="success" />
         <MetricCard title="Despesas" value={formatarMoeda(resumo.despesas)} description={`${resumo.saidas} saída(s) no período`} icon={TrendingDown} tone="danger" />
         <MetricCard title="Saldo operacional" value={formatarMoeda(resumo.saldo)} description={`Margem de ${resumo.margem.toFixed(0)}%`} icon={Activity} tone={resumo.saldo >= 0 ? "info" : "warning"} />
@@ -733,6 +735,8 @@ export default function RelatoriosClient({ data }: Props) {
           />
         </div>
       ) : null}
+
+      {aba === "retorno" ? <RetornoClientes dados={data.retorno} /> : null}
 
       {aba === "estoque" ? (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">

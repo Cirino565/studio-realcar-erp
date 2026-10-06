@@ -2,6 +2,7 @@ import { requirePagePermission } from "@/lib/auth";
 import RelatoriosClient from "./components/RelatoriosClient";
 import { prisma } from "@/lib/prisma";
 import type { RelatoriosData } from "./types";
+import { diaSaoPaulo } from "./retorno";
 
 export default async function RelatoriosPage() {
   await requirePagePermission("relatorios.visualizar");
@@ -37,6 +38,26 @@ export default async function RelatoriosPage() {
       prisma.lead.findMany({ orderBy: { createdAt: "desc" } }),
       prisma.campanhaMarketing.findMany({ orderBy: { createdAt: "desc" } }),
     ]);
+
+  // Dados do indicador de retorno (aba Retorno): so o necessario, bem enxuto.
+  const [atendidosRetorno, clientesRetorno, vendasRetorno] = await Promise.all([
+    prisma.agendamento.findMany({
+      where: { status: "Atendido", naturezaAtendimento: { not: "RETORNO" } },
+      select: { clienteId: true, procedimento: true, data: true },
+      orderBy: { data: "asc" },
+    }),
+    prisma.cliente.findMany({
+      select: {
+        id: true,
+        origem: true,
+        campanhaAquisicao: { select: { nome: true } },
+      },
+    }),
+    prisma.venda.findMany({
+      where: { situacao: "ATIVA", clienteId: { not: null } },
+      select: { clienteId: true, data: true, valorTotal: true },
+    }),
+  ]);
 
   const data: RelatoriosData = {
     clientes: clientes.map((cliente) => ({
@@ -99,6 +120,29 @@ export default async function RelatoriosPage() {
       inicio: campanha.inicio?.toISOString() ?? null,
       fim: campanha.fim?.toISOString() ?? null,
     })),
+    retorno: {
+      visitas: atendidosRetorno.map((item) => ({
+        clienteId: item.clienteId,
+        dia: diaSaoPaulo(item.data),
+        procedimento: item.procedimento,
+      })),
+      clientes: clientesRetorno.map((item) => ({
+        id: item.id,
+        origem: item.origem,
+        campanha: item.campanhaAquisicao?.nome ?? null,
+      })),
+      vendas: vendasRetorno.flatMap((item) =>
+        item.clienteId === null
+          ? []
+          : [
+              {
+                clienteId: item.clienteId,
+                dia: diaSaoPaulo(item.data),
+                valor: item.valorTotal,
+              },
+            ],
+      ),
+    },
   };
 
   return <RelatoriosClient data={data} />;

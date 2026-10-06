@@ -1,6 +1,8 @@
+import type { RetornoDados } from "./retorno";
+
 export type PeriodoRelatorio = "todos" | "mes" | "trimestre" | "ano";
 
-export type AbaRelatorio = "visao" | "financeiro" | "agenda" | "clientes" | "estoque";
+export type AbaRelatorio = "visao" | "financeiro" | "agenda" | "clientes" | "retorno" | "estoque";
 
 export type ClienteRelatorio = {
   id: number;
@@ -75,4 +77,5 @@ export type RelatoriosData = {
   produtos: ProdutoRelatorio[];
   leads: LeadRelatorio[];
   campanhas: CampanhaRelatorio[];
+  retorno: RetornoDados;
 };
