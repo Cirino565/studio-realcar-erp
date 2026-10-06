@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 
 import ProcedimentoSearchSelect from "@/components/clientes/ProcedimentoSearchSelect";
 import Link from "next/link";
@@ -11,6 +12,7 @@ import {
   CalendarClock,
   CalendarPlus,
   CheckCircle2,
+  ChevronDown,
   Clock3,
   Copy,
   DollarSign,
@@ -89,6 +91,13 @@ import {
   type MovimentosCampanha,
   type PeriodoAtalho,
 } from "../periodo";
+import {
+  CLASSE_DA_ETIQUETA,
+  custoPor,
+  etiquetaDaCampanha,
+  SITUACOES_FILTRO,
+  type SituacaoFiltro,
+} from "../campanhas-resumo";
 
 type Props = {
   leads: MarketingLead[];
@@ -1952,6 +1961,8 @@ function CampanhasView({
   // Filtro de periodo: abre sempre em "Ultimos 30 dias".
   const [atalho, setAtalho] = useState<PeriodoAtalho>("30d");
   const [periodo, setPeriodo] = useState(() => periodoDoAtalho("30d"));
+  // Filtro de situacao: abre mostrando so as campanhas ativas.
+  const [situacao, setSituacao] = useState<SituacaoFiltro>("Ativa");
 
   function escolherAtalho(proximo: PeriodoAtalho) {
     setAtalho(proximo);
@@ -1988,7 +1999,15 @@ function CampanhasView({
     );
   }, [campanhas, movimentos, leads, clientes, periodo]);
 
-  const totaisPeriodo = Array.from(metricasPeriodo.values());
+  const visiveis = useMemo(
+    () => (situacao === "Todas" ? campanhas : campanhas.filter((campanha) => campanha.status === situacao)),
+    [campanhas, situacao],
+  );
+  const situacaoAtual = SITUACOES_FILTRO.find((item) => item.valor === situacao) ?? SITUACOES_FILTRO[0];
+  const quantidadeDaSituacao = (valor: SituacaoFiltro) =>
+    valor === "Todas" ? campanhas.length : campanhas.filter((campanha) => campanha.status === valor).length;
+  // Os numeros do topo somam so as campanhas que estao na tabela.
+  const totaisPeriodo = visiveis.map((campanha) => metricasPeriodo.get(campanha.id) ?? METRICAS_PERIODO_VAZIAS);
   const totalClientes = totaisPeriodo.reduce((acc, item) => acc + item.clientes, 0);
   const custoReal = totaisPeriodo.reduce((acc, item) => acc + item.custoReal, 0);
   const receitaLiquida = totaisPeriodo.reduce((acc, item) => acc + item.receitaLiquida, 0);
@@ -2007,7 +2026,25 @@ function CampanhasView({
 
   return (
     <section className="grid gap-6">
-      <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-white/[0.10] bg-white/[0.055] px-4 py-3">
+      <div className="flex flex-wrap items-end gap-x-6 gap-y-3 rounded-2xl border border-white/[0.10] bg-white/[0.055] px-4 py-3">
+        <div className="grid gap-1.5">
+          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Situação</span>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Situação da campanha">
+            {SITUACOES_FILTRO.map((item) => (
+              <button
+                key={item.valor}
+                type="button"
+                aria-pressed={situacao === item.valor}
+                onClick={() => setSituacao(item.valor)}
+                className={`rounded-xl border px-3 py-2 text-xs font-semibold ${situacao === item.valor ? "border-violet-300/15 bg-violet-400/10 text-violet-100" : "border-white/[0.10] bg-white/[0.06] text-slate-300 hover:bg-white/[0.10]"}`}
+              >
+                {item.rotulo} ({quantidadeDaSituacao(item.valor)})
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="grid gap-1.5">
+          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Período</span>
         <div className="flex flex-wrap gap-2" role="group" aria-label="Período">
           {([
             ["7d", "Últimos 7 dias"],
@@ -2025,6 +2062,7 @@ function CampanhasView({
             </button>
           ))}
         </div>
+        </div>
         {atalho === "custom" ? (
           <div className="flex flex-wrap items-end gap-3">
             <Input label="Data inicial" type="date" value={periodo.de} onChange={(valor) => mudarData("de", valor)} />
@@ -2032,12 +2070,12 @@ function CampanhasView({
           </div>
         ) : null}
         <p className="text-xs text-slate-400 lg:ml-auto">
-          Mostrando de {formatarDiaCurto(periodo.de)} a {formatarDiaCurto(periodo.ate)}. O orçamento é o planejado e não muda com o período.
+          Mostrando {situacaoAtual.frase} de {formatarDiaCurto(periodo.de)} a {formatarDiaCurto(periodo.ate)}. O orçamento é o planejado e não muda com o período.
         </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <CampaignInsight label="Campanhas cadastradas" value={String(campanhas.length)} />
+        <CampaignInsight label={situacaoAtual.titulo} value={String(visiveis.length)} />
         <CampaignInsight label="Clientes atribuídos" value={String(totalClientes)} />
         <CampaignInsight label="Custo real em Ads" value={formatarMoeda(custoReal)} />
         <CampaignInsight label="Receita líquida atribuída" value={formatarMoeda(receitaLiquida)} />
@@ -2046,44 +2084,70 @@ function CampanhasView({
       {erroLocal ? <div className="rounded-2xl border border-rose-300/20 bg-rose-400/10 p-3 text-sm text-rose-100">{erroLocal}</div> : null}
 
       <div className="premium-table overflow-x-auto">
-        <table className="w-full min-w-[1180px] text-left text-sm">
+        <table className="w-full min-w-[1100px] text-left text-sm">
           <thead className="border-b border-white/[0.10] bg-white/[0.045] text-xs uppercase tracking-[0.18em] text-slate-500">
             <tr>
               <th className="px-5 py-4">Campanha</th>
               <th className="px-5 py-4">Clientes</th>
               <th className="px-5 py-4">Leads</th>
-              <th className="px-5 py-4">Orçamento</th>
               <th className="px-5 py-4">Custo real</th>
+              <th className="px-5 py-4">Custo por cliente</th>
+              <th className="px-5 py-4">Custo por lead</th>
               <th className="px-5 py-4">Receita bruta</th>
               <th className="px-5 py-4">Taxas</th>
               <th className="px-5 py-4">Resultado</th>
-              <th className="px-5 py-4">ROAS</th>
+              <th className="px-5 py-4">Retorno</th>
               <th className="px-5 py-4 text-right">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/[0.08]">
-            {campanhas.length === 0 ? (
-              <tr><td colSpan={10} className="px-5 py-10 text-center text-slate-500">Nenhuma campanha cadastrada.</td></tr>
-            ) : campanhas.map((campanha) => {
+            {visiveis.length === 0 ? (
+              <tr><td colSpan={11} className="px-5 py-10 text-center text-slate-500">{campanhas.length === 0 ? "Nenhuma campanha cadastrada." : `Nenhuma campanha ${situacaoAtual.rotulo.slice(0, -1).toLowerCase()}. Escolha outra situação acima para ver as demais.`}</td></tr>
+            ) : visiveis.map((campanha) => {
               const m = metricasPeriodo.get(campanha.id) ?? METRICAS_PERIODO_VAZIAS;
+              const etiqueta = etiquetaDaCampanha(m);
+              const custoCliente = custoPor(m.custoReal, m.clientes);
+              const custoLead = custoPor(m.custoReal, m.leads);
+              const passouOrcamento = campanha.investimento > 0 && campanha.metricas.custoReal > campanha.investimento;
               return (
                 <tr key={campanha.id} className="text-slate-300 hover:bg-white/[0.035]">
-                  <td className="px-5 py-4"><p className="font-semibold text-white">{campanha.nome}</p><p className="mt-1 text-xs text-slate-500">{campanha.canal} · {campanha.status}</p></td>
+                  <td className="max-w-[300px] px-5 py-4">
+                    <p className="line-clamp-2 font-semibold text-white" title={campanha.nome}>{campanha.nome}</p>
+                    <p className="mt-1 text-xs text-slate-500">{campanha.canal} · {campanha.status}</p>
+                    <span className={`mt-2 inline-block rounded-full border px-2.5 py-1 text-[11px] font-semibold ${CLASSE_DA_ETIQUETA[etiqueta.tom]}`}>{etiqueta.texto}</span>
+                  </td>
                   <td className="px-5 py-4">{m.clientes}</td>
                   <td className="px-5 py-4">{m.leads}</td>
-                  <td className="px-5 py-4">{formatarMoeda(campanha.investimento)}</td>
-                  <td className="px-5 py-4 text-rose-200">{formatarMoeda(m.custoReal)}</td>
+                  <td className="px-5 py-4">
+                    <p className="text-rose-200">{formatarMoeda(m.custoReal)}</p>
+                    {campanha.investimento > 0 ? <p className="mt-1 text-xs text-slate-500">Orçamento {formatarMoeda(campanha.investimento)}</p> : null}
+                    {passouOrcamento ? <p className="mt-0.5 text-xs font-semibold text-amber-600 dark:text-amber-300">Gasto total passou do orçamento</p> : null}
+                  </td>
+                  <td className="px-5 py-4">{custoCliente === null ? "—" : formatarMoeda(custoCliente)}</td>
+                  <td className="px-5 py-4">{custoLead === null ? "—" : formatarMoeda(custoLead)}</td>
                   <td className="px-5 py-4 text-emerald-200">{formatarMoeda(m.receitaBruta)}</td>
                   <td className="px-5 py-4">{formatarMoeda(m.taxasPagamento)}</td>
                   <td className={`px-5 py-4 font-semibold ${m.resultado >= 0 ? "text-emerald-300" : "text-rose-300"}`}>{formatarMoeda(m.resultado)}</td>
-                  <td className="px-5 py-4">{m.roas === null ? "Sem custo" : `${m.roas.toFixed(2)}x`}</td>
+                  <td className="px-5 py-4">
+                    {m.roas === null ? (
+                      <span className="text-slate-500">Sem custo</span>
+                    ) : (
+                      <>
+                        <p className={`font-semibold ${m.roas >= 1 ? "text-emerald-300" : "text-rose-300"}`}>{formatarMoeda(m.roas)}</p>
+                        <p className="text-xs text-slate-500">para cada R$ 1 gasto</p>
+                      </>
+                    )}
+                  </td>
                   <td className="px-5 py-4 text-right">
-                    {podeGerenciar ? <div className="flex justify-end gap-2">
+                    {podeGerenciar ? <div className="flex items-center justify-end gap-2">
                       <button type="button" onClick={() => onEditar(campanha)} disabled={isPending || pendingLocal} className="rounded-xl border border-violet-300/15 bg-violet-400/10 px-3 py-2 text-xs font-semibold text-violet-100">Editar</button>
-                      <button type="button" onClick={() => setVincular(campanha)} disabled={isPending || pendingLocal} className="rounded-xl border border-cyan-300/15 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100">Vincular cliente</button>
-                      <button type="button" onClick={() => setCusto(campanha)} disabled={isPending || pendingLocal} className="rounded-xl border border-amber-300/15 bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-100">Lançar custo</button>
-                      <button type="button" onClick={() => setReceita(campanha)} disabled={isPending || pendingLocal} className="rounded-xl border border-emerald-300/15 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-100">Vincular receita</button>
-                      <button type="button" onClick={() => onDelete(campanha.id)} disabled={isPending || pendingLocal} className="inline-flex items-center gap-2 rounded-xl border border-rose-300/15 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-200"><Trash2 className="size-3.5" />Excluir</button>
+                      <MenuAcoesCampanha
+                        disabled={isPending || pendingLocal}
+                        onVincularCliente={() => setVincular(campanha)}
+                        onLancarCusto={() => setCusto(campanha)}
+                        onVincularReceita={() => setReceita(campanha)}
+                        onExcluir={() => onDelete(campanha.id)}
+                      />
                     </div> : null}
                   </td>
                 </tr>
@@ -2127,6 +2191,96 @@ function CampanhasView({
         })}
       />
     </section>
+  );
+}
+
+function MenuAcoesCampanha({ disabled, onVincularCliente, onLancarCusto, onVincularReceita, onExcluir }: {
+  disabled: boolean;
+  onVincularCliente: () => void;
+  onLancarCusto: () => void;
+  onVincularReceita: () => void;
+  onExcluir: () => void;
+}) {
+  const botaoRef = useRef<HTMLButtonElement>(null);
+  const [aberto, setAberto] = useState<{ top: number; right: number; destino: Element } | null>(null);
+
+  useEffect(() => {
+    if (!aberto) return;
+    const abriuEm = Date.now();
+    const fechar = () => setAberto(null);
+    const aoRolar = () => {
+      // Ignora a rolagem que acabou de acontecer para chegar ate o botao.
+      if (Date.now() - abriuEm > 300) fechar();
+    };
+    const aoTecla = (event: KeyboardEvent) => {
+      if (event.key === "Escape") fechar();
+    };
+    window.addEventListener("resize", fechar);
+    window.addEventListener("scroll", aoRolar, true);
+    window.addEventListener("keydown", aoTecla);
+    return () => {
+      window.removeEventListener("resize", fechar);
+      window.removeEventListener("scroll", aoRolar, true);
+      window.removeEventListener("keydown", aoTecla);
+    };
+  }, [aberto]);
+
+  function alternar() {
+    if (aberto) {
+      setAberto(null);
+      return;
+    }
+    const botao = botaoRef.current;
+    if (!botao) return;
+    const caixa = botao.getBoundingClientRect();
+    setAberto({
+      top: caixa.bottom + 6,
+      right: window.innerWidth - caixa.right,
+      destino: botao.closest(".app-shell") ?? document.body,
+    });
+  }
+
+  function escolher(acao: () => void) {
+    setAberto(null);
+    acao();
+  }
+
+  const itemClasse = "block w-full rounded-xl bg-transparent px-3 py-2 text-left font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:text-slate-200 dark:hover:bg-white/[0.08]";
+
+  return (
+    <>
+      <button
+        ref={botaoRef}
+        type="button"
+        onClick={alternar}
+        disabled={disabled}
+        aria-haspopup="menu"
+        aria-expanded={Boolean(aberto)}
+        className="inline-flex items-center gap-1 rounded-xl border border-white/[0.10] bg-white/[0.06] px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-white/[0.10] disabled:opacity-50"
+      >
+        Mais
+        <ChevronDown className="size-3.5" />
+      </button>
+      {aberto
+        ? createPortal(
+            <>
+              <div className="fixed inset-0 z-[90]" onClick={() => setAberto(null)} />
+              <div
+                role="menu"
+                style={{ top: aberto.top, right: aberto.right }}
+                className="fixed z-[100] w-56 rounded-2xl border border-slate-200 bg-white p-1.5 text-sm shadow-xl dark:border-white/10 dark:bg-[#1d2437]"
+              >
+                <button type="button" role="menuitem" onClick={() => escolher(onVincularCliente)} className={itemClasse}>Vincular cliente</button>
+                <button type="button" role="menuitem" onClick={() => escolher(onLancarCusto)} className={itemClasse}>Lançar custo</button>
+                <button type="button" role="menuitem" onClick={() => escolher(onVincularReceita)} className={itemClasse}>Vincular receita</button>
+                <div className="my-1 border-t border-slate-200 dark:border-white/10" />
+                <button type="button" role="menuitem" onClick={() => escolher(onExcluir)} className="block w-full rounded-xl bg-transparent px-3 py-2 text-left font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-400/10">Excluir campanha</button>
+              </div>
+            </>,
+            aberto.destino,
+          )
+        : null}
+    </>
   );
 }
 
