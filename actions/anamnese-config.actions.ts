@@ -602,7 +602,10 @@ async function obterOuCriarRascunho(
 }
 
 export async function salvarRespostasAnamneseRapida(formData: FormData) {
+  // Cronometro: mede cada etapa e anota na Auditoria (para achar o que demora).
+  const tInicio = Date.now();
   const usuario = await requirePermission("clientes.clinico");
+  const tLogin = Date.now();
   const clienteId = getNumber(formData, "clienteId");
   const modeloId = getNumber(formData, "modeloId") || null;
   const anamneseIdAtual =
@@ -633,6 +636,7 @@ export async function salvarRespostasAnamneseRapida(formData: FormData) {
   if (intencao === "finalizar") {
     await validarObrigatorias(modeloId, respostas);
   }
+  const tConferencia = Date.now();
 
   const resumoRespostas = montarResumoRespostas(respostas);
   const termoConsentimento = formData.get("declaracaoFinal") === "on";
@@ -662,6 +666,7 @@ export async function salvarRespostasAnamneseRapida(formData: FormData) {
     dataFicha,
     anamneseIdAtual,
   );
+  const tFicha = Date.now();
 
   await prisma.$transaction(async (tx) => {
     await tx.clienteAnamneseResposta.deleteMany({
@@ -699,6 +704,7 @@ export async function salvarRespostasAnamneseRapida(formData: FormData) {
       },
     });
   });
+  const tGravacao = Date.now();
 
   await prisma.auditoria.create({
     data: {
@@ -709,7 +715,7 @@ export async function salvarRespostasAnamneseRapida(formData: FormData) {
           : "Salvou rascunho de anamnese",
       entidade: "ClienteAnamnese",
       usuario: usuario.nome || usuario.email,
-      detalhes: `${clienteId} - ${procedimento || "Sem procedimento"} - versão ${ficha.versao}`,
+      detalhes: `${clienteId} - ${procedimento || "Sem procedimento"} - versão ${ficha.versao} - servidor levou ${tGravacao - tInicio} ms (login ${tLogin - tInicio}, conferência ${tConferencia - tLogin}, ficha ${tFicha - tConferencia}, gravação ${tGravacao - tFicha}) - assinatura ${Math.round((assinaturaCliente?.length ?? 0) / 1024)} KB`,
     },
   });
 
