@@ -686,6 +686,8 @@ export default function AgendaClient({
         onClienteUpdated={atualizarClienteNoFluxo}
         onEvolucaoRegistrada={marcarEvolucaoConcluida}
         pacotesAbertos={pacotesAbertos}
+        formasPagamento={formasPagamento}
+        servicos={servicos}
         procedimentosAdicionais={
           selectedAppointment
             ? agendaAgrupada.adicionaisPorPrincipal.get(selectedAppointment.id) ?? []

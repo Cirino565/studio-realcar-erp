@@ -36,6 +36,7 @@ import {
 } from "@/lib/color-contrast";
 
 import AvisoSinalPago from "@/components/pacotes/AvisoSinalPago";
+import { FecharPacoteCard } from "@/components/pacotes/PacotesNaAgenda";
 import AvisoPacoteAberto, {
   type PacoteParaAviso,
 } from "@/components/pacotes/AvisoPacoteAberto";
@@ -113,11 +114,16 @@ type Props = {
   onWhatsApp: (appointment: AppointmentDetails) => void;
   onEditar: (appointment: AppointmentDetails) => void;
   onFinalizar: (appointment: AppointmentDetails) => void;
-  onReagendar: (appointment: AppointmentDetails) => void;
+  onReagendar: (
+    appointment: AppointmentDetails,
+    opcoes?: { procedimento?: string; duracao?: number; observacoes?: string },
+  ) => void;
   onClienteUpdated: (cliente: ClienteAtendimentoDetalhes) => void;
   onEvolucaoRegistrada: (agendamentoId: number) => void;
   procedimentosAdicionais?: AppointmentDetails[];
   pacotesAbertos?: (PacoteParaAviso & { clienteId: number })[];
+  formasPagamento?: { id: number; nome: string }[];
+  servicos?: { id: number; nome: string; duracaoPadrao: number; valorPadrao: number }[];
 };
 
 function useLockBodyScroll(open: boolean) {
@@ -251,7 +257,14 @@ export default function AppointmentDetailsModal({
   onEvolucaoRegistrada,
   procedimentosAdicionais = [],
   pacotesAbertos = [],
+  formasPagamento = [],
+  servicos = [],
 }: Props) {
+  const [pacoteRegistrado, setPacoteRegistrado] = useState<{
+    agendamentoId: number;
+    procedimentoId: number | null;
+    descricao: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isManagingSeries, setIsManagingSeries] = useState(false);
@@ -424,7 +437,28 @@ export default function AppointmentDetailsModal({
             <AcaoRapida
               icon={CalendarClock}
               label="Agendar próximo"
-              onClick={() => onReagendar(currentAppointment)}
+              onClick={() => {
+                // Se acabou de fechar um pacote aqui, o proximo ja abre com o procedimento dele.
+                const fechado =
+                  pacoteRegistrado &&
+                  pacoteRegistrado.agendamentoId === currentAppointment.id
+                    ? pacoteRegistrado
+                    : null;
+                const servicoDoPacote = fechado?.procedimentoId
+                  ? servicos.find((item) => item.id === fechado.procedimentoId)
+                  : null;
+
+                onReagendar(
+                  currentAppointment,
+                  servicoDoPacote
+                    ? {
+                        procedimento: servicoDoPacote.nome,
+                        duracao: servicoDoPacote.duracaoPadrao,
+                        observacoes: `Sessão do ${fechado?.descricao || "pacote"}.`,
+                      }
+                    : undefined,
+                );
+              }}
             />
             <AcaoRapida
               icon={Pencil}
@@ -462,6 +496,26 @@ export default function AppointmentDetailsModal({
               )}
               href={`/clientes/${currentAppointment.clienteId}?aba=pacotes`}
             />
+
+            {atendimentoFinalizado &&
+            currentAppointment.naturezaAtendimento !== "RETORNO" ? (
+              <FecharPacoteCard
+                key={currentAppointment.id}
+                clienteId={currentAppointment.clienteId}
+                formasPagamento={formasPagamento}
+                procedimentos={servicos.map((servico) => ({
+                  id: servico.id,
+                  nome: servico.nome,
+                  valorPadrao: Number(servico.valorPadrao || 0),
+                }))}
+                onPacoteRegistrado={(dados) =>
+                  setPacoteRegistrado({
+                    agendamentoId: currentAppointment.id,
+                    ...dados,
+                  })
+                }
+              />
+            ) : null}
 
             <button
               type="button"
