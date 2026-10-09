@@ -71,10 +71,17 @@ export function FecharPacoteCard({
   clienteId,
   formasPagamento,
   procedimentos = [],
+  onPacoteRegistrado,
 }: {
   clienteId: number;
   formasPagamento: FormaPagamentoPacote[];
   procedimentos?: ProcedimentoPacote[];
+  // Avisa a tela de cima qual procedimento foi fechado, para o botao
+  // "Agendar retorno" ja abrir com ele preenchido.
+  onPacoteRegistrado?: (dados: {
+    procedimentoId: number | null;
+    descricao: string;
+  }) => void;
 }) {
   const [aberto, setAberto] = useState(false);
   const [procedimentoId, setProcedimentoId] = useState("");
@@ -114,6 +121,10 @@ export function FecharPacoteCard({
           formaPagamentoConfigId: formaId ? Number(formaId) : null,
         });
         setSalvo(resultado);
+        onPacoteRegistrado?.({
+          procedimentoId: procedimentoId ? Number(procedimentoId) : null,
+          descricao: resultado.descricao,
+        });
       } catch (error) {
         setErro(mensagemDoErro(error));
       }
@@ -148,6 +159,12 @@ export function FecharPacoteCard({
               )}
               . O aviso aparece sempre que a cliente for atendida.
             </p>
+            {procedimentoId ? (
+              <p className="mt-1 text-xs font-bold text-emerald-950 dark:text-emerald-50">
+                Toque em &quot;Agendar retorno&quot;: o procedimento já vai
+                preenchido.
+              </p>
+            ) : null}
           </div>
         </div>
       </div>

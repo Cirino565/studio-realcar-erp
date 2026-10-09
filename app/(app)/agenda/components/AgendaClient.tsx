@@ -450,7 +450,10 @@ export default function AgendaClient({
     setFinishAppointment(appointment);
   }
 
-  function abrirReagendamento(appointment: AgendamentoAgenda) {
+  function abrirReagendamento(
+    appointment: AgendamentoAgenda,
+    opcoes?: { procedimento?: string; duracao?: number; observacoes?: string },
+  ) {
     const dataBase = new Date(appointment.data);
 
     // Depois de uma AVALIACAO, o que vem em seguida quase sempre e o
@@ -501,16 +504,18 @@ export default function AgendaClient({
       hora: toTimeInput(dataBase),
       profissionalId: appointment.profissionalId || undefined,
       clienteId: appointment.clienteId,
-      procedimento: appointment.procedimento,
-      duracao: appointment.duracao || 60,
+      procedimento: opcoes?.procedimento || appointment.procedimento,
+      duracao: opcoes?.duracao || appointment.duracao || 60,
       valor: 0,
       status: "Agendado",
       sinalPago: false,
       naturezaAtendimento: "RETORNO",
       agendamentoOrigemId: appointment.id,
-      observacoes: `Retorno referente ao atendimento de ${formatarDataCurta(
-        appointment.data,
-      )}.`,
+      observacoes:
+        opcoes?.observacoes ||
+        `Retorno referente ao atendimento de ${formatarDataCurta(
+          appointment.data,
+        )}.`,
     });
   }
 

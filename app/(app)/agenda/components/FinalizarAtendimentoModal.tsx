@@ -101,7 +101,10 @@ type Props = {
   kits: KitVendaOption[];
   formasPagamento: FormaPagamentoFinalizacao[];
   podeAutorizarEstoqueNegativo: boolean;
-  onAgendarRetorno?: (appointment: AppointmentDetails) => void;
+  onAgendarRetorno?: (
+    appointment: AppointmentDetails,
+    opcoes?: { procedimento?: string; duracao?: number; observacoes?: string },
+  ) => void;
   onFinalizado?: (payload: AtendimentoFinalizadoPayload) => void;
 };
 
@@ -189,6 +192,10 @@ export default function FinalizarAtendimentoModal({
   onFinalizado,
 }: Props) {
   const [procedimentoRealizado, setProcedimentoRealizado] = useState("");
+  const [pacoteRegistrado, setPacoteRegistrado] = useState<{
+    procedimentoId: number | null;
+    descricao: string;
+  } | null>(null);
   const [procedimentoServicoId, setProcedimentoServicoId] = useState<
     number | null
   >(null);
@@ -273,6 +280,7 @@ export default function FinalizarAtendimentoModal({
       atendimentoRetornoAtual ? 0 : Number(servico?.custoPadrao || 0),
     );
     setProcedimentosExtras([]);
+    setPacoteRegistrado(null);
     setItensProdutos([]);
     setItensKits([]);
     setPermitirEstoqueNegativo(false);
@@ -590,7 +598,21 @@ export default function FinalizarAtendimentoModal({
     onClose();
 
     if (onAgendarRetorno) {
-      onAgendarRetorno(currentAppointment);
+      // Se acabou de fechar um pacote, o retorno ja abre com o procedimento dele.
+      const servicoDoPacote = pacoteRegistrado?.procedimentoId
+        ? servicos.find((item) => item.id === pacoteRegistrado.procedimentoId)
+        : null;
+
+      onAgendarRetorno(
+        currentAppointment,
+        servicoDoPacote
+          ? {
+              procedimento: servicoDoPacote.nome,
+              duracao: servicoDoPacote.duracaoPadrao,
+              observacoes: `Sessão do ${pacoteRegistrado?.descricao || "pacote"}.`,
+            }
+          : undefined,
+      );
     }
   }
 
@@ -729,6 +751,7 @@ export default function FinalizarAtendimentoModal({
                   <FecharPacoteCard
                     clienteId={currentAppointment.clienteId}
                     formasPagamento={formasPagamento}
+                    onPacoteRegistrado={setPacoteRegistrado}
                     procedimentos={servicos.map((servico) => ({
                       id: servico.id,
                       nome: servico.nome,
