@@ -35,6 +35,7 @@ import {
   withAlpha,
 } from "@/lib/color-contrast";
 
+import AvisoSinalPago from "@/components/pacotes/AvisoSinalPago";
 import AvisoPacoteAberto, {
   type PacoteParaAviso,
 } from "@/components/pacotes/AvisoPacoteAberto";
@@ -77,6 +78,7 @@ export type AppointmentDetails = {
   valor: number;
   observacoes: string | null;
   sinalPago: boolean;
+  valorSinal?: number;
   naturezaAtendimento?: "PROCEDIMENTO" | "RETORNO";
   agendamentoOrigemId?: number | null;
   status: string;
@@ -446,6 +448,12 @@ export default function AppointmentDetailsModal({
                 <AlertCircle size={18} className="mt-0.5 shrink-0" />
                 <p className="text-sm">{error}</p>
               </div>
+            ) : null}
+
+            {currentAppointment.sinalPago &&
+            currentAppointment.status !== "Atendido" &&
+            currentAppointment.naturezaAtendimento !== "RETORNO" ? (
+              <AvisoSinalPago valorSinal={currentAppointment.valorSinal ?? 0} />
             ) : null}
 
             <AvisoPacoteAberto

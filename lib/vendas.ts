@@ -45,6 +45,10 @@ export type CriarVendaNoTxInput = {
   kits?: VendaKitInput[];
   permitirEstoqueNegativo?: boolean;
   estoqueNegativoAutorizadoPor?: string | null;
+  // Parte do total que a cliente ja pagou antes como sinal. Ela ja esta no
+  // Financeiro como lancamento proprio, entao o lancamento desta venda e
+  // so o restante (a venda em si continua com o valor cheio).
+  sinalAbatido?: number;
 };
 
 function numeroSeguro(value: unknown) {
@@ -409,6 +413,11 @@ export async function criarVendaNoTx(
   const custoProdutos = custoProdutosAvulsos + custoKits;
   const valorTotal = totalServicos + totalProdutos;
   const custoTotal = custoServicos + custoProdutos;
+  const sinalAbatido = Math.min(
+    valorTotal,
+    Math.round(dinheiroSeguro(dados.sinalAbatido) * 100) / 100,
+  );
+  const valorALancar = Math.round((valorTotal - sinalAbatido) * 100) / 100;
   const contextoFinanceiro = await resolverContextoFinanceiroVenda(tx, {
     clienteId: dados.clienteId,
     formaPagamento,
@@ -438,6 +447,7 @@ export async function criarVendaNoTx(
       custoServicos,
       custoProdutos,
       valorTotal,
+      sinalAbatido,
       custoTotal,
       taxaPagamento: contextoFinanceiro.taxaPagamento,
       taxaPercentualAplicada: contextoFinanceiro.taxaPercentual,
@@ -581,7 +591,20 @@ export async function criarVendaNoTx(
   }
 
   let lancamentoId: number | null = null;
-  if (valorTotal > 0) {
+  if (valorALancar > 0) {
+    // Com sinal ja pago, a taxa e o liquido do lancamento sao calculados so
+    // sobre o que e recebido agora.
+    const contextoLancamento =
+      sinalAbatido > 0
+        ? await resolverContextoFinanceiroVenda(tx, {
+            clienteId: dados.clienteId,
+            formaPagamento,
+            formaPagamentoConfigId: dados.formaPagamentoConfigId,
+            contaFinanceiraId: dados.contaFinanceiraId,
+            campanhaId: dados.campanhaId,
+            valorBruto: valorALancar,
+          })
+        : contextoFinanceiro;
     const cliente = dados.clienteId
       ? await tx.cliente.findUnique({
           where: { id: dados.clienteId },
@@ -608,17 +631,20 @@ export async function criarVendaNoTx(
     const lancamento = await tx.lancamento.create({
       data: {
         descricao: `Venda ${partesDescricao.join(" + ")}${cliente?.nome ? ` - ${cliente.nome}` : ""}`,
-        valor: valorTotal,
+        valor: valorALancar,
         tipo: "ENTRADA",
         categoria: categoriaLancamento({ temServico, temProdutos, statusPagamento }),
         observacoes: [
           `Venda #${venda.id} gerada automaticamente.`,
           dados.agendamentoId ? `Agendamento #${dados.agendamentoId}.` : null,
+          sinalAbatido > 0
+            ? `Total da venda R$ ${valorTotal.toFixed(2)}; sinal de R$ ${sinalAbatido.toFixed(2)} já recebido antes (lançamento próprio).`
+            : null,
           `Serviços: R$ ${totalServicos.toFixed(2)}.`,
           `Produtos e kits: R$ ${totalProdutos.toFixed(2)}.`,
-          `Forma de pagamento: ${contextoFinanceiro.formaPagamento}.`,
-          `Taxa de recebimento: R$ ${contextoFinanceiro.taxaPagamento.toFixed(2)}.`,
-          `Valor líquido previsto: R$ ${contextoFinanceiro.valorLiquido.toFixed(2)}.`,
+          `Forma de pagamento: ${contextoLancamento.formaPagamento}.`,
+          `Taxa de recebimento: R$ ${contextoLancamento.taxaPagamento.toFixed(2)}.`,
+          `Valor líquido previsto: R$ ${contextoLancamento.valorLiquido.toFixed(2)}.`,
           `Status do pagamento: ${statusPagamento}.`,
           dados.observacoes?.trim() || null,
           observacaoEstoqueNegativo,
@@ -626,16 +652,19 @@ export async function criarVendaNoTx(
           .filter(Boolean)
           .join("\n"),
         data: dados.data,
-        formaPagamento: contextoFinanceiro.formaPagamento,
-        formaPagamentoConfigId: contextoFinanceiro.formaPagamentoConfigId,
-        contaFinanceiraId: contextoFinanceiro.contaFinanceiraId,
-        campanhaId: contextoFinanceiro.campanhaId,
-        taxaPagamento: contextoFinanceiro.taxaPagamento,
-        taxaPercentualAplicada: contextoFinanceiro.taxaPercentual,
-        taxaFixaAplicada: contextoFinanceiro.taxaFixa,
-        valorLiquido: contextoFinanceiro.valorLiquido,
-        prazoRecebimentoDias: contextoFinanceiro.prazoRecebimentoDias,
-        recebimentoPrevistoEm,
+        formaPagamento: contextoLancamento.formaPagamento,
+        formaPagamentoConfigId: contextoLancamento.formaPagamentoConfigId,
+        contaFinanceiraId: contextoLancamento.contaFinanceiraId,
+        campanhaId: contextoLancamento.campanhaId,
+        taxaPagamento: contextoLancamento.taxaPagamento,
+        taxaPercentualAplicada: contextoLancamento.taxaPercentual,
+        taxaFixaAplicada: contextoLancamento.taxaFixa,
+        valorLiquido: contextoLancamento.valorLiquido,
+        prazoRecebimentoDias: contextoLancamento.prazoRecebimentoDias,
+        recebimentoPrevistoEm:
+          sinalAbatido > 0
+            ? adicionarDias(dados.data, contextoLancamento.prazoRecebimentoDias)
+            : recebimentoPrevistoEm,
         statusPagamento,
         origem: dados.origem,
         agendamentoId: dados.agendamentoId || null,

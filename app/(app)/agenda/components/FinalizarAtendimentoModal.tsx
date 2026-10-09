@@ -22,6 +22,11 @@ import {
 } from "lucide-react";
 
 import { finalizarAtendimento } from "@/actions/agendamento.actions";
+import AvisoSinalPago from "@/components/pacotes/AvisoSinalPago";
+import {
+  FecharPacoteCard,
+  ReceberRestantePacoteCard,
+} from "@/components/pacotes/PacotesNaAgenda";
 import ProdutosVendaEditor from "@/components/vendas/ProdutosVendaEditor";
 import KitsVendaEditor from "@/components/vendas/KitsVendaEditor";
 import type {
@@ -328,8 +333,24 @@ export default function FinalizarAtendimentoModal({
     custoServico,
   ]);
 
+  // Sinal ja pago (e lancado no Financeiro): a venda continua com o valor
+  // cheio, mas so o restante e cobrado agora.
+  const sinalDoAtendimento =
+    appointment &&
+    appointment.sinalPago &&
+    appointment.naturezaAtendimento !== "RETORNO"
+      ? Math.max(0, Number(appointment.valorSinal || 0))
+      : 0;
+  const sinalAbatidoPrevisto = Math.min(
+    sinalDoAtendimento,
+    Math.max(0, totais.total),
+  );
+
   const pagamentoPrevisto = useMemo(() => {
-    const valorBruto = Math.max(0, arredondarMoeda(totais.total));
+    const valorBruto = Math.max(
+      0,
+      arredondarMoeda(totais.total - sinalAbatidoPrevisto),
+    );
     const taxaPercentual = Math.max(0, Number(formaConfig?.taxaPercentual || 0));
     const taxaFixa = Math.max(0, arredondarMoeda(formaConfig?.taxaFixa || 0));
     const taxaPagamento = Math.min(
@@ -349,7 +370,7 @@ export default function FinalizarAtendimentoModal({
       margemLiquidaPercentual:
         valorBruto > 0 ? (margemLiquida / valorBruto) * 100 : 0,
     };
-  }, [formaConfig, totais.custo, totais.total]);
+  }, [formaConfig, totais.custo, totais.total, sinalAbatidoPrevisto]);
 
   const estoqueInsuficiente = useMemo(
     () => necessidadesEstoqueVenda(itensProdutos, itensKits),
@@ -703,6 +724,13 @@ export default function FinalizarAtendimentoModal({
                     </p>
                   </div>
                 </section>
+
+                {!atendimentoRetorno ? (
+                  <FecharPacoteCard
+                    clienteId={currentAppointment.clienteId}
+                    formasPagamento={formasPagamento}
+                  />
+                ) : null}
               </div>
             </main>
 
@@ -847,6 +875,31 @@ export default function FinalizarAtendimentoModal({
                     {atendimentoRetorno ? (
                       <div className="mb-3 rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2.5 text-[11px] leading-4 text-cyan-800">
                         O serviço deste retorno permanece em R$ 0,00 e não gera receita. Produtos ou kits adicionados abaixo continuam sendo registrados normalmente.
+                      </div>
+                    ) : null}
+
+                    {sinalDoAtendimento > 0 ||
+                    (currentAppointment.sinalPago && !atendimentoRetorno) ? (
+                      <div className="mb-3">
+                        <AvisoSinalPago
+                          valorSinal={sinalDoAtendimento}
+                          cobrarAgora={
+                            sinalDoAtendimento > 0
+                              ? Math.max(0, totais.total - sinalAbatidoPrevisto)
+                              : undefined
+                          }
+                        />
+                      </div>
+                    ) : null}
+
+                    {pacotesDaCliente.some(
+                      (pacote) => pacote.valorTotal - pacote.valorPago > 0.004,
+                    ) ? (
+                      <div className="mb-3">
+                        <ReceberRestantePacoteCard
+                          pacotes={pacotesDaCliente}
+                          formasPagamento={formasPagamento}
+                        />
                       </div>
                     ) : null}
 
@@ -1287,6 +1340,12 @@ export default function FinalizarAtendimentoModal({
                   <ResumoLinha label="Serviço" value={formatCurrency(valorServico)} />
                   <ResumoLinha label="Produtos" value={formatCurrency(totais.totalProdutos)} />
                   <ResumoLinha label="Total" value={formatCurrency(totais.total)} forte />
+                  {sinalAbatidoPrevisto > 0 ? (
+                    <>
+                      <ResumoLinha label="Sinal já recebido" value={`- ${formatCurrency(sinalAbatidoPrevisto)}`} />
+                      <ResumoLinha label="Cobrar agora" value={formatCurrency(Math.max(0, totais.total - sinalAbatidoPrevisto))} forte />
+                    </>
+                  ) : null}
                   <ResumoLinha label="Custo direto histórico" value={formatCurrency(totais.custo)} />
                   <ResumoLinha label="Margem direta" value={`${formatCurrency(totais.margem)} · ${totais.margemPercentual.toFixed(1).replace(".", ",")}%`} />
                   <ResumoLinha

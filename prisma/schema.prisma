@@ -138,6 +138,10 @@ model Agendamento {
   naturezaAtendimento String        @default("PROCEDIMENTO")
   agendamentoOrigemId Int?
   sinalPago            Boolean       @default(false)
+  // Valor do sinal e o lancamento dele no Financeiro (0 / nulo = sinal antigo,
+  // marcado so como aviso, sem valor registrado).
+  valorSinal           Float         @default(0)
+  sinalLancamentoId    Int?
   status               String        @default("Agendado")
   statusAntesAtendimento String?
   evolucaoStatus        String?
@@ -344,6 +348,9 @@ model Venda {
   custoServicos       Float     @default(0)
   custoProdutos       Float     @default(0)
   valorTotal          Float     @default(0)
+  // Parte do total que a cliente ja tinha pago como sinal (esta no Financeiro
+  // como lancamento proprio; o lancamento desta venda e so o restante).
+  sinalAbatido        Float     @default(0)
   custoTotal          Float     @default(0)
   taxaPagamento       Float     @default(0)
   taxaPercentualAplicada Float  @default(0)

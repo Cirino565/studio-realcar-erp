@@ -166,6 +166,7 @@ export async function editarVendaAdministrativa(
       totalServicos: true,
       totalProdutos: true,
       valorTotal: true,
+      sinalAbatido: true,
       formaPagamentoConfigId: true,
       contaFinanceiraId: true,
       campanhaId: true,
@@ -277,8 +278,14 @@ export async function editarVendaAdministrativa(
     const formaConfig = await tx.formaPagamentoConfig.findFirst({
       where: { nome: formaPagamento, status: "Ativa" },
     });
+    // Se parte do valor ja entrou como sinal, o lancamento da venda e so o
+    // restante (o sinal continua no Financeiro como lancamento proprio).
+    const valorDoLancamento = Math.max(
+      0,
+      arredondar(valorTotalNovo - (venda.sinalAbatido || 0)),
+    );
     const calculoTaxa = calcularTaxaRecebimento(
-      valorTotalNovo,
+      valorDoLancamento,
       formaConfig?.taxaPercentual || 0,
       formaConfig?.taxaFixa || 0,
     );
@@ -408,7 +415,7 @@ export async function editarVendaAdministrativa(
           prazoRecebimentoDias,
           recebimentoPrevistoEm,
           statusPagamento,
-          ...(valorMudou ? { valor: valorTotalNovo } : {}),
+          ...(valorMudou ? { valor: valorDoLancamento } : {}),
           categoria: categoriaLancamento,
           data,
           observacoes: [

@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "Agendamento" ADD COLUMN "valorSinal" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN "sinalLancamentoId" INTEGER;
+
+-- AlterTable
+ALTER TABLE "Venda" ADD COLUMN "sinalAbatido" DOUBLE PRECISION NOT NULL DEFAULT 0;

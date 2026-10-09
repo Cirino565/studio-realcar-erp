@@ -33,6 +33,7 @@ import {
 import { formatarDuracao, interpretarDuracao } from "@/lib/duracao";
 
 import type { NovoHorarioPayload } from "./AgendaCalendar";
+import type { FormaPagamentoFinalizacao } from "./FinalizarAtendimentoModal";
 
 type Cliente = {
   id: number;
@@ -81,6 +82,7 @@ type NovoAgendamentoPayload = NovoHorarioPayload & {
   status?: string;
   observacoes?: string;
   sinalPago?: boolean;
+  valorSinal?: number;
   naturezaAtendimento?: "PROCEDIMENTO" | "RETORNO";
   agendamentoOrigemId?: number | null;
 };
@@ -94,6 +96,7 @@ type Props = {
   servicos: ServicoAgenda[];
   areaPadraoAgendamento: "estetica" | "cilios" | null;
   intervaloEntreAtendimentos: number;
+  formasPagamento?: FormaPagamentoFinalizacao[];
   initialPayload: NovoAgendamentoPayload | null;
 };
 
@@ -226,6 +229,7 @@ export default function NovoAgendamentoModal({
   servicos,
   areaPadraoAgendamento,
   intervaloEntreAtendimentos,
+  formasPagamento = [],
   initialPayload,
 }: Props) {
   const [tipoAtendimento, setTipoAtendimento] = useState<"agendamento" | "bloqueio">("agendamento");
@@ -266,6 +270,8 @@ export default function NovoAgendamentoModal({
   const [status, setStatus] = useState("Agendado");
   const [observacoes, setObservacoes] = useState("");
   const [sinalPago, setSinalPago] = useState(false);
+  const [valorSinal, setValorSinal] = useState("");
+  const [formaSinalId, setFormaSinalId] = useState("");
   const [motivoBloqueio, setMotivoBloqueio] = useState("Almoço");
   const [recorrenciaTipo, setRecorrenciaTipo] = useState<
     "nenhuma" | "semanal" | "quinzenal" | "mensal" | "personalizada"
@@ -384,6 +390,16 @@ export default function NovoAgendamentoModal({
         ? false
         : Boolean(initialPayload?.sinalPago),
     );
+    setValorSinal(valorParaInput(initialPayload?.valorSinal));
+    setFormaSinalId(
+      String(
+        (
+          formasPagamento.find(
+            (item) => normalizarTexto(item.nome) === "pix",
+          ) || formasPagamento[0]
+        )?.id || "",
+      ),
+    );
     setMotivoBloqueio(initialPayload?.motivoBloqueio || "Almoço");
     setRecorrenciaTipo("nenhuma");
     setBloqueioAteData("");
@@ -423,6 +439,7 @@ export default function NovoAgendamentoModal({
     areaAutomaticaAtiva,
     modoEdicao,
     modoEdicaoBloqueio,
+    formasPagamento,
   ]);
 
   useEffect(() => {
@@ -861,6 +878,11 @@ export default function NovoAgendamentoModal({
         observacoes,
         sinalPago:
           naturezaAtendimento === "RETORNO" ? false : sinalPago,
+        valorSinal:
+          naturezaAtendimento === "RETORNO" || !sinalPago
+            ? 0
+            : parseCurrency(valorSinal),
+        formaPagamentoSinalId: formaSinalId ? Number(formaSinalId) : null,
         naturezaAtendimento,
         agendamentoOrigemId:
           naturezaAtendimento === "RETORNO" && agendamentoOrigemId
@@ -1755,10 +1777,60 @@ export default function NovoAgendamentoModal({
                 <input
                   type="checkbox"
                   checked={sinalPago}
-                  onChange={(event) => setSinalPago(event.target.checked)}
+                  onChange={(event) => {
+                    setSinalPago(event.target.checked);
+                    if (event.target.checked && parseCurrency(valorSinal) <= 0) {
+                      setValorSinal("30,00");
+                    }
+                  }}
                   className="size-5 shrink-0 accent-emerald-600"
                 />
               </label>
+            ) : null}
+
+            {naturezaAtendimento === "PROCEDIMENTO" && sinalPago ? (
+              <div className="mt-2 rounded-xl border border-emerald-200 bg-white px-4 py-3 dark:border-emerald-500/30 dark:bg-white/[0.04]">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="block text-xs font-bold text-slate-700 dark:text-slate-200">
+                      Valor do sinal (R$)
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={valorSinal}
+                      onChange={(event) => setValorSinal(event.target.value)}
+                      placeholder="30,00"
+                      className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-400 dark:border-white/10 dark:bg-white/[0.06] dark:text-white"
+                    />
+                  </label>
+
+                  {formasPagamento.length > 0 && !(modoEdicao && (initialPayload?.valorSinal || 0) > 0) ? (
+                    <label className="block">
+                      <span className="block text-xs font-bold text-slate-700 dark:text-slate-200">
+                        Forma de pagamento
+                      </span>
+                      <select
+                        value={formaSinalId}
+                        onChange={(event) => setFormaSinalId(event.target.value)}
+                        className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-400 dark:border-white/10 dark:bg-white/[0.06] dark:text-white"
+                      >
+                        {formasPagamento.map((forma) => (
+                          <option key={forma.id} value={forma.id}>
+                            {forma.nome}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                </div>
+
+                <p className="mt-2 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+                  {parseCurrency(valorSinal) > 0
+                    ? "O sinal entra no Financeiro agora e é descontado do total quando o atendimento for finalizado."
+                    : "Sinal antigo, sem valor registrado: nada é lançado no Financeiro. Informe o valor para lançar."}
+                </p>
+              </div>
             ) : null}
 
             {!modoEdicao && naturezaAtendimento === "PROCEDIMENTO" ? (

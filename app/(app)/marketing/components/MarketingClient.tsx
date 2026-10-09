@@ -3339,6 +3339,7 @@ function AgendarAvaliacaoModal({
   const [duracao, setDuracao] = useState("30");
   const [valor, setValor] = useState("0");
   const [sinalPago, setSinalPago] = useState(false);
+  const [valorSinal, setValorSinal] = useState("30,00");
   const [permitirEncaixeSemIntervalo, setPermitirEncaixeSemIntervalo] =
     useState(false);
   const [horarios, setHorarios] = useState<
@@ -3440,6 +3441,9 @@ function AgendarAvaliacaoModal({
           duracao: Number(duracao) || servicoParaAgendar.duracaoPadrao,
           valor: Number(valor) || 0,
           sinalPago,
+          valorSinal: sinalPago
+            ? Number(valorSinal.replace(/\./g, "").replace(",", ".")) || 0
+            : 0,
           permitirEncaixeSemIntervalo,
         });
         onSuccess();
@@ -3599,6 +3603,25 @@ function AgendarAvaliacaoModal({
             className="size-5 shrink-0 accent-emerald-600"
           />
         </label>
+
+        {sinalPago ? (
+          <label className="block rounded-2xl border border-emerald-200 bg-white px-4 py-3 dark:border-emerald-400/20 dark:bg-white/[0.04]">
+            <span className="block text-xs font-bold text-slate-700 dark:text-slate-200">
+              Valor do sinal (R$)
+            </span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={valorSinal}
+              onChange={(event) => setValorSinal(event.target.value)}
+              placeholder="30,00"
+              className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-400 dark:border-white/10 dark:bg-white/[0.06] dark:text-white"
+            />
+            <span className="mt-1.5 block text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+              O sinal entra no Financeiro e é descontado do total quando a cliente for atendida.
+            </span>
+          </label>
+        ) : null}
 
         {ocupados.length ? (
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5 dark:border-white/[0.08] dark:bg-white/[0.04]">

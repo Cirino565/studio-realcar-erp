@@ -859,8 +859,13 @@ export async function obterDadosGestao(
       .filter((id): id is number => typeof id === "number"),
   );
 
+  // O sinal de reserva ja e contado na receita total; quando a cliente e
+  // atendida ele faz parte da venda (que entra pelos itens), entao nao pode
+  // ser somado de novo como "receita do procedimento".
   const lancamentosAgendaLegados = lancamentosAgendaPagos.filter(
-    (lancamento) => !lancamentoIdsVendasPagas.has(lancamento.id),
+    (lancamento) =>
+      !lancamentoIdsVendasPagas.has(lancamento.id) &&
+      lancamento.categoria !== "Sinal",
   );
 
   const itensServicoVendas = vendasPagas.flatMap((venda) =>

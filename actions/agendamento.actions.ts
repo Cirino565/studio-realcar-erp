@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { isAdminUser, requirePermission } from "@/lib/auth";
 import { obterAreaPadraoAgendamento } from "@/lib/area-cliente";
 import { prisma } from "@/lib/prisma";
+import { sincronizarSinalNoTx } from "@/lib/sinal";
 import {
   criarVendaNoTx,
   type VendaKitInput,
@@ -41,6 +42,9 @@ type NovoAgendamento = {
   status?: string;
   observacoes?: string;
   sinalPago?: boolean;
+  // Valor do sinal (vai para o Financeiro) e forma de pagamento usada.
+  valorSinal?: number;
+  formaPagamentoSinalId?: number | null;
   naturezaAtendimento?: NaturezaAtendimentoAgenda;
   agendamentoOrigemId?: number;
   areaEstetica?: boolean;
@@ -912,10 +916,35 @@ export async function criarAgendamento(
         recorrenciaTotal: serieId ? datas.length : null,
       })),
     });
+
+    // Sinal com valor: lanca no Financeiro (so no primeiro horario, caso o
+    // agendamento seja uma serie).
+    if (naturezaAtendimento !== "RETORNO" && dados.sinalPago) {
+      const primeiro = await tx.agendamento.findFirst({
+        where: {
+          clienteId: clienteId!,
+          data: datas[0],
+          procedimento: dados.procedimento,
+          naturezaAtendimento,
+        },
+        orderBy: { id: "desc" },
+        select: { id: true },
+      });
+
+      if (primeiro) {
+        await sincronizarSinalNoTx(tx, {
+          agendamentoId: primeiro.id,
+          sinalPago: true,
+          valorSinal: dados.valorSinal,
+          formaPagamentoConfigId: dados.formaPagamentoSinalId,
+        });
+      }
+    }
   });
 
   revalidatePath("/agenda");
   revalidatePath("/clientes");
+  revalidatePath("/financeiro");
   revalidatePath("/");
 
   return { ok: true };
@@ -1049,6 +1078,18 @@ export async function atualizarAgendamento({
       },
     });
 
+    // Mantem o Financeiro de acordo com o sinal (so quando a tela informou
+    // o valor do sinal).
+    if (dados.valorSinal !== undefined) {
+      await sincronizarSinalNoTx(tx, {
+        agendamentoId: id,
+        sinalPago:
+          naturezaAtendimento !== "RETORNO" && Boolean(dados.sinalPago),
+        valorSinal: dados.valorSinal,
+        formaPagamentoConfigId: dados.formaPagamentoSinalId,
+      });
+    }
+
     const leadVinculado = agendamentoAnterior.lead;
 
     if (
@@ -1125,6 +1166,7 @@ export async function atualizarAgendamento({
   revalidatePath("/agenda");
   revalidatePath("/clientes");
   revalidatePath("/marketing");
+  revalidatePath("/financeiro");
   revalidatePath("/");
 
   return { ok: true };
@@ -1948,9 +1990,24 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
       deslocamentoMinutos += adicional.duracao;
     }
 
+    // Sinal ja pago: continua no Financeiro como lancamento proprio e a venda
+    // lanca so o restante (a venda mantem o valor cheio).
+    let sinalAbatido = 0;
+    if (!atendimentoRetorno && agendamento.sinalLancamentoId) {
+      const sinalLancado = await tx.lancamento.findFirst({
+        where: {
+          id: agendamento.sinalLancamentoId,
+          statusPagamento: "Pago",
+        },
+        select: { valor: true },
+      });
+      sinalAbatido = sinalLancado?.valor ?? 0;
+    }
+
     const venda = await criarVendaNoTx(tx, {
       clienteId: agendamento.clienteId,
       agendamentoId: agendamento.id,
+      sinalAbatido,
       data: dataAtendimento,
       formaPagamento,
       formaPagamentoConfigId: dados.formaPagamentoConfigId,

@@ -3,6 +3,7 @@
 import { buscarDisponibilidadeAgenda } from "@/actions/agendamento.actions";
 import { requirePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { SINAL_PADRAO, sincronizarSinalNoTx } from "@/lib/sinal";
 import { revalidatePath } from "next/cache";
 import type { LeadEtapa } from "@/app/(app)/marketing/types";
 
@@ -58,6 +59,8 @@ export type AgendarAvaliacaoLeadInput = {
   duracao: number;
   valor: number;
   sinalPago?: boolean;
+  // Valor do sinal (padrao R$ 30,00). Vai para o Financeiro.
+  valorSinal?: number;
   permitirEncaixeSemIntervalo?: boolean;
 };
 
@@ -934,6 +937,14 @@ export async function agendarAvaliacaoLead(dados: AgendarAvaliacaoLeadInput) {
             sinalPago: Boolean(dados.sinalPago),
           },
         });
+
+    if (dados.sinalPago) {
+      await sincronizarSinalNoTx(tx, {
+        agendamentoId: agendamento.id,
+        sinalPago: true,
+        valorSinal: dados.valorSinal ?? SINAL_PADRAO,
+      });
+    }
 
     await tx.lead.update({
       where: { id: lead.id },

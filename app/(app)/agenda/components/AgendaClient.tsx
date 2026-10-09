@@ -89,6 +89,7 @@ type NovoAgendamentoPayload = NovoHorarioPayload & {
   status?: string;
   observacoes?: string;
   sinalPago?: boolean;
+  valorSinal?: number;
   naturezaAtendimento?: "PROCEDIMENTO" | "RETORNO";
   agendamentoOrigemId?: number | null;
 };
@@ -433,6 +434,7 @@ export default function AgendaClient({
       valor: appointment.valor || 0,
       status: appointment.status,
       sinalPago: appointment.sinalPago,
+      valorSinal: appointment.valorSinal,
       naturezaAtendimento: appointment.naturezaAtendimento,
       agendamentoOrigemId: appointment.agendamentoOrigemId,
       serieId: appointment.serieId,
@@ -662,6 +664,7 @@ export default function AgendaClient({
         servicos={servicos}
         areaPadraoAgendamento={areaPadraoAgendamento}
         intervaloEntreAtendimentos={intervaloEntreAtendimentos}
+        formasPagamento={formasPagamento}
         initialPayload={novoHorario}
       />
 
