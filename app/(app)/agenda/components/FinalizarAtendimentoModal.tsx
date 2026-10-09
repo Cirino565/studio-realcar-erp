@@ -729,6 +729,11 @@ export default function FinalizarAtendimentoModal({
                   <FecharPacoteCard
                     clienteId={currentAppointment.clienteId}
                     formasPagamento={formasPagamento}
+                    procedimentos={servicos.map((servico) => ({
+                      id: servico.id,
+                      nome: servico.nome,
+                      valorPadrao: Number(servico.valorPadrao || 0),
+                    }))}
                   />
                 ) : null}
               </div>

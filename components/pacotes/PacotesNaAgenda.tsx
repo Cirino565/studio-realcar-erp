@@ -12,6 +12,12 @@ import { formatarMoeda } from "@/lib/format";
 
 export type FormaPagamentoPacote = { id: number; nome: string };
 
+export type ProcedimentoPacote = {
+  id: number;
+  nome: string;
+  valorPadrao: number;
+};
+
 export type PacoteComSaldo = {
   id: number;
   descricao: string;
@@ -23,6 +29,15 @@ function paraNumero(texto: string) {
   const limpo = texto.replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", ".");
   const numero = Number(limpo);
   return Number.isFinite(numero) ? numero : 0;
+}
+
+function valorParaCampo(valor: number) {
+  return Number(valor) > 0
+    ? Number(valor).toLocaleString("pt-BR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    : "";
 }
 
 function formaInicial(formas: FormaPagamentoPacote[]) {
@@ -55,11 +70,14 @@ const rotulo =
 export function FecharPacoteCard({
   clienteId,
   formasPagamento,
+  procedimentos = [],
 }: {
   clienteId: number;
   formasPagamento: FormaPagamentoPacote[];
+  procedimentos?: ProcedimentoPacote[];
 }) {
   const [aberto, setAberto] = useState(false);
+  const [procedimentoId, setProcedimentoId] = useState("");
   const [descricao, setDescricao] = useState("");
   const [valorTotal, setValorTotal] = useState("");
   const [valorSinal, setValorSinal] = useState("");
@@ -67,6 +85,20 @@ export function FecharPacoteCard({
   const [erro, setErro] = useState("");
   const [salvo, setSalvo] = useState<PacoteSalvoNaAgenda | null>(null);
   const [pendente, iniciar] = useTransition();
+
+  function escolherProcedimento(id: string) {
+    setProcedimentoId(id);
+    const escolhido = procedimentos.find((item) => String(item.id) === id);
+
+    if (!escolhido) {
+      setDescricao("");
+      setValorTotal("");
+      return;
+    }
+
+    setDescricao("Pacote " + escolhido.nome);
+    setValorTotal(valorParaCampo(escolhido.valorPadrao));
+  }
 
   function salvar() {
     if (pendente) return;
@@ -154,6 +186,27 @@ export function FecharPacoteCard({
       </div>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {procedimentos.length > 0 ? (
+          <label className="block sm:col-span-2">
+            <span className={rotulo}>Procedimento do pacote</span>
+            <select
+              value={procedimentoId}
+              onChange={(event) => escolherProcedimento(event.target.value)}
+              className={campo}
+            >
+              <option value="">Escolha na lista (ou digite abaixo)</option>
+              {procedimentos.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.nome}
+                  {item.valorPadrao > 0
+                    ? " - " + formatarMoeda(item.valorPadrao)
+                    : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+
         <label className="block sm:col-span-2">
           <span className={rotulo}>Nome do pacote</span>
           <input
@@ -172,19 +225,22 @@ export function FecharPacoteCard({
             inputMode="decimal"
             value={valorTotal}
             onChange={(event) => setValorTotal(event.target.value)}
-            placeholder="600,00"
+            placeholder="Digite o valor total aqui"
             className={campo}
           />
         </label>
 
         <label className="block">
           <span className={rotulo}>Sinal pago agora (R$)</span>
+          <span className="block text-[11px] font-medium text-slate-500 dark:text-slate-400">
+            Se não pagou sinal, deixe em branco.
+          </span>
           <input
             type="text"
             inputMode="decimal"
             value={valorSinal}
             onChange={(event) => setValorSinal(event.target.value)}
-            placeholder="100,00"
+            placeholder="Digite o valor do sinal aqui"
             className={campo}
           />
         </label>
