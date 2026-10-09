@@ -1,6 +1,7 @@
 "use client";
 
 import ClienteProfileActions from "./ClienteProfileActions";
+import AvisoPacoteAberto from "@/components/pacotes/AvisoPacoteAberto";
 import type { Cliente } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import {
@@ -112,6 +113,11 @@ export default function ClienteProfileHeader({
 
           <ClienteProfileActions cliente={cliente} />
         </div>
+
+        <AvisoPacoteAberto
+          pacotes={data.pacotes.filter((pacote) => pacote.status === "Aberto")}
+          href="#pacotes"
+        />
 
         {enderecoEstruturado || enderecoOriginal ? (
           <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-400/20 dark:bg-sky-500/10">

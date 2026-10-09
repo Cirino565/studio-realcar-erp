@@ -20,6 +20,7 @@ const ABAS_VALIDAS = [
   "documentos",
   "procedimentos",
   "evolucao",
+  "pacotes",
 ] as const;
 
 type AbaValida = (typeof ABAS_VALIDAS)[number];

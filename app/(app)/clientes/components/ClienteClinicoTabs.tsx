@@ -320,6 +320,22 @@ export function ClienteClinicoTabs({
     if (abas.some((aba) => aba.id === hash)) {
       setActiveTab(hash);
     }
+
+    // Quando um botao da ficha (ex.: aviso de pacote) muda o endereco para
+    // "#pacotes", abre a aba certa e rola ate ela.
+    function aoMudarEndereco() {
+      const novo = window.location.hash.replace("#", "") as AbaClinica;
+      if (!abas.some((aba) => aba.id === novo)) return;
+      setActiveTab(novo);
+      window.setTimeout(() => {
+        document
+          .getElementById(novo)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 80);
+    }
+
+    window.addEventListener("hashchange", aoMudarEndereco);
+    return () => window.removeEventListener("hashchange", aoMudarEndereco);
   }, []);
 
   useEffect(() => {

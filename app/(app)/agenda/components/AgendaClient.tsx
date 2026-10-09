@@ -677,6 +677,7 @@ export default function AgendaClient({
         onReagendar={abrirReagendamento}
         onClienteUpdated={atualizarClienteNoFluxo}
         onEvolucaoRegistrada={marcarEvolucaoConcluida}
+        pacotesAbertos={pacotesAbertos}
         procedimentosAdicionais={
           selectedAppointment
             ? agendaAgrupada.adicionaisPorPrincipal.get(selectedAppointment.id) ?? []

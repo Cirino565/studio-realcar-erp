@@ -35,6 +35,10 @@ import {
   withAlpha,
 } from "@/lib/color-contrast";
 
+import AvisoPacoteAberto, {
+  type PacoteParaAviso,
+} from "@/components/pacotes/AvisoPacoteAberto";
+
 import AnamneseAtendimentoModal from "./AnamneseAtendimentoModal";
 import ClienteQuickEditModal from "./ClienteQuickEditModal";
 
@@ -111,6 +115,7 @@ type Props = {
   onClienteUpdated: (cliente: ClienteAtendimentoDetalhes) => void;
   onEvolucaoRegistrada: (agendamentoId: number) => void;
   procedimentosAdicionais?: AppointmentDetails[];
+  pacotesAbertos?: (PacoteParaAviso & { clienteId: number })[];
 };
 
 function useLockBodyScroll(open: boolean) {
@@ -243,6 +248,7 @@ export default function AppointmentDetailsModal({
   onClienteUpdated,
   onEvolucaoRegistrada,
   procedimentosAdicionais = [],
+  pacotesAbertos = [],
 }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -441,6 +447,13 @@ export default function AppointmentDetailsModal({
                 <p className="text-sm">{error}</p>
               </div>
             ) : null}
+
+            <AvisoPacoteAberto
+              pacotes={pacotesAbertos.filter(
+                (pacote) => pacote.clienteId === currentAppointment.clienteId,
+              )}
+              href={`/clientes/${currentAppointment.clienteId}?aba=pacotes`}
+            />
 
             <button
               type="button"
