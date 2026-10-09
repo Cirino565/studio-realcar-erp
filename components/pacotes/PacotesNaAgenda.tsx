@@ -1,8 +1,18 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { CheckCircle2, LoaderCircle, PackagePlus, Wallet } from "lucide-react";
+import { useRef, useState, useTransition } from "react";
+import {
+  CalendarPlus,
+  CheckCircle2,
+  LoaderCircle,
+  PackagePlus,
+  Wallet,
+} from "lucide-react";
 
+import {
+  buscarDisponibilidadeAgenda,
+  criarAgendamento,
+} from "@/actions/agendamento.actions";
 import {
   fecharPacoteNaAgenda,
   receberRestantePacoteNaAgenda,
@@ -16,7 +26,38 @@ export type ProcedimentoPacote = {
   id: number;
   nome: string;
   valorPadrao: number;
+  duracaoPadrao?: number;
 };
+
+// Atendimento de onde o pacote esta sendo fechado. Com ele o cartao consegue
+// marcar a proxima sessao ali mesmo (mesma profissional, mesmo horario).
+export type AgendamentoBasePacote = {
+  id: number;
+  profissionalId: number | null;
+  data: string;
+  duracao: number;
+};
+
+const FUSO = "America/Sao_Paulo";
+
+function horaDoAgendamento(data: string) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: FUSO,
+  }).format(new Date(data));
+}
+
+function dataEmDias(dias: number) {
+  const alvo = new Date(Date.now() + dias * 86_400_000);
+  return alvo.toLocaleDateString("en-CA", { timeZone: FUSO });
+}
+
+function dataBonita(dia: string) {
+  const [ano, mes, diaMes] = dia.split("-");
+  return `${diaMes}/${mes}/${ano}`;
+}
 
 export type PacoteComSaldo = {
   id: number;
@@ -72,6 +113,8 @@ export function FecharPacoteCard({
   formasPagamento,
   procedimentos = [],
   onPacoteRegistrado,
+  onAgendar,
+  agendamentoBase,
 }: {
   clienteId: number;
   formasPagamento: FormaPagamentoPacote[];
@@ -82,6 +125,10 @@ export function FecharPacoteCard({
     procedimentoId: number | null;
     descricao: string;
   }) => void;
+  // Mostra o botao "Agendar retorno agora" no cartao de pacote registrado.
+  onAgendar?: () => void;
+  // Quando informado, aparece "Agendar a proxima sessao" dentro do cartao.
+  agendamentoBase?: AgendamentoBasePacote;
 }) {
   const [aberto, setAberto] = useState(false);
   const [procedimentoId, setProcedimentoId] = useState("");
@@ -91,10 +138,77 @@ export function FecharPacoteCard({
   const [formaId, setFormaId] = useState(() => formaInicial(formasPagamento));
   const [erro, setErro] = useState("");
   const [salvo, setSalvo] = useState<PacoteSalvoNaAgenda | null>(null);
+  const [diaProxima, setDiaProxima] = useState("");
+  const [horaProxima, setHoraProxima] = useState("");
+  const [encaixe, setEncaixe] = useState(false);
+  const [horarios, setHorarios] = useState<
+    { hora: string; disponivel: boolean; encaixe?: boolean }[]
+  >([]);
+  const [carregandoHorarios, setCarregandoHorarios] = useState(false);
+  const buscaAtual = useRef(0);
+  const [agendadoPara, setAgendadoPara] = useState<{
+    dia: string;
+    hora: string;
+  } | null>(null);
+  const [erroAgenda, setErroAgenda] = useState("");
   const [pendente, iniciar] = useTransition();
+
+  // Mesma regra da agenda: so aparecem os horarios livres do dia (clinica
+  // aberta, sem conflito e respeitando o intervalo entre atendimentos). Com
+  // "encaixe" ligado, o intervalo padrao deixa de valer.
+  async function carregarHorarios(opcoes: {
+    dia: string;
+    encaixe: boolean;
+    procedimentoId: string;
+  }) {
+    const busca = ++buscaAtual.current;
+    setHoraProxima("");
+    setHorarios([]);
+
+    if (!agendamentoBase || !opcoes.dia || !agendamentoBase.profissionalId) {
+      return;
+    }
+
+    const escolhido = procedimentos.find(
+      (item) => String(item.id) === opcoes.procedimentoId,
+    );
+
+    setCarregandoHorarios(true);
+
+    try {
+      const lista = await buscarDisponibilidadeAgenda({
+        profissionalId: agendamentoBase.profissionalId,
+        data: opcoes.dia,
+        duracao: escolhido?.duracaoPadrao || agendamentoBase.duracao || 60,
+        permitirEncaixeSemIntervalo: opcoes.encaixe,
+      });
+
+      if (busca !== buscaAtual.current) return;
+
+      setHorarios(lista);
+
+      // Sugere o mesmo horario do atendimento de hoje, se estiver livre.
+      const mesmaHora = horaDoAgendamento(agendamentoBase.data);
+      if (lista.some((item) => item.disponivel && item.hora === mesmaHora)) {
+        setHoraProxima(mesmaHora);
+      }
+    } catch {
+      if (busca === buscaAtual.current) setHorarios([]);
+    } finally {
+      if (busca === buscaAtual.current) setCarregandoHorarios(false);
+    }
+  }
+
+  function escolherDia(dia: string) {
+    setDiaProxima(dia);
+    void carregarHorarios({ dia, encaixe, procedimentoId });
+  }
 
   function escolherProcedimento(id: string) {
     setProcedimentoId(id);
+    if (diaProxima) {
+      void carregarHorarios({ dia: diaProxima, encaixe, procedimentoId: id });
+    }
     const escolhido = procedimentos.find((item) => String(item.id) === id);
 
     if (!escolhido) {
@@ -110,6 +224,14 @@ export function FecharPacoteCard({
   function salvar() {
     if (pendente) return;
     setErro("");
+    setErroAgenda("");
+
+    if (agendamentoBase && diaProxima && !horaProxima) {
+      setErro(
+        "Escolha o horário da próxima sessão (ou apague o dia para salvar só o pacote).",
+      );
+      return;
+    }
 
     iniciar(async () => {
       try {
@@ -125,6 +247,40 @@ export function FecharPacoteCard({
           procedimentoId: procedimentoId ? Number(procedimentoId) : null,
           descricao: resultado.descricao,
         });
+
+        // Se escolheu dia e hora, ja marca a proxima sessao (retorno).
+        if (agendamentoBase && diaProxima && horaProxima) {
+          try {
+            const escolhido = procedimentos.find(
+              (item) => String(item.id) === procedimentoId,
+            );
+            const agendamento = await criarAgendamento({
+              clienteId,
+              profissionalId: agendamentoBase.profissionalId || undefined,
+              procedimento: escolhido?.nome || resultado.descricao,
+              data: `${diaProxima}T${horaProxima}:00`,
+              duracao:
+                escolhido?.duracaoPadrao || agendamentoBase.duracao || 60,
+              valor: 0,
+              status: "Agendado",
+              observacoes: `Sessão do ${resultado.descricao}.`,
+              sinalPago: false,
+              naturezaAtendimento: "RETORNO",
+              agendamentoOrigemId: agendamentoBase.id,
+              permitirEncaixeSemIntervalo: encaixe,
+            });
+
+            if (agendamento.ok) {
+              setAgendadoPara({ dia: diaProxima, hora: horaProxima });
+            } else {
+              setErroAgenda(agendamento.mensagem);
+            }
+          } catch {
+            setErroAgenda(
+              "Não foi possível marcar o horário agora. Use o botão abaixo para escolher outro.",
+            );
+          }
+        }
       } catch (error) {
         setErro(mensagemDoErro(error));
       }
@@ -159,11 +315,32 @@ export function FecharPacoteCard({
               )}
               . O aviso aparece sempre que a cliente for atendida.
             </p>
-            {procedimentoId ? (
+            {procedimentoId && !agendadoPara ? (
               <p className="mt-1 text-xs font-bold text-emerald-950 dark:text-emerald-50">
                 Toque em &quot;Agendar retorno&quot;: o procedimento já vai
                 preenchido.
               </p>
+            ) : null}
+            {agendadoPara ? (
+              <p className="mt-2 rounded-xl bg-emerald-200 px-3 py-2 text-xs font-bold text-emerald-950 dark:bg-emerald-400/20 dark:text-emerald-100">
+                Próxima sessão marcada para {dataBonita(agendadoPara.dia)} às{" "}
+                {agendadoPara.hora}.
+              </p>
+            ) : null}
+            {erroAgenda ? (
+              <p className="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+                O pacote foi salvo, mas a sessão não foi marcada: {erroAgenda}
+              </p>
+            ) : null}
+            {onAgendar && !agendadoPara ? (
+              <button
+                type="button"
+                onClick={onAgendar}
+                className="mt-2 flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-emerald-300 px-4 text-xs font-bold text-emerald-950 ring-1 ring-emerald-600/30 dark:bg-emerald-500/25 dark:text-emerald-100"
+              >
+                <CalendarPlus className="size-4" />
+                Agendar retorno agora
+              </button>
             ) : null}
           </div>
         </div>
@@ -279,6 +456,103 @@ export function FecharPacoteCard({
           </label>
         ) : null}
       </div>
+
+      {agendamentoBase ? (
+        <div className="mt-3 rounded-xl border border-amber-300/70 bg-white/60 p-3 dark:border-amber-400/20 dark:bg-white/[0.04]">
+          <p className="text-xs font-bold text-amber-950 dark:text-amber-50">
+            Agendar a próxima sessão (opcional)
+          </p>
+          <p className="mt-0.5 text-[11px] text-amber-900 dark:text-amber-100">
+            Escolha o dia e a hora e a sessão já fica marcada ao salvar.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {[7, 15, 30].map((dias) => (
+              <button
+                key={dias}
+                type="button"
+                onClick={() => escolherDia(dataEmDias(dias))}
+                className="rounded-full border border-amber-400 bg-amber-100 px-3 py-1 text-[11px] font-bold text-amber-950 dark:border-amber-400/40 dark:bg-amber-500/20 dark:text-amber-100"
+              >
+                Daqui a {dias} dias
+              </button>
+            ))}
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className={rotulo}>Dia</span>
+              <input
+                type="date"
+                value={diaProxima}
+                min={dataEmDias(0)}
+                onChange={(event) => escolherDia(event.target.value)}
+                className={campo}
+              />
+            </label>
+            <label className="block">
+              <span className={rotulo}>Hora</span>
+              <select
+                value={horaProxima}
+                onChange={(event) => setHoraProxima(event.target.value)}
+                disabled={!diaProxima || carregandoHorarios}
+                className={campo}
+              >
+                <option value="">
+                  {!diaProxima
+                    ? "Escolha o dia"
+                    : carregandoHorarios
+                      ? "Carregando..."
+                      : horarios.some((item) => item.disponivel)
+                        ? "Selecione"
+                        : "Sem horário livre"}
+                </option>
+                {horarios
+                  .filter((item) => item.disponivel)
+                  .map((item) => (
+                    <option key={item.hora} value={item.hora}>
+                      {item.hora}
+                      {item.encaixe ? " · encaixe" : ""}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          </div>
+          {diaProxima &&
+          !carregandoHorarios &&
+          !horarios.some((item) => item.disponivel) ? (
+            <p className="mt-2 text-[11px] font-semibold text-rose-700 dark:text-rose-300">
+              Sem horário livre neste dia (clínica fechada ou agenda cheia).
+              Escolha outro dia
+              {encaixe ? "." : " ou ligue o encaixe abaixo."}
+            </p>
+          ) : null}
+          <label className="mt-2 flex cursor-pointer items-start justify-between gap-3 rounded-xl border border-amber-300/70 bg-amber-50/70 p-2.5 dark:border-amber-400/20 dark:bg-amber-400/10">
+            <span className="min-w-0">
+              <span className="block text-xs font-bold text-amber-950 dark:text-amber-100">
+                Permitir encaixe sem intervalo
+              </span>
+              <span className="mt-0.5 block text-[11px] leading-4 text-amber-900 dark:text-amber-100">
+                Libera horários que ficam colados em outro atendimento. Dois
+                atendimentos ao mesmo tempo continuam bloqueados.
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              checked={encaixe}
+              onChange={(event) => {
+                setEncaixe(event.target.checked);
+                if (diaProxima) {
+                  void carregarHorarios({
+                    dia: diaProxima,
+                    encaixe: event.target.checked,
+                    procedimentoId,
+                  });
+                }
+              }}
+              className="mt-0.5 size-5 shrink-0 accent-amber-600"
+            />
+          </label>
+        </div>
+      ) : null}
 
       {paraNumero(valorTotal) > 0 ? (
         <p className="mt-2 text-xs font-semibold text-amber-900 dark:text-amber-100">

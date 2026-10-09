@@ -752,10 +752,18 @@ export default function FinalizarAtendimentoModal({
                     clienteId={currentAppointment.clienteId}
                     formasPagamento={formasPagamento}
                     onPacoteRegistrado={setPacoteRegistrado}
+                    onAgendar={agendarRetornoAgora}
+                    agendamentoBase={{
+                      id: currentAppointment.id,
+                      profissionalId: currentAppointment.profissionalId ?? null,
+                      data: currentAppointment.data,
+                      duracao: currentAppointment.duracao,
+                    }}
                     procedimentos={servicos.map((servico) => ({
                       id: servico.id,
                       nome: servico.nome,
                       valorPadrao: Number(servico.valorPadrao || 0),
+                      duracaoPadrao: servico.duracaoPadrao,
                     }))}
                   />
                 ) : null}

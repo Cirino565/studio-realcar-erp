@@ -303,6 +303,28 @@ export default function AppointmentDetailsModal({
     "Não informado";
 
   const atendimentoFinalizado = currentAppointment.status === "Atendido";
+
+  // Se acabou de fechar um pacote aqui, o proximo ja abre com o procedimento dele.
+  function agendarProximo() {
+    const fechado =
+      pacoteRegistrado && pacoteRegistrado.agendamentoId === currentAppointment.id
+        ? pacoteRegistrado
+        : null;
+    const servicoDoPacote = fechado?.procedimentoId
+      ? servicos.find((item) => item.id === fechado.procedimentoId)
+      : null;
+
+    onReagendar(
+      currentAppointment,
+      servicoDoPacote
+        ? {
+            procedimento: servicoDoPacote.nome,
+            duracao: servicoDoPacote.duracaoPadrao,
+            observacoes: `Sessão do ${fechado?.descricao || "pacote"}.`,
+          }
+        : undefined,
+    );
+  }
   const atendimentoCancelado = currentAppointment.status === "Cancelado";
   const atendimentoEmAndamento = currentAppointment.status === "Em atendimento";
   const evolucaoPendente = currentAppointment.evolucaoStatus === "PENDENTE";
@@ -437,28 +459,7 @@ export default function AppointmentDetailsModal({
             <AcaoRapida
               icon={CalendarClock}
               label="Agendar próximo"
-              onClick={() => {
-                // Se acabou de fechar um pacote aqui, o proximo ja abre com o procedimento dele.
-                const fechado =
-                  pacoteRegistrado &&
-                  pacoteRegistrado.agendamentoId === currentAppointment.id
-                    ? pacoteRegistrado
-                    : null;
-                const servicoDoPacote = fechado?.procedimentoId
-                  ? servicos.find((item) => item.id === fechado.procedimentoId)
-                  : null;
-
-                onReagendar(
-                  currentAppointment,
-                  servicoDoPacote
-                    ? {
-                        procedimento: servicoDoPacote.nome,
-                        duracao: servicoDoPacote.duracaoPadrao,
-                        observacoes: `Sessão do ${fechado?.descricao || "pacote"}.`,
-                      }
-                    : undefined,
-                );
-              }}
+              onClick={agendarProximo}
             />
             <AcaoRapida
               icon={Pencil}
@@ -507,6 +508,7 @@ export default function AppointmentDetailsModal({
                   id: servico.id,
                   nome: servico.nome,
                   valorPadrao: Number(servico.valorPadrao || 0),
+                  duracaoPadrao: servico.duracaoPadrao,
                 }))}
                 onPacoteRegistrado={(dados) =>
                   setPacoteRegistrado({
@@ -514,6 +516,13 @@ export default function AppointmentDetailsModal({
                     ...dados,
                   })
                 }
+                onAgendar={agendarProximo}
+                agendamentoBase={{
+                  id: currentAppointment.id,
+                  profissionalId: currentAppointment.profissionalId ?? null,
+                  data: currentAppointment.data,
+                  duracao: currentAppointment.duracao,
+                }}
               />
             ) : null}
 
