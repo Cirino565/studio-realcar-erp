@@ -2,8 +2,6 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import type { ReactNode } from "react";
-import { useFormStatus } from "react-dom";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
@@ -15,11 +13,9 @@ import {
   ImageIcon,
   Loader2,
   Maximize2,
-  Pencil,
   Plus,
   Stethoscope,
   Trash2,
-  Wallet,
   X,
 } from "lucide-react";
 
@@ -27,31 +23,20 @@ import {
   criarDocumentoCliente,
   criarEvolucaoCliente,
   criarProcedimentoCliente,
-  editarEvolucaoCliente,
   excluirRegistroClinico,
 } from "@/actions/cliente-clinico.actions";
-import {
-  cancelarPacoteCliente,
-  criarPacoteCliente,
-  registrarPagamentoPacote,
-} from "@/actions/pacote.actions";
 import RegistrarEvolucaoPendenteModal from "@/components/atendimento/RegistrarEvolucaoPendenteModal";
 import { Button } from "@/components/ui/button";
 import AnamneseMobileForm from "./AnamneseMobileForm";
 import { ClienteFotoUploadForm } from "./ClienteFotoUploadForm";
 import { formatarData, formatarMoeda } from "@/lib/format";
-import type {
-  ClienteClinicoData,
-  ClienteEvolucaoData,
-  ClienteFotoData,
-} from "../types";
+import type { ClienteClinicoData, ClienteFotoData } from "../types";
 
 type AbaClinica =
   | "anamnese"
   | "fotos"
   | "evolucao"
   | "procedimentos"
-  | "pacotes"
   | "documentos";
 
 type Props = {
@@ -93,7 +78,6 @@ const abas: { id: AbaClinica; label: string; icon: LucideIcon }[] = [
   { id: "fotos", label: "Fotos", icon: ImageIcon },
   { id: "evolucao", label: "Evolução", icon: Activity },
   { id: "procedimentos", label: "Procedimentos", icon: Stethoscope },
-  { id: "pacotes", label: "Pacotes", icon: Wallet },
   { id: "documentos", label: "Documentos", icon: FileText },
 ];
 
@@ -245,306 +229,6 @@ function DeleteButton({
   );
 }
 
-function CancelarPacoteButton({ pacoteId }: { pacoteId: number }) {
-  const [isPending, startTransition] = useTransition();
-
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      disabled={isPending}
-      onClick={() => {
-        if (!window.confirm("Cancelar este pacote? O dinheiro já recebido continua no Financeiro normalmente.")) {
-          return;
-        }
-
-        startTransition(() => {
-          const formData = new FormData();
-          formData.set("pacoteId", String(pacoteId));
-
-          void cancelarPacoteCliente(formData).catch((error) => {
-            window.alert(
-              error instanceof Error ? error.message : "Não foi possível cancelar o pacote.",
-            );
-          });
-        });
-      }}
-    >
-      {isPending ? <Loader2 className="size-4 animate-spin" /> : "Cancelar"}
-    </Button>
-  );
-}
-
-// Baixa a foto de verdade num clique só.
-//
-// O iPhone/iPad trata IMAGEM de um jeito à parte: mesmo entregando o
-// arquivo pronto para download, o Safari ainda mostra uma tela de
-// pré-visualização antes de salvar (algo próprio do sistema, não do link
-// em si). O caminho que realmente funciona sem tela extra nesses
-// aparelhos é abrir o menu nativo de COMPARTILHAR, que já oferece "Salvar
-// imagem" direto na galeria de fotos.
-//
-// Por isso: no iPhone/iPad, abre o menu de compartilhar. Em qualquer outro
-// aparelho (computador, a maioria dos Android), continua baixando direto,
-// como já funcionava bem.
-function BotaoBaixarFoto({
-  url,
-  nomeArquivo,
-  titulo,
-  variante = "cartao",
-}: {
-  url: string;
-  nomeArquivo: string | null;
-  titulo: string;
-  variante?: "cartao" | "ampliada";
-}) {
-  const [baixando, setBaixando] = useState(false);
-
-  async function baixar() {
-    if (baixando) return;
-    setBaixando(true);
-
-    try {
-      // Sem "no-store": a foto muito provavelmente já foi carregada pelo
-      // navegador para exibir na tela, então isso reaproveita o que já
-      // está em memória em vez de baixar tudo de novo - mais rápido, e
-      // importante para o compartilhar nativo, que só funciona bem quando
-      // chamado logo em seguida ao toque da pessoa.
-      const resposta = await fetch(url);
-      if (!resposta.ok) throw new Error("Falha ao baixar a foto.");
-
-      const blob = await resposta.blob();
-      const nomeFinal = nomeArquivo || `${titulo || "foto"}.jpg`;
-      const arquivo = new File([blob], nomeFinal, {
-        type: blob.type || "image/jpeg",
-      });
-
-      if (navigator.canShare?.({ files: [arquivo] })) {
-        await navigator.share({ files: [arquivo] });
-        return;
-      }
-
-      const urlTemporaria = URL.createObjectURL(blob);
-
-      const link = document.createElement("a");
-      link.href = urlTemporaria;
-      link.download = nomeFinal;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      // Libera a memória depois que o navegador já pegou o arquivo.
-      window.setTimeout(() => URL.revokeObjectURL(urlTemporaria), 10_000);
-    } catch (erro) {
-      // A pessoa cancelou o menu de compartilhar - não é uma falha, só
-      // desistiu. Não faz sentido abrir outra coisa nesse caso.
-      if (erro instanceof DOMException && erro.name === "AbortError") {
-        return;
-      }
-
-      // Qualquer outra falha: abre do jeito antigo em vez de deixar sem saída.
-      window.open(url, "_blank", "noopener");
-    } finally {
-      setBaixando(false);
-    }
-  }
-
-  const estiloCartao =
-    "flex size-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 disabled:opacity-50 dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/[0.06]";
-  const estiloAmpliada =
-    "flex size-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 disabled:opacity-50";
-
-  return (
-    <button
-      type="button"
-      onClick={() => void baixar()}
-      disabled={baixando}
-      title="Baixar foto"
-      aria-label={`Baixar foto ${titulo}`}
-      className={variante === "ampliada" ? estiloAmpliada : estiloCartao}
-    >
-      {baixando ? (
-        <Loader2 className={variante === "ampliada" ? "size-5 animate-spin" : "size-4 animate-spin"} />
-      ) : (
-        <Download size={variante === "ampliada" ? 19 : 16} />
-      )}
-    </button>
-  );
-}
-
-// Botão de envio que sabe sozinho quando o formulário está salvando.
-// Sem isso, clicar não dava sinal nenhum na tela - e a pessoa acabava
-// clicando várias vezes, criando registros repetidos.
-function BotaoSalvar({
-  children,
-  salvandoLabel = "Salvando...",
-  className = "w-full",
-}: {
-  children: ReactNode;
-  salvandoLabel?: string;
-  className?: string;
-}) {
-  const { pending } = useFormStatus();
-
-  return (
-    <Button type="submit" className={className} disabled={pending}>
-      {pending ? (
-        <>
-          <Loader2 className="size-4 animate-spin" />
-          {salvandoLabel}
-        </>
-      ) : (
-        children
-      )}
-    </Button>
-  );
-}
-
-function EvolucaoCard({
-  clienteId,
-  evolucao,
-}: {
-  clienteId: number;
-  evolucao: ClienteEvolucaoData;
-}) {
-  const [editando, setEditando] = useState(false);
-  const [titulo, setTitulo] = useState(evolucao.titulo);
-  const [descricao, setDescricao] = useState(evolucao.descricao);
-  const [isPending, startTransition] = useTransition();
-  const [erro, setErro] = useState<string | null>(null);
-
-  function salvar() {
-    setErro(null);
-
-    startTransition(() => {
-      const formData = new FormData();
-      formData.set("evolucaoId", String(evolucao.id));
-      formData.set("titulo", titulo);
-      formData.set("descricao", descricao);
-
-      void editarEvolucaoCliente(formData)
-        .then(() => setEditando(false))
-        .catch((error) => {
-          setErro(
-            error instanceof Error
-              ? error.message
-              : "Não foi possível salvar a alteração.",
-          );
-        });
-    });
-  }
-
-  return (
-    <article className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:p-5">
-      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-        <div className="min-w-0 flex-1">
-          {editando ? (
-            <input
-              value={titulo}
-              onChange={(event) => setTitulo(event.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-violet-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
-            />
-          ) : (
-            <p className="break-words font-semibold text-slate-900 dark:text-white">
-              {evolucao.titulo}
-            </p>
-          )}
-
-          <p className="mt-1 text-xs text-slate-500">
-            {formatarData(evolucao.dataRegistro)}{" "}
-            {evolucao.profissional ? `• ${evolucao.profissional}` : ""}
-            {evolucao.totalVersoes > 0 ? (
-              <span
-                className="ml-1 text-amber-600 dark:text-amber-400"
-                title="Esta evolução foi editada depois de salva. O texto anterior fica guardado no histórico do sistema."
-              >
-                · editada {evolucao.totalVersoes}{" "}
-                {evolucao.totalVersoes === 1 ? "vez" : "vezes"}
-              </span>
-            ) : null}
-          </p>
-        </div>
-
-        {!editando ? (
-          <div className="flex shrink-0 items-center gap-1">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setTitulo(evolucao.titulo);
-                setDescricao(evolucao.descricao);
-                setErro(null);
-                setEditando(true);
-              }}
-              className="h-9 px-3 text-xs"
-            >
-              <Pencil className="size-3.5" />
-              Editar
-            </Button>
-
-            <DeleteButton clienteId={clienteId} tipo="evolucao" id={evolucao.id} />
-          </div>
-        ) : null}
-      </div>
-
-      {editando ? (
-        <div className="mt-3 space-y-3">
-          <textarea
-            rows={6}
-            value={descricao}
-            onChange={(event) => setDescricao(event.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-slate-900 outline-none focus:border-violet-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
-          />
-
-          {erro ? (
-            <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-              {erro}
-            </p>
-          ) : null}
-
-          <p className="text-[11px] leading-4 text-slate-500">
-            O texto atual será guardado no histórico antes de salvar, para o
-            registro clínico continuar rastreável.
-          </p>
-
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              onClick={salvar}
-              disabled={isPending || !titulo.trim() || !descricao.trim()}
-              className="flex-1"
-            >
-              {isPending ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                "Salvar alteração"
-              )}
-            </Button>
-
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isPending}
-              onClick={() => {
-                setTitulo(evolucao.titulo);
-                setDescricao(evolucao.descricao);
-                setErro(null);
-                setEditando(false);
-              }}
-            >
-              Cancelar
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-300">
-          {evolucao.descricao}
-        </p>
-      )}
-    </article>
-  );
-}
-
 // Agrupa as fotos por dia (mais recente primeiro) para exibi-las em blocos
 // com um cabecalho de data, em vez de uma grade unica onde tudo se mistura
 // quando a cliente tem varios retornos.
@@ -590,32 +274,16 @@ export function ClienteClinicoTabs({
     useState(false);
   const [fotoAberta, setFotoAberta] = useState<ClienteFotoData | null>(null);
 
-  // Guarda apenas as datas que a usuaria FECHOU. Assim, por padrao, o grupo
-  // mais recente ja aparece aberto e os demais tambem - e o que ela fechar
-  // continua fechado enquanto estiver na ficha.
-  // Guarda quais grupos de data estão ABERTOS. Antes guardava os fechados,
-  // ou seja, tudo abria de uma vez - com várias visitas a página ficava
-  // enorme e era preciso rolar muito. Agora só o grupo mais recente abre
-  // sozinho, e os demais ficam recolhidos até você clicar.
-  // Guarda o estado de CADA grupo individualmente (aberto ou fechado),
-  // só para os que a pessoa já tocou. Os que nunca foram tocados usam o
-  // padrão: só o primeiro (visita mais recente) começa aberto.
-  //
-  // Antes isso era um único array de "abertos", e assim que qualquer
-  // grupo era tocado, todos os outros paravam de usar o padrão - o
-  // primeiro grupo podia fechar sozinho, ou tudo podia parecer abrir de
-  // uma vez, dependendo da ordem dos cliques.
-  const [estadoGrupos, setEstadoGrupos] = useState<Record<string, boolean>>(
-    {},
-  );
+  // Guarda apenas as datas que a usuaria ABRIU. Por padrao todos os grupos
+  // comecam fechados - ela clica em cada um para abrir o que quiser olhar.
+  const [gruposAbertos, setGruposAbertos] = useState<string[]>([]);
 
-  function alternarGrupo(chave: string, abertoAtual: boolean) {
-    setEstadoGrupos((atual) => ({ ...atual, [chave]: !abertoAtual }));
-  }
-
-  function grupoEstaAberto(chave: string, indice: number) {
-    if (chave in estadoGrupos) return estadoGrupos[chave];
-    return indice === 0;
+  function alternarGrupo(chave: string) {
+    setGruposAbertos((atual) =>
+      atual.includes(chave)
+        ? atual.filter((item) => item !== chave)
+        : [...atual, chave],
+    );
   }
   const [evolucaoPendenteSelecionada, setEvolucaoPendenteSelecionada] =
     useState<number | null>(null);
@@ -960,23 +628,20 @@ export function ClienteClinicoTabs({
 
               {data.fotos.length > 0 ? (
                 <div className="space-y-8">
-                  {agruparFotosPorData(data.fotos).map((grupo, indiceGrupo) => {
-                    const aberto = grupoEstaAberto(grupo.chave, indiceGrupo);
-
-                    return (
+                  {agruparFotosPorData(data.fotos).map((grupo) => (
                     <section key={grupo.chave} className="min-w-0">
                       <button
                         type="button"
-                        onClick={() => alternarGrupo(grupo.chave, aberto)}
-                        aria-expanded={aberto}
+                        onClick={() => alternarGrupo(grupo.chave)}
+                        aria-expanded={gruposAbertos.includes(grupo.chave)}
                         className="mb-3 flex w-full items-center gap-3 rounded-xl px-1 py-1 text-left transition hover:bg-slate-50 dark:hover:bg-white/[0.04]"
                       >
                         <ChevronDown
                           size={18}
                           className={`shrink-0 text-slate-400 transition-transform ${
-                            aberto
-                              ? ""
-                              : "-rotate-90"
+                            !gruposAbertos.includes(grupo.chave)
+                              ? "-rotate-90"
+                              : ""
                           }`}
                         />
 
@@ -992,7 +657,7 @@ export function ClienteClinicoTabs({
                         <div className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
                       </button>
 
-                      {aberto ? (
+                      {gruposAbertos.includes(grupo.chave) ? (
                       <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                         {grupo.fotos.map((foto) => (
                     <article
@@ -1037,15 +702,19 @@ export function ClienteClinicoTabs({
                           </div>
 
                           <div className="flex shrink-0 items-center gap-1">
-                            <BotaoBaixarFoto
-                              url={
+                            <a
+                              href={
                                 foto.armazenamento === "GOOGLE_DRIVE"
                                   ? `/api/clientes/fotos/${foto.id}/arquivo?download=1`
                                   : foto.url
                               }
-                              nomeArquivo={foto.nomeArquivo}
-                              titulo={foto.titulo}
-                            />
+                              download={foto.nomeArquivo || undefined}
+                              title="Baixar foto"
+                              aria-label={`Baixar foto ${foto.titulo}`}
+                              className="flex size-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/[0.06]"
+                            >
+                              <Download size={16} />
+                            </a>
 
                             <DeleteButton
                               clienteId={data.id}
@@ -1077,8 +746,7 @@ export function ClienteClinicoTabs({
                       </div>
                       ) : null}
                     </section>
-                    );
-                  })}
+                  ))}
                 </div>
               ) : (
                 <EmptyState
@@ -1179,18 +847,46 @@ export function ClienteClinicoTabs({
                   rows={5}
                 />
 
-                <BotaoSalvar salvandoLabel="Salvando evolução...">
+                <Button type="submit" className="w-full">
                   <Plus size={17} />
                   Registrar evolução
-                </BotaoSalvar>
+                </Button>
               </form>
 
               <div className="min-w-0 space-y-4">
                 {data.evolucoes.length > 0 ? (
                   data.evolucoes.map((evolucao) => (
-                    <div key={evolucao.id} className="min-w-0">
-                      <EvolucaoCard clienteId={data.id} evolucao={evolucao} />
-                    </div>
+                    <article
+                      key={evolucao.id}
+                      className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:p-5"
+                    >
+                      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                        <div className="min-w-0">
+                          <p className="break-words font-semibold text-slate-900 dark:text-white">
+                            {evolucao.titulo}
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-500">
+                            {formatarData(
+                              evolucao.dataRegistro,
+                            )}{" "}
+                            {evolucao.profissional
+                              ? `• ${evolucao.profissional}`
+                              : ""}
+                          </p>
+                        </div>
+
+                        <DeleteButton
+                          clienteId={data.id}
+                          tipo="evolucao"
+                          id={evolucao.id}
+                        />
+                      </div>
+
+                      <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-300">
+                        {evolucao.descricao}
+                      </p>
+                    </article>
                   ))
                 ) : (
                   <EmptyState
@@ -1263,10 +959,10 @@ export function ClienteClinicoTabs({
                   rows={3}
                 />
 
-                <BotaoSalvar salvandoLabel="Salvando procedimento...">
+                <Button type="submit" className="w-full">
                   <Plus size={17} />
                   Registrar procedimento
-                </BotaoSalvar>
+                </Button>
               </form>
 
               <div className="min-w-0 space-y-4">
@@ -1332,241 +1028,6 @@ export function ClienteClinicoTabs({
           </div>
         )}
 
-        {activeTab === "pacotes" && (
-          <div id="pacotes">
-            <SectionHeader
-              icon={Wallet}
-              title="Pacotes"
-              description="Pacotes fechados com a cliente e o saldo que ainda falta receber."
-            />
-
-            <div className="grid min-w-0 gap-5 p-4 sm:p-6 lg:grid-cols-[minmax(280px,380px)_minmax(0,1fr)]">
-              <form
-                action={criarPacoteCliente}
-                className="h-fit space-y-4 rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/[0.04]"
-              >
-                <input type="hidden" name="clienteId" value={data.id} />
-
-                <Field
-                  label="Descrição do pacote"
-                  name="descricao"
-                  required
-                  placeholder="Ex: Pacote Criolipólise 5 sessões"
-                />
-
-                <div className="grid grid-cols-2 gap-3">
-                  <Field
-                    label="Valor total"
-                    name="valorTotal"
-                    type="text"
-                    required
-                    placeholder="0,00"
-                  />
-
-                  <Field
-                    label="Adiantado agora"
-                    name="valorAdiantado"
-                    type="text"
-                    placeholder="0,00"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="space-y-1.5">
-                    <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                      Forma de pagamento
-                    </span>
-                    <select
-                      name="formaPagamentoConfigId"
-                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
-                    >
-                      <option value="">Não informada</option>
-                      {data.formasPagamento.map((forma) => (
-                        <option key={forma.id} value={forma.id}>
-                          {forma.nome}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="space-y-1.5">
-                    <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                      Conta
-                    </span>
-                    <select
-                      name="contaFinanceiraId"
-                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
-                    >
-                      <option value="">Conta principal</option>
-                      {data.contas.map((conta) => (
-                        <option key={conta.id} value={conta.id}>
-                          {conta.nome}
-                          {conta.principal ? " · principal" : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-
-                <Field label="Data do adiantamento" name="data" type="date" defaultValue={dateInputValue(null)} />
-
-                <TextArea
-                  label="Observações (opcional)"
-                  name="observacoes"
-                  placeholder="Ex: pacote combinado na avaliação de hoje"
-                />
-
-                <p className="text-[11px] leading-4 text-slate-500">
-                  Se preencher &quot;Adiantado agora&quot;, esse valor já entra
-                  como uma entrada de verdade no Financeiro, na categoria
-                  Pacotes. Deixe em branco se ainda não recebeu nada.
-                </p>
-
-                <BotaoSalvar salvandoLabel="Criando pacote...">
-                  Criar pacote
-                </BotaoSalvar>
-              </form>
-
-              <div className="min-w-0 space-y-3">
-                {data.pacotes.length > 0 ? (
-                  data.pacotes.map((pacote) => {
-                    const saldo = Math.max(0, pacote.valorTotal - pacote.valorPago);
-                    const quitado = pacote.status === "Quitado";
-                    const cancelado = pacote.status === "Cancelado";
-
-                    return (
-                      <article
-                        key={pacote.id}
-                        className={`rounded-2xl border p-4 ${
-                          cancelado
-                            ? "border-slate-200 bg-slate-50 opacity-60 dark:border-white/10 dark:bg-white/[0.02]"
-                            : quitado
-                              ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-400/20 dark:bg-emerald-500/5"
-                              : "border-amber-200 bg-amber-50/60 dark:border-amber-400/20 dark:bg-amber-500/5"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate font-semibold text-slate-900 dark:text-white">
-                              {pacote.descricao}
-                            </p>
-                            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                              Total {pacote.valorTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                              {" · "}
-                              Pago {pacote.valorPago.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                            </p>
-                          </div>
-
-                          <span
-                            className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
-                              cancelado
-                                ? "bg-slate-200 text-slate-600 dark:bg-white/10 dark:text-slate-300"
-                                : quitado
-                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
-                                  : "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
-                            }`}
-                          >
-                            {pacote.status}
-                          </span>
-                        </div>
-
-                        {!cancelado ? (
-                          <p
-                            className={`mt-2 text-lg font-bold ${
-                              quitado
-                                ? "text-emerald-700 dark:text-emerald-300"
-                                : "text-amber-700 dark:text-amber-300"
-                            }`}
-                          >
-                            {quitado
-                              ? "Quitado"
-                              : `Falta ${saldo.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`}
-                          </p>
-                        ) : null}
-
-                        {pacote.observacoes ? (
-                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{pacote.observacoes}</p>
-                        ) : null}
-
-                        {pacote.status === "Aberto" ? (
-                          <details className="mt-3 group">
-                            <summary className="cursor-pointer list-none rounded-xl border border-slate-200 px-3 py-2 text-center text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5">
-                              Registrar pagamento
-                            </summary>
-
-                            <form action={registrarPagamentoPacote} className="mt-3 space-y-3 rounded-xl border border-slate-200 p-3 dark:border-white/10">
-                              <input type="hidden" name="pacoteId" value={pacote.id} />
-
-                              <div className="grid grid-cols-2 gap-3">
-                                <Field label="Valor" name="valor" type="text" required placeholder="0,00" />
-                                <Field label="Data" name="data" type="date" defaultValue={dateInputValue(null)} />
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-3">
-                                <label className="space-y-1.5">
-                                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                    Forma de pagamento
-                                  </span>
-                                  <select
-                                    name="formaPagamentoConfigId"
-                                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
-                                  >
-                                    <option value="">Não informada</option>
-                                    {data.formasPagamento.map((forma) => (
-                                      <option key={forma.id} value={forma.id}>
-                                        {forma.nome}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </label>
-
-                                <label className="space-y-1.5">
-                                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                    Conta
-                                  </span>
-                                  <select
-                                    name="contaFinanceiraId"
-                                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
-                                  >
-                                    <option value="">Conta principal</option>
-                                    {data.contas.map((conta) => (
-                                      <option key={conta.id} value={conta.id}>
-                                        {conta.nome}
-                                        {conta.principal ? " · principal" : ""}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </label>
-                              </div>
-
-                              <div className="flex gap-2">
-                                <BotaoSalvar
-                                  className="flex-1"
-                                  salvandoLabel="Salvando..."
-                                >
-                                  Salvar pagamento
-                                </BotaoSalvar>
-
-                                <CancelarPacoteButton pacoteId={pacote.id} />
-                              </div>
-                            </form>
-                          </details>
-                        ) : null}
-                      </article>
-                    );
-                  })
-                ) : (
-                  <EmptyState
-                    icon={Wallet}
-                    title="Nenhum pacote registrado"
-                    text="Use o formulário ao lado quando a cliente fechar um pacote com adiantamento, para acompanhar o saldo que ainda falta."
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
         {activeTab === "documentos" && (
           <div id="documentos">
             <SectionHeader
@@ -1620,10 +1081,10 @@ export function ClienteClinicoTabs({
                   rows={4}
                 />
 
-                <BotaoSalvar salvandoLabel="Salvando documento...">
+                <Button type="submit" className="w-full">
                   <Plus size={17} />
                   Adicionar documento
-                </BotaoSalvar>
+                </Button>
               </form>
 
               <div className="min-w-0 space-y-4">
@@ -1724,16 +1185,19 @@ export function ClienteClinicoTabs({
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                <BotaoBaixarFoto
-                  url={
+                <a
+                  href={
                     fotoAberta.armazenamento === "GOOGLE_DRIVE"
                       ? `/api/clientes/fotos/${fotoAberta.id}/arquivo?download=1`
                       : fotoAberta.url
                   }
-                  nomeArquivo={fotoAberta.nomeArquivo}
-                  titulo={fotoAberta.titulo}
-                  variante="ampliada"
-                />
+                  download={fotoAberta.nomeArquivo || undefined}
+                  className="flex size-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+                  aria-label="Baixar foto"
+                  title="Baixar foto"
+                >
+                  <Download size={19} />
+                </a>
 
                 <button
                   type="button"
