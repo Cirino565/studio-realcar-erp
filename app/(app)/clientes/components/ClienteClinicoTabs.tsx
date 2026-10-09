@@ -33,6 +33,8 @@ import {
 import {
   cancelarPacoteCliente,
   criarPacoteCliente,
+  editarPacoteCliente,
+  excluirPacoteCliente,
   registrarPagamentoPacote,
 } from "@/actions/pacote.actions";
 import RegistrarEvolucaoPendenteModal from "@/components/atendimento/RegistrarEvolucaoPendenteModal";
@@ -271,6 +273,46 @@ function CancelarPacoteButton({ pacoteId }: { pacoteId: number }) {
       }}
     >
       {isPending ? <Loader2 className="size-4 animate-spin" /> : "Cancelar"}
+    </Button>
+  );
+}
+
+function ExcluirPacoteButton({
+  pacoteId,
+  valorPago,
+}: {
+  pacoteId: number;
+  valorPago: number;
+}) {
+  const [isPending, startTransition] = useTransition();
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      disabled={isPending}
+      className="flex-1 text-rose-600"
+      onClick={() => {
+        const aviso =
+          valorPago > 0
+            ? `Excluir este pacote? Os ${formatarMoeda(valorPago)} já lançados no Financeiro também serão cancelados.`
+            : "Excluir este pacote?";
+
+        if (!window.confirm(aviso)) return;
+
+        startTransition(() => {
+          const formData = new FormData();
+          formData.set("pacoteId", String(pacoteId));
+
+          void excluirPacoteCliente(formData).catch((error) => {
+            window.alert(
+              error instanceof Error ? error.message : "Não foi possível excluir o pacote.",
+            );
+          });
+        });
+      }}
+    >
+      {isPending ? <Loader2 className="size-4 animate-spin" /> : "Excluir pacote"}
     </Button>
   );
 }
@@ -1552,6 +1594,47 @@ export function ClienteClinicoTabs({
                             </form>
                           </details>
                         ) : null}
+
+                        <details className="mt-2">
+                          <summary className="cursor-pointer list-none rounded-xl border border-slate-200 px-3 py-2 text-center text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5">
+                            Editar ou excluir pacote
+                          </summary>
+
+                          <form
+                            action={editarPacoteCliente}
+                            className="mt-3 space-y-3 rounded-xl border border-slate-200 p-3 dark:border-white/10"
+                          >
+                            <input type="hidden" name="pacoteId" value={pacote.id} />
+
+                            <Field
+                              label="Nome do pacote"
+                              name="descricao"
+                              type="text"
+                              required
+                              defaultValue={pacote.descricao}
+                            />
+                            <Field
+                              label="Valor total (R$)"
+                              name="valorTotal"
+                              type="text"
+                              required
+                              defaultValue={pacote.valorTotal.toLocaleString("pt-BR", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            />
+
+                            <div className="flex gap-2">
+                              <BotaoSalvar className="flex-1" salvandoLabel="Salvando...">
+                                Salvar alterações
+                              </BotaoSalvar>
+                              <ExcluirPacoteButton
+                                pacoteId={pacote.id}
+                                valorPago={pacote.valorPago}
+                              />
+                            </div>
+                          </form>
+                        </details>
                       </article>
                     );
                   })

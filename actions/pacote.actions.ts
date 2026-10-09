@@ -241,3 +241,104 @@ export async function cancelarPacoteCliente(formData: FormData) {
 
   revalidatePath(`/clientes/${pacote.clienteId}`);
 }
+
+/**
+ * Corrige o nome e o valor total de um pacote (ex.: digitou errado).
+ * O valor total nao pode ficar menor do que ja foi pago. Quitado/Aberto
+ * e recalculado sozinho.
+ */
+export async function editarPacoteCliente(formData: FormData) {
+  await requirePermission("financeiro.gerenciar");
+
+  const pacoteId = Number(formData.get("pacoteId"));
+  if (!Number.isInteger(pacoteId) || pacoteId <= 0) {
+    throw new Error("Pacote inválido.");
+  }
+
+  const descricao = getString(formData, "descricao");
+  const valorTotal = getNumber(formData, "valorTotal");
+
+  if (!descricao) {
+    throw new Error("Informe o nome do pacote.");
+  }
+
+  if (valorTotal <= 0) {
+    throw new Error("Informe o valor total do pacote.");
+  }
+
+  const pacote = await prisma.pacoteCliente.findUnique({
+    where: { id: pacoteId },
+    select: { id: true, clienteId: true, valorPago: true, status: true },
+  });
+
+  if (!pacote) {
+    throw new Error("Pacote não encontrado.");
+  }
+
+  if (valorTotal < pacote.valorPago - 0.01) {
+    throw new Error(
+      `O valor total não pode ser menor do que já foi pago (R$ ${pacote.valorPago.toFixed(2).replace(".", ",")}).`,
+    );
+  }
+
+  await prisma.pacoteCliente.update({
+    where: { id: pacote.id },
+    data: {
+      descricao,
+      valorTotal,
+      status:
+        pacote.status === "Cancelado"
+          ? "Cancelado"
+          : pacote.valorPago >= valorTotal - 0.01
+            ? "Quitado"
+            : "Aberto",
+    },
+  });
+
+  revalidatePath(`/clientes/${pacote.clienteId}`);
+  revalidatePath("/agenda");
+  revalidatePath("/financeiro");
+  revalidatePath("/gestao");
+}
+
+/**
+ * Exclui o pacote de vez. Os pagamentos que ele recebeu (adiantamento etc.)
+ * sao CANCELADOS no Financeiro - ficam no historico, mas deixam de contar
+ * no caixa e nos relatorios.
+ */
+export async function excluirPacoteCliente(formData: FormData) {
+  await requirePermission("financeiro.gerenciar");
+
+  const pacoteId = Number(formData.get("pacoteId"));
+  if (!Number.isInteger(pacoteId) || pacoteId <= 0) {
+    throw new Error("Pacote inválido.");
+  }
+
+  const clienteId = await prisma.$transaction(async (tx) => {
+    const pacote = await tx.pacoteCliente.findUnique({
+      where: { id: pacoteId },
+      select: { id: true, clienteId: true, descricao: true },
+    });
+
+    if (!pacote) {
+      throw new Error("Pacote não encontrado.");
+    }
+
+    await tx.lancamento.updateMany({
+      where: { pacoteClienteId: pacote.id, statusPagamento: { not: "Cancelado" } },
+      data: {
+        statusPagamento: "Cancelado",
+        observacoes: `Pacote "${pacote.descricao}" excluído.`,
+      },
+    });
+
+    await tx.pacoteCliente.delete({ where: { id: pacote.id } });
+
+    return pacote.clienteId;
+  });
+
+  revalidatePath(`/clientes/${clienteId}`);
+  revalidatePath("/agenda");
+  revalidatePath("/financeiro");
+  revalidatePath("/gestao");
+}
