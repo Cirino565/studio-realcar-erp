@@ -2,6 +2,7 @@ import type { Viewport } from "next";
 import { cookies } from "next/headers";
 
 import "./globals.css";
+import AvisoSalvando from "@/components/layout/AvisoSalvando";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -63,6 +64,7 @@ export default async function RootLayout({
 
       <body className="min-h-screen w-full overflow-x-hidden">
         {children}
+        <AvisoSalvando />
       </body>
     </html>
   );

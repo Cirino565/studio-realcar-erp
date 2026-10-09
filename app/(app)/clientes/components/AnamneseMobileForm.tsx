@@ -94,6 +94,10 @@ function AssinaturaCanvas() {
   }
 
   function iniciar(event: ReactPointerEvent<HTMLCanvasElement>) {
+    // Fecha o teclado do celular (se estiver aberto) antes de assinar, para a
+    // tela nao "pular" depois e o toque em Finalizar nao se perder.
+    const ativo = document.activeElement as HTMLElement | null;
+    if (ativo && ativo !== document.body) ativo.blur();
     const ctx = contexto();
     if (!ctx) return;
     const { x, y } = ponto(event);
