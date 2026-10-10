@@ -20,7 +20,7 @@ export const GRUPOS_ORIGEM = [
 ] as const;
 
 export type GrupoOrigem = (typeof GRUPOS_ORIGEM)[number];
-export type TipoLista = "feitos" | "agendados" | "pendentes";
+export type TipoLista = "feitos" | "agendados" | "pendentes" | "semcobranca";
 
 export type FiltroRelatorio = {
   procedimentoId: number | null;
@@ -35,6 +35,8 @@ export type ResumoRelatorio = {
   feitos: LinhaOrigem[];
   pendentes: LinhaOrigem[];
   agendados: LinhaOrigem[];
+  // Atendimentos de venda paga com valor R$ 0 (ex.: sessao de pacote ja pago, retorno).
+  semCobranca: number;
 };
 
 export type LinhaLista = {
@@ -132,20 +134,20 @@ function organizar(linhas: LinhaBruta[]): LinhaOrigem[] {
 }
 
 export async function resumoPorProcedimento(f: FiltroRelatorio): Promise<ResumoRelatorio> {
-  const [feitos, pendentes, agendados] = await Promise.all([
+  const [feitos, pendentes, agendados, gratis] = await Promise.all([
     prisma.$queryRaw<LinhaBruta[]>`
       SELECT ${GRUPO_SQL} AS "grupo",
              COALESCE(SUM(vi."quantidade"), 0)::int AS "quantidade",
              COALESCE(SUM(vi."valorTotal"), 0)::float8 AS "valor"
       ${DE_VENDAS}
-      WHERE ${filtroVendas(f)} AND v."statusPagamento" = 'Pago'
+      WHERE ${filtroVendas(f)} AND v."statusPagamento" = 'Pago' AND vi."valorTotal" > 0
       GROUP BY 1`,
     prisma.$queryRaw<LinhaBruta[]>`
       SELECT ${GRUPO_SQL} AS "grupo",
              COALESCE(SUM(vi."quantidade"), 0)::int AS "quantidade",
              COALESCE(SUM(vi."valorTotal"), 0)::float8 AS "valor"
       ${DE_VENDAS}
-      WHERE ${filtroVendas(f)} AND v."statusPagamento" = 'Pendente'
+      WHERE ${filtroVendas(f)} AND v."statusPagamento" = 'Pendente' AND vi."valorTotal" > 0
       GROUP BY 1`,
     prisma.$queryRaw<LinhaBruta[]>`
       SELECT ${GRUPO_SQL} AS "grupo",
@@ -154,9 +156,15 @@ export async function resumoPorProcedimento(f: FiltroRelatorio): Promise<ResumoR
       ${DE_AGENDA}
       WHERE ${filtroAgenda(f)}
       GROUP BY 1`,
+    prisma.$queryRaw<{ quantidade: number }[]>`
+      SELECT COALESCE(SUM(vi."quantidade"), 0)::int AS "quantidade"
+      ${DE_VENDAS}
+      WHERE ${filtroVendas(f)} AND v."statusPagamento" = 'Pago' AND vi."valorTotal" <= 0`,
   ]);
 
-  return { feitos: organizar(feitos), pendentes: organizar(pendentes), agendados: organizar(agendados) };
+  return { feitos: organizar(feitos), pendentes: organizar(pendentes), agendados: organizar(agendados),
+    semCobranca: gratis[0]?.quantidade ?? 0,
+  };
 }
 
 type LinhaListaBruta = {
@@ -197,7 +205,8 @@ export async function listaPorProcedimento(
                  (COUNT(*) OVER ())::int AS "total"
           ${DE_VENDAS}
           WHERE ${filtroVendas(f)}
-            AND v."statusPagamento" = ${tipo === "feitos" ? "Pago" : "Pendente"}
+            AND v."statusPagamento" = ${tipo === "pendentes" ? "Pendente" : "Pago"}
+            AND ${tipo === "semcobranca" ? Prisma.sql`vi."valorTotal" <= 0` : Prisma.sql`vi."valorTotal" > 0`}
           ORDER BY v."data" DESC, vi."id" DESC
           LIMIT ${POR_PAGINA} OFFSET ${deslocamento}`;
 

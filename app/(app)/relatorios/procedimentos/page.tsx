@@ -50,6 +50,7 @@ const TITULO_LISTA: Record<TipoLista, string> = {
   feitos: "Quem fez (pagos)",
   agendados: "Agendados em aberto",
   pendentes: "Feitos e ainda não pagos",
+  semcobranca: "Atendimentos sem cobrança",
 };
 
 export default async function RelatorioProcedimentosPage({ searchParams }: { searchParams: Params }) {
@@ -88,7 +89,12 @@ export default async function RelatorioProcedimentosPage({ searchParams }: { sea
 
   const tipoPedido = um(params.lista);
   const tipo: TipoLista | null =
-    tipoPedido === "feitos" || tipoPedido === "agendados" || tipoPedido === "pendentes" ? tipoPedido : null;
+    tipoPedido === "feitos" ||
+    tipoPedido === "agendados" ||
+    tipoPedido === "pendentes" ||
+    tipoPedido === "semcobranca"
+      ? tipoPedido
+      : null;
   const lista = tipo ? await listaPorProcedimento(filtro, tipo, Number(um(params.pagina)) || 1) : null;
 
   const nomeProc = escolhido ? escolhido.nome : "procedimentos";
@@ -161,7 +167,17 @@ export default async function RelatorioProcedimentosPage({ searchParams }: { sea
           origens ({formatarMoeda(outras.valor)}).
         </p>
         <p className="mt-1 text-xs opacity-80">
-          Conta só o que foi vendido e já está pago. As vendas canceladas ficam de fora.
+          Conta só o que foi vendido e já está pago, com valor. As vendas canceladas ficam de fora.
+          {resumo.semCobranca > 0 ? (
+            <>
+              {" "}
+              Não entram aqui {resumo.semCobranca} atendimento(s) sem cobrança (R$ 0,00, como sessão de pacote
+              já pago ou retorno).{" "}
+              <Link href={linkLista("semcobranca")} className="font-semibold underline">
+                Ver quais
+              </Link>
+            </>
+          ) : null}
         </p>
       </section>
 
