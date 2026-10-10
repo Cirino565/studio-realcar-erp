@@ -89,7 +89,7 @@ export default async function GoogleAdsPage() {
           ? {
               ok: ultimaExecucao.acao === "Exportação de conversões atualizada",
               detalhes: ultimaExecucao.detalhes,
-              usuario: ultimaExecucao.usuario,
+              usuario: ultimaExecucao.usuario ?? "automático",
               data: ultimaExecucao.createdAt.toISOString(),
             }
           : null
