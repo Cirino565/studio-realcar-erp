@@ -2417,7 +2417,13 @@ function MenuAcoesCampanha({ disabled, onVincularCliente, onLancarCusto, onVincu
   onExcluir: () => void;
 }) {
   const botaoRef = useRef<HTMLButtonElement>(null);
-  const [aberto, setAberto] = useState<{ top: number; right: number; destino: Element } | null>(null);
+  const [aberto, setAberto] = useState<{
+    top?: number;
+    bottom?: number;
+    right: number;
+    maxAltura: number;
+    destino: Element;
+  } | null>(null);
 
   useEffect(() => {
     if (!aberto) return;
@@ -2448,11 +2454,30 @@ function MenuAcoesCampanha({ disabled, onVincularCliente, onLancarCusto, onVincu
     const botao = botaoRef.current;
     if (!botao) return;
     const caixa = botao.getBoundingClientRect();
-    setAberto({
-      top: caixa.bottom + 6,
-      right: window.innerWidth - caixa.right,
-      destino: botao.closest(".app-shell") ?? document.body,
-    });
+    // O menu tem uns 210px de altura. Se nao couber embaixo do botao (linha
+    // no fim da tela), abre para CIMA; se faltar espaco dos dois lados, usa o
+    // maior e deixa rolar dentro do menu - nunca fica cortado.
+    const margem = 12;
+    const espacoAbaixo = window.innerHeight - caixa.bottom - margem;
+    const espacoAcima = caixa.top - margem;
+    const abrirParaBaixo = espacoAbaixo >= 210 || espacoAbaixo >= espacoAcima;
+    const destino = botao.closest(".app-shell") ?? document.body;
+
+    setAberto(
+      abrirParaBaixo
+        ? {
+            top: caixa.bottom + 6,
+            right: window.innerWidth - caixa.right,
+            maxAltura: Math.max(120, espacoAbaixo),
+            destino,
+          }
+        : {
+            bottom: window.innerHeight - caixa.top + 6,
+            right: window.innerWidth - caixa.right,
+            maxAltura: Math.max(120, espacoAcima),
+            destino,
+          },
+    );
   }
 
   function escolher(acao: () => void) {
@@ -2482,8 +2507,13 @@ function MenuAcoesCampanha({ disabled, onVincularCliente, onLancarCusto, onVincu
               <div className="fixed inset-0 z-[90]" onClick={() => setAberto(null)} />
               <div
                 role="menu"
-                style={{ top: aberto.top, right: aberto.right }}
-                className="fixed z-[100] w-56 rounded-2xl border border-slate-200 bg-white p-1.5 text-sm shadow-xl dark:border-white/10 dark:bg-[#1d2437]"
+                style={{
+                  top: aberto.top,
+                  bottom: aberto.bottom,
+                  right: aberto.right,
+                  maxHeight: aberto.maxAltura,
+                }}
+                className="fixed z-[100] w-56 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 text-sm shadow-xl dark:border-white/10 dark:bg-[#1d2437]"
               >
                 <button type="button" role="menuitem" onClick={() => escolher(onVincularCliente)} className={itemClasse}>Vincular cliente</button>
                 <button type="button" role="menuitem" onClick={() => escolher(onLancarCusto)} className={itemClasse}>Lançar custo</button>
