@@ -224,7 +224,9 @@ export default function ClienteTable({
                         {cliente.nome}
                       </Link>
                       <p className="mt-0.5 truncate text-xs text-slate-500">
-                        {cliente.cpf || cliente.origem || "Sem documento"}
+                        {[cliente.cpf, cliente.origem ? `Origem: ${cliente.origem}` : null]
+                          .filter(Boolean)
+                          .join(" · ") || "Sem documento"}
                       </p>
                     </div>
                   </div>

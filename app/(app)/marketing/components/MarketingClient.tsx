@@ -1789,7 +1789,19 @@ function LeadCard({
 
       <div className="mt-4 space-y-2 text-xs text-slate-400">
         <div className="flex items-center justify-between gap-3">
-          <span className="truncate">{lead.campanha?.nome || getOrigemLabel(lead.origem)}</span>
+          <span className="truncate" title={lead.campanha && !lead.cliquePago ? "Caiu na página da campanha, mas veio de outra origem: não conta nos números da campanha paga." : undefined}>
+            {lead.campanha ? (
+              <>
+                {lead.campanha.nome}{" "}
+                <span className="text-slate-500">
+                  · origem: {getOrigemLabel(lead.origem)}
+                  {lead.cliquePago ? "" : " (só pela página)"}
+                </span>
+              </>
+            ) : (
+              getOrigemLabel(lead.origem)
+            )}
+          </span>
           <strong className="shrink-0 text-slate-100">{formatarMoeda(lead.valorPrevisto)}</strong>
         </div>
         {lead.telefone ? <div className="flex items-center gap-2"><Phone className="size-3.5 text-slate-500" /><span>{lead.telefone}</span></div> : null}
@@ -2181,8 +2193,22 @@ function CampanhasView({
                     <p className="mt-1 text-xs text-slate-500">{campanha.canal} · {campanha.status}</p>
                     <span className={`mt-2 inline-block rounded-full border px-2.5 py-1 text-[11px] font-semibold ${CLASSE_DA_ETIQUETA[etiqueta.tom]}`}>{etiqueta.texto}</span>
                   </td>
-                  <td className="px-5 py-4">{m.clientes}</td>
-                  <td className="px-5 py-4">{m.leads}</td>
+                  <td className="px-5 py-4">
+                    {m.clientes}
+                    {m.clientesSoPagina > 0 ? (
+                      <p className="mt-1 text-[11px] text-slate-500" title="Caíram na página da campanha mas vieram de outra origem (Direto, Orgânico, Instagram, Perfil da Empresa). Não entram nos números da campanha paga.">
+                        +{m.clientesSoPagina} só pela página
+                      </p>
+                    ) : null}
+                  </td>
+                  <td className="px-5 py-4">
+                    {m.leads}
+                    {m.leadsSoPagina > 0 ? (
+                      <p className="mt-1 text-[11px] text-slate-500" title="Caíram na página da campanha mas vieram de outra origem (Direto, Orgânico, Instagram, Perfil da Empresa). Não entram nos números da campanha paga.">
+                        +{m.leadsSoPagina} só pela página
+                      </p>
+                    ) : null}
+                  </td>
                   <td className="px-5 py-4">
                     <p className="text-rose-200">{formatarMoeda(m.custoReal)}</p>
                     {campanha.investimento > 0 ? <p className="mt-1 text-xs text-slate-500">Orçamento {formatarMoeda(campanha.investimento)}</p> : null}
@@ -2389,6 +2415,13 @@ function CartaoCampanha({ campanha, m, podeGerenciar, disabled, onEditar, onVinc
           <p className="text-[11px] text-slate-500">Custo por lead</p>
         </div>
       </div>
+
+      {m.clientesSoPagina > 0 || m.leadsSoPagina > 0 || m.receitaSoPagina > 0 ? (
+        <p className="rounded-xl bg-slate-100 px-3 py-2 text-[11px] leading-4 text-slate-600 dark:bg-white/[0.06] dark:text-slate-400" title="Caíram na página da campanha mas vieram de outra origem (Direto, Orgânico, Instagram, Perfil da Empresa). Não entram nos números da campanha paga.">
+          Só pela página (outra origem, fora dos números acima): {m.clientesSoPagina} cliente(s), {m.leadsSoPagina} lead(s)
+          {m.receitaSoPagina > 0 ? ` e ${formatarMoeda(m.receitaSoPagina)} em vendas` : ""}.
+        </p>
+      ) : null}
 
       <div className="mt-auto flex items-end justify-between gap-3">
         <div className="min-w-0 text-xs text-slate-500">

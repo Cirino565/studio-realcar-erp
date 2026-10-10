@@ -20,6 +20,13 @@ import { formatarData, formatarMoeda } from "@/lib/format";
 type Props = {
   data: ClienteClinicoData;
   cliente: Cliente;
+  // De onde a cliente veio de verdade (origem real, nunca so a campanha).
+  atribuicao?: {
+    origem: string | null;
+    origemDosContatos: string[];
+    campanha: string | null;
+    cliquePago: boolean;
+  };
 };
 
 
@@ -48,6 +55,7 @@ function getInitials(nome: string) {
 export default function ClienteProfileHeader({
   data,
   cliente,
+  atribuicao,
 }: Props) {
   const totalProcedimentos = data.procedimentos.length;
 
@@ -113,6 +121,29 @@ export default function ClienteProfileHeader({
 
           <ClienteProfileActions cliente={cliente} />
         </div>
+
+        {atribuicao ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-white/10 dark:bg-white/[0.04]">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              De onde veio
+            </p>
+            <p className="mt-1 font-medium text-slate-800 dark:text-slate-100">
+              {atribuicao.origem ||
+                atribuicao.origemDosContatos[0] ||
+                "Origem não informada"}
+              {atribuicao.origemDosContatos.filter((item) => item !== atribuicao.origem).length > 0
+                ? ` (contatos: ${atribuicao.origemDosContatos.filter((item) => item !== atribuicao.origem).join(", ")})`
+                : ""}
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              {atribuicao.cliquePago
+                ? `Clique pago confirmado${atribuicao.campanha ? ` · campanha: ${atribuicao.campanha}` : ""}.`
+                : atribuicao.campanha
+                  ? `Caiu na página da campanha "${atribuicao.campanha}", mas sem clique pago: não conta nos números da campanha.`
+                  : "Sem clique pago."}
+            </p>
+          </div>
+        ) : null}
 
         <AvisoPacoteAberto
           pacotes={data.pacotes.filter((pacote) => pacote.status === "Aberto")}

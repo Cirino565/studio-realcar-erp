@@ -151,11 +151,10 @@ export function avaliarVendaGoogleAds(
   }
 
   const comClique = leadsDaCliente.filter((lead) => Boolean(lead.gclid));
-  const veioDeAnuncio =
-    venda.campanhaId != null ||
-    leadsDaCliente.some(
-      (lead) => lead.campanhaId != null || /google/i.test(lead.origem || ""),
-    );
+  // So conta como "veio de anuncio" quem teve origem Google Ads. Apenas ter
+  // caido na pagina de uma campanha (Direto, Organico, Instagram...) nao e
+  // clique pago e nao deve aparecer como venda que "deveria ter subido".
+  const veioDeAnuncio = leadsDaCliente.some((lead) => /google\s*ads/i.test(lead.origem || ""));
 
   if (comClique.length === 0) {
     return veioDeAnuncio
@@ -163,12 +162,12 @@ export function avaliarVendaGoogleAds(
           ...base,
           status: "NAO_ENVIADA",
           motivo:
-            "A cliente está ligada a uma campanha, mas nenhum contato dela guardou o código de clique do Google (gclid). Sem ele o Google não consegue ligar a venda ao anúncio.",
+            "A origem da cliente é Google Ads, mas nenhum contato dela guardou o código de clique (gclid). Sem ele o Google não consegue ligar a venda ao anúncio.",
         }
       : {
           ...base,
           status: "NAO_SE_APLICA",
-          motivo: "Cliente não veio de anúncio.",
+          motivo: "Cliente sem clique pago (veio de outra origem, mesmo que tenha caído na página de uma campanha).",
         };
   }
 

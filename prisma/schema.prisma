@@ -62,6 +62,7 @@ model Cliente {
   pacotes         PacoteCliente[]
 
   @@index([campanhaAquisicaoId])
+  @@index([origem])
 }
 
 model OrigemCliente {
@@ -491,6 +492,9 @@ model Lead {
   @@index([etapa])
   @@index([proximoContatoEm])
   @@index([codigoAtendimento])
+  // Atribuicao: so clique pago conta na campanha.
+  @@index([gclid])
+  @@index([origem])
 }
 
 model LeadInteracao {

@@ -24,6 +24,8 @@ export type MarketingLead = Lead & {
   } | null;
   interacoes: LeadInteracao[];
   receitaRastreada: number;
+  // Teve clique pago (codigo do clique ou origem Google Ads).
+  cliquePago: boolean;
 };
 
 export type MarketingCampanha = CampanhaMarketing & {
@@ -31,6 +33,10 @@ export type MarketingCampanha = CampanhaMarketing & {
     leads: number;
     convertidos: number;
     clientes: number;
+    // Cairam na pagina da campanha mas nao tiveram clique pago: ficam fora dos numeros.
+    leadsSoPagina: number;
+    clientesSoPagina: number;
+    receitaSoPagina: number;
     receitaBruta: number;
     taxasPagamento: number;
     receitaLiquida: number;
@@ -46,6 +52,8 @@ export type MarketingClienteOption = {
   telefone: string;
   whatsapp: string | null;
   campanhaAquisicaoId: number | null;
+  // Teve clique pago (codigo do clique ou origem Google Ads).
+  cliquePago: boolean;
   createdAt: Date;
 };
 

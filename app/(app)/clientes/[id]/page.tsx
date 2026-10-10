@@ -4,6 +4,7 @@ import { canAccess, requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isGoogleDriveConfigured } from "@/lib/google-drive";
 import ClienteProfileHeader from "@/app/(app)/clientes/components/ClienteProfileHeader";
+import { leadTeveCliquePago, origemEhGoogleAds } from "@/lib/atribuicao-campanha";
 
 type ClientePageProps = {
   params: Promise<{ id: string }> | { id: string };
@@ -167,6 +168,37 @@ export default async function ClientePage({
     );
   }
 
+  // De onde a cliente veio de verdade: origem cadastrada, origem dos contatos
+  // e se algum clique foi pago (codigo do clique / Google Ads).
+  const [contatosDaCliente, campanhaDaCliente] = await Promise.all([
+    prisma.lead.findMany({
+      where: { clienteId },
+      select: { origem: true, gclid: true, campanha: { select: { nome: true } } },
+      orderBy: { createdAt: "asc" },
+    }),
+    cliente.campanhaAquisicaoId
+      ? prisma.campanhaMarketing.findUnique({
+          where: { id: cliente.campanhaAquisicaoId },
+          select: { nome: true },
+        })
+      : Promise.resolve(null),
+  ]);
+  const origemDosContatos = Array.from(
+    new Set(
+      contatosDaCliente
+        .map((contato) => contato.origem?.trim())
+        .filter((origem): origem is string => Boolean(origem)),
+    ),
+  );
+  const atribuicao = {
+    origem: cliente.origem?.trim() || null,
+    origemDosContatos,
+    campanha: campanhaDaCliente?.nome ?? null,
+    cliquePago:
+      origemEhGoogleAds(cliente.origem) ||
+      contatosDaCliente.some((contato) => leadTeveCliquePago(contato)),
+  };
+
   const anamneses = cliente.anamneses.map(mapAnamnese);
 
   const data: ClienteClinicoData = {
@@ -279,7 +311,7 @@ export default async function ClientePage({
 
   return (
     <div className="app-mobile-safe space-y-5 sm:space-y-6">
-      <ClienteProfileHeader data={data} cliente={cliente} />
+      <ClienteProfileHeader data={data} cliente={cliente} atribuicao={atribuicao} />
 
       <ClienteClinicoTabs data={data} initialTab={abaInicial} />
     </div>

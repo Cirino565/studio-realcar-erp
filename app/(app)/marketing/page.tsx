@@ -1,11 +1,20 @@
 import { canAccess, requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import {
+  buscarIdsClientesComCliquePago,
+  leadTeveCliquePago,
+  movimentoEhDeCliquePago,
+} from "@/lib/atribuicao-campanha";
 import MarketingClient from "./components/MarketingClient";
 
 export default async function MarketingPage() {
   const usuario = await requirePagePermission("marketing.visualizar");
 
-  const [leadsBase, campanhasBase, profissionais, servicos, procedimentosInteresseBase, clientes, contas, vendasCampanha, lancamentosCampanha, receitasSemCampanhaBase, motivosPerda] = await Promise.all([
+  // Quem teve clique pago de verdade (codigo do clique ou origem Google Ads).
+  // So essas pessoas entram nos numeros da campanha paga.
+  const idsPagos = await buscarIdsClientesComCliquePago();
+
+  const [leadsBase, campanhasBase, profissionais, servicos, procedimentosInteresseBase, clientesBase, contas, vendasCampanha, lancamentosCampanha, receitasSemCampanhaBase, motivosPerda] = await Promise.all([
     prisma.lead.findMany({
       include: {
         cliente: {
@@ -88,6 +97,7 @@ export default async function MarketingPage() {
       },
       select: {
         campanhaId: true,
+        clienteId: true,
         data: true,
         valorTotal: true,
         totalServicos: true,
@@ -103,6 +113,7 @@ export default async function MarketingPage() {
       },
       select: {
         campanhaId: true,
+        clienteId: true,
         data: true,
         tipo: true,
         categoria: true,
@@ -170,8 +181,14 @@ export default async function MarketingPage() {
     );
   }
 
+  const clientes = clientesBase.map((cliente) => ({
+    ...cliente,
+    cliquePago: idsPagos.has(cliente.id),
+  }));
+
   const leads = leadsBase.map((lead) => ({
     ...lead,
+    cliquePago: leadTeveCliquePago(lead),
     receitaRastreada: lead.agendamentoId
       ? receitaPorAgendamento.get(lead.agendamentoId) || 0
       : 0,
@@ -191,14 +208,23 @@ export default async function MarketingPage() {
   }));
 
   const campanhas = campanhasBase.map((campanha) => {
-    const leadsCampanha = leads.filter((lead) => lead.campanhaId === campanha.id);
-    const clientesCampanha = clientes.filter((cliente) => cliente.campanhaAquisicaoId === campanha.id);
-    const vendas = vendasCampanha.filter((venda) => venda.campanhaId === campanha.id);
+    // "Da pagina" = caiu na pagina da campanha. "Pago" = alem disso, teve clique
+    // pago de verdade. So os pagos entram nos numeros; os demais aparecem a parte.
+    const leadsDaPagina = leads.filter((lead) => lead.campanhaId === campanha.id);
+    const leadsCampanha = leadsDaPagina.filter((lead) => lead.cliquePago);
+    const clientesDaPagina = clientes.filter((cliente) => cliente.campanhaAquisicaoId === campanha.id);
+    const clientesCampanha = clientesDaPagina.filter((cliente) => cliente.cliquePago);
+    const vendasDaPagina = vendasCampanha.filter((venda) => venda.campanhaId === campanha.id);
+    const vendas = vendasDaPagina.filter((venda) => movimentoEhDeCliquePago(venda.clienteId, idsPagos));
+    const receitaSoPagina = vendasDaPagina
+      .filter((venda) => !movimentoEhDeCliquePago(venda.clienteId, idsPagos))
+      .reduce((total, venda) => total + venda.valorTotal, 0);
     const lancamentosManuais = lancamentosCampanha.filter(
       (lancamento) =>
         lancamento.campanhaId === campanha.id &&
         lancamento.tipo === "ENTRADA" &&
-        !lancamento.venda,
+        !lancamento.venda &&
+        movimentoEhDeCliquePago(lancamento.clienteId, idsPagos),
     );
     const custos = lancamentosCampanha.filter(
       (lancamento) =>
@@ -228,6 +254,9 @@ export default async function MarketingPage() {
         leads: leadsCampanha.length,
         convertidos: leadsCampanha.filter((lead) => lead.etapa === "Convertido").length,
         clientes: clientesCampanha.length,
+        leadsSoPagina: leadsDaPagina.length - leadsCampanha.length,
+        clientesSoPagina: clientesDaPagina.length - clientesCampanha.length,
+        receitaSoPagina,
         receitaBruta,
         taxasPagamento,
         receitaLiquida,
@@ -249,8 +278,12 @@ export default async function MarketingPage() {
       contas={contas}
       receitasSemCampanha={receitasSemCampanha}
       movimentosCampanha={{
-        vendas: vendasCampanha,
+        vendas: vendasCampanha.map((venda) => ({
+          ...venda,
+          cliquePago: movimentoEhDeCliquePago(venda.clienteId, idsPagos),
+        })),
         lancamentos: lancamentosCampanha.map((item) => ({
+          cliquePago: movimentoEhDeCliquePago(item.clienteId, idsPagos),
           campanhaId: item.campanhaId,
           tipo: item.tipo,
           categoria: item.categoria,

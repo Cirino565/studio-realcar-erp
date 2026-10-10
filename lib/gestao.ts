@@ -1,4 +1,9 @@
 import { prisma } from "@/lib/prisma";
+import {
+  CLIENTE_COM_CLIQUE_PAGO,
+  buscarIdsClientesComCliquePago,
+  movimentoEhDeCliquePago,
+} from "@/lib/atribuicao-campanha";
 
 const TIMEZONE = "America/Sao_Paulo";
 const DIA_MS = 24 * 60 * 60 * 1000;
@@ -450,6 +455,8 @@ export async function obterDadosGestao(
   const hojeISO = dataISOEmSaoPaulo(agora);
   const inicioHoje = inicioDiaSaoPaulo(hojeISO);
   const sessentaDiasAtras = new Date(inicioHoje.getTime() - 60 * DIA_MS);
+  // Retorno das campanhas: so conta quem teve clique pago de verdade.
+  const idsClientesPagos = await buscarIdsClientesComCliquePago();
 
   const [
     lancamentos,
@@ -617,6 +624,7 @@ export async function obterDadosGestao(
       },
       select: {
         id: true,
+        clienteId: true,
         lancamentoId: true,
         agendamentoId: true,
         totalServicos: true,
@@ -673,6 +681,7 @@ export async function obterDadosGestao(
       where: {
         createdAt: { gte: periodo.inicio, lt: periodo.fim },
         campanhaAquisicaoId: { not: null },
+        ...CLIENTE_COM_CLIQUE_PAGO,
       },
     }),
   ]);
@@ -1112,7 +1121,9 @@ export async function obterDadosGestao(
   // do painel, para nao divergir dos numeros das outras secoes. A venda ja grava
   // a campanha no proprio lancamento, entao nao ha risco de contar duas vezes.
   const lancamentosCampanhaPagos = lancamentosPagos.filter(
-    (item) => typeof item.campanhaId === "number",
+    (item) =>
+      typeof item.campanhaId === "number" &&
+      movimentoEhDeCliquePago(item.clienteId, idsClientesPagos),
   );
 
   const investimentoRealizado = somarValores(
@@ -1147,7 +1158,9 @@ export async function obterDadosGestao(
   // Separacao entre servico e produto. A venda ja guarda os dois valores
   // congelados, entao basta filtrar as vendas pagas que tem campanha.
   const vendasCampanhaPagas = vendasPagas.filter(
-    (venda) => typeof venda.campanhaId === "number",
+    (venda) =>
+      typeof venda.campanhaId === "number" &&
+      movimentoEhDeCliquePago(venda.clienteId, idsClientesPagos),
   );
 
   const receitaServicoAtribuida = somarValores(

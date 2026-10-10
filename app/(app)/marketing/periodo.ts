@@ -12,6 +12,8 @@ export type VendaCampanhaMovimento = {
   totalProdutos: number;
   taxaPagamento: number;
   valorLiquido: number | null;
+  // false = a pessoa so caiu na pagina da campanha, sem clique pago.
+  cliquePago?: boolean;
 };
 
 export type LancamentoCampanhaMovimento = {
@@ -23,6 +25,7 @@ export type LancamentoCampanhaMovimento = {
   valorLiquido: number | null;
   taxaPagamento: number;
   temVenda: boolean;
+  cliquePago?: boolean;
 };
 
 export type MovimentosCampanha = {
@@ -34,6 +37,10 @@ export type MetricasPeriodo = {
   leads: number;
   convertidos: number;
   clientes: number;
+  // So cairam na pagina da campanha (sem clique pago): nao entram nos numeros.
+  leadsSoPagina: number;
+  clientesSoPagina: number;
+  receitaSoPagina: number;
   receitaBruta: number;
   taxasPagamento: number;
   receitaLiquida: number;
@@ -51,6 +58,9 @@ export const METRICAS_PERIODO_VAZIAS: MetricasPeriodo = {
   leads: 0,
   convertidos: 0,
   clientes: 0,
+  leadsSoPagina: 0,
+  clientesSoPagina: 0,
+  receitaSoPagina: 0,
   receitaBruta: 0,
   taxasPagamento: 0,
   receitaLiquida: 0,
@@ -122,17 +132,33 @@ export function calcularMetricasPeriodo({
   inicio: number;
   fim: number;
   movimentos: MovimentosCampanha;
-  leads: Array<{ campanhaId: number | null; etapa: string; createdAt: Date | string }>;
-  clientes: Array<{ campanhaAquisicaoId: number | null; createdAt: Date | string }>;
+  leads: Array<{
+    campanhaId: number | null;
+    etapa: string;
+    createdAt: Date | string;
+    cliquePago?: boolean;
+  }>;
+  clientes: Array<{
+    campanhaAquisicaoId: number | null;
+    createdAt: Date | string;
+    cliquePago?: boolean;
+  }>;
 }): MetricasPeriodo {
-  const vendas = movimentos.vendas.filter(
+  // Da pagina = ligada a campanha. Pago = alem disso, com clique pago de verdade.
+  // Sem a marca (cliquePago ausente) vale como antes.
+  const vendasDaPagina = movimentos.vendas.filter(
     (venda) => venda.campanhaId === campanhaId && dentro(venda.data, inicio, fim),
   );
+  const vendas = vendasDaPagina.filter((venda) => venda.cliquePago !== false);
+  const receitaSoPagina = vendasDaPagina
+    .filter((venda) => venda.cliquePago === false)
+    .reduce((total, venda) => total + venda.valorTotal, 0);
   const manuais = movimentos.lancamentos.filter(
     (item) =>
       item.campanhaId === campanhaId &&
       item.tipo === "ENTRADA" &&
       !item.temVenda &&
+      item.cliquePago !== false &&
       dentro(item.data, inicio, fim),
   );
   const custos = movimentos.lancamentos.filter(
@@ -141,13 +167,17 @@ export function calcularMetricasPeriodo({
       item.tipo === "SAIDA" &&
       dentro(item.data, inicio, fim),
   );
-  const leadsNoPeriodo = leads.filter(
+  const leadsDaPaginaNoPeriodo = leads.filter(
     (lead) => lead.campanhaId === campanhaId && dentro(lead.createdAt, inicio, fim),
   );
-  const clientesNoPeriodo = clientes.filter(
+  const leadsNoPeriodo = leadsDaPaginaNoPeriodo.filter((lead) => lead.cliquePago !== false);
+  const clientesDaPaginaNoPeriodo = clientes.filter(
     (cliente) =>
       cliente.campanhaAquisicaoId === campanhaId &&
       dentro(cliente.createdAt, inicio, fim),
+  );
+  const clientesNoPeriodo = clientesDaPaginaNoPeriodo.filter(
+    (cliente) => cliente.cliquePago !== false,
   );
 
   const soma = <T,>(lista: T[], valor: (item: T) => number) =>
@@ -195,6 +225,9 @@ export function calcularMetricasPeriodo({
     leads: leadsNoPeriodo.length,
     convertidos: leadsNoPeriodo.filter((lead) => lead.etapa === "Convertido").length,
     clientes: clientesNoPeriodo.length,
+    leadsSoPagina: leadsDaPaginaNoPeriodo.length - leadsNoPeriodo.length,
+    clientesSoPagina: clientesDaPaginaNoPeriodo.length - clientesNoPeriodo.length,
+    receitaSoPagina,
     receitaBruta,
     taxasPagamento,
     receitaLiquida,
