@@ -168,6 +168,9 @@ model Agendamento {
   @@index([naturezaAtendimento, data])
   @@index([agendamentoOrigemId])
   @@index([evolucaoStatus, evolucaoPendenteDesde])
+  // Relatorio por procedimento: agendados em aberto por periodo.
+  @@index([status, data])
+  @@index([procedimento, data])
 }
 
 model Profissional {
@@ -391,6 +394,8 @@ model Venda {
   @@index([formaPagamentoConfigId])
   @@index([recebimentoPrevistoEm, statusPagamento])
   @@index([conversaoAdsEnviadaEm])
+  // Relatorio por procedimento: vendas ativas e pagas por periodo.
+  @@index([situacao, statusPagamento, data])
 }
 
 model VendaItem {

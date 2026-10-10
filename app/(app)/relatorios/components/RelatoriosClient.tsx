@@ -18,6 +18,8 @@ import {
   Users,
 } from "lucide-react";
 
+import Link from "next/link";
+
 import { Button } from "@/components/ui/button";
 import { formatarData, formatarMoeda } from "@/lib/format";
 import RetornoClientes from "./RetornoClientes";
@@ -595,6 +597,12 @@ export default function RelatoriosClient({ data }: Props) {
                 className="h-12 w-full rounded-2xl border border-white/[0.12] bg-slate-950/35 pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/50 sm:w-72"
               />
             </div>
+            <Link
+              href="/relatorios/procedimentos"
+              className="inline-flex h-12 items-center justify-center rounded-2xl border border-white/[0.12] bg-white/[0.08] px-5 text-sm font-semibold text-white transition hover:bg-white/[0.14]"
+            >
+              Relatório por procedimento
+            </Link>
             <Button onClick={() => baixarRelatorio(data, periodo)} className="h-12 rounded-2xl">
               <Download className="mr-2 h-4 w-4" />
               Exportar CSV
