@@ -211,6 +211,8 @@ export default function FinalizarAtendimentoModal({
   const [formaPagamentoConfigId, setFormaPagamentoConfigId] = useState<number | null>(null);
   const [statusPagamento, setStatusPagamento] = useState("Pago");
   const [confirmando, setConfirmando] = useState(false);
+  // Avaliacao: so o sinal entra. Cobrar o procedimento aqui exige confirmar.
+  const [cobrancaNaAvaliacaoOk, setCobrancaNaAvaliacaoOk] = useState(false);
   const [finalizado, setFinalizado] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -281,6 +283,7 @@ export default function FinalizarAtendimentoModal({
     );
     setProcedimentosExtras([]);
     setPacoteRegistrado(null);
+    setCobrancaNaAvaliacaoOk(false);
     setItensProdutos([]);
     setItensKits([]);
     setPermitirEstoqueNegativo(false);
@@ -390,6 +393,13 @@ export default function FinalizarAtendimentoModal({
   const currentAppointment = appointment;
   const atendimentoRetorno =
     currentAppointment.naturezaAtendimento === "RETORNO";
+  // Agendamento de AVALIACAO: nele entra so o sinal. O procedimento e cobrado
+  // no dia em que for feito.
+  const atendimentoAvaliacao =
+    !atendimentoRetorno &&
+    normalizarTexto(currentAppointment.procedimento).includes("avalia");
+  const cobrandoNaAvaliacao =
+    atendimentoAvaliacao && valorServico + totais.totalExtras > 0;
 
   // Pacotes em aberto desta cliente. Se existir algum, ela ja adiantou
   // dinheiro que ainda nao foi usado - cobrar o valor cheio aqui contaria a
@@ -501,6 +511,13 @@ export default function FinalizarAtendimentoModal({
     if (procedimentosExtras.some((item) => !item.nome.trim())) {
       setError(
         "Escolha o procedimento em todos os itens adicionados, ou remova os que estiverem em branco.",
+      );
+      return;
+    }
+
+    if (cobrandoNaAvaliacao && !cobrancaNaAvaliacaoOk) {
+      setError(
+        "Esta é uma avaliação: nela entra só o sinal. Zere o valor do serviço ou marque que a cliente pagou o procedimento hoje.",
       );
       return;
     }
@@ -988,6 +1005,65 @@ export default function FinalizarAtendimentoModal({
                                 nesta sessão.
                               </p>
                             )}
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+                    {atendimentoAvaliacao ? (
+                      <div className="mb-3 rounded-xl border-2 border-amber-300 bg-amber-50 px-3 py-3">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle
+                            size={16}
+                            className="mt-0.5 shrink-0 text-amber-700"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-amber-900">
+                              Esta é uma avaliação
+                            </p>
+                            <p className="mt-1 text-[11px] leading-4 text-amber-800">
+                              Na avaliação entra só o sinal (que se registra no
+                              agendamento). O procedimento é cobrado no dia em
+                              que for feito, com o valor cheio - o sistema
+                              desconta o sinal sozinho. Lançar o procedimento
+                              aqui faz a venda e o envio ao Google Ads caírem no
+                              dia errado. Se a cliente fechou um pacote hoje, use
+                              &quot;Registrar pacote&quot;.
+                            </p>
+
+                            {valorServico > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setValorServico(0);
+                                  setCobrancaNaAvaliacaoOk(false);
+                                }}
+                                className="mt-2 inline-flex min-h-9 items-center justify-center rounded-lg bg-amber-600 px-3 text-[11px] font-bold text-white transition hover:bg-amber-700"
+                              >
+                                Zerar valor (avaliação não é venda)
+                              </button>
+                            ) : (
+                              <p className="mt-2 text-[11px] font-bold text-emerald-700">
+                                Valor do serviço em R$ 0,00 - correto para uma
+                                avaliação.
+                              </p>
+                            )}
+
+                            {cobrandoNaAvaliacao ? (
+                              <label className="mt-2 flex items-start gap-2 rounded-lg border border-amber-300 bg-white/70 p-2.5">
+                                <input
+                                  type="checkbox"
+                                  checked={cobrancaNaAvaliacaoOk}
+                                  onChange={(event) =>
+                                    setCobrancaNaAvaliacaoOk(event.target.checked)
+                                  }
+                                  className="mt-0.5 size-4"
+                                />
+                                <span className="text-[11px] font-semibold text-amber-900">
+                                  A cliente pagou o procedimento hoje, mesmo
+                                  sendo uma avaliação.
+                                </span>
+                              </label>
+                            ) : null}
                           </div>
                         </div>
                       </div>
