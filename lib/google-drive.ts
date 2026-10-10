@@ -572,12 +572,6 @@ export async function atualizarPlanilhaConversoesAds(
 ): Promise<ResultadoPlanilhaConversoes> {
   const spreadsheetId = await getOrCreateConversoesSpreadsheet();
 
-  const limpar = await driveFetch(
-    `${SHEETS_API_BASE}/${spreadsheetId}/values/A1:E100000:clear`,
-    { method: "POST" },
-  );
-  await assertDriveResponse(limpar, "Falha ao limpar a planilha de conversões");
-
   // O cabeçalho fica na linha 1, sem a linha "Parameters:TimeZone=" que o
   // upload manual de arquivo usa. Na conexão direta por Google Sheets, o
   // Google Ads só reconhece cabeçalho na primeira linha - e como cada data
@@ -609,6 +603,15 @@ export async function atualizarPlanilhaConversoesAds(
     },
   );
   await assertDriveResponse(escrever, "Falha ao escrever na planilha de conversões");
+
+  // Escreve primeiro e so depois limpa o que sobrou embaixo: assim a planilha
+  // nunca fica vazia no meio do caminho (se algo falhar, os dados antigos
+  // continuam la para o Google importar).
+  const limparResto = await driveFetch(
+    `${SHEETS_API_BASE}/${spreadsheetId}/values/A${valores.length + 1}:E100000:clear`,
+    { method: "POST" },
+  );
+  await assertDriveResponse(limparResto, "Falha ao limpar o resto da planilha de conversões");
 
   return {
     spreadsheetId,

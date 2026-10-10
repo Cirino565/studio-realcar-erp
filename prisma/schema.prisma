@@ -374,6 +374,8 @@ model Venda {
   observacoes         String?
   data                DateTime  @default(now())
   conversaoAdsEnviadaEm DateTime?
+  // Ultimo erro ao escrever esta venda na planilha do Google Ads (limpo ao dar certo).
+  conversaoAdsErro    String?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
@@ -667,6 +669,8 @@ model ConfiguracaoClinica {
   toleranciaAtraso      Int      @default(10)
   moeda                 String   @default("BRL")
   timezone              String   @default("America/Sao_Paulo")
+  // Envia tambem uma conversao por procedimento ao Google Ads (ex.: "Venda Real - Limpeza de Pele").
+  googleAdsPorProcedimento Boolean @default(false)
   logoUrl               String?
   corPrincipal          String   @default("violet")
   assinaturaMensagem    String?

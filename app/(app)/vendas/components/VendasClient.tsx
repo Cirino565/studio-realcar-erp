@@ -946,6 +946,26 @@ export default function VendasClient({
   );
 }
 
+function GoogleAdsSelo({ googleAds }: { googleAds: VendaHistoricoItem["googleAds"] }) {
+  if (!googleAds || googleAds.status === "NAO_SE_APLICA") return null;
+
+  const visual = {
+    ENVIADA: { texto: "Google Ads: enviada", classe: "bg-emerald-100 text-emerald-700" },
+    AGUARDANDO: { texto: "Google Ads: aguardando envio", classe: "bg-amber-100 text-amber-700" },
+    ERRO: { texto: "Google Ads: erro", classe: "bg-rose-100 text-rose-700" },
+    NAO_ENVIADA: { texto: "Google Ads: não enviada", classe: "bg-slate-200 text-slate-700" },
+  }[googleAds.status];
+
+  return (
+    <span
+      title={googleAds.motivo}
+      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${visual.classe}`}
+    >
+      {visual.texto}
+    </span>
+  );
+}
+
 function ResumoCard({
   icon: Icon,
   label,
@@ -1027,6 +1047,7 @@ function VendaRow({
                 {venda.statusPagamento}
               </span>
             )}
+            <GoogleAdsSelo googleAds={venda.googleAds} />
           </div>
           <p className="mt-1 text-xs text-slate-500">
             {dataHora(venda.data)}, {venda.origem}, {venda.formaPagamento || "Pagamento não informado"}

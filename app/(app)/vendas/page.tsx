@@ -1,4 +1,5 @@
 import { canAccess, isAdminUser, requirePagePermission } from "@/lib/auth";
+import { avaliarVendasGoogleAds } from "@/lib/conversoes-marketing";
 import { prisma } from "@/lib/prisma";
 import VendasClient from "./components/VendasClient";
 
@@ -94,6 +95,16 @@ export default async function VendasPage() {
     }),
   ]);
 
+  // Situacao do envio ao Google Ads de cada venda mostrada. Se der problema
+  // aqui, a tela de vendas continua funcionando normalmente, sem o indicador.
+  const googleAds = new Map(
+    (
+      await avaliarVendasGoogleAds({ ids: vendas.map((venda) => venda.id) }).catch(() => ({
+        avaliacoes: [],
+      }))
+    ).avaliacoes.map((item) => [item.vendaId, { status: item.status, motivo: item.motivo }]),
+  );
+
   return (
     <VendasClient
       clientes={clientes}
@@ -102,6 +113,7 @@ export default async function VendasPage() {
       formasPagamento={formasPagamento}
       vendas={vendas.map((venda) => ({
         ...venda,
+        googleAds: googleAds.get(venda.id),
         data: venda.data.toISOString(),
         canceladaEm: venda.canceladaEm?.toISOString() ?? null,
       }))}

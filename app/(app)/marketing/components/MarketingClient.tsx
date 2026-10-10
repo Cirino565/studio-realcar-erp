@@ -1458,6 +1458,12 @@ export default function MarketingClient({
 
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button type="button" variant="outline" onClick={() => baixarCsv(leadsFiltrados)} disabled={leadsFiltrados.length === 0}>Exportar CSV</Button>
+              <Link
+                href="/marketing/google-ads"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:border-violet-200 hover:bg-violet-50 hover:text-violet-800"
+              >
+                Conversões Google Ads
+              </Link>
               {podeGerenciarMarketing ? (
                 <>
                   <Button type="button" variant="outline" onClick={() => setCampanhaModal(true)}><Megaphone className="size-4" /> Campanha</Button>

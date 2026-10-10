@@ -99,10 +99,21 @@ export async function POST(request: NextRequest) {
     // inclusive porque a essa altura pode já ter sido editado à mão.
     const existente = await prisma.lead.findFirst({
       where: { codigoAtendimento: codigo },
-      select: { id: true },
+      select: { id: true, gclid: true },
     });
 
     if (existente) {
+      // Se o lead ja existia SEM o codigo de clique e agora ele chegou, guarda
+      // - sem isso a venda dessa cliente nunca subiria para o Google Ads.
+      const gclidRecebido = limpar(typeof body.gclid === "string" ? body.gclid : null);
+
+      if (!existente.gclid && gclidRecebido) {
+        await prisma.lead.update({
+          where: { id: existente.id },
+          data: { gclid: gclidRecebido.slice(0, 500) },
+        });
+      }
+
       return NextResponse.json({ ok: true, criado: false, leadId: existente.id });
     }
 
@@ -112,7 +123,7 @@ export async function POST(request: NextRequest) {
     const origemDetectada = limpar(
       typeof body.origem_detectada === "string" ? body.origem_detectada : null,
     );
-    const gclid = limpar(typeof body.gclid === "string" ? body.gclid : null);
+    const gclid = limpar(typeof body.gclid === "string" ? body.gclid : null)?.slice(0, 500) ?? null;
 
     // Descobre a campanha em duas tentativas:
     //

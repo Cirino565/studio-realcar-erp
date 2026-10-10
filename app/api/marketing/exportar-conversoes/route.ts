@@ -2,16 +2,10 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-import {
-  gerarConversoesGoogleAds,
-  marcarVendasComoEnviadasAds,
-} from "@/lib/conversoes-marketing";
-import { atualizarPlanilhaConversoesAds, isGoogleDriveConfigured } from "@/lib/google-drive";
-import { prisma } from "@/lib/prisma";
+import { executarExportacaoGoogleAds } from "@/lib/conversoes-marketing";
+import { isGoogleDriveConfigured } from "@/lib/google-drive";
 
 export const dynamic = "force-dynamic";
-
-const JANELA_DIAS = 90;
 
 function comparacaoSegura(valorRecebido: string, valorEsperado: string) {
   const recebido = Buffer.from(valorRecebido);
@@ -72,45 +66,22 @@ async function executar(request: NextRequest) {
     );
   }
 
-  try {
-    const linhas = await gerarConversoesGoogleAds(JANELA_DIAS);
+  // A planilha leva TODAS as vendas elegíveis dos últimos 90 dias (não só as
+  // novas) e cada venda registra se subiu ou deu erro - dá para ver na tela
+  // Marketing > Conversões Google Ads e em cada venda.
+  const resultado = await executarExportacaoGoogleAds("Sistema (exportação de conversões)");
 
-    // Nada novo desde o último envio - não sobe planilha nenhuma.
-    if (linhas.length === 0) {
-      return NextResponse.json({
-        ok: true,
-        linhas: 0,
-        planilha: null,
-        mensagem: "Nenhuma conversão nova. Nada foi enviado.",
-      });
-    }
-
-    const resultado = await atualizarPlanilhaConversoesAds(linhas);
-
-    // Só marca como enviado DEPOIS da confirmação de sucesso acima. Se a
-    // linha anterior tivesse falhado, o código nunca chegaria aqui, e essas
-    // vendas continuariam disponíveis para a próxima tentativa.
-    await marcarVendasComoEnviadasAds(linhas.map((linha) => linha.vendaId));
-
-    await prisma.auditoria.create({
-      data: {
-        modulo: "Marketing",
-        acao: "Exportação de conversões atualizada",
-        entidade: "CampanhaMarketing",
-        usuario: "Sistema (exportação de conversões)",
-        detalhes: `${linhas.length} conversão(ões) nova(s) na janela de ${JANELA_DIAS} dias.`,
-      },
-    });
-
-    return NextResponse.json({
-      ok: true,
-      linhas: linhas.length,
-      planilha: resultado.url,
-    });
-  } catch (erro) {
-    const mensagem = erro instanceof Error ? erro.message : "Erro desconhecido.";
-    return NextResponse.json({ ok: false, erro: mensagem }, { status: 500 });
+  if (!resultado.ok) {
+    return NextResponse.json({ ok: false, erro: resultado.erro }, { status: 500 });
   }
+
+  return NextResponse.json({
+    ok: true,
+    linhas: resultado.linhas,
+    vendas: resultado.vendas,
+    novas: resultado.novas,
+    planilha: resultado.planilha,
+  });
 }
 
 export async function GET(request: NextRequest) {

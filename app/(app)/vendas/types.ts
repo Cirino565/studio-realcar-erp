@@ -26,6 +26,11 @@ export type VendaHistoricoItem = {
   campanhaId: number | null;
   formaPagamento: string | null;
   statusPagamento: string;
+  // Situacao do envio da venda ao Google Ads (so para clientes vindas de anuncio).
+  googleAds?: {
+    status: "ENVIADA" | "AGUARDANDO" | "ERRO" | "NAO_ENVIADA" | "NAO_SE_APLICA";
+    motivo: string;
+  };
   situacao: string;
   canceladaEm: string | null;
   canceladaPor: string | null;
