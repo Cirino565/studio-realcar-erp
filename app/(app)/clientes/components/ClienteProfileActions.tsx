@@ -6,12 +6,15 @@ import { CalendarPlus, MessageCircle, Pencil } from "lucide-react";
 
 import type { Cliente } from "@/lib/types";
 import ClienteQuickMessageModal from "./ClienteQuickMessageModal";
+import JuntarCadastrosBotao from "./JuntarCadastrosBotao";
 
 type Props = {
   cliente: Cliente;
+  // Mostra o botao de juntar cadastro duplicado (so para quem pode gerenciar clientes).
+  podeJuntar?: boolean;
 };
 
-export default function ClienteProfileActions({ cliente }: Props) {
+export default function ClienteProfileActions({ cliente, podeJuntar = false }: Props) {
   const [mensagemAberta, setMensagemAberta] = useState(false);
 
   return (
@@ -41,6 +44,10 @@ export default function ClienteProfileActions({ cliente }: Props) {
           <Pencil className="size-4" />
           Editar
         </Link>
+
+        {podeJuntar ? (
+          <JuntarCadastrosBotao clienteId={cliente.id} clienteNome={cliente.nome} />
+        ) : null}
       </div>
 
       <ClienteQuickMessageModal

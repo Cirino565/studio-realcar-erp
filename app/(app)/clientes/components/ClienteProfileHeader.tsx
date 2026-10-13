@@ -20,6 +20,7 @@ import { formatarData, formatarMoeda } from "@/lib/format";
 type Props = {
   data: ClienteClinicoData;
   cliente: Cliente;
+  podeJuntar?: boolean;
   // De onde a cliente veio de verdade (origem real, nunca so a campanha).
   atribuicao?: {
     origem: string | null;
@@ -56,6 +57,7 @@ export default function ClienteProfileHeader({
   data,
   cliente,
   atribuicao,
+  podeJuntar = false,
 }: Props) {
   const totalProcedimentos = data.procedimentos.length;
 
@@ -119,7 +121,7 @@ export default function ClienteProfileHeader({
             </div>
           </div>
 
-          <ClienteProfileActions cliente={cliente} />
+          <ClienteProfileActions cliente={cliente} podeJuntar={podeJuntar} />
         </div>
 
         {atribuicao ? (

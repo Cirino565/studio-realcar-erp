@@ -311,7 +311,12 @@ export default async function ClientePage({
 
   return (
     <div className="app-mobile-safe space-y-5 sm:space-y-6">
-      <ClienteProfileHeader data={data} cliente={cliente} atribuicao={atribuicao} />
+      <ClienteProfileHeader
+        data={data}
+        cliente={cliente}
+        atribuicao={atribuicao}
+        podeJuntar={canAccess(usuario, "clientes.gerenciar")}
+      />
 
       <ClienteClinicoTabs data={data} initialTab={abaInicial} />
     </div>
