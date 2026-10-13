@@ -590,6 +590,44 @@ function EvolucaoCard({
 // Agrupa as fotos por dia (mais recente primeiro) para exibi-las em blocos
 // com um cabecalho de data, em vez de uma grade unica onde tudo se mistura
 // quando a cliente tem varios retornos.
+// Mostra a foto; se o arquivo nao abrir (por exemplo, nao existe mais no Drive),
+// mostra um aviso claro no lugar do quadrado vazio.
+function ImagemDaFoto({
+  src,
+  alt,
+  className,
+}: {
+  src: string;
+  alt: string;
+  className: string;
+}) {
+  const [falhou, setFalhou] = useState(false);
+
+  if (falhou) {
+    return (
+      <div className="flex h-full min-h-40 w-full flex-col items-center justify-center gap-2 p-4 text-center text-slate-500 dark:text-slate-300">
+        <AlertTriangle className="size-6 text-amber-500" />
+        <p className="text-sm font-semibold">Foto não encontrada no Drive</p>
+        <p className="text-xs">
+          O arquivo não existe mais. Você pode excluir este registro e enviar a foto de novo.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+      className={className}
+      onError={() => setFalhou(true)}
+    />
+  );
+}
+
 function agruparFotosPorData(fotos: ClienteFotoData[]) {
   const grupos = new Map<string, { rotulo: string; fotos: ClienteFotoData[] }>();
 
@@ -1047,12 +1085,9 @@ export function ClienteClinicoTabs({
                         className="group relative block aspect-[4/3] w-full bg-slate-100 text-left dark:bg-slate-950/60"
                         aria-label={`Abrir foto ${foto.titulo}`}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
+                        <ImagemDaFoto
                           src={foto.url}
                           alt={foto.titulo}
-                          loading="lazy"
-                          decoding="async"
                           className="h-full w-full object-contain"
                         />
                         <span className="absolute right-3 top-3 flex size-9 items-center justify-center rounded-full bg-slate-950/75 text-white opacity-90 shadow-lg transition group-hover:scale-105 group-hover:bg-slate-950">
@@ -1830,8 +1865,8 @@ export function ClienteClinicoTabs({
             </div>
 
             <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-black p-2 sm:p-4">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <ImagemDaFoto
+                key={fotoAberta.id}
                 src={fotoAberta.url}
                 alt={fotoAberta.titulo}
                 className="max-h-[78vh] max-w-full object-contain"

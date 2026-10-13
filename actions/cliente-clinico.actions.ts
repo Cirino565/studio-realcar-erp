@@ -325,8 +325,21 @@ export async function excluirRegistroClinico(
       throw new Error("Foto não encontrada ou já excluída.");
     }
 
+    // Se o arquivo ja nao existe mais no Drive (foi apagado la), nao ha o que
+    // mandar para a lixeira: segue e so oculta o registro quebrado da ficha.
+    let arquivoJaNaoExiste = false;
+
     if (foto.driveFileId) {
-      await moveDriveFileToTrash(foto.driveFileId);
+      try {
+        await moveDriveFileToTrash(foto.driveFileId);
+      } catch (error) {
+        const texto = error instanceof Error ? error.message : "";
+        if (/not found|404/i.test(texto)) {
+          arquivoJaNaoExiste = true;
+        } else {
+          throw error;
+        }
+      }
     }
 
     try {
@@ -345,14 +358,16 @@ export async function excluirRegistroClinico(
             entidade: "ClienteFoto",
             entidadeId: String(foto.id),
             usuario: usuario.nome || usuario.email,
-            detalhes: foto.driveFileId
+            detalhes: arquivoJaNaoExiste
+              ? `Cliente ${clienteId}, título ${foto.titulo}. O arquivo já não existia no Drive; só o registro foi ocultado.`
+              : foto.driveFileId
               ? `Cliente ${clienteId}, título ${foto.titulo}. O arquivo do Drive foi movido para a lixeira.`
               : `Cliente ${clienteId}, título ${foto.titulo}. Registro antigo por link ocultado.`,
           },
         }),
       ]);
     } catch (error) {
-      if (foto.driveFileId) {
+      if (foto.driveFileId && !arquivoJaNaoExiste) {
         await restoreDriveFile(foto.driveFileId).catch(() => undefined);
       }
       throw error;
