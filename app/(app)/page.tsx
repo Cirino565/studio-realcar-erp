@@ -357,6 +357,8 @@ export default async function Home() {
 
     prisma.lancamento.findMany({
       where: {
+        // So recebimentos (entradas). Contas fixas a pagar ficam no Financeiro.
+        tipo: "ENTRADA",
         statusPagamento: { notIn: ["Pago", "Cancelado"] },
         data: { lt: inicioAmanha },
       },
@@ -401,6 +403,8 @@ export default async function Home() {
       where: {
         data: { gte: inicioMes, lt: inicioProximoMes },
         statusPagamento: { not: "Cancelado" },
+        // Conta fixa ainda nao paga nao e despesa realizada.
+        NOT: { tipo: "SAIDA", statusPagamento: "Pendente" },
       },
       select: { tipo: true, valor: true, statusPagamento: true },
     }),

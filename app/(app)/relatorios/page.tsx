@@ -22,7 +22,11 @@ export default async function RelatoriosPage() {
         orderBy: { data: "desc" },
       }),
       prisma.lancamento.findMany({
-        where: { statusPagamento: { not: "Cancelado" } },
+        where: {
+          statusPagamento: { not: "Cancelado" },
+          // Conta fixa ainda nao paga nao e despesa realizada.
+          NOT: { tipo: "SAIDA", statusPagamento: "Pendente" },
+        },
         orderBy: { data: "desc" },
       }),
       prisma.produto.findMany({

@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { formatarMoeda } from "@/lib/format";
 
+import ContasFixasPainel from "./ContasFixasPainel";
 import FinanceiroConfiguracoes from "./FinanceiroConfiguracoes";
 import FinanceiroResumo from "./FinanceiroResumo";
 import LancamentosTable from "./LancamentosTable";
@@ -27,6 +28,7 @@ import type {
   CampanhaFinanceiroOption,
   ClienteFinanceiroOption,
   ContaFinanceiraData,
+  ContaFixaData,
   FinanceiroResumoData,
   FormaPagamentoConfigData,
   LancamentoFinanceiro,
@@ -39,6 +41,7 @@ type Props = {
   formasPagamento: FormaPagamentoConfigData[];
   campanhas: CampanhaFinanceiroOption[];
   clientes: ClienteFinanceiroOption[];
+  contasFixas?: ContaFixaData[];
 };
 
 type SituacaoFiltro = "ativos" | "cancelados" | "todos";
@@ -196,7 +199,7 @@ function baixarCsv(
   URL.revokeObjectURL(url);
 }
 
-export default function FinanceiroClient({ lancamentos, contas, formasPagamento, campanhas, clientes }: Props) {
+export default function FinanceiroClient({ lancamentos, contas, formasPagamento, campanhas, clientes, contasFixas = [] }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [modalAberto, setModalAberto] = useState(false);
@@ -321,6 +324,13 @@ export default function FinanceiroClient({ lancamentos, contas, formasPagamento,
           </div>
         </div>
       </section>
+
+      <ContasFixasPainel
+        contasFixas={contasFixas}
+        lancamentos={lancamentos}
+        contas={contas}
+        onAtualizado={() => router.refresh()}
+      />
 
       <FinanceiroConfiguracoes contas={contas} formasPagamento={formasPagamento} />
 

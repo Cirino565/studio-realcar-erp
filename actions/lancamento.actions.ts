@@ -262,6 +262,7 @@ export async function excluirLancamento(id: number) {
     select: {
       id: true,
       clienteId: true,
+      contaFixaId: true,
       venda: { select: { id: true } },
     },
   });
@@ -276,6 +277,17 @@ export async function excluirLancamento(id: number) {
       mensagem:
         "Este lançamento pertence a uma venda e não pode ser excluído isoladamente, pois isso quebraria o histórico de receita, custo e estoque.",
     };
+  }
+
+  // Conta fixa do mes: cancela em vez de apagar, senao o sistema lancaria
+  // de novo a mesma conta deste mes na proxima vez que o Financeiro abrir.
+  if (existente.contaFixaId) {
+    await prisma.lancamento.update({
+      where: { id },
+      data: { statusPagamento: "Cancelado", observacoes: "Conta fixa deste mês cancelada." },
+    });
+    revalidarFinanceiro(existente.clienteId);
+    return { ok: true, mensagem: "Conta fixa deste mês cancelada (ela não será lançada de novo neste mês)." };
   }
 
   await prisma.lancamento.delete({ where: { id } });

@@ -1,4 +1,5 @@
 import { requirePagePermission } from "@/lib/auth";
+import { gerarContasFixasPendentes } from "@/lib/contas-fixas";
 import { prisma } from "@/lib/prisma";
 
 import FinanceiroClient from "./components/FinanceiroClient";
@@ -9,7 +10,11 @@ function lancamentoCancelado(item: { statusPagamento: string; venda: { situacao:
 
 export default async function FinanceiroPage() {
   await requirePagePermission("financeiro.visualizar");
-  const [lancamentos, contasBase, formasPagamento, campanhas, clientes] = await Promise.all([
+
+  // Lanca sozinho as contas fixas do mes que ainda faltam (nunca duplica).
+  await gerarContasFixasPendentes();
+
+  const [lancamentos, contasBase, formasPagamento, campanhas, clientes, contasFixas] = await Promise.all([
     prisma.lancamento.findMany({
       include: {
         contaFinanceira: { select: { id: true, nome: true } },
@@ -45,6 +50,9 @@ export default async function FinanceiroPage() {
       where: { status: { not: "Inativa" } },
       select: { id: true, nome: true, telefone: true, whatsapp: true },
       orderBy: { nome: "asc" },
+    }),
+    prisma.contaFixa.findMany({
+      orderBy: [{ status: "asc" }, { diaVencimento: "asc" }, { nome: "asc" }],
     }),
   ]);
 
@@ -85,6 +93,7 @@ export default async function FinanceiroPage() {
       formasPagamento={formasPagamento}
       campanhas={campanhas}
       clientes={clientes}
+      contasFixas={contasFixas}
     />
   );
 }

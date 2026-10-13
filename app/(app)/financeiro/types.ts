@@ -75,8 +75,26 @@ export type LancamentoFinanceiro = {
     id: number;
     situacao: string;
   } | null;
+  // Conta fixa: de qual conta e de qual mes ("2026-10") e quando vence.
+  contaFixaId?: number | null;
+  competencia?: string | null;
+  vencimento?: Date | null;
   createdAt: Date;
   updatedAt: Date;
+};
+
+export type ContaFixaData = {
+  id: number;
+  nome: string;
+  valor: number;
+  diaVencimento: number;
+  categoria: string | null;
+  formaPagamento: string | null;
+  contaFinanceiraId: number | null;
+  valorVariavel: boolean;
+  status: string;
+  inicioCompetencia: string;
+  observacoes: string | null;
 };
 
 export type FinanceiroResumoData = {

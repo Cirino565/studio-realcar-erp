@@ -245,6 +245,14 @@ model Lancamento {
   pacoteClienteId          Int?
   pacoteCliente            PacoteCliente? @relation(fields: [pacoteClienteId], references: [id], onDelete: SetNull)
 
+  // Conta fixa (aluguel, luz...): de qual conta e de qual mes ("2026-10") este
+  // lancamento e, e quando vence. Uma conta tem no maximo um lancamento por mes.
+  contaFixaId              Int?
+  contaFixa                ContaFixa? @relation(fields: [contaFixaId], references: [id], onDelete: SetNull)
+  competencia              String?
+  vencimento               DateTime?
+
+  @@unique([contaFixaId, competencia])
   @@index([contaFinanceiraId, data])
   @@index([pacoteClienteId])
   @@index([campanhaId, data])
@@ -552,6 +560,30 @@ model PacoteCliente {
   @@index([clienteId, status])
 }
 
+
+// Conta que se repete todo mes. O sistema lanca sozinho como "a pagar".
+model ContaFixa {
+  id                Int      @id @default(autoincrement())
+  nome              String
+  valor             Float
+  diaVencimento     Int
+  categoria         String?
+  formaPagamento    String?
+  contaFinanceiraId Int?
+  // Luz, agua... : o valor e uma estimativa, confirmado na hora de pagar.
+  valorVariavel     Boolean  @default(false)
+  // Ativa / Pausada / Encerrada
+  status            String   @default("Ativa")
+  // Primeiro mes lancado ("2026-10").
+  inicioCompetencia String
+  observacoes       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  lancamentos       Lancamento[]
+
+  @@index([status])
+}
 
 model ContaFinanceira {
   id            Int      @id @default(autoincrement())

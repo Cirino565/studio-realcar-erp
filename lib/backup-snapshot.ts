@@ -63,6 +63,7 @@ export async function gerarSnapshotBackup(): Promise<BackupSnapshot> {
     documentos,
     procedimentos,
     evolucoes,
+    contasFixas,
   ] = await Promise.all([
     prisma.cliente.findMany(),
     prisma.origemCliente.findMany(),
@@ -121,6 +122,7 @@ export async function gerarSnapshotBackup(): Promise<BackupSnapshot> {
     prisma.clienteDocumento.findMany(),
     prisma.clienteProcedimento.findMany(),
     prisma.clienteEvolucao.findMany(),
+    prisma.contaFixa.findMany(),
   ]);
 
   const data = {
@@ -164,6 +166,7 @@ export async function gerarSnapshotBackup(): Promise<BackupSnapshot> {
     documentos,
     procedimentos,
     evolucoes,
+    contasFixas,
   };
 
   const totalRegistros = Object.values(data).reduce(
