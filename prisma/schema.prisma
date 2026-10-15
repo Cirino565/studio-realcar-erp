@@ -252,6 +252,10 @@ model Lancamento {
   competencia              String?
   vencimento               DateTime?
 
+  // Gasto de anuncio lancado sozinho, um por campanha por dia (ex.:
+  // "gads:3:2026-10-14"). Serve para atualizar o mesmo dia sem duplicar.
+  chaveGasto               String?  @unique
+
   @@unique([contaFixaId, competencia])
   @@index([contaFinanceiraId, data])
   @@index([pacoteClienteId])
@@ -527,6 +531,10 @@ model CampanhaMarketing {
   inicio            DateTime?
   fim               DateTime?
   observacoes       String?
+  // Ligacao com a campanha no Google Ads (numero da campanha la) e a partir de
+  // que dia ("2026-10-15") o gasto diario passa a ser lancado sozinho.
+  googleAdsCampanhaId  String? @unique
+  gastoAutomaticoDesde String?
   leadsRelacionados Lead[]
   clientesAquisicao Cliente[]
   vendas            Venda[]
@@ -562,6 +570,21 @@ model PacoteCliente {
 
 
 // Conta que se repete todo mes. O sistema lanca sozinho como "a pagar".
+// Gasto de cada campanha em cada dia, do jeito que o Google Ads mandou
+// (o script agendado dentro do Google Ads envia todo dia).
+model GastoGoogleAdsDia {
+  id               Int      @id @default(autoincrement())
+  googleCampanhaId String
+  campanhaNome     String
+  data             String
+  custo            Float
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([googleCampanhaId, data])
+  @@index([data])
+}
+
 model ContaFixa {
   id                Int      @id @default(autoincrement())
   nome              String

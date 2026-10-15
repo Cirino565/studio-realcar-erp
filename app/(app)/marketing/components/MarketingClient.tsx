@@ -1464,6 +1464,12 @@ export default function MarketingClient({
               >
                 Conversões Google Ads
               </Link>
+              <Link
+                href="/marketing/gasto-google-ads"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:border-violet-200 hover:bg-violet-50 hover:text-violet-800"
+              >
+                Gasto Google Ads
+              </Link>
               {podeGerenciarMarketing ? (
                 <>
                   <Button type="button" variant="outline" onClick={() => setCampanhaModal(true)}><Megaphone className="size-4" /> Campanha</Button>
@@ -2717,25 +2723,29 @@ function CustoCampanhaModal({ campanha, contas, disabled, onClose, onSubmit }: {
   contas: MarketingContaOption[];
   disabled: boolean;
   onClose: () => void;
-  onSubmit: (dados: { descricao: string; valor: number; data: string; contaFinanceiraId: number | null; observacoes?: string }) => void;
+  onSubmit: (dados: { descricao: string; valor: number; data: string; dataFim?: string | null; contaFinanceiraId: number | null; observacoes?: string }) => void;
 }) {
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
   const [data, setData] = useState(hojeInput());
+  // Opcional: ultimo dia do periodo. Com ele o valor e dividido pelos dias.
+  const [dataFim, setDataFim] = useState("");
   const [contaId, setContaId] = useState("");
   const [observacoes, setObservacoes] = useState("");
-  useEffect(() => { if (campanha) { setDescricao(`Investimento em Ads · ${campanha.nome}`); setValor(""); setData(hojeInput()); setContaId(contas.find((item) => item.principal)?.id ? String(contas.find((item) => item.principal)?.id) : ""); setObservacoes(""); } }, [campanha, contas]);
+  useEffect(() => { if (campanha) { setDescricao(`Investimento em Ads · ${campanha.nome}`); setValor(""); setData(hojeInput()); setDataFim(""); setContaId(contas.find((item) => item.principal)?.id ? String(contas.find((item) => item.principal)?.id) : ""); setObservacoes(""); } }, [campanha, contas]);
   if (!campanha) return null;
   return (
     <Modal title="Lançar custo da campanha" description="O valor será registrado como saída de Marketing no financeiro." onClose={onClose}>
       <div className="grid gap-4">
         <Input label="Descrição" value={descricao} onChange={setDescricao} />
-        <div className="grid gap-4 sm:grid-cols-2"><Input label="Valor pago" type="number" min="0.01" step="0.01" value={valor} onChange={setValor} /><Input label="Data" type="date" value={data} onChange={setData} /></div>
+        <div className="grid gap-4 sm:grid-cols-3"><Input label="Valor pago" type="number" min="0.01" step="0.01" value={valor} onChange={setValor} /><Input label={dataFim ? "De (primeiro dia)" : "Data"} type="date" value={data} onChange={setData} /><Input label="Até (opcional)" type="date" value={dataFim} onChange={setDataFim} /></div>
+        {dataFim && dataFim > data ? <div className="rounded-2xl border border-sky-300/15 bg-sky-400/8 p-3 text-xs leading-5 text-sky-100">O valor será dividido por igual entre os {Math.round((new Date(`${dataFim}T12:00:00`).getTime() - new Date(`${data}T12:00:00`).getTime()) / 86400000) + 1} dias do período (um lançamento por dia), para aparecer no dia certo nas telas de período.</div> : dataFim ? <div className="rounded-2xl border border-rose-300/15 bg-rose-400/8 p-3 text-xs leading-5 text-rose-100">O &quot;Até&quot; precisa ser depois do primeiro dia.</div> : null}
+        {campanha.gastoAutomaticoDesde ? <div className="rounded-2xl border border-rose-300/15 bg-rose-400/8 p-3 text-xs leading-5 text-rose-100">Esta campanha recebe o gasto do Google Ads sozinha desde {campanha.gastoAutomaticoDesde.split("-").reverse().join("/")}. Não lance à mão o gasto do Google desses dias, senão ele conta em dobro.</div> : null}
         <label className="grid gap-2 text-sm font-medium text-slate-300">Conta financeira<select value={contaId} onChange={(event) => setContaId(event.target.value)} className="premium-input w-full bg-[#1d2437]"><option value="">Selecione a conta</option>{contas.map((conta) => <option key={conta.id} value={conta.id}>{conta.nome}{conta.banco ? ` · ${conta.banco}` : ""}{conta.principal ? " · principal" : ""}</option>)}</select></label>
         <Textarea label="Observações" value={observacoes} onChange={setObservacoes} />
         {contas.length === 0 ? <div className="rounded-2xl border border-rose-300/15 bg-rose-400/8 p-3 text-xs leading-5 text-rose-100">Cadastre primeiro a conta corrente na área Financeiro.</div> : null}
         <div className="rounded-2xl border border-amber-300/15 bg-amber-400/8 p-3 text-xs leading-5 text-amber-100">O orçamento previsto da campanha não substitui o custo real. Registre cada cobrança do Ads apenas uma vez.</div>
-        <div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={onClose}>Cancelar</Button><Button type="button" disabled={disabled || !descricao.trim() || Number(valor) <= 0 || !contaId} onClick={() => onSubmit({ descricao, valor: Number(valor), data, contaFinanceiraId: contaId ? Number(contaId) : null, observacoes })}>{disabled ? "Salvando..." : "Lançar custo"}</Button></div>
+        <div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={onClose}>Cancelar</Button><Button type="button" disabled={disabled || !descricao.trim() || Number(valor) <= 0 || !contaId || Boolean(dataFim && dataFim <= data)} onClick={() => onSubmit({ descricao, valor: Number(valor), data, dataFim: dataFim || null, contaFinanceiraId: contaId ? Number(contaId) : null, observacoes })}>{disabled ? "Salvando..." : "Lançar custo"}</Button></div>
       </div>
     </Modal>
   );

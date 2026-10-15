@@ -41,7 +41,14 @@ export async function middleware(req: NextRequest) {
   // liberar somente este caminho exato.
   const isExportarConversoes = pathname === "/api/marketing/exportar-conversoes";
 
-  if (isBackupAutomatico || isCapturaClique || isExportarConversoes) {
+  // Rota chamada pelo script agendado dentro do Google Ads para mandar o gasto
+  // de cada dia. Tem sua propria autenticacao (MARKETING_EXPORT_SECRET).
+  //
+  // IMPORTANTE:
+  // liberar somente este caminho exato.
+  const isGastoGoogleAds = pathname === "/api/marketing/gasto-google-ads";
+
+  if (isBackupAutomatico || isCapturaClique || isExportarConversoes || isGastoGoogleAds) {
     return securityHeaders(NextResponse.next());
   }
 

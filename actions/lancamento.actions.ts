@@ -263,6 +263,7 @@ export async function excluirLancamento(id: number) {
       id: true,
       clienteId: true,
       contaFixaId: true,
+      chaveGasto: true,
       venda: { select: { id: true } },
     },
   });
@@ -288,6 +289,17 @@ export async function excluirLancamento(id: number) {
     });
     revalidarFinanceiro(existente.clienteId);
     return { ok: true, mensagem: "Conta fixa deste mês cancelada (ela não será lançada de novo neste mês)." };
+  }
+
+  // Gasto diario do Google Ads: cancela em vez de apagar, senao o proximo
+  // envio do Google lancaria o mesmo dia de novo.
+  if (existente.chaveGasto) {
+    await prisma.lancamento.update({
+      where: { id },
+      data: { statusPagamento: "Cancelado" },
+    });
+    revalidarFinanceiro(existente.clienteId);
+    return { ok: true, mensagem: "Gasto do dia cancelado (ele não será lançado de novo)." };
   }
 
   await prisma.lancamento.delete({ where: { id } });

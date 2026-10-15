@@ -3,6 +3,7 @@
 import { buscarDisponibilidadeAgenda } from "@/actions/agendamento.actions";
 import { requirePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { diaValido, diasEntre, distribuirValor } from "@/lib/gasto-google-ads";
 import { SINAL_PADRAO, sincronizarSinalNoTx } from "@/lib/sinal";
 import { revalidatePath } from "next/cache";
 import type { LeadEtapa } from "@/app/(app)/marketing/types";
@@ -1234,6 +1235,9 @@ export async function registrarCustoCampanha(dados: {
   descricao: string;
   valor: number;
   data: string;
+  // Opcional: ultimo dia do periodo. Com ele, o valor e dividido por igual
+  // entre os dias (um lancamento por dia), em vez de ficar todo num dia so.
+  dataFim?: string | null;
   contaFinanceiraId?: number | null;
   observacoes?: string;
 }) {
@@ -1263,6 +1267,57 @@ export async function registrarCustoCampanha(dados: {
 
   if (!contaId) {
     throw new Error("Cadastre e selecione uma conta financeira antes de lançar o custo da campanha.");
+  }
+
+  // Custo por periodo: espalha o valor pelos dias (de "data" ate "dataFim").
+  const dataFim = dados.dataFim?.trim() || "";
+  if (dataFim && diaValido(dados.data) && diaValido(dataFim) && dataFim > dados.data) {
+    const dias = diasEntre(dados.data, dataFim);
+    if (dias.length > 120) throw new Error("O período pode ter no máximo 120 dias.");
+    const partes = distribuirValor(valor, dias.map(() => 1));
+
+    const criados = await prisma.$transaction(
+      dias.map((dia, indice) =>
+        prisma.lancamento.create({
+          data: {
+            descricao: `${dados.descricao.trim()} (dia ${indice + 1}/${dias.length})`,
+            valor: partes[indice],
+            valorLiquido: partes[indice],
+            tipo: "SAIDA",
+            categoria: "Marketing",
+            observacoes: limparTexto(
+              [dados.observacoes, `Parte de ${valor.toFixed(2)} dividido de ${dados.data} a ${dataFim}.`]
+                .filter(Boolean)
+                .join(" "),
+            ),
+            data: new Date(`${dia}T12:00:00-03:00`),
+            statusPagamento: "Pago",
+            origem: "Marketing",
+            campanhaId: campanha.id,
+            contaFinanceiraId: contaId,
+          },
+          select: { id: true },
+        }),
+      ),
+    );
+
+    await prisma.auditoria.create({
+      data: {
+        modulo: "Marketing",
+        acao: "Lançou custo de campanha por período",
+        entidade: "CampanhaMarketing",
+        entidadeId: String(campanha.id),
+        usuario: usuario.email,
+        detalhes: `${campanha.nome}. R$ ${valor.toFixed(2)} de ${dados.data} a ${dataFim} (${dias.length} dias). Lançamentos: ${criados.map((item) => item.id).join(", ")}.`,
+      },
+    });
+
+    revalidatePath("/marketing");
+    revalidatePath("/financeiro");
+    revalidatePath("/gestao");
+    revalidatePath("/");
+
+    return { ok: true, lancamentoId: criados[0]?.id ?? 0 };
   }
 
   const lancamento = await prisma.lancamento.create({
