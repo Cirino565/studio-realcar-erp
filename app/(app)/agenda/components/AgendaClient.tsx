@@ -20,6 +20,8 @@ import FinalizarAtendimentoModal, {
   type PacoteAbertoFinalizacao,
 } from "./FinalizarAtendimentoModal";
 import NovoAgendamentoModal from "./NovoAgendamentoModal";
+import ParaRemarcarPainel from "./ParaRemarcarPainel";
+import type { RemarcacaoPendente } from "@/lib/remarcacao";
 
 type ClienteAgenda = {
   id: number;
@@ -117,6 +119,8 @@ type Props = {
   podeEditarCliente: boolean;
   podeRegistrarEvolucao: boolean;
   driveConfigurado?: boolean;
+  // Clientes que desmarcaram e ainda nao tem nova data (lista "Para remarcar").
+  remarcacoesPendentes?: RemarcacaoPendente[];
 };
 
 function parseLocalDate(value: string) {
@@ -302,6 +306,7 @@ export default function AgendaClient({
   podeEditarCliente,
   podeRegistrarEvolucao,
   driveConfigurado,
+  remarcacoesPendentes = [],
 }: Props) {
   const [selectedDate, setSelectedDate] = useState(() =>
     parseLocalDate(initialDate),
@@ -393,6 +398,28 @@ export default function AgendaClient({
       ...payload,
       modo: "novo",
       tipoAtendimento: "agendamento",
+    });
+  }
+
+  // "Agendar" na lista Para remarcar: abre um novo horario ja com a cliente e o
+  // procedimento. Ao salvar, o sistema tira ela da lista (e leva o sinal guardado).
+  function abrirRemarcacao(pendente: RemarcacaoPendente) {
+    setSelectedAppointment(null);
+    setNovoHorario({
+      modo: "novo",
+      tipoAtendimento: "agendamento",
+      data: toDateInput(selectedDate),
+      hora: toTimeInput(pendente.data),
+      profissionalId: pendente.profissionalId || undefined,
+      clienteId: pendente.clienteId,
+      procedimento: pendente.procedimento,
+      duracao: pendente.duracao || 60,
+      naturezaAtendimento: pendente.naturezaAtendimento,
+      agendamentoOrigemId: pendente.agendamentoOrigemId,
+      valor: pendente.naturezaAtendimento === "RETORNO" ? 0 : undefined,
+      status: "Agendado",
+      sinalPago: false,
+      observacoes: `Remarcação do horário de ${formatarDataCurta(pendente.data)}.`,
     });
   }
 
@@ -637,6 +664,11 @@ export default function AgendaClient({
               }}
             />
 
+            <ParaRemarcarPainel
+              pendentes={remarcacoesPendentes}
+              onAgendar={abrirRemarcacao}
+            />
+
             <AgendaCalendar
             selectedDate={selectedDate}
             onDateChange={handleDateChange}
@@ -671,6 +703,7 @@ export default function AgendaClient({
         intervaloEntreAtendimentos={intervaloEntreAtendimentos}
         formasPagamento={formasPagamento}
         initialPayload={novoHorario}
+        remarcacoesPendentes={remarcacoesPendentes}
       />
 
       <AppointmentDetailsModal

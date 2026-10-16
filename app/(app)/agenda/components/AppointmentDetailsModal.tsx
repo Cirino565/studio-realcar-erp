@@ -42,6 +42,7 @@ import AvisoPacoteAberto, {
 } from "@/components/pacotes/AvisoPacoteAberto";
 
 import AnamneseAtendimentoModal from "./AnamneseAtendimentoModal";
+import DesmarcarAgendamentoModal from "./DesmarcarAgendamentoModal";
 import ClienteQuickEditModal from "./ClienteQuickEditModal";
 
 export type ClienteAtendimentoDetalhes = {
@@ -274,6 +275,7 @@ export default function AppointmentDetailsModal({
   const [adiantandoEvolucao, setAdiantandoEvolucao] = useState(false);
   const [evolucaoAdicional, setEvolucaoAdicional] =
     useState<AppointmentDetails | null>(null);
+  const [desmarcando, setDesmarcando] = useState(false);
 
   useLockBodyScroll(open);
 
@@ -286,6 +288,7 @@ export default function AppointmentDetailsModal({
     setRegistrandoEvolucao(false);
     setAdiantandoEvolucao(false);
     setEvolucaoAdicional(null);
+    setDesmarcando(false);
   }, [open, appointment?.id]);
 
   if (!open || !appointment) return null;
@@ -757,9 +760,19 @@ export default function AppointmentDetailsModal({
               <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Outras ações</p>
               {/* Mensagem, Agendar próximo e Editar ficam fixos no topo.
                   Aqui embaixo fica só o que apaga, para não ser tocado sem querer. */}
+              {!atendimentoCancelado && currentAppointment.status !== "Faltou" ? (
+                <div className="mt-2">
+                  <Button type="button" onClick={() => setDesmarcando(true)} disabled={isDeleting} className="h-11 w-full rounded-xl bg-amber-600 text-sm font-bold text-white hover:bg-amber-700 disabled:opacity-50">
+                    <CalendarClock size={16} /> Cliente desmarcou ou faltou
+                  </Button>
+                  <p className="mt-1 text-[11px] leading-4 text-slate-500">
+                    Libera o horário, decide o sinal e, se ela vai remarcar, coloca na lista &quot;Para remarcar&quot;.
+                  </p>
+                </div>
+              ) : null}
               <div className="mt-2">
                 <Button type="button" variant="outline" onClick={handleExcluir} disabled={isDeleting} className="h-10 w-full rounded-xl border-rose-200 text-xs text-rose-700 hover:bg-rose-50 disabled:opacity-50">
-                  <Trash2 size={15} /> {isDeleting ? "Excluindo" : "Excluir agendamento"}
+                  <Trash2 size={15} /> {isDeleting ? "Excluindo" : "Excluir (só se foi lançado por engano)"}
                 </Button>
               </div>
 
@@ -777,6 +790,25 @@ export default function AppointmentDetailsModal({
           </div>
         </div>
       </aside>
+
+      <DesmarcarAgendamentoModal
+        open={desmarcando}
+        agendamento={{
+          id: currentAppointment.id,
+          data: currentAppointment.data,
+          procedimento: currentAppointment.procedimento,
+          clienteNome: currentAppointment.cliente.nome,
+          valorSinal: currentAppointment.valorSinal ?? 0,
+          sinalPago: currentAppointment.sinalPago,
+          retorno: currentAppointment.naturezaAtendimento === "RETORNO",
+        }}
+        onClose={() => setDesmarcando(false)}
+        onConcluido={() => {
+          setDesmarcando(false);
+          onClose();
+          window.location.reload();
+        }}
+      />
 
       <ClienteQuickEditModal
         open={editandoCliente}

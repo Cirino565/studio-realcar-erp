@@ -2,6 +2,7 @@ import { canAccess, isAdminUser, requirePagePermission } from "@/lib/auth";
 import { obterAreaPadraoAgendamento } from "@/lib/area-cliente";
 import { isGoogleDriveConfigured } from "@/lib/google-drive";
 import { prisma } from "@/lib/prisma";
+import { listarRemarcacoesPendentes } from "@/lib/remarcacao";
 
 import AgendaClient from "./components/AgendaClient";
 
@@ -293,6 +294,9 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
         ? String(profissionalDoUsuario.id)
         : "todas";
 
+  // Clientes que desmarcaram e ainda nao tem nova data.
+  const remarcacoesPendentes = await listarRemarcacoesPendentes();
+
   const [agendamentos, bloqueios] = await Promise.all([
     prisma.agendamento.findMany({
       where: {
@@ -396,6 +400,7 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
         produtos={produtos}
         kits={kits}
         formasPagamento={formasPagamento}
+        remarcacoesPendentes={remarcacoesPendentes}
         pacotesAbertos={pacotesAbertos}
         podeAutorizarEstoqueNegativo={usuarioAdmin}
         areaPadraoAgendamento={areaPadraoAgendamento}

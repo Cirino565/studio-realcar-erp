@@ -155,6 +155,12 @@ model Agendamento {
   recorrenciaIntervalo Int?
   recorrenciaIndice    Int?
   recorrenciaTotal     Int?
+  // Desmarcacao: a cliente cancelou (ou faltou) e vai remarcar. Fica na lista
+  // "Para remarcar" da Agenda ate ganhar uma nova data.
+  aguardandoRemarcacao Boolean       @default(false)
+  // O sinal pago ficou guardado para a nova data (vai junto ao remarcar).
+  sinalGuardado        Boolean       @default(false)
+  desmarcadoEm         DateTime?
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 
@@ -172,6 +178,7 @@ model Agendamento {
   // Relatorio por procedimento: agendados em aberto por periodo.
   @@index([status, data])
   @@index([procedimento, data])
+  @@index([aguardandoRemarcacao, clienteId])
 }
 
 model Profissional {

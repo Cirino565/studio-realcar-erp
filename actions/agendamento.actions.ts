@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { isAdminUser, requirePermission } from "@/lib/auth";
 import { obterAreaPadraoAgendamento } from "@/lib/area-cliente";
 import { prisma } from "@/lib/prisma";
+import { concluirRemarcacaoNoTx } from "@/lib/remarcacao";
 import { sincronizarSinalNoTx } from "@/lib/sinal";
 import {
   criarVendaNoTx,
@@ -52,6 +53,10 @@ type NovoAgendamento = {
   recorrencia?: RecorrenciaAgendaInput;
   permitirEncaixeSemIntervalo?: boolean;
   excecaoHorarioFuncionamento?: boolean;
+  // Remarcacao: agendamento desmarcado que esta ganhando esta nova data, e se o
+  // sinal guardado dele vai junto.
+  remarcacaoDeId?: number;
+  usarSinalGuardado?: boolean;
 };
 
 export type ResultadoSalvarAgenda =
@@ -937,6 +942,31 @@ export async function criarAgendamento(
           sinalPago: true,
           valorSinal: dados.valorSinal,
           formaPagamentoConfigId: dados.formaPagamentoSinalId,
+        });
+      }
+    }
+
+    // Cliente que tinha desmarcado e estava "Para remarcar": tira da lista e,
+    // se pedido, leva o sinal guardado para este novo horario.
+    if (dados.remarcacaoDeId && dados.clienteId) {
+      const novo = await tx.agendamento.findFirst({
+        where: {
+          clienteId: clienteId!,
+          data: datas[0],
+          procedimento: dados.procedimento,
+          naturezaAtendimento,
+        },
+        orderBy: { id: "desc" },
+        select: { id: true },
+      });
+
+      if (novo) {
+        await concluirRemarcacaoNoTx(tx, {
+          clienteId: clienteId!,
+          remarcacaoDeId: Number(dados.remarcacaoDeId),
+          novoAgendamentoId: novo.id,
+          usarSinalGuardado:
+            Boolean(dados.usarSinalGuardado) && naturezaAtendimento !== "RETORNO" && !dados.sinalPago,
         });
       }
     }

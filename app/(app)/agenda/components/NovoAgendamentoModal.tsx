@@ -33,6 +33,7 @@ import {
 import { formatarDuracao, interpretarDuracao } from "@/lib/duracao";
 
 import type { NovoHorarioPayload } from "./AgendaCalendar";
+import type { RemarcacaoPendente } from "@/lib/remarcacao";
 import type { FormaPagamentoFinalizacao } from "./FinalizarAtendimentoModal";
 
 type Cliente = {
@@ -98,6 +99,8 @@ type Props = {
   intervaloEntreAtendimentos: number;
   formasPagamento?: FormaPagamentoFinalizacao[];
   initialPayload: NovoAgendamentoPayload | null;
+  // Clientes que desmarcaram e estao para remarcar (para avisar e levar o sinal).
+  remarcacoesPendentes?: RemarcacaoPendente[];
 };
 
 function useLockBodyScroll(open: boolean) {
@@ -231,6 +234,7 @@ export default function NovoAgendamentoModal({
   intervaloEntreAtendimentos,
   formasPagamento = [],
   initialPayload,
+  remarcacoesPendentes = [],
 }: Props) {
   const [tipoAtendimento, setTipoAtendimento] = useState<"agendamento" | "bloqueio">("agendamento");
   const [naturezaAtendimento, setNaturezaAtendimento] = useState<
@@ -270,6 +274,8 @@ export default function NovoAgendamentoModal({
   const [status, setStatus] = useState("Agendado");
   const [observacoes, setObservacoes] = useState("");
   const [sinalPago, setSinalPago] = useState(false);
+  // Remarcacao: usar o sinal que ficou guardado quando a cliente desmarcou.
+  const [usarSinalGuardado, setUsarSinalGuardado] = useState(true);
   const [valorSinal, setValorSinal] = useState("");
   const [formaSinalId, setFormaSinalId] = useState("");
   const [motivoBloqueio, setMotivoBloqueio] = useState("Almoço");
@@ -391,6 +397,7 @@ export default function NovoAgendamentoModal({
         : Boolean(initialPayload?.sinalPago),
     );
     setValorSinal(valorParaInput(initialPayload?.valorSinal));
+    setUsarSinalGuardado(true);
     setFormaSinalId(
       String(
         (
@@ -504,6 +511,23 @@ export default function NovoAgendamentoModal({
     if (!clienteId) return null;
     return clientes.find((cliente) => String(cliente.id) === String(clienteId)) || null;
   }, [clienteId, clientes]);
+
+  // A cliente escolhida tinha desmarcado e estava "Para remarcar"? (o que tem
+  // sinal guardado vem primeiro).
+  const remarcacaoDaCliente = useMemo(() => {
+    if (modoEdicao || tipoCliente !== "existente" || !clienteId) return null;
+    const daCliente = remarcacoesPendentes.filter(
+      (item) => String(item.clienteId) === String(clienteId),
+    );
+    return daCliente.find((item) => item.sinalGuardado) ?? daCliente[0] ?? null;
+  }, [modoEdicao, tipoCliente, clienteId, remarcacoesPendentes]);
+
+  const usandoSinalGuardado = Boolean(
+    remarcacaoDaCliente?.sinalGuardado &&
+      remarcacaoDaCliente.valorSinal > 0 &&
+      naturezaAtendimento === "PROCEDIMENTO" &&
+      usarSinalGuardado,
+  );
 
   const clientesFiltrados = useMemo(() => {
     const query = normalizarTexto(buscaCliente);
@@ -877,11 +901,13 @@ export default function NovoAgendamentoModal({
         status,
         observacoes,
         sinalPago:
-          naturezaAtendimento === "RETORNO" ? false : sinalPago,
+          naturezaAtendimento === "RETORNO" || usandoSinalGuardado ? false : sinalPago,
         valorSinal:
-          naturezaAtendimento === "RETORNO" || !sinalPago
+          naturezaAtendimento === "RETORNO" || !sinalPago || usandoSinalGuardado
             ? 0
             : parseCurrency(valorSinal),
+        remarcacaoDeId: remarcacaoDaCliente?.id,
+        usarSinalGuardado: usandoSinalGuardado,
         formaPagamentoSinalId: formaSinalId ? Number(formaSinalId) : null,
         naturezaAtendimento,
         agendamentoOrigemId:
@@ -1764,7 +1790,39 @@ export default function NovoAgendamentoModal({
               </label>
             </div>
 
-            {naturezaAtendimento === "PROCEDIMENTO" ? (
+            {remarcacaoDaCliente ? (
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-100">
+                <p className="font-bold">Esta cliente estava para remarcar</p>
+                <p className="mt-0.5 text-xs">
+                  {remarcacaoDaCliente.procedimento} de{" "}
+                  {new Date(remarcacaoDaCliente.data).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}{" "}
+                  ({remarcacaoDaCliente.status === "Faltou" ? "faltou" : "desmarcou"}). Ao salvar, ela sai da lista Para remarcar.
+                </p>
+                {remarcacaoDaCliente.sinalGuardado && remarcacaoDaCliente.valorSinal > 0 ? (
+                  naturezaAtendimento === "PROCEDIMENTO" ? (
+                    <label className="mt-2 flex cursor-pointer items-start gap-2 font-semibold">
+                      <input
+                        type="checkbox"
+                        checked={usarSinalGuardado}
+                        onChange={(event) => setUsarSinalGuardado(event.target.checked)}
+                        className="mt-0.5 size-4 accent-emerald-600"
+                      />
+                      <span>
+                        Usar o sinal guardado de{" "}
+                        {remarcacaoDaCliente.valorSinal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} neste
+                        horário (ele já está no Financeiro e é descontado na hora de cobrar).
+                      </span>
+                    </label>
+                  ) : (
+                    <p className="mt-2 text-xs font-semibold">
+                      Ela tem um sinal guardado, mas retorno não usa sinal: ele continua guardado para o próximo procedimento.
+                    </p>
+                  )
+                ) : null}
+              </div>
+            ) : null}
+
+            {naturezaAtendimento === "PROCEDIMENTO" && !usandoSinalGuardado ? (
               <label className="mt-4 flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 dark:border-emerald-500/30 dark:bg-emerald-500/10">
                 <span>
                   <span className="block text-sm font-bold text-emerald-800 dark:text-emerald-200">
@@ -1788,7 +1846,7 @@ export default function NovoAgendamentoModal({
               </label>
             ) : null}
 
-            {naturezaAtendimento === "PROCEDIMENTO" && sinalPago ? (
+            {naturezaAtendimento === "PROCEDIMENTO" && sinalPago && !usandoSinalGuardado ? (
               <div className="mt-2 rounded-xl border border-emerald-200 bg-white px-4 py-3 dark:border-emerald-500/30 dark:bg-white/[0.04]">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="block">
