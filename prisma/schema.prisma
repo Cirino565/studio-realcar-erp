@@ -505,6 +505,12 @@ model Lead {
   primeiraMensagemEm DateTime?
   // "Nao e esse clique": nao sugerir mais clique para este contato.
   sugestaoCliqueRecusada Boolean @default(false)
+  // Reativacao de perdidos: quando virou Perdido, quando recebeu a mensagem
+  // de reativacao (uma vez so) e o que aconteceu depois.
+  perdidoEm             DateTime?
+  reativacaoEnviadaEm   DateTime?
+  reativacaoResultado   String?
+  reativacaoResultadoEm DateTime?
   // "Chamou" / "Nao chamou" / "A verificar" - controle manual de quem
   // atende, para medir quantos codigos gerados no clique do anuncio
   // realmente viraram conversa de verdade no WhatsApp.
@@ -522,6 +528,8 @@ model Lead {
   // Atribuicao: so clique pago conta na campanha.
   @@index([gclid])
   @@index([origem])
+  @@index([etapa, reativacaoEnviadaEm, perdidoEm])
+  @@index([reativacaoEnviadaEm])
 }
 
 model LeadInteracao {
@@ -750,6 +758,8 @@ model ConfiguracaoClinica {
   timezone              String   @default("America/Sao_Paulo")
   // Envia tambem uma conversao por procedimento ao Google Ads (ex.: "Venda Real - Limpeza de Pele").
   googleAdsPorProcedimento Boolean @default(false)
+  // Reativacao de perdidos: quantas mensagens por dia (protege o numero).
+  reativacaoLimiteDiario Int @default(15)
   logoUrl               String?
   corPrincipal          String   @default("violet")
   assinaturaMensagem    String?

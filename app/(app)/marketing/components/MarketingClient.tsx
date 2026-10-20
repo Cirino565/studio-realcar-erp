@@ -1475,6 +1475,12 @@ export default function MarketingClient({
               >
                 Gasto Google Ads
               </Link>
+              <Link
+                href="/marketing/reativacao"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 text-sm font-semibold text-violet-700 shadow-sm hover:border-violet-300 hover:bg-violet-100"
+              >
+                Reativar perdidos
+              </Link>
               {podeGerenciarMarketing ? (
                 <>
                   <Button type="button" variant="outline" onClick={() => setCampanhaModal(true)}><Megaphone className="size-4" /> Campanha</Button>

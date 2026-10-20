@@ -550,6 +550,7 @@ export async function marcarLeadPerdido(id: number, motivo: string) {
         etapa: "Perdido",
         motivoPerda: motivoLimpo,
         proximoContatoEm: null,
+        perdidoEm: new Date(),
       },
     });
 
