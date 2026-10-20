@@ -98,7 +98,9 @@ export async function POST(request: NextRequest) {
     // não deve criar um segundo lead nem sobrescrever o que já existe -
     // inclusive porque a essa altura pode já ter sido editado à mão.
     const existente = await prisma.lead.findFirst({
-      where: { codigoAtendimento: codigo },
+      where: {
+        OR: [{ codigoAtendimento: codigo }, { codigosExtras: { contains: codigo } }],
+      },
       select: { id: true, gclid: true },
     });
 
@@ -118,6 +120,46 @@ export async function POST(request: NextRequest) {
     }
 
     const servico = limpar(typeof body.servico === "string" ? body.servico : null);
+
+    // Mesmo clique do Google (mesmo gclid) gerando um segundo codigo: a pessoa
+    // clicou em outro botao da pagina poucos minutos depois. E a mesma pessoa,
+    // entao nao cria outro lead: guarda o codigo novo no lead que ja existe
+    // (a busca acha pelos dois codigos).
+    const gclidDoClique = limpar(typeof body.gclid === "string" ? body.gclid : null)?.slice(0, 500) ?? null;
+    if (gclidDoClique) {
+      const doMesmoClique = await prisma.lead.findFirst({
+        where: { gclid: gclidDoClique },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, codigosExtras: true },
+      });
+
+      if (doMesmoClique) {
+        const extras = new Set(
+          (doMesmoClique.codigosExtras || "")
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean),
+        );
+        extras.add(codigo);
+
+        await prisma.$transaction([
+          prisma.lead.update({
+            where: { id: doMesmoClique.id },
+            data: { codigosExtras: Array.from(extras).join(", ") },
+          }),
+          prisma.leadInteracao.create({
+            data: {
+              leadId: doMesmoClique.id,
+              tipo: "Clique",
+              descricao: `Mesmo clique do anúncio gerou também o código ${codigo}${servico ? ` (${servico})` : ""}. Não foi criado outro lead.`,
+            },
+          }),
+        ]);
+
+        return NextResponse.json({ ok: true, criado: false, mesmoClique: true, leadId: doMesmoClique.id });
+      }
+    }
+
     const utmCampaign = limpar(typeof body.utm_campaign === "string" ? body.utm_campaign : null);
     const utmSource = limpar(typeof body.utm_source === "string" ? body.utm_source : null);
     const origemDetectada = limpar(

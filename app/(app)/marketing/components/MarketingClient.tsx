@@ -37,6 +37,8 @@ import {
 } from "lucide-react";
 
 import { buscarDisponibilidadeAgenda } from "@/actions/agendamento.actions";
+import type { VinculoDoLead } from "@/lib/vinculo-clique";
+import VinculoCliquePainel from "./VinculoCliquePainel";
 import {
   agendarAvaliacaoLead,
   atualizarCampanha,
@@ -113,6 +115,8 @@ type Props = {
   motivosPerda: MotivoPerdaOption[];
   podeGerenciarMarketing: boolean;
   podeGerenciarAgenda: boolean;
+  // Contato sem codigo com clique provavel do anuncio, e leads do mesmo clique.
+  vinculosClique?: Record<number, VinculoDoLead>;
 };
 
 export type MotivoPerdaOption = {
@@ -543,6 +547,7 @@ export default function MarketingClient({
   motivosPerda,
   podeGerenciarMarketing,
   podeGerenciarAgenda,
+  vinculosClique = {},
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -666,7 +671,7 @@ export default function MarketingClient({
 
     return leads.filter((lead) => {
       const textoBusca = normalizarTexto(
-        `${lead.nome} ${lead.telefone || ""} ${lead.origem || ""} ${lead.interesse || ""} ${lead.campanha?.nome || ""} ${lead.observacoes || ""} ${lead.codigoAtendimento || ""}`,
+        `${lead.nome} ${lead.telefone || ""} ${lead.origem || ""} ${lead.interesse || ""} ${lead.campanha?.nome || ""} ${lead.observacoes || ""} ${lead.codigoAtendimento || ""} ${lead.codigosExtras || ""}`,
       );
       const matchesBusca = !termo || textoBusca.includes(termo);
       const matchesEtapa =
@@ -1493,6 +1498,47 @@ export default function MarketingClient({
           ))}
         </section>
 
+        {tab === "pipeline" ? (() => {
+          // Contatos que chegaram sem codigo mas tem clique provavel, e leads repetidos do mesmo clique.
+          const comSugestao = leads.filter((lead) => vinculosClique[lead.id]?.sugestao);
+          const repetidos = leads.filter(
+            (lead) => (vinculosClique[lead.id]?.mesmoClique.length ?? 0) > 0,
+          );
+          if (comSugestao.length === 0 && repetidos.length === 0) return null;
+          return (
+            <section className="rounded-3xl border border-amber-300/25 bg-amber-400/10 p-3 text-sm text-amber-100">
+              {comSugestao.length > 0 ? (
+                <p className="leading-6">
+                  <strong>{comSugestao.length} contato{comSugestao.length === 1 ? "" : "s"} sem código</strong> com provável clique do Google:{" "}
+                  {comSugestao.map((lead, indice) => (
+                    <span key={lead.id}>
+                      {indice > 0 ? ", " : ""}
+                      <button type="button" onClick={() => setDetalhesModal(lead)} className="font-semibold underline underline-offset-2">
+                        {lead.nome}
+                      </button>
+                    </span>
+                  ))}
+                  . Abra e confirme se for ela.
+                </p>
+              ) : null}
+              {repetidos.length > 0 ? (
+                <p className="leading-6">
+                  <strong>Mesmo clique em mais de um lead:</strong>{" "}
+                  {repetidos.map((lead, indice) => (
+                    <span key={lead.id}>
+                      {indice > 0 ? ", " : ""}
+                      <button type="button" onClick={() => setDetalhesModal(lead)} className="font-semibold underline underline-offset-2">
+                        {lead.codigoAtendimento || lead.nome}
+                      </button>
+                    </span>
+                  ))}
+                  . Abra para juntar num lead só.
+                </p>
+              ) : null}
+            </section>
+          );
+        })() : null}
+
         {tab === "pipeline" ? (
           <>
             <section className="grid grid-cols-2 gap-2 rounded-3xl border border-white/[0.10] bg-white/[0.045] p-2">
@@ -1635,6 +1681,7 @@ export default function MarketingClient({
         onTrocarCliente={setLeadTrocandoCliente}
         podeGerenciarMarketing={podeGerenciarMarketing}
         podeGerenciarAgenda={podeGerenciarAgenda}
+        vinculoClique={detalhesModal ? vinculosClique[detalhesModal.id] : undefined}
       />
       {/* Nasce DEPOIS do LeadDetailsModal de proposito: os dois usam o mesmo
           Modal compartilhado, com o mesmo z-index. Quem vem depois no JSX
@@ -3266,7 +3313,9 @@ function LeadDetailsModal({
   onTrocarCliente,
   podeGerenciarMarketing,
   podeGerenciarAgenda,
+  vinculoClique,
 }: {
+  vinculoClique?: VinculoDoLead;
   lead: MarketingLead | null;
   onClose: () => void;
   onEdit: (lead: MarketingLead) => void;
@@ -3327,7 +3376,7 @@ function LeadDetailsModal({
               <Detail label="Telefone" value={lead.telefone || "Não informado"} />
               <Detail label="Origem" value={getOrigemLabel(lead.origem)} />
               <Detail label="Campanha" value={lead.campanha?.nome || "Sem campanha"} />
-              <Detail label="Código de atendimento" value={lead.codigoAtendimento || "Não informado"} />
+              <Detail label="Código de atendimento" value={lead.codigoAtendimento ? (lead.codigosExtras ? `${lead.codigoAtendimento} (também ${lead.codigosExtras})` : lead.codigoAtendimento) : "Não informado"} />
               {lead.codigoAtendimento ? (
                 <Detail label="Chamou no WhatsApp" value={lead.chamouWhatsapp} />
               ) : null}
@@ -3339,6 +3388,14 @@ function LeadDetailsModal({
             {lead.motivoPerda ? <div className="mt-4 rounded-2xl border border-rose-300/15 bg-rose-400/8 p-3 text-sm text-rose-100"><strong>Motivo da perda:</strong> {lead.motivoPerda}</div> : null}
             {lead.ignorarVinculoTelefone ? <div className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-400/10 p-3 text-sm leading-6 text-amber-100"><strong>Telefone compartilhado:</strong> este lead foi confirmado como uma pessoa diferente. O CRM não reutilizará automaticamente outro cliente apenas por este número.</div> : null}
           </section>
+
+          <VinculoCliquePainel
+            key={lead.id}
+            leadId={lead.id}
+            vinculo={vinculoClique}
+            podeGerenciar={podeGerenciarMarketing}
+            onAtualizado={onClose}
+          />
 
           <section className="rounded-3xl border border-white/[0.10] bg-white/[0.055] p-4">
             <h4 className="flex items-center gap-2 font-semibold text-white"><Link2 className="size-4 text-cyan-900" />Vínculos</h4>

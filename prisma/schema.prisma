@@ -496,7 +496,15 @@ model Lead {
   campanhaId       Int?
   campanha         CampanhaMarketing? @relation(fields: [campanhaId], references: [id], onDelete: SetNull)
   codigoAtendimento String?
+  // Outros codigos gerados pelo MESMO clique do Google (a pessoa clicou em dois
+  // botoes da pagina). Separados por virgula. Servem para achar o lead pela busca.
+  codigosExtras    String?
   gclid            String?
+  // Quando chegou a 1a mensagem no WhatsApp (se for diferente da hora do
+  // cadastro). Usado para achar o clique provavel de quem apagou o codigo.
+  primeiraMensagemEm DateTime?
+  // "Nao e esse clique": nao sugerir mais clique para este contato.
+  sugestaoCliqueRecusada Boolean @default(false)
   // "Chamou" / "Nao chamou" / "A verificar" - controle manual de quem
   // atende, para medir quantos codigos gerados no clique do anuncio
   // realmente viraram conversa de verdade no WhatsApp.

@@ -5,6 +5,7 @@ import {
   leadTeveCliquePago,
   movimentoEhDeCliquePago,
 } from "@/lib/atribuicao-campanha";
+import { calcularVinculosClique } from "@/lib/vinculo-clique";
 import MarketingClient from "./components/MarketingClient";
 
 export default async function MarketingPage() {
@@ -272,6 +273,7 @@ export default async function MarketingPage() {
   return (
     <MarketingClient
       leads={leads}
+      vinculosClique={calcularVinculosClique(leads)}
       campanhas={campanhas}
       procedimentosInteresse={procedimentosInteresse}
       clientes={clientes}
