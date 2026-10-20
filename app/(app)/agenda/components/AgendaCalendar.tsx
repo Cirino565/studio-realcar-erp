@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import type { AppointmentDetails } from "./AppointmentDetailsModal";
+import { feriadoDoDia, rotuloTipoFeriado } from "@/lib/feriados";
 import {
   getMutedTextColor,
   getOverlayBackground,
@@ -648,14 +649,18 @@ export default function AgendaCalendar({
     const container = dateStripRef.current;
     if (!container) return;
 
-    const center = container.scrollLeft + container.clientWidth / 2;
+    // Mede pela posicao na tela (e nao por offsetLeft, que e contado a partir
+    // de outro elemento e fazia o mes do topo ficar atrasado).
+    const caixa = container.getBoundingClientRect();
+    const center = caixa.left + caixa.width / 2;
     let closestDate = "";
     let closestDistance = Number.POSITIVE_INFINITY;
 
     container
       .querySelectorAll<HTMLElement>("[data-agenda-date]")
       .forEach((element) => {
-        const elementCenter = element.offsetLeft + element.offsetWidth / 2;
+        const retangulo = element.getBoundingClientRect();
+        const elementCenter = retangulo.left + retangulo.width / 2;
         const distance = Math.abs(elementCenter - center);
 
         if (distance < closestDistance) {
@@ -1374,7 +1379,9 @@ export default function AgendaCalendar({
                   const todayItem = isSameDay(day, today);
                   const dayOfWeek = day.getDay();
                   const saturday = dayOfWeek === 6;
-                  const sunday = dayOfWeek === 0;
+                  const feriado = feriadoDoDia(formatDateInput(day));
+                  // Feriado aparece com a mesma cor do domingo, mais o ponto vermelho.
+                  const sunday = dayOfWeek === 0 || Boolean(feriado);
 
                   return (
                     <a
@@ -1382,8 +1389,8 @@ export default function AgendaCalendar({
                       data-agenda-date={formatDateInput(day)}
                       href={agendaHref(day, profissionalFiltro, viewMode)}
                       aria-current={active ? "date" : undefined}
-                      aria-label={`${formatWeekday(day)}, ${formatDateCompact(day)}${todayItem ? ", hoje" : ""}`}
-                      title={formatDateCompact(day)}
+                      aria-label={`${formatWeekday(day)}, ${formatDateCompact(day)}${todayItem ? ", hoje" : ""}${feriado ? `, ${feriado.nome}` : ""}`}
+                      title={feriado ? `${formatDateCompact(day)} · ${feriado.nome} (${rotuloTipoFeriado(feriado.tipo)})` : formatDateCompact(day)}
                       className={`relative flex h-11 w-full snap-center flex-col items-center justify-center rounded-xl border text-center transition sm:h-10 sm:w-[82px] sm:flex-none sm:rounded-lg ${
                         active
                           ? "border-violet-700 bg-violet-700 text-white shadow-[0_5px_14px_rgba(109,40,217,0.22)]"
@@ -1399,6 +1406,12 @@ export default function AgendaCalendar({
                       {todayItem && !active ? (
                         <span
                           className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-violet-600 dark:bg-violet-300"
+                          aria-hidden="true"
+                        />
+                      ) : null}
+                      {feriado ? (
+                        <span
+                          className={`absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full ${active ? "bg-white" : "bg-rose-500"}`}
                           aria-hidden="true"
                         />
                       ) : null}
@@ -1506,6 +1519,23 @@ export default function AgendaCalendar({
         </div>
       </div>
 
+      {(() => {
+        const feriadosVisiveis = (viewMode === "week" ? weekDays : [selectedDate])
+          .map((dia) => ({ dia, feriado: feriadoDoDia(formatDateInput(dia)) }))
+          .filter((item) => item.feriado);
+        if (feriadosVisiveis.length === 0) return null;
+        return (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200 sm:text-sm">
+            {feriadosVisiveis.map(({ dia, feriado }) => (
+              <span key={formatDateInput(dia)}>
+                {viewMode === "week" ? `${formatWeekday(dia)} ${String(dia.getDate()).padStart(2, "0")}: ` : "Feriado: "}
+                {feriado!.nome} <span className="font-normal opacity-80">({rotuloTipoFeriado(feriado!.tipo)})</span>
+              </span>
+            ))}
+          </div>
+        );
+      })()}
+
       {viewMode === "week" ? (
         <div className="w-full overflow-x-auto border-t border-slate-300 dark:border-slate-700">
           <div className="grid min-w-[1180px] grid-cols-7 bg-slate-200 dark:bg-slate-800">
@@ -1559,6 +1589,11 @@ export default function AgendaCalendar({
                       <p className="mt-0.5 text-lg font-extrabold text-slate-900 dark:text-white">
                         {String(day.getDate()).padStart(2, "0")}
                       </p>
+                      {feriadoDoDia(formatDateInput(day)) ? (
+                        <p className="max-w-[9rem] truncate text-[10px] font-bold text-rose-600 dark:text-rose-300">
+                          {feriadoDoDia(formatDateInput(day))!.nome}
+                        </p>
+                      ) : null}
                     </div>
                     {!closed ? (
                       <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
