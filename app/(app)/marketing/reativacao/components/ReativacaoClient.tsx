@@ -147,6 +147,28 @@ export default function ReativacaoClient({ dados, podeGerenciar }: Props) {
           Quem procurou e não fechou. Cada pessoa recebe a mensagem uma vez só: depois de enviar, ela sai da lista.
           Mande aos poucos, dentro do limite do dia, para o WhatsApp não entender como spam.
         </p>
+        {dados.foraDaLista.perdidos > 0 ? (
+          <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600 dark:bg-white/[0.04] dark:text-slate-300">
+            Você tem <strong>{dados.foraDaLista.perdidos}</strong> perdidos no total.{" "}
+            {dados.foraDaLista.semTelefone > 0 ? (
+              <>
+                <strong>{dados.foraDaLista.semTelefone}</strong> não têm telefone (clicaram no anúncio mas não mandaram
+                mensagem), então não dá para enviar.{" "}
+              </>
+            ) : null}
+            {dados.foraDaLista.jaEnviados > 0 ? (
+              <>
+                <strong>{dados.foraDaLista.jaEnviados}</strong> já receberam.{" "}
+              </>
+            ) : null}
+            {dados.foraDaLista.comHorario > 0 ? (
+              <>
+                <strong>{dados.foraDaLista.comHorario}</strong> já têm horário marcado.{" "}
+              </>
+            ) : null}
+            Convertidos não entram, porque já são clientes.
+          </p>
+        ) : null}
 
         <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-[1.4fr_1fr_1fr_1fr] sm:gap-3">
           <div className={`col-span-3 rounded-2xl border p-3 sm:col-span-1 ${limiteAtingido ? "border-rose-200 bg-rose-50 dark:border-rose-400/20 dark:bg-rose-500/10" : "border-emerald-200 bg-emerald-50 dark:border-emerald-400/20 dark:bg-emerald-500/10"}`}>

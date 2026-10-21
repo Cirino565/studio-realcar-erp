@@ -60,6 +60,8 @@ export type DadosReativacao = {
   totalEnviadas: number;
   enviadas: ItemEnviado[];
   resumo: { enviadas: number; responderam: number; voltaram: number; enviadasHoje: number };
+  // Por que nem todo Perdido aparece na lista.
+  foraDaLista: { perdidos: number; semTelefone: number; comHorario: number; jaEnviados: number };
   limiteDiario: number;
   ultimoEnvioEm: string | null;
   modelos: Array<{ servico: string | null; chave: string; texto: string; personalizado: boolean }>;
@@ -98,6 +100,18 @@ export async function carregarReativacao(filtros: FiltrosReativacao): Promise<Da
       },
     ],
   };
+
+  const semTelefone: Prisma.LeadWhereInput = { OR: [{ telefone: null }, { telefone: "" }] };
+  const comHorarioFuturo: Prisma.LeadWhereInput = {
+    cliente: { is: { agendamentos: { some: { data: { gt: agora }, status: { notIn: ["Cancelado", "Faltou"] } } } } },
+  };
+
+  const [foraPerdidos, foraSemTelefone, foraComHorario, foraJaEnviados] = await Promise.all([
+    prisma.lead.count({ where: { etapa: "Perdido" } }),
+    prisma.lead.count({ where: { etapa: "Perdido", ...semTelefone } }),
+    prisma.lead.count({ where: { AND: [{ etapa: "Perdido", reativacaoEnviadaEm: null }, { NOT: semTelefone }, comHorarioFuturo] } }),
+    prisma.lead.count({ where: { etapa: "Perdido", reativacaoEnviadaEm: { not: null }, NOT: semTelefone } }),
+  ]);
 
   const [servicosCadastrados, porInteresse, porOrigem, config, enviadasHoje, ultimoEnvio, modelosSalvos] =
     await Promise.all([
@@ -268,6 +282,12 @@ export async function carregarReativacao(filtros: FiltrosReativacao): Promise<Da
         ? enviadasTodas.slice((filtros.pagina - 1) * POR_PAGINA, filtros.pagina * POR_PAGINA)
         : [],
     resumo: { enviadas: enviadasTodas.length, responderam, voltaram, enviadasHoje },
+    foraDaLista: {
+      perdidos: foraPerdidos,
+      semTelefone: foraSemTelefone,
+      comHorario: foraComHorario,
+      jaEnviados: foraJaEnviados,
+    },
     limiteDiario: config?.reativacaoLimiteDiario ?? 15,
     ultimoEnvioEm: ultimoEnvio?.enviadoEm?.toISOString() ?? null,
     modelos,

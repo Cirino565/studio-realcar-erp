@@ -1736,6 +1736,10 @@ function ResumoCard({ title, value, detail, icon: Icon }: { title: string; value
   );
 }
 
+// Encerrados (convertidos e perdidos) mostram so os mais recentes; o resto
+// aparece no "Mostrar mais". A busca continua achando todos.
+const LEADS_ENCERRADOS_POR_VEZ = 10;
+
 function PipelineColumn({
   etapa,
   label,
@@ -1766,6 +1770,10 @@ function PipelineColumn({
   podeGerenciarAgenda: boolean;
 }) {
   const total = leads.reduce((acc, lead) => acc + lead.valorPrevisto, 0);
+  const encerrada = etapa === "Convertido" || etapa === "Perdido";
+  const [quantosVer, setQuantosVer] = useState(LEADS_ENCERRADOS_POR_VEZ);
+  const visiveis = encerrada ? leads.slice(0, quantosVer) : leads;
+  const faltam = leads.length - visiveis.length;
 
   return (
     <div className="min-h-[20rem] rounded-3xl border border-white/[0.10] bg-white/[0.055] p-4 shadow-xl shadow-black/10">
@@ -1781,7 +1789,7 @@ function PipelineColumn({
       <div className="space-y-3">
         {leads.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-white/[0.12] p-4 text-center text-xs text-slate-500">Nenhum lead nesta etapa.</div>
-        ) : leads.map((lead) => (
+        ) : visiveis.map((lead) => (
           <LeadCard
             key={lead.id}
             lead={lead}
@@ -1798,6 +1806,29 @@ function PipelineColumn({
           />
         ))}
       </div>
+
+      {encerrada && (faltam > 0 || quantosVer > LEADS_ENCERRADOS_POR_VEZ) ? (
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+          {faltam > 0 ? (
+            <button
+              type="button"
+              onClick={() => setQuantosVer((atual) => atual + LEADS_ENCERRADOS_POR_VEZ)}
+              className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:border-violet-200 hover:bg-violet-50 hover:text-violet-800"
+            >
+              Mostrar mais {Math.min(LEADS_ENCERRADOS_POR_VEZ, faltam)} (faltam {faltam})
+            </button>
+          ) : null}
+          {quantosVer > LEADS_ENCERRADOS_POR_VEZ ? (
+            <button
+              type="button"
+              onClick={() => setQuantosVer(LEADS_ENCERRADOS_POR_VEZ)}
+              className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+            >
+              Recolher
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
