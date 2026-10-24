@@ -218,7 +218,7 @@ export default async function RetornosPage() {
         ? buildReactivationSecondWhatsAppMessage({
             clientName: cliente.nome,
             procedure: principal?.nome,
-            disseQueIaMarcar: cliente.situacao === "Vai marcar",
+            // Texto neutro: nao deduz se a cliente respondeu ou nao.
           })
         : buildReactivationWhatsAppMessage({
             clientName: cliente.nome,

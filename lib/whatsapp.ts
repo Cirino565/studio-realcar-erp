@@ -312,11 +312,12 @@ export function buildReactivationSecondWhatsAppMessage({
       ? `seu próximo atendimento de ${procedimento.toLowerCase()}`
       : "seu próximo atendimento";
 
-  if (disseQueIaMarcar) {
-    return `Oi, ${firstName}! Tudo bem? 😊\n\nVocê tinha comentado que ia marcar ${oQue}. Quer que eu já veja um horário para você?\n\nÉ só me responder com o dia e o período (manhã ou tarde) que ficam melhores. 💜`;
-  }
+  // Texto neutro: serve tanto para quem nao respondeu quanto para quem disse
+  // que ia marcar (o sistema nao tem como saber com certeza).
+  void disseQueIaMarcar;
+  const lembrarDe = `${oQue.startsWith("sua") ? "da" : "do"} ${oQue}`;
 
-  return `Oi, ${firstName}! Tudo bem? 😊\n\nTe mandei uma mensagem há alguns dias e acho que acabou passando no meio da correria, então vou deixar bem simples:\n\nQuer que eu separe um horário para ${oQue}? É só me responder com o dia e o período (manhã ou tarde) que ficam melhores para você. 💜`;
+  return `Oi, ${firstName}! Tudo bem? 😊\n\nPassando de novo por aqui para lembrar ${lembrarDe}, que já está na época.\n\nQuer que eu veja um horário para você? É só me responder com o dia e o período (manhã ou tarde) que ficam melhores. 💜`;
 }
 
 export function buildWhatsAppUrl(phone: string | null | undefined, message: string) {
