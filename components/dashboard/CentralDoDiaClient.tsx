@@ -17,11 +17,14 @@ type ConfirmacaoItem = {
 
 type Props = {
   confirmacoes: ConfirmacaoItem[];
+  // "amanhã" ou "segunda (26/10)" quando domingo/feriado ficam no meio.
+  rotuloDia?: string;
   podeGerenciarAgenda: boolean;
 };
 
 export default function CentralDoDiaClient({
   confirmacoes,
+  rotuloDia = "amanhã",
   podeGerenciarAgenda,
 }: Props) {
   const router = useRouter();
@@ -54,10 +57,10 @@ export default function CentralDoDiaClient({
       <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/70 p-5 text-center">
         <BadgeCheck className="mx-auto size-6 text-emerald-600" />
         <p className="mt-2 text-sm font-semibold text-emerald-900">
-          Nenhuma confirmação pendente para amanhã.
+          Nenhuma confirmação pendente para {rotuloDia}.
         </p>
         <p className="mt-1 text-xs text-emerald-700">
-          A agenda de amanhã está sem atendimentos aguardando confirmação.
+          A agenda de {rotuloDia} está sem atendimentos aguardando confirmação.
         </p>
       </div>
     );

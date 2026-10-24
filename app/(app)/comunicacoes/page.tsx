@@ -1,6 +1,7 @@
 import { canAccess, requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { decodificarMensagemModelo } from "@/lib/mensagem-modelo.server";
+import { janelaConfirmacao } from "@/lib/janela-confirmacao";
 
 import ComunicacoesClient from "./components/ComunicacoesClient";
 import type {
@@ -100,6 +101,10 @@ export default async function ComunicacoesPage({ searchParams }: ComunicacoesPag
   const inicioHoje = inicioDia(hojeISO);
   const inicioAmanha = inicioDia(amanhaISO);
   const inicioDepoisAmanha = inicioDia(depoisAmanhaISO);
+  void inicioDepoisAmanha;
+  // Confirmacoes: amanha, ou ate o proximo dia de atendimento quando domingo
+  // ou feriado ficam no meio (no sabado ja aparecem os de segunda).
+  const janela = janelaConfirmacao(hojeISO);
   const sessentaDiasAtras = new Date(inicioHoje.getTime() - 60 * UM_DIA);
   const tresDiasAtras = new Date(inicioHoje.getTime() - 3 * UM_DIA);
 
@@ -119,7 +124,7 @@ export default async function ComunicacoesPage({ searchParams }: ComunicacoesPag
     prisma.configuracaoClinica.findFirst(),
     prisma.agendamento.findMany({
       where: {
-        data: { gte: inicioAmanha, lt: inicioDepoisAmanha },
+        data: { gte: inicioDia(janela.inicioISO), lt: inicioDia(janela.fimExclusivoISO) },
         status: "Agendado",
       },
       include: {

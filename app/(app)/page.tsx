@@ -2,6 +2,7 @@ import { canAccess, requirePagePermission } from "@/lib/auth";
 import { formatarMoeda } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { decodificarMensagemModelo } from "@/lib/mensagem-modelo.server";
+import { janelaConfirmacao } from "@/lib/janela-confirmacao";
 import {
   buildClientWhatsAppMessage,
   buildReactivationWhatsAppMessage,
@@ -188,6 +189,17 @@ export default async function Home() {
   const inicioHoje = inicioDiaSaoPaulo(hojeISO);
   const inicioAmanha = inicioDiaSaoPaulo(amanhaISO);
   const inicioDepoisAmanha = inicioDiaSaoPaulo(depoisAmanhaISO);
+  void inicioDepoisAmanha;
+
+  // Confirmacoes: amanha, ou - se amanha for domingo/feriado - ate o proximo
+  // dia de atendimento (no sabado ja aparecem os de segunda).
+  const janela = janelaConfirmacao(hojeISO);
+  const inicioJanelaConfirmacao = inicioDiaSaoPaulo(janela.inicioISO);
+  const fimJanelaConfirmacao = inicioDiaSaoPaulo(janela.fimExclusivoISO);
+  const horarioConfirmacao = (data: Date) =>
+    dataISOEmSaoPaulo(data) === janela.diaAtendimentoISO
+      ? formatarHorario(data)
+      : `${dataISOEmSaoPaulo(data).slice(8, 10)}/${dataISOEmSaoPaulo(data).slice(5, 7)} · ${formatarHorario(data)}`;
 
   const sessentaDiasAtras = new Date(inicioHoje.getTime() - 60 * 24 * 60 * 60 * 1000);
   const inicioMesISO = `${hojeISO.slice(0, 7)}-01`;
@@ -238,7 +250,7 @@ export default async function Home() {
 
     prisma.agendamento.findMany({
       where: {
-        data: { gte: inicioAmanha, lt: inicioDepoisAmanha },
+        data: { gte: inicioJanelaConfirmacao, lt: fimJanelaConfirmacao },
         status: "Agendado",
       },
       include: {
@@ -250,7 +262,7 @@ export default async function Home() {
 
     prisma.agendamento.findMany({
       where: {
-        data: { gte: inicioAmanha, lt: inicioDepoisAmanha },
+        data: { gte: inicioJanelaConfirmacao, lt: fimJanelaConfirmacao },
         status: "Confirmado",
       },
       include: {
@@ -662,7 +674,7 @@ export default async function Home() {
     id: agendamento.id,
     cliente: agendamento.cliente.nome,
     procedimento: formatarProcedimentoAgendamento(agendamento),
-    horario: formatarHorario(agendamento.data),
+    horario: horarioConfirmacao(agendamento.data),
     profissional: agendamento.profissional?.nome || null,
     whatsappUrl: buildWhatsAppUrl(
       agendamento.cliente.whatsapp || agendamento.cliente.telefone,
@@ -679,7 +691,7 @@ export default async function Home() {
     id: agendamento.id,
     cliente: agendamento.cliente.nome,
     procedimento: formatarProcedimentoAgendamento(agendamento),
-    horario: formatarHorario(agendamento.data),
+    horario: horarioConfirmacao(agendamento.data),
     profissional: agendamento.profissional?.nome || null,
     whatsappUrl: buildWhatsAppUrl(
       agendamento.cliente.whatsapp || agendamento.cliente.telefone,
@@ -705,7 +717,8 @@ export default async function Home() {
   }));
 
   const dataAgendaHoje = hojeISO;
-  const dataAgendaAmanha = amanhaISO;
+  const dataAgendaAmanha = janela.pulouDias ? janela.diaAtendimentoISO : amanhaISO;
+  const rotuloDiaConfirmacao = janela.rotulo;
 
   return (
     <div className="min-w-0 space-y-5 pb-4">
@@ -762,7 +775,7 @@ export default async function Home() {
           tone="violet"
         />
         <CardIndicador
-          titulo="Confirmar amanhã"
+          titulo={`Confirmar ${rotuloDiaConfirmacao}`}
           valor={confirmacoesAmanha.length}
           descricao="Ainda estão como agendados."
           href="#confirmacoes"
@@ -770,7 +783,7 @@ export default async function Home() {
           tone="amber"
         />
         <CardIndicador
-          titulo="Confirmados amanhã"
+          titulo={`Confirmados ${rotuloDiaConfirmacao}`}
           valor={confirmadosAmanha.length}
           descricao="Presença já confirmada."
           href="#confirmados-amanha"
@@ -951,22 +964,28 @@ export default async function Home() {
               <div>
                 <div className="flex items-center gap-2">
                   <Bell className="size-5 text-amber-600" />
-                  <h2 className="text-lg font-bold text-slate-950">Confirmar amanhã</h2>
+                  <h2 className="text-lg font-bold text-slate-950">Confirmar {rotuloDiaConfirmacao}</h2>
                 </div>
                 <p className="mt-1 text-sm text-slate-500">
                   Envie a mensagem e marque a presença confirmada.
                 </p>
+                {janela.aviso ? (
+                  <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                    {janela.aviso}
+                  </p>
+                ) : null}
               </div>
               <Link
                 href={`/agenda?data=${dataAgendaAmanha}`}
                 className="shrink-0 text-xs font-bold text-violet-700"
               >
-                Ver amanhã
+                Ver {janela.pulouDias ? "agenda" : "amanhã"}
               </Link>
             </div>
 
             <div className="mt-4">
               <CentralDoDiaClient
+                rotuloDia={rotuloDiaConfirmacao}
                 confirmacoes={confirmacoes}
                 podeGerenciarAgenda={podeGerenciarAgenda}
               />
@@ -978,7 +997,7 @@ export default async function Home() {
               <div>
                 <div className="flex items-center gap-2">
                   <BadgeCheck className="size-5 text-emerald-600" />
-                  <h2 className="text-lg font-bold text-slate-950">Confirmados de amanhã</h2>
+                  <h2 className="text-lg font-bold text-slate-950">Confirmados de {rotuloDiaConfirmacao}</h2>
                 </div>
                 <p className="mt-1 text-sm text-slate-500">
                   Clientes que já confirmaram presença.
@@ -988,7 +1007,7 @@ export default async function Home() {
                 href={`/agenda?data=${dataAgendaAmanha}`}
                 className="shrink-0 text-xs font-bold text-violet-700"
               >
-                Ver amanhã
+                Ver {janela.pulouDias ? "agenda" : "amanhã"}
               </Link>
             </div>
 
@@ -1037,7 +1056,7 @@ export default async function Home() {
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center">
                   <BadgeCheck className="mx-auto size-6 text-slate-400" />
                   <p className="mt-2 text-sm font-semibold text-slate-800">
-                    Nenhum cliente confirmado para amanhã.
+                    Nenhum cliente confirmado para {rotuloDiaConfirmacao}.
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
                     As confirmações aparecerão aqui assim que forem registradas.
@@ -1373,8 +1392,8 @@ export default async function Home() {
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Leitura operacional</p>
             <div className="mt-3 space-y-2 text-sm text-slate-600">
               <p><strong className="text-slate-900">{agendaHoje.length}</strong> atendimento(s) ativo(s) hoje.</p>
-              <p><strong className="text-slate-900">{confirmacoesAmanha.length}</strong> confirmação(ões) pendente(s) para amanhã.</p>
-              <p><strong className="text-slate-900">{confirmadosAmanha.length}</strong> cliente(s) confirmado(s) para amanhã.</p>
+              <p><strong className="text-slate-900">{confirmacoesAmanha.length}</strong> confirmação(ões) pendente(s) para {rotuloDiaConfirmacao}.</p>
+              <p><strong className="text-slate-900">{confirmadosAmanha.length}</strong> cliente(s) confirmado(s) para {rotuloDiaConfirmacao}.</p>
               <p><strong className="text-slate-900">{clientesReativacao.length}</strong> cliente(s) priorizado(s) para reativação.</p>
               <p><strong className="text-slate-900">{followUpsVencidos.length}</strong> follow-up(s) vencido(s) e <strong className="text-slate-900">{negociacoesParadas.length}</strong> negociação(ões) sem contato há 3+ dias.</p>
             </div>

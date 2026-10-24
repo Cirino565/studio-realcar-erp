@@ -1,5 +1,6 @@
 import { requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { janelaConfirmacao } from "@/lib/janela-confirmacao";
 import { AutomacoesClient } from "./components/AutomacoesClient";
 import type { AutomacaoInsight } from "./types";
 
@@ -7,10 +8,17 @@ function diasAtras(data: Date, dias: number) {
   return new Date(data.getFullYear(), data.getMonth(), data.getDate() - dias);
 }
 
+// Amanha, ou ate o proximo dia de atendimento quando domingo/feriado ficam no meio.
 function amanhaRange() {
-  const agora = new Date();
-  const inicio = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + 1);
-  const fim = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + 2);
+  const hojeISO = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "America/Sao_Paulo",
+  }).format(new Date());
+  const janela = janelaConfirmacao(hojeISO);
+  const inicio = new Date(`${janela.inicioISO}T00:00:00-03:00`);
+  const fim = new Date(`${janela.fimExclusivoISO}T00:00:00-03:00`);
 
   return { inicio, fim };
 }
