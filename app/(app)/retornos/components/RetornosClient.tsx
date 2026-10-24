@@ -31,6 +31,8 @@ type ClienteRetorno = {
   procedimentos: ProcedimentoAtrasado[];
   maiorAtraso: number;
   situacao: string | null;
+  // Mensagens de retorno ja enviadas neste ciclo (1+ = 2a tentativa).
+  tentativas?: number;
   mensagem: string;
   whatsappUrl: string | null;
 };
@@ -217,7 +219,9 @@ export default function RetornosClient({
       cliente.mensagem,
     )
       .then(() => {
-        adicionarNaEspera(cliente, "Contatada", 30);
+        // 2a mensagem: so chama de novo daqui a 3 meses.
+        if ((cliente.tentativas ?? 0) >= 1) adicionarNaEspera(cliente, "Mais tarde", 90);
+        else adicionarNaEspera(cliente, "Contatada", 30);
         window.setTimeout(() => {
           setOcultos((atuais) => [...atuais, cliente.clienteId]);
         }, 900);
@@ -363,7 +367,11 @@ export default function RetornosClient({
                         <p className="truncate font-semibold text-slate-900 dark:text-white">
                           {cliente.nome}
                         </p>
-                        {etiqueta ? (
+                        {(cliente.tentativas ?? 0) >= 1 ? (
+                          <p className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">
+                            2ª tentativa · não respondeu a 1ª mensagem
+                          </p>
+                        ) : etiqueta ? (
                           <p className={`mt-0.5 text-[11px] font-bold ${etiqueta.classe}`}>
                             {etiqueta.texto}
                           </p>

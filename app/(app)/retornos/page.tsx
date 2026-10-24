@@ -1,6 +1,7 @@
 import { requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
+  buildReactivationSecondWhatsAppMessage,
   buildReactivationWhatsAppMessage,
   buildWhatsAppUrl,
 } from "@/lib/whatsapp";
@@ -175,17 +176,48 @@ export default async function RetornosPage() {
     }))
     .sort((a, b) => b.maiorAtraso - a.maiorAtraso);
 
+  // Quantas mensagens de retorno cada cliente ja recebeu neste ciclo (depois
+  // do ultimo atendimento e nos ultimos 75 dias). 1 ou mais = 2a tentativa,
+  // com outro texto; depois dela a cliente descansa 3 meses.
+  const JANELA_TENTATIVAS_DIAS = 75;
+  const registrosRetorno = itens.length
+    ? await prisma.comunicacaoRegistro.findMany({
+        where: {
+          clienteId: { in: itens.map((cliente) => cliente.clienteId) },
+          categoria: "Reativação",
+          OR: [{ status: "Enviada" }, { enviadoEm: { not: null } }],
+          createdAt: { gte: new Date(agora.getTime() - JANELA_TENTATIVAS_DIAS * UM_DIA_MS) },
+        },
+        select: { clienteId: true, createdAt: true },
+      })
+    : [];
+
   const itensComMensagem = itens.map((cliente) => {
     const principal = cliente.procedimentos[0];
-    const mensagem = buildReactivationWhatsAppMessage({
-      clientName: cliente.nome,
-      procedure: principal?.nome,
-      lastVisit: principal?.ultimaVez,
-    });
+    const ultimoAtendimento = Math.max(
+      ...cliente.procedimentos.map((item) => new Date(item.ultimaVez).getTime()),
+    );
+    const tentativas = registrosRetorno.filter(
+      (registro) =>
+        registro.clienteId === cliente.clienteId &&
+        registro.createdAt.getTime() > ultimoAtendimento,
+    ).length;
+    const mensagem =
+      tentativas >= 1
+        ? buildReactivationSecondWhatsAppMessage({
+            clientName: cliente.nome,
+            procedure: principal?.nome,
+          })
+        : buildReactivationWhatsAppMessage({
+            clientName: cliente.nome,
+            procedure: principal?.nome,
+            lastVisit: principal?.ultimaVez,
+          });
     const numero = (cliente.whatsapp || cliente.telefone || "").trim();
 
     return {
       ...cliente,
+      tentativas,
       mensagem,
       whatsappUrl: numero ? buildWhatsAppUrl(numero, mensagem) : null,
     };

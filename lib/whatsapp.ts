@@ -294,6 +294,26 @@ export function buildReactivationWhatsAppMessage({
   return `Oi, ${firstName}! Tudo bem? 😊\n\nPassando para te contar que ${abertura}.\n\nManter o cuidado com regularidade é o que faz o resultado durar e ficar cada vez melhor.\n\nQuer que eu veja um horário para você? Me conta qual dia e período (manhã ou tarde) ficam melhores e eu já reservo. 💜`;
 }
 
+/**
+ * 2a tentativa de retorno (a 1a mensagem ficou sem resposta). Texto curto e
+ * diferente da primeira, com uma pergunta facil de responder. Nao sugere
+ * horario fixo: quem atende confere a agenda antes de oferecer.
+ */
+export function buildReactivationSecondWhatsAppMessage({
+  clientName,
+  procedure,
+}: WhatsAppReactivationMessageInput) {
+  const firstName = getFirstName(clientName);
+  const procedimento = (procedure || "").trim();
+  const oQue = /limpeza/i.test(procedimento)
+    ? "sua próxima limpeza de pele"
+    : procedimento
+      ? `seu próximo atendimento de ${procedimento.toLowerCase()}`
+      : "seu próximo atendimento";
+
+  return `Oi, ${firstName}! Tudo bem? 😊\n\nTe mandei uma mensagem há alguns dias e acho que acabou passando no meio da correria, então vou deixar bem simples:\n\nQuer que eu separe um horário para ${oQue}? É só me responder com o dia e o período (manhã ou tarde) que ficam melhores para você. 💜`;
+}
+
 export function buildWhatsAppUrl(phone: string | null | undefined, message: string) {
   const normalizedPhone = normalizeBrazilianPhone(phone);
   const params = new URLSearchParams();

@@ -19,6 +19,10 @@ const DIA_MS = 24 * 60 * 60 * 1000;
 const DIAS_APOS_MENSAGEM = 30;
 // "Vai marcar um dia": da um prazo curto e, se nao marcou, ela volta.
 const DIAS_VAI_MARCAR = 21;
+// 2a mensagem sem resposta: descansa 3 meses antes de chamar de novo.
+const DIAS_APOS_SEGUNDA_MENSAGEM = 90;
+// Mensagens mais antigas que isso nao contam como tentativa (o ciclo recomeca).
+const JANELA_TENTATIVAS_DIAS = 75;
 
 export async function registrarReativacao(
   clienteId: number,
@@ -45,9 +49,36 @@ export async function registrarReativacao(
   let situacao: string | null = null;
   let voltaEm: Date | null = null;
 
+  let segundaTentativa = false;
+
   if (acao === "CONTATADA") {
-    situacao = "Contatada";
-    voltaEm = new Date(agora.getTime() + DIAS_APOS_MENSAGEM * DIA_MS);
+    // Ja recebeu mensagem de retorno neste ciclo (depois do ultimo atendimento
+    // e nos ultimos 75 dias)? Entao esta e a 2a: depois dela, so em 3 meses.
+    const ultimoAtendimento = await prisma.agendamento.findFirst({
+      where: { clienteId, status: "Atendido" },
+      orderBy: { data: "desc" },
+      select: { data: true },
+    });
+    const desde = new Date(
+      Math.max(
+        agora.getTime() - JANELA_TENTATIVAS_DIAS * DIA_MS,
+        ultimoAtendimento?.data.getTime() ?? 0,
+      ),
+    );
+    const anteriores = await prisma.comunicacaoRegistro.count({
+      where: {
+        clienteId,
+        categoria: "Reativação",
+        OR: [{ status: "Enviada" }, { enviadoEm: { not: null } }],
+        createdAt: { gte: desde },
+      },
+    });
+    segundaTentativa = anteriores >= 1;
+
+    situacao = segundaTentativa ? "Mais tarde" : "Contatada";
+    voltaEm = new Date(
+      agora.getTime() + (segundaTentativa ? DIAS_APOS_SEGUNDA_MENSAGEM : DIAS_APOS_MENSAGEM) * DIA_MS,
+    );
   } else if (acao === "VAI_MARCAR") {
     situacao = "Vai marcar";
     voltaEm = new Date(agora.getTime() + DIAS_VAI_MARCAR * DIA_MS);
@@ -94,6 +125,7 @@ export async function registrarReativacao(
 
   revalidatePath("/");
   revalidatePath("/comunicacoes");
+  revalidatePath("/retornos");
 
-  return { ok: true };
+  return { ok: true, segundaTentativa };
 }
