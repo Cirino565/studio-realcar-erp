@@ -369,7 +369,9 @@ export default function RetornosClient({
                         </p>
                         {(cliente.tentativas ?? 0) >= 1 ? (
                           <p className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">
-                            2ª tentativa · não respondeu a 1ª mensagem
+                            {cliente.situacao === "Vai marcar"
+                              ? "2ª mensagem · disse que ia marcar e não marcou"
+                              : "2ª tentativa · não respondeu a 1ª mensagem"}
                           </p>
                         ) : etiqueta ? (
                           <p className={`mt-0.5 text-[11px] font-bold ${etiqueta.classe}`}>

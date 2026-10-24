@@ -302,7 +302,8 @@ export function buildReactivationWhatsAppMessage({
 export function buildReactivationSecondWhatsAppMessage({
   clientName,
   procedure,
-}: WhatsAppReactivationMessageInput) {
+  disseQueIaMarcar = false,
+}: WhatsAppReactivationMessageInput & { disseQueIaMarcar?: boolean }) {
   const firstName = getFirstName(clientName);
   const procedimento = (procedure || "").trim();
   const oQue = /limpeza/i.test(procedimento)
@@ -310,6 +311,10 @@ export function buildReactivationSecondWhatsAppMessage({
     : procedimento
       ? `seu próximo atendimento de ${procedimento.toLowerCase()}`
       : "seu próximo atendimento";
+
+  if (disseQueIaMarcar) {
+    return `Oi, ${firstName}! Tudo bem? 😊\n\nVocê tinha comentado que ia marcar ${oQue}. Quer que eu já veja um horário para você?\n\nÉ só me responder com o dia e o período (manhã ou tarde) que ficam melhores. 💜`;
+  }
 
   return `Oi, ${firstName}! Tudo bem? 😊\n\nTe mandei uma mensagem há alguns dias e acho que acabou passando no meio da correria, então vou deixar bem simples:\n\nQuer que eu separe um horário para ${oQue}? É só me responder com o dia e o período (manhã ou tarde) que ficam melhores para você. 💜`;
 }

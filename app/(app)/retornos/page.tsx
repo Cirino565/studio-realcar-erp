@@ -55,6 +55,7 @@ export default async function RetornosPage() {
           status: true,
           reativacaoSituacao: true,
           reativacaoVoltaEm: true,
+          reativacaoAtualizadaEm: true,
         },
       },
     },
@@ -102,6 +103,7 @@ export default async function RetornosPage() {
       whatsapp: string | null;
       telefone: string;
       situacao: string | null;
+      situacaoEm: Date | null;
       procedimentos: Array<{
         nome: string;
         ultimaVez: string;
@@ -152,6 +154,7 @@ export default async function RetornosPage() {
       whatsapp: atendimento.cliente.whatsapp,
       telefone: atendimento.cliente.telefone,
       situacao: atendimento.cliente.reativacaoSituacao ?? null,
+      situacaoEm: atendimento.cliente.reativacaoAtualizadaEm ?? null,
       procedimentos: [],
     };
 
@@ -197,16 +200,25 @@ export default async function RetornosPage() {
     const ultimoAtendimento = Math.max(
       ...cliente.procedimentos.map((item) => new Date(item.ultimaVez).getTime()),
     );
-    const tentativas = registrosRetorno.filter(
+    const registros = registrosRetorno.filter(
       (registro) =>
         registro.clienteId === cliente.clienteId &&
         registro.createdAt.getTime() > ultimoAtendimento,
     ).length;
+    // Tambem conta como 1a tentativa quem foi marcada como "ja recebeu" ou
+    // "vai marcar" neste ciclo (mesmo se a mensagem saiu fora do sistema).
+    const marcadaNesteCiclo =
+      (cliente.situacao === "Contatada" || cliente.situacao === "Vai marcar") &&
+      cliente.situacaoEm !== null &&
+      cliente.situacaoEm.getTime() > ultimoAtendimento &&
+      cliente.situacaoEm.getTime() > agora.getTime() - JANELA_TENTATIVAS_DIAS * UM_DIA_MS;
+    const tentativas = Math.max(registros, marcadaNesteCiclo ? 1 : 0);
     const mensagem =
       tentativas >= 1
         ? buildReactivationSecondWhatsAppMessage({
             clientName: cliente.nome,
             procedure: principal?.nome,
+            disseQueIaMarcar: cliente.situacao === "Vai marcar",
           })
         : buildReactivationWhatsAppMessage({
             clientName: cliente.nome,
@@ -215,8 +227,10 @@ export default async function RetornosPage() {
           });
     const numero = (cliente.whatsapp || cliente.telefone || "").trim();
 
+    const { situacaoEm, ...restoCliente } = cliente;
+    void situacaoEm;
     return {
-      ...cliente,
+      ...restoCliente,
       tentativas,
       mensagem,
       whatsappUrl: numero ? buildWhatsAppUrl(numero, mensagem) : null,

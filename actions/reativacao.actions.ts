@@ -38,7 +38,14 @@ export async function registrarReativacao(
 
   const cliente = await prisma.cliente.findUnique({
     where: { id: clienteId },
-    select: { id: true, nome: true, telefone: true, whatsapp: true },
+    select: {
+      id: true,
+      nome: true,
+      telefone: true,
+      whatsapp: true,
+      reativacaoSituacao: true,
+      reativacaoAtualizadaEm: true,
+    },
   });
 
   if (!cliente) {
@@ -73,7 +80,13 @@ export async function registrarReativacao(
         createdAt: { gte: desde },
       },
     });
-    segundaTentativa = anteriores >= 1;
+    // Marcada como "ja recebeu"/"vai marcar" neste ciclo tambem conta, mesmo
+    // se a 1a mensagem saiu fora do sistema.
+    const marcadaNesteCiclo =
+      (cliente.reativacaoSituacao === "Contatada" || cliente.reativacaoSituacao === "Vai marcar") &&
+      cliente.reativacaoAtualizadaEm !== null &&
+      cliente.reativacaoAtualizadaEm >= desde;
+    segundaTentativa = anteriores >= 1 || marcadaNesteCiclo;
 
     situacao = segundaTentativa ? "Mais tarde" : "Contatada";
     voltaEm = new Date(
