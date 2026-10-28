@@ -32,6 +32,7 @@ import EvolucoesPendentesClient from "@/components/dashboard/EvolucoesPendentesC
 import FilaComercialClient from "@/components/dashboard/FilaComercialClient";
 import ReativacaoClient from "@/components/dashboard/ReativacaoClient";
 import { WhatsAppLink } from "@/components/ui/whatsapp-link";
+import { lerProcedimentosExtras, nomesParaMensagem } from "@/lib/procedimentos-extras";
 
 const TIMEZONE = "America/Sao_Paulo";
 
@@ -93,11 +94,15 @@ function primeiroNome(nome: string) {
 
 function formatarProcedimentoAgendamento(agendamento: {
   procedimento: string;
+  procedimentosExtras?: string | null;
   naturezaAtendimento?: string | null;
 }) {
   return agendamento.naturezaAtendimento === "RETORNO"
     ? `Retorno, ${agendamento.procedimento}`
-    : agendamento.procedimento;
+    : nomesParaMensagem(
+        agendamento.procedimento,
+        lerProcedimentosExtras(agendamento.procedimentosExtras),
+      );
 }
 
 function renderizarMensagemModelo(

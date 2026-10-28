@@ -160,6 +160,9 @@ model Agendamento {
   aguardandoRemarcacao Boolean       @default(false)
   // O sinal pago ficou guardado para a nova data (vai junto ao remarcar).
   sinalGuardado        Boolean       @default(false)
+  // Procedimentos marcados no mesmo horario alem do principal (lista em JSON).
+  // valor e duracao do agendamento sao o TOTAL da visita.
+  procedimentosExtras  String?
   desmarcadoEm         DateTime?
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt

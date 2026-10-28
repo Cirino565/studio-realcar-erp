@@ -36,6 +36,11 @@ import {
 } from "@/lib/color-contrast";
 
 import AvisoSinalPago from "@/components/pacotes/AvisoSinalPago";
+import {
+  lerProcedimentosExtras,
+  nomesComExtras,
+  somaValorExtras,
+} from "@/lib/procedimentos-extras";
 import { FecharPacoteCard } from "@/components/pacotes/PacotesNaAgenda";
 import AvisoPacoteAberto, {
   type PacoteParaAviso,
@@ -75,6 +80,8 @@ export type AppointmentDetails = {
   clienteId: number;
   profissionalId: number | null;
   procedimento: string;
+  // Outros procedimentos marcados no mesmo horario (lista em JSON).
+  procedimentosExtras?: string | null;
   data: string;
   duracao: number;
   valor: number;
@@ -438,7 +445,12 @@ export default function AppointmentDetailsModal({
                 <h2 id="appointment-details-title" className="mt-1 truncate text-base font-bold text-slate-950">
                   {currentAppointment.cliente.nome}
                 </h2>
-                <p className="truncate text-xs text-slate-500">{currentAppointment.procedimento}</p>
+                <p className="truncate text-xs text-slate-500">
+                  {nomesComExtras(
+                    currentAppointment.procedimento,
+                    lerProcedimentosExtras(currentAppointment.procedimentosExtras),
+                  )}
+                </p>
               </div>
             </div>
 
@@ -661,11 +673,33 @@ export default function AppointmentDetailsModal({
                       ? "Retorno do procedimento"
                       : "Procedimento"}
                   </p>
-                  <p className="mt-1 text-sm font-bold text-slate-900">{currentAppointment.procedimento}</p>
+                  {(() => {
+                    const extras = lerProcedimentosExtras(currentAppointment.procedimentosExtras);
+                    if (extras.length === 0) {
+                      return (
+                        <p className="mt-1 text-sm font-bold text-slate-900">{currentAppointment.procedimento}</p>
+                      );
+                    }
+                    const valorPrincipal = Math.max(0, currentAppointment.valor - somaValorExtras(extras));
+                    return (
+                      <div className="mt-1 space-y-0.5 text-sm font-bold text-slate-900">
+                        <p className="flex justify-between gap-2">
+                          <span className="min-w-0">{currentAppointment.procedimento}</span>
+                          <span className="shrink-0 text-xs font-semibold text-slate-500">{formatCurrency(valorPrincipal)}</span>
+                        </p>
+                        {extras.map((extra, indice) => (
+                          <p key={`${extra.nome}-${indice}`} className="flex justify-between gap-2">
+                            <span className="min-w-0">+ {extra.nome}</span>
+                            <span className="shrink-0 text-xs font-semibold text-slate-500">{formatCurrency(extra.valor)}</span>
+                          </p>
+                        ))}
+                      </div>
+                    );
+                  })()}
                   <p className="mt-0.5 text-xs font-bold text-violet-700">
                     {currentAppointment.naturezaAtendimento === "RETORNO"
                       ? "Sem cobrança"
-                      : formatCurrency(currentAppointment.valor)}
+                      : `${lerProcedimentosExtras(currentAppointment.procedimentosExtras).length > 0 ? "Total " : ""}${formatCurrency(currentAppointment.valor)}`}
                   </p>
                 </div>
               </div>

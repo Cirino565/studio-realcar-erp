@@ -43,6 +43,7 @@ import {
 
 import { ClienteFotoUploadForm } from "@/app/(app)/clientes/components/ClienteFotoUploadForm";
 import type { AppointmentDetails } from "./AppointmentDetailsModal";
+import { lerProcedimentosExtras, somaValorExtras } from "@/lib/procedimentos-extras";
 
 type ServicoFinalizacao = {
   id: number;
@@ -271,17 +272,42 @@ export default function FinalizarAtendimentoModal({
     const atendimentoRetornoAtual =
       appointment.naturezaAtendimento === "RETORNO";
 
+    // Procedimentos extras marcados na hora de agendar: ja vem preenchidos.
+    // O valor do agendamento era o TOTAL; o principal fica com o que sobra.
+    const extrasAgendados = atendimentoRetornoAtual
+      ? []
+      : lerProcedimentosExtras(appointment.procedimentosExtras);
+    const valorDoPrincipal = Math.max(
+      0,
+      Number(appointment.valor ?? servico?.valorPadrao ?? 0) -
+        somaValorExtras(extrasAgendados),
+    );
+
     setProcedimentoRealizado(appointment.procedimento || "");
     setProcedimentoServicoId(servico?.id || null);
-    setValorServico(
-      atendimentoRetornoAtual
-        ? 0
-        : Number(appointment.valor ?? servico?.valorPadrao ?? 0),
-    );
+    setValorServico(atendimentoRetornoAtual ? 0 : valorDoPrincipal);
     setCustoServico(
       atendimentoRetornoAtual ? 0 : Number(servico?.custoPadrao || 0),
     );
-    setProcedimentosExtras([]);
+    setProcedimentosExtras(
+      extrasAgendados.map((extra, indice) => {
+        const servicoExtra = servicos.find(
+          (item) =>
+            (extra.servicoId && item.id === extra.servicoId) ||
+            normalizarTexto(item.nome) === normalizarTexto(extra.nome),
+        );
+
+        return {
+          chave: `agendado-${appointment.id}-${indice}`,
+          servicoId: servicoExtra?.id ?? extra.servicoId,
+          nome: extra.nome,
+          valor: extra.valor,
+          custo: Number(servicoExtra?.custoPadrao || 0),
+          duracao: Math.max(15, extra.duracao),
+          evolucao: "",
+        };
+      }),
+    );
     setPacoteRegistrado(null);
     setCobrancaNaAvaliacaoOk(false);
     setItensProdutos([]);

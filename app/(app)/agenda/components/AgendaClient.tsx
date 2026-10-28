@@ -22,6 +22,10 @@ import FinalizarAtendimentoModal, {
 import NovoAgendamentoModal from "./NovoAgendamentoModal";
 import ParaRemarcarPainel from "./ParaRemarcarPainel";
 import type { RemarcacaoPendente } from "@/lib/remarcacao";
+import {
+  lerProcedimentosExtras,
+  type ProcedimentoExtraAgenda,
+} from "@/lib/procedimentos-extras";
 
 type ClienteAgenda = {
   id: number;
@@ -75,6 +79,7 @@ type BloqueioAgenda = {
 };
 
 type NovoAgendamentoPayload = NovoHorarioPayload & {
+  procedimentosExtras?: ProcedimentoExtraAgenda[];
   agendamentoId?: number;
   bloqueioId?: number;
   modo?: "novo" | "retorno" | "edicao" | "edicao_bloqueio";
@@ -457,6 +462,7 @@ export default function AgendaClient({
       profissionalId: appointment.profissionalId || undefined,
       clienteId: appointment.clienteId,
       procedimento: appointment.procedimento,
+      procedimentosExtras: lerProcedimentosExtras(appointment.procedimentosExtras),
       duracao: appointment.duracao || 60,
       valor: appointment.valor || 0,
       status: appointment.status,

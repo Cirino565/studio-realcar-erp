@@ -2,6 +2,7 @@ import { canAccess, requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { decodificarMensagemModelo } from "@/lib/mensagem-modelo.server";
 import { janelaConfirmacao } from "@/lib/janela-confirmacao";
+import { lerProcedimentosExtras, nomesParaMensagem } from "@/lib/procedimentos-extras";
 
 import ComunicacoesClient from "./components/ComunicacoesClient";
 import type {
@@ -293,6 +294,10 @@ export default async function ComunicacoesPage({ searchParams }: ComunicacoesPag
   }
 
   for (const item of confirmacoes) {
+    const procedimentosTexto = nomesParaMensagem(
+      item.procedimento,
+      lerProcedimentosExtras(item.procedimentosExtras),
+    );
     adicionarItem({
       id: `confirmacao-${item.id}`,
       prioridade: 10,
@@ -302,10 +307,10 @@ export default async function ComunicacoesPage({ searchParams }: ComunicacoesPag
       telefone: item.cliente.whatsapp || item.cliente.telefone,
       clienteId: item.cliente.id,
       agendamentoId: item.id,
-      detalhe: `${formatarData(item.data)} às ${formatarHorario(item.data)} · ${item.procedimento}`,
+      detalhe: `${formatarData(item.data)} às ${formatarHorario(item.data)} · ${procedimentosTexto}`,
       destinoHref: `/agenda?data=${dataISOEmSaoPaulo(item.data)}`,
       variaveis: {
-        procedimento: item.procedimento,
+        procedimento: procedimentosTexto,
         data: formatarData(item.data),
         horario: formatarHorario(item.data),
         profissional: item.profissional?.nome || "",

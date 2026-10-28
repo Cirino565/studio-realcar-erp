@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import type { AppointmentDetails } from "./AppointmentDetailsModal";
 import { feriadoDoDia, rotuloTipoFeriado } from "@/lib/feriados";
+import { lerProcedimentosExtras, nomesComExtras } from "@/lib/procedimentos-extras";
 import {
   getMutedTextColor,
   getOverlayBackground,
@@ -1688,7 +1689,7 @@ export default function AgendaCalendar({
                                 {appointment.cliente.nome}
                               </p>
                               <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-slate-600 dark:text-slate-300">
-                                {appointment.procedimento}
+                                {nomesComExtras(appointment.procedimento, lerProcedimentosExtras(appointment.procedimentosExtras))}
                               </p>
                               <div className="mt-1 flex flex-wrap items-center gap-1">
                                 <span
@@ -2182,11 +2183,11 @@ export default function AgendaCalendar({
                                 style={{ color: statusPalette.mutedText }}
                                 title={
                                   observacaoReal
-                                    ? `${appointment.procedimento} · ${observacaoReal}`
-                                    : appointment.procedimento
+                                    ? `${nomesComExtras(appointment.procedimento, lerProcedimentosExtras(appointment.procedimentosExtras))} · ${observacaoReal}`
+                                    : nomesComExtras(appointment.procedimento, lerProcedimentosExtras(appointment.procedimentosExtras))
                                 }
                               >
-                                {appointment.procedimento}
+                                {nomesComExtras(appointment.procedimento, lerProcedimentosExtras(appointment.procedimentosExtras))}
                                 {observacaoReal ? ` · ${observacaoReal}` : ""}
                               </p>
                             ) : null}

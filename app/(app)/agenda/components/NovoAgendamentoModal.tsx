@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock3,
+  Plus,
   Repeat2,
   RotateCcw,
   Search,
@@ -31,6 +32,7 @@ import {
 } from "@/actions/agendamento.actions";
 
 import { formatarDuracao, interpretarDuracao } from "@/lib/duracao";
+import type { ProcedimentoExtraAgenda } from "@/lib/procedimentos-extras";
 
 import type { NovoHorarioPayload } from "./AgendaCalendar";
 import type { RemarcacaoPendente } from "@/lib/remarcacao";
@@ -66,7 +68,16 @@ type ServicoAgenda = {
   valorPadrao: number;
 };
 
+type ExtraRascunho = {
+  chave: string;
+  servicoId: string;
+  nome: string;
+  valor: string;
+  duracao: number;
+};
+
 type NovoAgendamentoPayload = NovoHorarioPayload & {
+  procedimentosExtras?: ProcedimentoExtraAgenda[];
   agendamentoId?: number;
   bloqueioId?: number;
   modo?: "novo" | "retorno" | "edicao" | "edicao_bloqueio";
@@ -271,6 +282,8 @@ export default function NovoAgendamentoModal({
     );
   const [duracao, setDuracao] = useState("1 hora");
   const [valor, setValor] = useState("");
+  // Outros procedimentos no mesmo horario (botao "Adicionar procedimento").
+  const [extras, setExtras] = useState<ExtraRascunho[]>([]);
   const [status, setStatus] = useState("Agendado");
   const [observacoes, setObservacoes] = useState("");
   const [sinalPago, setSinalPago] = useState(false);
@@ -384,10 +397,25 @@ export default function NovoAgendamentoModal({
     setSucesso(false);
     setAvisoSucesso(null);
     setDuracao(formatarDuracao(initialPayload?.duracao || 60));
+    const extrasIniciais =
+      naturezaInicial === "RETORNO" ? [] : initialPayload?.procedimentosExtras || [];
+    // valor e duracao salvos sao o TOTAL; o campo mostra so o do 1o procedimento.
+    const somaValorIniciais = extrasIniciais.reduce((s, e) => s + e.valor, 0);
+    setExtras(
+      extrasIniciais.map((extra, indice) => ({
+        chave: `ini-${indice}`,
+        servicoId: extra.servicoId ? String(extra.servicoId) : "",
+        nome: extra.nome,
+        valor: valorParaInput(extra.valor),
+        duracao: extra.duracao,
+      })),
+    );
     setValor(
       naturezaInicial === "RETORNO"
         ? ""
-        : valorParaInput(initialPayload?.valor),
+        : valorParaInput(
+            Math.max(0, Number(initialPayload?.valor || 0) - somaValorIniciais),
+          ),
     );
     setStatus(initialPayload?.status || "Agendado");
     setObservacoes(initialPayload?.observacoes || "");
@@ -597,14 +625,73 @@ export default function NovoAgendamentoModal({
   const horarioSelecionadoForaDaLista = Boolean(
     hora && !horariosDisponiveis.some((item) => item.hora === hora),
   );
-  const total = parseCurrency(valor);
+  const somaExtras = extras.reduce((s, e) => s + parseCurrency(e.valor), 0);
+  const total =
+    Math.round((parseCurrency(valor) + (naturezaAtendimento === "RETORNO" ? 0 : somaExtras)) * 100) / 100;
+  const somaDuracaoDosExtras = extras.reduce((s, e) => s + e.duracao, 0);
+
+  function adicionarExtra() {
+    setExtras((atuais) =>
+      atuais.length >= 8
+        ? atuais
+        : [
+            ...atuais,
+            { chave: `novo-${Date.now()}-${atuais.length}`, servicoId: "", nome: "", valor: "", duracao: 0 },
+          ],
+    );
+    setErro("");
+  }
+
+  function escolherServicoExtra(chave: string, servicoId: string) {
+    const servico = servicos.find((item) => String(item.id) === servicoId) || null;
+    const atual = extras.find((item) => item.chave === chave);
+    if (!atual) return;
+    const novaDuracao = servico ? Math.max(5, servico.duracaoPadrao || 30) : 0;
+    // Tempo total = tempo atual - o que o item tinha + o do novo item.
+    setDuracao(
+      formatarDuracao(Math.max(5, interpretarDuracao(duracao) - atual.duracao + novaDuracao)),
+    );
+    setExtras((atuais) =>
+      atuais.map((item) =>
+        item.chave === chave
+          ? {
+              ...item,
+              servicoId,
+              nome: servico?.nome || "",
+              duracao: novaDuracao,
+              valor:
+                servico && servico.valorPadrao > 0
+                  ? servico.valorPadrao.toFixed(2).replace(".", ",")
+                  : "",
+            }
+          : item,
+      ),
+    );
+    setErro("");
+  }
+
+  function alterarValorExtra(chave: string, texto: string) {
+    setExtras((atuais) =>
+      atuais.map((item) =>
+        item.chave === chave ? { ...item, valor: formatCurrencyInput(texto) } : item,
+      ),
+    );
+  }
+
+  function removerExtra(chave: string) {
+    const atual = extras.find((item) => item.chave === chave);
+    if (!atual) return;
+    setDuracao(formatarDuracao(Math.max(5, interpretarDuracao(duracao) - atual.duracao)));
+    setExtras((atuais) => atuais.filter((item) => item.chave !== chave));
+    setErro("");
+  }
 
   function selecionarServico(servico: ServicoAgenda) {
     setServicoSelecionadoId(String(servico.id));
     setBuscaServico(servico.nome);
     setProcedimento(servico.nome);
     setMostrarListaServicos(false);
-    setDuracao(formatarDuracao(servico.duracaoPadrao));
+    setDuracao(formatarDuracao(servico.duracaoPadrao + somaDuracaoDosExtras));
     setValor(
       naturezaAtendimento === "RETORNO"
         ? ""
@@ -637,6 +724,12 @@ export default function NovoAgendamentoModal({
 
     if (novaNatureza === "RETORNO") {
       setTipoCliente("existente");
+      if (extras.length > 0) {
+        setDuracao(
+          formatarDuracao(Math.max(5, interpretarDuracao(duracao) - somaDuracaoDosExtras)),
+        );
+        setExtras([]);
+      }
       setValor("");
       setSinalPago(false);
       setRecorrenciaTipo("nenhuma");
@@ -739,6 +832,17 @@ export default function NovoAgendamentoModal({
 
     const dataCompleta = `${data}T${hora}:00`;
     const duracaoNumerica = interpretarDuracao(duracao);
+
+    if (
+      tipoAtendimento !== "bloqueio" &&
+      naturezaAtendimento !== "RETORNO" &&
+      extras.some((extra) => !extra.nome)
+    ) {
+      setErro(
+        "Escolha o procedimento em todos os itens adicionados, ou remova os que estiverem em branco.",
+      );
+      return;
+    }
     const recorrencia = {
       tipo: recorrenciaTipo,
       intervalo: Math.max(1, Number(recorrenciaIntervalo) || 1),
@@ -894,10 +998,16 @@ export default function NovoAgendamentoModal({
         procedimento,
         data: dataCompleta,
         duracao: duracaoNumerica,
-        valor:
+        valor: naturezaAtendimento === "RETORNO" ? 0 : total,
+        procedimentosExtras:
           naturezaAtendimento === "RETORNO"
-            ? 0
-            : parseCurrency(valor),
+            ? []
+            : extras.map((extra) => ({
+                servicoId: extra.servicoId ? Number(extra.servicoId) : null,
+                nome: extra.nome,
+                valor: parseCurrency(extra.valor),
+                duracao: extra.duracao,
+              })),
         status,
         observacoes,
         sinalPago:
@@ -1742,10 +1852,66 @@ export default function NovoAgendamentoModal({
               </div>
             </div>
 
+            {naturezaAtendimento !== "RETORNO" ? (
+              <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50/60 p-3 dark:border-violet-400/30 dark:bg-violet-500/10">
+                {extras.length > 0 ? (
+                  <div className="mb-3 space-y-2">
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                      Outros procedimentos no mesmo horário
+                    </p>
+                    {extras.map((extra) => (
+                      <div key={extra.chave} className="flex flex-wrap items-center gap-2">
+                        <select
+                          value={extra.servicoId}
+                          onChange={(event) => escolherServicoExtra(extra.chave, event.target.value)}
+                          aria-label="Procedimento adicional"
+                          className={`${fieldClassName()} min-w-0 flex-1`}
+                        >
+                          <option value="">Escolha o procedimento…</option>
+                          {[...servicos]
+                            .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }))
+                            .map((servico) => (
+                              <option key={servico.id} value={servico.id}>
+                                {servico.nome}
+                              </option>
+                            ))}
+                        </select>
+                        <input
+                          value={extra.valor}
+                          onChange={(event) => alterarValorExtra(extra.chave, event.target.value)}
+                          placeholder="0,00"
+                          inputMode="decimal"
+                          aria-label="Valor do procedimento adicional"
+                          className={`${fieldClassName()} w-28`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removerExtra(extra.chave)}
+                          aria-label="Remover procedimento"
+                          className="rounded-lg p-2 text-slate-500 transition hover:bg-rose-50 hover:text-rose-600"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={adicionarExtra}
+                  disabled={extras.length >= 8}
+                  className="inline-flex items-center gap-1.5 text-sm font-bold text-violet-700 transition hover:text-violet-900 disabled:opacity-50 dark:text-violet-300"
+                >
+                  <Plus className="h-4 w-4" />
+                  Adicionar procedimento
+                </button>
+              </div>
+            ) : null}
+
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <label>
                 <span className={labelClassName()}>
-                  Duração baseada no procedimento
+                  {extras.length > 0 ? "Duração total" : "Duração baseada no procedimento"}
                 </span>
                 <div className="relative">
                   <input
@@ -1771,7 +1937,9 @@ export default function NovoAgendamentoModal({
                 <span className={labelClassName()}>
                   {naturezaAtendimento === "RETORNO"
                     ? "Valor do retorno"
-                    : "Valor previsto"}
+                    : extras.length > 0
+                      ? "Valor do 1º procedimento"
+                      : "Valor previsto"}
                 </span>
                 <input
                   value={valor}

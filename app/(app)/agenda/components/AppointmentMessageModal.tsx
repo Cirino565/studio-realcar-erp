@@ -11,6 +11,10 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  lerProcedimentosExtras,
+  nomesParaMensagem,
+} from "@/lib/procedimentos-extras";
 import { WhatsAppLink } from "@/components/ui/whatsapp-link";
 import {
   buildWhatsAppMessage,
@@ -22,6 +26,7 @@ import {
 type AppointmentForMessage = {
   id: number;
   procedimento: string;
+  procedimentosExtras?: string | null;
   naturezaAtendimento?: "PROCEDIMENTO" | "RETORNO";
   data: Date | string;
   cliente: {
@@ -54,7 +59,10 @@ function gerarMensagem(
     procedure:
       appointment.naturezaAtendimento === "RETORNO"
         ? `Retorno, ${appointment.procedimento}`
-        : appointment.procedimento,
+        : nomesParaMensagem(
+            appointment.procedimento,
+            lerProcedimentosExtras(appointment.procedimentosExtras),
+          ),
     appointmentDate: appointment.data,
   });
 }
@@ -175,7 +183,10 @@ function AppointmentMessageContent({
                   : "Procedimento"}
               </p>
               <p className="mt-1 truncate text-sm font-bold text-slate-900 dark:text-white">
-                {appointment.procedimento}
+                {nomesParaMensagem(
+                  appointment.procedimento,
+                  lerProcedimentosExtras(appointment.procedimentosExtras),
+                )}
               </p>
             </div>
 

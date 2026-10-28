@@ -5,6 +5,12 @@ import { randomUUID } from "node:crypto";
 import { isAdminUser, requirePermission } from "@/lib/auth";
 import { obterAreaPadraoAgendamento } from "@/lib/area-cliente";
 import { prisma } from "@/lib/prisma";
+import {
+  lerProcedimentosExtras,
+  serializarProcedimentosExtras,
+  somaDuracaoExtras,
+  type ProcedimentoExtraAgenda,
+} from "@/lib/procedimentos-extras";
 import { concluirRemarcacaoNoTx } from "@/lib/remarcacao";
 import { sincronizarSinalNoTx } from "@/lib/sinal";
 import {
@@ -37,6 +43,9 @@ type NovoAgendamento = {
   novoCliente?: ClienteNovoAgendamento;
   profissionalId?: number;
   procedimento: string;
+  // Outros procedimentos no mesmo horario. "valor" e "duracao" abaixo ja sao o
+  // TOTAL da visita (principal + extras).
+  procedimentosExtras?: ProcedimentoExtraAgenda[];
   data: string;
   duracao?: number;
   valor?: number;
@@ -817,6 +826,10 @@ export async function criarAgendamento(
     naturezaAtendimento === "RETORNO"
       ? 0
       : Math.max(0, Number(dados.valor) || 0);
+  const extrasTexto =
+    naturezaAtendimento === "RETORNO"
+      ? null
+      : serializarProcedimentosExtras(dados.procedimentosExtras);
 
   if (!dados.excecaoHorarioFuncionamento) {
     await validarDatasNoHorarioFuncionamento(datas);
@@ -903,6 +916,7 @@ export async function criarAgendamento(
         clienteId: clienteId!,
         profissionalId: dados.profissionalId || null,
         procedimento: dados.procedimento,
+        procedimentosExtras: extrasTexto,
         data,
         duracao,
         valor: valorAgendamento,
@@ -1000,6 +1014,10 @@ export async function atualizarAgendamento({
     naturezaAtendimento === "RETORNO"
       ? 0
       : Math.max(0, Number(dados.valor) || 0);
+  const extrasTexto =
+    naturezaAtendimento === "RETORNO"
+      ? null
+      : serializarProcedimentosExtras(dados.procedimentosExtras);
 
   if (!dados.excecaoHorarioFuncionamento) {
     await validarDatasNoHorarioFuncionamento([data]);
@@ -1086,6 +1104,7 @@ export async function atualizarAgendamento({
         clienteId,
         profissionalId: dados.profissionalId || null,
         procedimento: dados.procedimento,
+        procedimentosExtras: extrasTexto,
         data,
         duracao,
         valor: valorAgendamento,
@@ -1789,6 +1808,16 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
 
   const procedimentoRealizado = dados.procedimentoRealizado.trim();
   const observacoes = dados.observacoes?.trim() || null;
+
+  // Procedimentos extras marcados na hora de agendar: a duracao do agendamento
+  // era a da visita toda. O principal volta a ter so o tempo dele (os extras
+  // viram atendimentos proprios logo depois), para o tempo nao ser contado
+  // duas vezes.
+  const extrasAgendados = lerProcedimentosExtras(agendamento.procedimentosExtras);
+  const duracaoDoPrincipal =
+    extrasAgendados.length > 0
+      ? Math.max(15, (agendamento.duracao || 60) - somaDuracaoExtras(extrasAgendados))
+      : Math.max(0, agendamento.duracao || 60);
   const evolucaoClinica = dados.evolucao?.trim() || null;
 
   // Considera "tem evolução" tanto o texto digitado agora quanto uma
@@ -1891,6 +1920,8 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
         evolucaoRegistradaPor: temEvolucaoRegistrada ? profissional : null,
         procedimento: procedimentoRealizado,
         valor: valorCobrado,
+        ...(extrasAgendados.length > 0 ? { duracao: duracaoDoPrincipal } : {}),
+        procedimentosExtras: null,
         observacoes: [agendamento.observacoes, observacoes]
           .filter(Boolean)
           .join("\n\nFinalização: "),
@@ -1967,7 +1998,7 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
     //
     // O pagamento continua sendo UM SO: os valores entram como linhas a
     // mais na mesma venda, mais abaixo.
-    let deslocamentoMinutos = Math.max(0, agendamento.duracao || 60);
+    let deslocamentoMinutos = duracaoDoPrincipal;
 
     for (const adicional of procedimentosAdicionais) {
       const inicioAdicional = new Date(
