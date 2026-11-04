@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { entradaEhSinal } from "@/lib/receita-campanha";
 import {
   CLIENTE_COM_CLIQUE_PAGO,
   buscarIdsClientesComCliquePago,
@@ -490,6 +491,7 @@ export async function obterDadosGestao(
         agendamentoId: true,
         clienteId: true,
         categoria: true,
+        origem: true,
         data: true,
         campanhaId: true,
         campanha: {
@@ -1120,10 +1122,41 @@ export async function obterDadosGestao(
   // Ancorado no financeiro realizado (data do lancamento pago), igual ao resto
   // do painel, para nao divergir dos numeros das outras secoes. A venda ja grava
   // a campanha no proprio lancamento, entao nao ha risco de contar duas vezes.
+  // Sinal ligado a campanha so conta depois que o atendimento aconteceu
+  // (antes disso e so reserva, a venda ainda nao foi fechada).
+  const idsAgendamentoSinalCampanha = Array.from(
+    new Set(
+      lancamentosPagos
+        .filter(
+          (item) =>
+            typeof item.campanhaId === "number" &&
+            item.tipo === "ENTRADA" &&
+            item.agendamentoId &&
+            entradaEhSinal(item),
+        )
+        .map((item) => item.agendamentoId as number),
+    ),
+  );
+  const agendamentosSinalAtendidos = new Set(
+    idsAgendamentoSinalCampanha.length
+      ? (
+          await prisma.agendamento.findMany({
+            where: { id: { in: idsAgendamentoSinalCampanha }, status: "Atendido" },
+            select: { id: true },
+          })
+        ).map((item) => item.id)
+      : [],
+  );
+
   const lancamentosCampanhaPagos = lancamentosPagos.filter(
     (item) =>
       typeof item.campanhaId === "number" &&
-      movimentoEhDeCliquePago(item.clienteId, idsClientesPagos),
+      movimentoEhDeCliquePago(item.clienteId, idsClientesPagos) &&
+      !(
+        item.tipo === "ENTRADA" &&
+        entradaEhSinal(item) &&
+        !(item.agendamentoId && agendamentosSinalAtendidos.has(item.agendamentoId))
+      ),
   );
 
   const investimentoRealizado = somarValores(

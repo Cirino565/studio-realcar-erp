@@ -60,6 +60,7 @@ import {
   vincularClienteCampanha,
   vincularLeadAOutroCliente,
   vincularReceitaCampanha,
+  desvincularReceitaCampanha,
 } from "@/actions/marketing.actions";
 import { Button } from "@/components/ui/button";
 import { WhatsAppLink } from "@/components/ui/whatsapp-link";
@@ -72,6 +73,7 @@ import {
 } from "@/lib/whatsapp";
 import type {
   CampanhaFormData,
+  ItemReceitaCampanha,
   LeadEtapa,
   LeadFormData,
   MarketingCampanha,
@@ -109,6 +111,8 @@ type Props = {
   clientes: MarketingClienteOption[];
   contas: MarketingContaOption[];
   receitasSemCampanha: MarketingReceitaOption[];
+  // O que esta por tras do "Entrou" de cada campanha (o que conta e o que nao).
+  itensReceita?: ItemReceitaCampanha[];
   movimentosCampanha: MovimentosCampanha;
   profissionais: MarketingProfissional[];
   servicos: MarketingServico[];
@@ -541,6 +545,7 @@ export default function MarketingClient({
   clientes,
   contas,
   receitasSemCampanha,
+  itensReceita = [],
   movimentosCampanha,
   profissionais,
   servicos,
@@ -1645,7 +1650,7 @@ export default function MarketingClient({
         ) : null}
 
         {tab === "campanhas" ? (
-          <CampanhasView campanhas={campanhas} leads={leads} clientes={clientes} contas={contas} receitasSemCampanha={receitasSemCampanha} movimentos={movimentosCampanha} onDelete={removerCampanha} onEditar={abrirEdicaoCampanha} isPending={isPending} podeGerenciar={podeGerenciarMarketing} />
+          <CampanhasView campanhas={campanhas} leads={leads} clientes={clientes} contas={contas} receitasSemCampanha={receitasSemCampanha} itensReceita={itensReceita} movimentos={movimentosCampanha} onDelete={removerCampanha} onEditar={abrirEdicaoCampanha} isPending={isPending} podeGerenciar={podeGerenciarMarketing} />
         ) : null}
 
         {tab === "mensagens" ? <TemplatesView /> : null}
@@ -2044,6 +2049,7 @@ function CampanhasView({
   clientes,
   contas,
   receitasSemCampanha,
+  itensReceita,
   movimentos,
   onDelete,
   onEditar,
@@ -2055,6 +2061,7 @@ function CampanhasView({
   clientes: MarketingClienteOption[];
   contas: MarketingContaOption[];
   receitasSemCampanha: MarketingReceitaOption[];
+  itensReceita: ItemReceitaCampanha[];
   movimentos: MovimentosCampanha;
   onDelete: (id: number) => void;
   onEditar: (campanha: MarketingCampanha) => void;
@@ -2065,6 +2072,8 @@ function CampanhasView({
   const [vincular, setVincular] = useState<MarketingCampanha | null>(null);
   const [custo, setCusto] = useState<MarketingCampanha | null>(null);
   const [receita, setReceita] = useState<MarketingCampanha | null>(null);
+  // Lista do que compoe o "Entrou" (abre ao clicar no valor).
+  const [detalheReceita, setDetalheReceita] = useState<MarketingCampanha | null>(null);
   const [erroLocal, setErroLocal] = useState<string | null>(null);
   const [pendingLocal, startLocalTransition] = useTransition();
   // Filtro de periodo: abre sempre em "Ultimos 30 dias".
@@ -2239,6 +2248,7 @@ function CampanhasView({
                 onVincularCliente={() => setVincular(campanha)}
                 onLancarCusto={() => setCusto(campanha)}
                 onVincularReceita={() => setReceita(campanha)}
+                onVerReceita={() => setDetalheReceita(campanha)}
                 onExcluir={() => onDelete(campanha.id)}
               />
             ))}
@@ -2308,7 +2318,16 @@ function CampanhasView({
                   <td className="px-5 py-4">{custoLead === null ? "—" : formatarMoeda(custoLead)}</td>
                   <td className="px-5 py-4 text-emerald-200">{formatarMoeda(m.receitaServico)}</td>
                   <td className="px-5 py-4 text-cyan-200">{formatarMoeda(m.receitaProduto)}</td>
-                  <td className="px-5 py-4 font-semibold text-emerald-200">{formatarMoeda(m.receitaBruta)}</td>
+                  <td className="px-5 py-4 font-semibold text-emerald-200">
+                    <button
+                      type="button"
+                      onClick={() => setDetalheReceita(campanha)}
+                      title="Ver o que compõe este valor"
+                      className="underline decoration-dotted underline-offset-4 hover:text-emerald-100"
+                    >
+                      {formatarMoeda(m.receitaBruta)}
+                    </button>
+                  </td>
                   <td className="px-5 py-4">{formatarMoeda(m.taxasPagamento)}</td>
                   <td className={`px-5 py-4 font-semibold ${m.resultado >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{formatarMoeda(m.resultado)}</td>
                   <td className="px-5 py-4">
@@ -2373,6 +2392,19 @@ function CampanhasView({
           setReceita(null);
         })}
       />
+      <ReceitaDetalheModal
+        key={detalheReceita?.id ?? "fechado"}
+        campanha={detalheReceita}
+        itens={itensReceita}
+        periodo={periodo}
+        podeGerenciar={podeGerenciar}
+        disabled={pendingLocal}
+        erro={erroLocal}
+        onClose={() => setDetalheReceita(null)}
+        onDesvincular={(item) => executarLocal(async () => {
+          await desvincularReceitaCampanha({ tipo: item.tipo, id: item.id });
+        })}
+      />
       <CustoCampanhaModal
         campanha={custo}
         contas={contas}
@@ -2388,7 +2420,7 @@ function CampanhasView({
   );
 }
 
-function CartaoCampanha({ campanha, m, podeGerenciar, disabled, onEditar, onVincularCliente, onLancarCusto, onVincularReceita, onExcluir }: {
+function CartaoCampanha({ campanha, m, podeGerenciar, disabled, onEditar, onVincularCliente, onLancarCusto, onVincularReceita, onVerReceita, onExcluir }: {
   campanha: MarketingCampanha;
   m: MetricasPeriodo;
   podeGerenciar: boolean;
@@ -2397,6 +2429,7 @@ function CartaoCampanha({ campanha, m, podeGerenciar, disabled, onEditar, onVinc
   onVincularCliente: () => void;
   onLancarCusto: () => void;
   onVincularReceita: () => void;
+  onVerReceita: () => void;
   onExcluir: () => void;
 }) {
   const etiqueta = etiquetaDaCampanha(m);
@@ -2465,7 +2498,14 @@ function CartaoCampanha({ campanha, m, podeGerenciar, disabled, onEditar, onVinc
               <div className="h-full" style={{ width: `${100 - parteServico}%`, backgroundColor: "#38bdf8" }} />
             </div>
           </div>
-          <span className="w-28 shrink-0 text-right text-sm font-semibold text-emerald-200">{formatarMoeda(m.receitaBruta)}</span>
+          <button
+            type="button"
+            onClick={onVerReceita}
+            title="Ver o que compõe este valor"
+            className="w-28 shrink-0 text-right text-sm font-semibold text-emerald-200 underline decoration-dotted underline-offset-4 hover:text-emerald-100"
+          >
+            {formatarMoeda(m.receitaBruta)}
+          </button>
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pl-[60px] text-xs">
           <span className="inline-flex items-center gap-1.5 text-slate-500">
@@ -2797,6 +2837,142 @@ function ReceitaCampanhaModal({ campanha, receitas, disabled, onClose, onSubmit 
           <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
           <Button type="button" disabled={disabled || !lancamentoId} onClick={() => onSubmit(Number(lancamentoId))}>{disabled ? "Vinculando..." : "Vincular receita"}</Button>
         </div>
+      </div>
+    </Modal>
+  );
+}
+
+function ReceitaDetalheModal({ campanha, itens, periodo, podeGerenciar, disabled, erro, onClose, onDesvincular }: {
+  campanha: MarketingCampanha | null;
+  itens: ItemReceitaCampanha[];
+  periodo: { de: string; ate: string };
+  podeGerenciar: boolean;
+  disabled: boolean;
+  erro: string | null;
+  onClose: () => void;
+  onDesvincular: (item: ItemReceitaCampanha) => void;
+}) {
+  // Abre sempre mostrando so o que conta (o modal e recriado a cada campanha).
+  const [mostrarTodos, setMostrarTodos] = useState(false);
+  if (!campanha) return null;
+
+  const { inicio, fim } = limitesDoPeriodo(periodo.de, periodo.ate);
+  const doPeriodo = itens.filter((item) => {
+    if (item.campanhaId !== campanha.id) return false;
+    const tempo = new Date(item.data).getTime();
+    return tempo >= inicio && tempo <= fim;
+  });
+  const contam = doPeriodo.filter((item) => item.conta);
+  const naoContam = doPeriodo.filter((item) => !item.conta);
+  const total = contam.reduce((soma, item) => soma + item.valor, 0);
+  const lista = mostrarTodos ? doPeriodo : contam;
+
+  function tirar(item: ItemReceitaCampanha) {
+    const quem = item.clienteNome ? ` de ${item.clienteNome}` : "";
+    const ok = window.confirm(
+      `Tirar ${formatarMoeda(item.valor)}${quem} desta campanha?\n\nO dinheiro continua no Financeiro; só deixa de contar como resultado da campanha.`,
+    );
+    if (ok) onDesvincular(item);
+  }
+
+  return (
+    <Modal
+      title="O que entrou nesta campanha"
+      description={`${campanha.nome} · ${formatarDiaCurto(periodo.de)} a ${formatarDiaCurto(periodo.ate)}`}
+      onClose={onClose}
+      wide
+    >
+      <div className="grid gap-4">
+        <div className="rounded-2xl border border-emerald-300/15 bg-emerald-400/8 p-3 text-sm leading-5 text-emerald-100">
+          <p>
+            <strong>{formatarMoeda(total)}</strong> em {contam.length} {contam.length === 1 ? "item" : "itens"}. Só entra venda fechada e paga de cliente que veio de clique pago.
+          </p>
+          {naoContam.length > 0 ? (
+            <p className="mt-1 text-xs text-emerald-200/80">
+              Outros {naoContam.length} {naoContam.length === 1 ? "item ligado" : "itens ligados"} a esta campanha no período não {naoContam.length === 1 ? "entra" : "entram"} na conta (sinal, a receber ou origem orgânica).
+            </p>
+          ) : null}
+        </div>
+
+        {erro ? <div className="rounded-2xl border border-rose-300/20 bg-rose-400/10 p-3 text-sm text-rose-100">{erro}</div> : null}
+
+        {naoContam.length > 0 ? (
+          <div className="flex gap-2" role="group" aria-label="O que mostrar">
+            {([
+              [false, `Só o que conta (${contam.length})`],
+              [true, `Tudo ligado à campanha (${doPeriodo.length})`],
+            ] as const).map(([valor, rotulo]) => (
+              <button
+                key={String(valor)}
+                type="button"
+                aria-pressed={mostrarTodos === valor}
+                onClick={() => setMostrarTodos(valor)}
+                className={`rounded-xl border px-3 py-2 text-xs font-semibold ${mostrarTodos === valor ? "border-violet-300/15 bg-violet-400/10 text-violet-100" : "border-white/[0.10] bg-white/[0.06] text-slate-300 hover:bg-white/[0.10]"}`}
+              >
+                {rotulo}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {lista.length === 0 ? (
+          <p className="rounded-2xl border border-white/[0.10] bg-white/[0.04] p-6 text-center text-sm text-slate-500">
+            Nada ligado a esta campanha no período.
+          </p>
+        ) : (
+          <ul className="grid gap-2">
+            {lista.map((item) => (
+              <li
+                key={item.chave}
+                className={`rounded-2xl border p-3 ${item.conta ? "border-white/[0.10] bg-white/[0.04]" : "border-dashed border-slate-300/30 bg-transparent opacity-80"}`}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                      {item.clienteNome || "Sem cliente ligado"}
+                      <span className="ml-2 text-xs font-normal text-slate-500">{formatarData(item.data)}</span>
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-slate-500" title={item.descricao}>{item.descricao}</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold">
+                      <span className={`rounded-full px-2 py-0.5 ${item.fechado ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" : "bg-amber-500/15 text-amber-700 dark:text-amber-300"}`}>
+                        {item.fechado ? "Fechado" : "Em aberto"} · {item.situacao}
+                      </span>
+                      <span className={`rounded-full px-2 py-0.5 ${item.cliquePago ? "bg-violet-500/15 text-violet-700 dark:text-violet-300" : "bg-slate-500/15 text-slate-600 dark:text-slate-300"}`}>
+                        {item.clienteId
+                          ? item.cliquePago
+                            ? `Clique pago${item.origemCliente ? ` · ${item.origemCliente}` : ""}`
+                            : `Sem clique pago · ${item.origemCliente || "origem não informada"}`
+                          : "Sem cliente: ligado à mão"}
+                      </span>
+                    </div>
+                    {item.motivo ? (
+                      <p className="mt-2 text-xs text-slate-500">Não conta: {item.motivo}</p>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <strong className={`text-sm ${item.conta ? "text-emerald-600 dark:text-emerald-300" : "text-slate-400 line-through"}`}>
+                      {formatarMoeda(item.valor)}
+                    </strong>
+                    {podeGerenciar ? (
+                      <button
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => tirar(item)}
+                        className="rounded-xl border border-rose-300/30 px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-500/10 disabled:opacity-50 dark:text-rose-300"
+                      >
+                        Tirar da campanha
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <p className="text-[11px] leading-4 text-slate-500">
+          Tirar da campanha não apaga nada: o valor continua no Financeiro. Se a cliente estiver ligada a esta campanha, as próximas receitas dela continuam entrando aqui; para isso não acontecer, mude a campanha na ficha da cliente.
+        </p>
       </div>
     </Modal>
   );

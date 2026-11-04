@@ -26,6 +26,8 @@ export type LancamentoCampanhaMovimento = {
   taxaPagamento: number;
   temVenda: boolean;
   cliquePago?: boolean;
+  // false = nao e receita fechada (ex.: sinal de agendamento): fica fora do "Entrou".
+  contaNaReceita?: boolean;
 };
 
 export type MovimentosCampanha = {
@@ -159,6 +161,7 @@ export function calcularMetricasPeriodo({
       item.tipo === "ENTRADA" &&
       !item.temVenda &&
       item.cliquePago !== false &&
+      item.contaNaReceita !== false &&
       dentro(item.data, inicio, fim),
   );
   const custos = movimentos.lancamentos.filter(

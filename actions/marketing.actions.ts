@@ -1231,6 +1231,89 @@ export async function vincularReceitaCampanha(dados: {
   return { ok: true };
 }
 
+/**
+ * Tira uma venda ou receita da campanha (o dinheiro continua no Financeiro,
+ * so deixa de contar como resultado da campanha). Usado na lista do "Entrou".
+ */
+export async function desvincularReceitaCampanha(dados: {
+  tipo: "venda" | "lancamento";
+  id: number;
+}) {
+  const usuario = await requirePermission("marketing.gerenciar");
+  const id = Math.trunc(Number(dados.id));
+  if (!id) throw new Error("Item inválido.");
+
+  const resumo = await prisma.$transaction(async (tx) => {
+    if (dados.tipo === "venda") {
+      const venda = await tx.venda.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          valorTotal: true,
+          lancamentoId: true,
+          campanha: { select: { nome: true } },
+          cliente: { select: { nome: true } },
+        },
+      });
+      if (!venda) throw new Error("Venda não encontrada.");
+      await tx.venda.update({ where: { id: venda.id }, data: { campanhaId: null } });
+      if (venda.lancamentoId) {
+        await tx.lancamento.updateMany({
+          where: { id: venda.lancamentoId },
+          data: { campanhaId: null },
+        });
+      }
+      return {
+        entidade: "Venda",
+        texto: `Venda #${venda.id} · ${venda.cliente?.nome || "sem cliente"} · R$ ${venda.valorTotal.toFixed(2)} saiu de ${venda.campanha?.nome || "campanha"}.`,
+      };
+    }
+
+    const lancamento = await tx.lancamento.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        descricao: true,
+        valor: true,
+        tipo: true,
+        campanha: { select: { nome: true } },
+        venda: { select: { id: true } },
+      },
+    });
+    if (!lancamento) throw new Error("Receita não encontrada.");
+    if (lancamento.tipo !== "ENTRADA") {
+      throw new Error("Por aqui só dá para tirar receitas da campanha.");
+    }
+    await tx.lancamento.update({ where: { id: lancamento.id }, data: { campanhaId: null } });
+    if (lancamento.venda) {
+      await tx.venda.update({ where: { id: lancamento.venda.id }, data: { campanhaId: null } });
+    }
+    return {
+      entidade: "Lancamento",
+      texto: `${lancamento.descricao} · R$ ${lancamento.valor.toFixed(2)} saiu de ${lancamento.campanha?.nome || "campanha"}.`,
+    };
+  });
+
+  await prisma.auditoria.create({
+    data: {
+      modulo: "Marketing",
+      acao: "Tirou receita da campanha",
+      entidade: resumo.entidade,
+      entidadeId: String(id),
+      usuario: usuario.email,
+      detalhes: resumo.texto,
+    },
+  });
+
+  revalidatePath("/marketing");
+  revalidatePath("/financeiro");
+  revalidatePath("/vendas");
+  revalidatePath("/gestao");
+  revalidatePath("/");
+
+  return { ok: true };
+}
+
 export async function registrarCustoCampanha(dados: {
   campanhaId: number;
   descricao: string;

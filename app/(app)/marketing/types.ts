@@ -58,6 +58,8 @@ export type MarketingClienteOption = {
 };
 
 
+export type { ItemReceitaCampanha } from "@/lib/receita-campanha";
+
 export type MarketingReceitaOption = {
   id: number;
   descricao: string;

@@ -6,6 +6,12 @@ import {
   movimentoEhDeCliquePago,
 } from "@/lib/atribuicao-campanha";
 import { calcularVinculosClique } from "@/lib/vinculo-clique";
+import {
+  entradaEhSinal,
+  itemDaEntrada,
+  itemDaVenda,
+  type ItemReceitaCampanha,
+} from "@/lib/receita-campanha";
 import MarketingClient from "./components/MarketingClient";
 
 export default async function MarketingPage() {
@@ -118,6 +124,7 @@ export default async function MarketingPage() {
         data: true,
         tipo: true,
         categoria: true,
+        origem: true,
         valor: true,
         valorLiquido: true,
         taxaPagamento: true,
@@ -187,6 +194,117 @@ export default async function MarketingPage() {
     cliquePago: idsPagos.has(cliente.id),
   }));
 
+  // Lista do que esta por tras do "Entrou" de cada campanha: tudo que esta
+  // ligado a campanha (vendas e receitas), dizendo o que conta e o que nao.
+  const [vendasLista, entradasLista] = await Promise.all([
+    prisma.venda.findMany({
+      where: { campanhaId: { not: null }, situacao: { not: "CANCELADA" } },
+      orderBy: [{ data: "desc" }, { id: "desc" }],
+      select: {
+        id: true,
+        campanhaId: true,
+        clienteId: true,
+        data: true,
+        valorTotal: true,
+        statusPagamento: true,
+        origem: true,
+        itens: { select: { descricao: true }, take: 3, orderBy: { id: "asc" } },
+      },
+    }),
+    prisma.lancamento.findMany({
+      where: {
+        campanhaId: { not: null },
+        tipo: "ENTRADA",
+        venda: { is: null },
+        statusPagamento: { not: "Cancelado" },
+      },
+      orderBy: [{ data: "desc" }, { id: "desc" }],
+      select: {
+        id: true,
+        campanhaId: true,
+        clienteId: true,
+        data: true,
+        valor: true,
+        descricao: true,
+        categoria: true,
+        origem: true,
+        statusPagamento: true,
+        agendamentoId: true,
+        pacoteClienteId: true,
+      },
+    }),
+  ]);
+  const idsClientesLista = Array.from(
+    new Set(
+      [...vendasLista, ...entradasLista]
+        .map((item) => item.clienteId)
+        .filter((id): id is number => typeof id === "number"),
+    ),
+  );
+  const idsAgendamentosSinal = Array.from(
+    new Set(
+      entradasLista
+        .filter((item) => entradaEhSinal(item) && item.agendamentoId)
+        .map((item) => item.agendamentoId as number),
+    ),
+  );
+  const [clientesLista, agendamentosSinal] = await Promise.all([
+    idsClientesLista.length
+      ? prisma.cliente.findMany({
+          where: { id: { in: idsClientesLista } },
+          select: { id: true, nome: true, origem: true },
+        })
+      : Promise.resolve([] as Array<{ id: number; nome: string; origem: string | null }>),
+    idsAgendamentosSinal.length
+      ? prisma.agendamento.findMany({
+          where: { id: { in: idsAgendamentosSinal } },
+          select: { id: true, status: true },
+        })
+      : Promise.resolve([] as Array<{ id: number; status: string }>),
+  ]);
+  const clientePorIdLista = new Map(clientesLista.map((item) => [item.id, item]));
+  const statusAgendamentoPorId = new Map(agendamentosSinal.map((item) => [item.id, item.status]));
+  const itensReceita: ItemReceitaCampanha[] = [
+    ...vendasLista.map((venda) =>
+      itemDaVenda(
+        {
+          id: venda.id,
+          campanhaId: venda.campanhaId as number,
+          data: venda.data,
+          valorTotal: venda.valorTotal,
+          statusPagamento: venda.statusPagamento,
+          clienteId: venda.clienteId,
+          descricao:
+            venda.itens.map((item) => item.descricao).filter(Boolean).join(" + ") ||
+            `Venda (${venda.origem})`,
+        },
+        venda.clienteId ? clientePorIdLista.get(venda.clienteId) ?? null : null,
+        movimentoEhDeCliquePago(venda.clienteId, idsPagos),
+      ),
+    ),
+    ...entradasLista.map((entrada) =>
+      itemDaEntrada(
+        {
+          id: entrada.id,
+          campanhaId: entrada.campanhaId as number,
+          data: entrada.data,
+          valor: entrada.valor,
+          descricao: entrada.descricao,
+          categoria: entrada.categoria,
+          origem: entrada.origem,
+          statusPagamento: entrada.statusPagamento,
+          clienteId: entrada.clienteId,
+          pacoteClienteId: entrada.pacoteClienteId,
+          statusAgendamento: entrada.agendamentoId
+            ? statusAgendamentoPorId.get(entrada.agendamentoId) ?? null
+            : null,
+        },
+        entrada.clienteId ? clientePorIdLista.get(entrada.clienteId) ?? null : null,
+        movimentoEhDeCliquePago(entrada.clienteId, idsPagos),
+      ),
+    ),
+  ].sort((a, b) => b.data.localeCompare(a.data));
+
   const leads = leadsBase.map((lead) => ({
     ...lead,
     cliquePago: leadTeveCliquePago(lead),
@@ -225,6 +343,7 @@ export default async function MarketingPage() {
         lancamento.campanhaId === campanha.id &&
         lancamento.tipo === "ENTRADA" &&
         !lancamento.venda &&
+        !entradaEhSinal(lancamento) &&
         movimentoEhDeCliquePago(lancamento.clienteId, idsPagos),
     );
     const custos = lancamentosCampanha.filter(
@@ -279,6 +398,7 @@ export default async function MarketingPage() {
       clientes={clientes}
       contas={contas}
       receitasSemCampanha={receitasSemCampanha}
+      itensReceita={itensReceita}
       movimentosCampanha={{
         vendas: vendasCampanha.map((venda) => ({
           ...venda,
@@ -294,6 +414,7 @@ export default async function MarketingPage() {
           valorLiquido: item.valorLiquido,
           taxaPagamento: item.taxaPagamento,
           temVenda: Boolean(item.venda),
+          contaNaReceita: !entradaEhSinal(item),
         })),
       }}
       profissionais={profissionais}
