@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 
 import { buscarDisponibilidadeAgenda } from "@/actions/agendamento.actions";
+import { registrarLeadInstagram, type ResultadoLeadInstagram } from "@/actions/lead-instagram.actions";
 import type { VinculoDoLead } from "@/lib/vinculo-clique";
 import VinculoCliquePainel from "./VinculoCliquePainel";
 import {
@@ -561,6 +562,8 @@ export default function MarketingClient({
     useState<"ativos" | "encerrados">("ativos");
   const [filaHojeAberta, setFilaHojeAberta] = useState(false);
   const [leadModal, setLeadModal] = useState(false);
+  // Botao "Lead do Instagram" (anuncio clique pro WhatsApp).
+  const [leadInstagramAberto, setLeadInstagramAberto] = useState(false);
   const [leadEditando, setLeadEditando] = useState<MarketingLead | null>(null);
   const [conflitoTelefone, setConflitoTelefone] = useState<ConflitoTelefoneLead | null>(null);
   const [campanhaModal, setCampanhaModal] = useState(false);
@@ -1489,6 +1492,7 @@ export default function MarketingClient({
               {podeGerenciarMarketing ? (
                 <>
                   <Button type="button" variant="outline" onClick={() => setCampanhaModal(true)}><Megaphone className="size-4" /> Campanha</Button>
+                  <Button type="button" variant="outline" onClick={() => setLeadInstagramAberto(true)}><Plus className="size-4" /> Lead do Instagram</Button>
                   <Button type="button" onClick={() => { setLeadEditando(null); setLeadModal(true); }}><Plus className="size-4" /> Novo lead</Button>
                 </>
               ) : null}
@@ -1663,6 +1667,13 @@ export default function MarketingClient({
         onClose={() => setLeadPerdaModal(null)}
         onSubmit={confirmarPerdaLead}
       />
+
+      {leadInstagramAberto ? (
+        <LeadInstagramModal
+          onClose={() => setLeadInstagramAberto(false)}
+          onSalvo={() => router.refresh()}
+        />
+      ) : null}
 
       <LeadModal
         open={leadModal}
@@ -2974,6 +2985,84 @@ function ReceitaDetalheModal({ campanha, itens, periodo, podeGerenciar, disabled
           Tirar da campanha não apaga nada: o valor continua no Financeiro. Se a cliente estiver ligada a esta campanha, as próximas receitas dela continuam entrando aqui; para isso não acontecer, mude a campanha na ficha da cliente.
         </p>
       </div>
+    </Modal>
+  );
+}
+
+function LeadInstagramModal({ onClose, onSalvo }: { onClose: () => void; onSalvo: () => void }) {
+  const [telefone, setTelefone] = useState("");
+  const [nome, setNome] = useState("");
+  const [interesse, setInteresse] = useState("");
+  const [erro, setErro] = useState<string | null>(null);
+  const [resultado, setResultado] = useState<ResultadoLeadInstagram | null>(null);
+  const [salvando, startSalvar] = useTransition();
+
+  function salvar() {
+    setErro(null);
+    startSalvar(async () => {
+      try {
+        const feito = await registrarLeadInstagram({ telefone, nome, interesse });
+        setResultado(feito);
+        onSalvo();
+      } catch (error) {
+        setErro(error instanceof Error ? error.message : "Não foi possível lançar o lead.");
+      }
+    });
+  }
+
+  function outro() {
+    setTelefone("");
+    setNome("");
+    setInteresse("");
+    setErro(null);
+    setResultado(null);
+  }
+
+  return (
+    <Modal
+      title="Lead do Instagram"
+      description="Quem chamou no WhatsApp pelo anúncio do Instagram. Cole o número; o resto o CRM faz."
+      onClose={onClose}
+    >
+      {resultado ? (
+        <div className="grid gap-4">
+          <div className="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 p-4 text-sm leading-6 text-emerald-800 dark:text-emerald-100">
+            {resultado.mensagem}
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="outline" onClick={onClose}>Fechar</Button>
+            <Button type="button" onClick={outro}>Lançar outro</Button>
+          </div>
+        </div>
+      ) : (
+        <form
+          className="grid gap-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!salvando) salvar();
+          }}
+        >
+          <Input
+            label="Número do WhatsApp"
+            value={telefone}
+            onChange={setTelefone}
+            placeholder="Cole aqui, ex.: +55 11 91234-5678"
+            inputMode="tel"
+            autoFocus
+            required
+          />
+          <Input label="Nome (se souber)" value={nome} onChange={setNome} placeholder="Pode deixar em branco" />
+          <Input label="Interesse (opcional)" value={interesse} onChange={setInteresse} placeholder="Ex.: Limpeza de pele" />
+          <p className="rounded-2xl border border-violet-300/15 bg-violet-400/8 p-3 text-xs leading-5 text-slate-600 dark:text-violet-100">
+            Entra com origem Instagram Ads (clique pago), na campanha do Instagram. Se o número já estiver no CRM, não cria outro lead: só registra o contato.
+          </p>
+          {erro ? <div className="rounded-2xl border border-rose-300/20 bg-rose-400/10 p-3 text-sm text-rose-700 dark:text-rose-100">{erro}</div> : null}
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button type="submit" disabled={salvando || !telefone.trim()}>{salvando ? "Lançando..." : "Lançar lead"}</Button>
+          </div>
+        </form>
+      )}
     </Modal>
   );
 }

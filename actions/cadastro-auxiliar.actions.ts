@@ -284,6 +284,7 @@ export async function criarCadastrosAuxiliaresPadrao() {
   const origens = [
     "Indicação",
     "Google Ads",
+    "Instagram Ads",
     "Facebook Ads",
     "Instagram",
     "WhatsApp",

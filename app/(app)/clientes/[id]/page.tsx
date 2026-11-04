@@ -4,7 +4,7 @@ import { canAccess, requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isGoogleDriveConfigured } from "@/lib/google-drive";
 import ClienteProfileHeader from "@/app/(app)/clientes/components/ClienteProfileHeader";
-import { leadTeveCliquePago, origemEhGoogleAds } from "@/lib/atribuicao-campanha";
+import { leadTeveCliquePago, origemEhAnuncioPago } from "@/lib/atribuicao-campanha";
 
 type ClientePageProps = {
   params: Promise<{ id: string }> | { id: string };
@@ -195,7 +195,7 @@ export default async function ClientePage({
     origemDosContatos,
     campanha: campanhaDaCliente?.nome ?? null,
     cliquePago:
-      origemEhGoogleAds(cliente.origem) ||
+      origemEhAnuncioPago(cliente.origem) ||
       contatosDaCliente.some((contato) => leadTeveCliquePago(contato)),
   };
 

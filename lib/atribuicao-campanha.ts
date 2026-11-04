@@ -17,11 +17,24 @@ export function origemEhGoogleAds(origem: string | null | undefined): boolean {
   return /google\s*ads/i.test(origem ?? "");
 }
 
+// Anuncio pago do Instagram (clique pro WhatsApp). "Instagram" sozinho
+// continua sendo organico (perfil, stories, direct).
+export const ORIGEM_INSTAGRAM_ADS = "Instagram Ads";
+
+export function origemEhInstagramAds(origem: string | null | undefined): boolean {
+  return /instagram\s*ads/i.test(origem ?? "");
+}
+
+/** Origem de anuncio pago: Google Ads ou Instagram Ads. */
+export function origemEhAnuncioPago(origem: string | null | undefined): boolean {
+  return origemEhGoogleAds(origem) || origemEhInstagramAds(origem);
+}
+
 export function leadTeveCliquePago(lead: {
   gclid?: string | null;
   origem?: string | null;
 }): boolean {
-  return Boolean(lead.gclid && lead.gclid.trim()) || origemEhGoogleAds(lead.origem);
+  return Boolean(lead.gclid && lead.gclid.trim()) || origemEhAnuncioPago(lead.origem);
 }
 
 /** Filtro de banco: contato com clique pago. */
@@ -29,6 +42,7 @@ export const LEAD_COM_CLIQUE_PAGO: Prisma.LeadWhereInput = {
   OR: [
     { AND: [{ gclid: { not: null } }, { gclid: { not: "" } }] },
     { origem: { contains: "google ads", mode: "insensitive" } },
+    { origem: { contains: "instagram ads", mode: "insensitive" } },
   ],
 };
 
@@ -36,6 +50,7 @@ export const LEAD_COM_CLIQUE_PAGO: Prisma.LeadWhereInput = {
 export const CLIENTE_COM_CLIQUE_PAGO: Prisma.ClienteWhereInput = {
   OR: [
     { origem: { contains: "google ads", mode: "insensitive" } },
+    { origem: { contains: "instagram ads", mode: "insensitive" } },
     { leads: { some: LEAD_COM_CLIQUE_PAGO } },
   ],
 };

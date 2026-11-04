@@ -18,6 +18,7 @@ type Props = {
 const ORIGENS_FALLBACK = [
   "Indicação",
   "Google Ads",
+  "Instagram Ads",
   "Facebook Ads",
   "Instagram",
   "WhatsApp",
