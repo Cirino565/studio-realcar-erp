@@ -365,6 +365,14 @@ export default async function MarketingPage() {
     );
     const custoReal = custos.reduce((total, item) => total + item.valor, 0);
     const receitaBruta = receitaBrutaVendas + receitaBrutaManual;
+    // Cadastrada pela campanha OU comprou pela campanha (uma vez por pessoa).
+    const pessoasCampanha = new Set<number>(clientesCampanha.map((cliente) => cliente.id));
+    for (const item of [
+      ...vendas.map((venda) => ({ clienteId: venda.clienteId, valor: venda.valorTotal })),
+      ...lancamentosManuais,
+    ]) {
+      if (item.clienteId != null && item.valor > 0) pessoasCampanha.add(item.clienteId);
+    }
     const taxasPagamento = taxasVendas + taxasManuais;
     const receitaLiquida = receitaLiquidaVendas + receitaLiquidaManual;
 
@@ -373,7 +381,7 @@ export default async function MarketingPage() {
       metricas: {
         leads: leadsCampanha.length,
         convertidos: leadsCampanha.filter((lead) => lead.etapa === "Convertido").length,
-        clientes: clientesCampanha.length,
+        clientes: pessoasCampanha.size,
         leadsSoPagina: leadsDaPagina.length - leadsCampanha.length,
         clientesSoPagina: clientesDaPagina.length - clientesCampanha.length,
         receitaSoPagina,
@@ -407,6 +415,7 @@ export default async function MarketingPage() {
         lancamentos: lancamentosCampanha.map((item) => ({
           cliquePago: movimentoEhDeCliquePago(item.clienteId, idsPagos),
           campanhaId: item.campanhaId,
+          clienteId: item.clienteId,
           tipo: item.tipo,
           categoria: item.categoria,
           data: item.data,

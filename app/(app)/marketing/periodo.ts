@@ -6,6 +6,7 @@ export type PeriodoAtalho = "7d" | "30d" | "custom";
 
 export type VendaCampanhaMovimento = {
   campanhaId: number | null;
+  clienteId?: number | null;
   data: Date | string;
   valorTotal: number;
   totalServicos: number;
@@ -18,6 +19,7 @@ export type VendaCampanhaMovimento = {
 
 export type LancamentoCampanhaMovimento = {
   campanhaId: number | null;
+  clienteId?: number | null;
   tipo: string;
   categoria: string | null;
   data: Date | string;
@@ -141,6 +143,7 @@ export function calcularMetricasPeriodo({
     cliquePago?: boolean;
   }>;
   clientes: Array<{
+    id?: number;
     campanhaAquisicaoId: number | null;
     createdAt: Date | string;
     cliquePago?: boolean;
@@ -182,6 +185,17 @@ export function calcularMetricasPeriodo({
   const clientesNoPeriodo = clientesDaPaginaNoPeriodo.filter(
     (cliente) => cliente.cliquePago !== false,
   );
+
+  // Clientes da campanha no periodo: cadastrada pela campanha no periodo OU
+  // que comprou pela campanha no periodo (cliente antiga que voltou pelo
+  // anuncio tambem conta). Cada pessoa conta uma vez so.
+  const pessoas = new Set<string>();
+  clientesNoPeriodo.forEach((cliente, indice) => {
+    pessoas.add(cliente.id != null ? `c${cliente.id}` : `sem-id-${indice}`);
+  });
+  for (const item of [...vendas.map((venda) => ({ clienteId: venda.clienteId, valor: venda.valorTotal })), ...manuais]) {
+    if (item.clienteId != null && item.valor > 0) pessoas.add(`c${item.clienteId}`);
+  }
 
   const soma = <T,>(lista: T[], valor: (item: T) => number) =>
     lista.reduce((total, item) => total + valor(item), 0);
@@ -227,7 +241,7 @@ export function calcularMetricasPeriodo({
   return {
     leads: leadsNoPeriodo.length,
     convertidos: leadsNoPeriodo.filter((lead) => lead.etapa === "Convertido").length,
-    clientes: clientesNoPeriodo.length,
+    clientes: pessoas.size,
     leadsSoPagina: leadsDaPaginaNoPeriodo.length - leadsNoPeriodo.length,
     clientesSoPagina: clientesDaPaginaNoPeriodo.length - clientesNoPeriodo.length,
     receitaSoPagina,
