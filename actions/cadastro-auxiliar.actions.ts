@@ -103,6 +103,19 @@ export async function criarOrigemCliente(dados: CadastroAuxiliarInput) {
   const nome = normalizarNome(dados.nome);
   if (!nome) return;
 
+  // Ja existe com esse nome (talvez inativa): reativa em vez de dar erro.
+  const existente = (await prisma.origemCliente.findMany({ select: { id: true, nome: true, status: true } }))
+    .find((item) => chaveNome(item.nome) === chaveNome(nome));
+  if (existente) {
+    if (existente.status !== "Ativa") {
+      await prisma.origemCliente.update({ where: { id: existente.id }, data: { status: "Ativa" } });
+      await registrarAuditoria("Reativou origem de cliente", "OrigemCliente", existente.nome);
+    }
+    revalidatePath("/configuracoes");
+    revalidatePath("/clientes");
+    return;
+  }
+
   await prisma.origemCliente.create({
     data: {
       nome,
@@ -162,6 +175,18 @@ export async function criarMotivoPerda(dados: MotivoPerdaInput) {
   await requirePermission("configuracoes.gerenciar");
   const nome = normalizarNome(dados.nome);
   if (!nome) return;
+
+  const existente = (await prisma.motivoPerdaLead.findMany({ select: { id: true, nome: true, status: true } }))
+    .find((item) => chaveNome(item.nome) === chaveNome(nome));
+  if (existente) {
+    if (existente.status !== "Ativo") {
+      await prisma.motivoPerdaLead.update({ where: { id: existente.id }, data: { status: "Ativo" } });
+      await registrarAuditoria("Reativou motivo de perda", "MotivoPerdaLead", existente.nome);
+    }
+    revalidatePath("/configuracoes");
+    revalidatePath("/marketing");
+    return;
+  }
 
   await prisma.motivoPerdaLead.create({
     data: {
@@ -223,6 +248,19 @@ export async function criarProcedimentoInteresse(dados: CadastroAuxiliarInput) {
   const nome = normalizarNome(dados.nome);
   if (!nome) return;
 
+  // Ja existe com esse nome (ex.: ficou inativo): reativa em vez de dar erro.
+  const existente = (await prisma.procedimentoInteresse.findMany({ select: { id: true, nome: true, status: true } }))
+    .find((item) => chaveNome(item.nome) === chaveNome(nome));
+  if (existente) {
+    if (existente.status !== "Ativo") {
+      await prisma.procedimentoInteresse.update({ where: { id: existente.id }, data: { status: "Ativo" } });
+      await registrarAuditoria("Reativou procedimento de interesse", "ProcedimentoInteresse", existente.nome);
+    }
+    revalidatePath("/configuracoes");
+    revalidatePath("/clientes");
+    return;
+  }
+
   await prisma.$transaction(async (tx) => {
     await tx.procedimentoInteresse.create({
       data: {
@@ -277,6 +315,25 @@ export async function excluirProcedimentoInteresse(id: number) {
   await registrarAuditoria("Excluiu procedimento de interesse", "ProcedimentoInteresse", procedimento.nome);
   revalidatePath("/configuracoes");
   revalidatePath("/clientes");
+}
+
+/** Botao "Ativar" das listas de origens, procedimentos de interesse e motivos de perda. */
+export async function reativarCadastroAuxiliar(tipo: "origem" | "interesse" | "motivo", id: number) {
+  await requirePermission("configuracoes.gerenciar");
+  if (tipo === "origem") {
+    const item = await prisma.origemCliente.update({ where: { id }, data: { status: "Ativa" } });
+    await registrarAuditoria("Reativou origem de cliente", "OrigemCliente", item.nome);
+    revalidatePath("/clientes");
+  } else if (tipo === "interesse") {
+    const item = await prisma.procedimentoInteresse.update({ where: { id }, data: { status: "Ativo" } });
+    await registrarAuditoria("Reativou procedimento de interesse", "ProcedimentoInteresse", item.nome);
+    revalidatePath("/clientes");
+  } else {
+    const item = await prisma.motivoPerdaLead.update({ where: { id }, data: { status: "Ativo" } });
+    await registrarAuditoria("Reativou motivo de perda", "MotivoPerdaLead", item.nome);
+    revalidatePath("/marketing");
+  }
+  revalidatePath("/configuracoes");
 }
 
 export async function criarCadastrosAuxiliaresPadrao() {

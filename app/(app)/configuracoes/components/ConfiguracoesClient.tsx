@@ -46,6 +46,7 @@ import {
   excluirProcedimentoServico,
   alterarVisibilidadeProcedimentoServico,
   renomearProcedimentoServico,
+  reativarCadastroAuxiliar,
 } from "@/actions/cadastro-auxiliar.actions";
 import { Button } from "@/components/ui/button";
 import { formatarDuracao, interpretarDuracao } from "@/lib/duracao";
@@ -354,6 +355,8 @@ type AuxiliarListProps = {
   ordenacaoAutomatica?: boolean;
   onCreate: (nome: string) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
+  // Botao "Ativar" para itens inativos.
+  onReativar?: (id: number) => Promise<void>;
 };
 
 function AuxiliarList({
@@ -365,19 +368,47 @@ function AuxiliarList({
   ordenacaoAutomatica = false,
   onCreate,
   onDelete,
+  onReativar,
 }: AuxiliarListProps) {
   const [nome, setNome] = useState("");
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [listaAberta, setListaAberta] = useState(false);
+  const [erroLista, setErroLista] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const chaveTexto = (texto: string) =>
+    texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toLowerCase();
+  const jaExiste = nome.trim()
+    ? items.find((item) => chaveTexto(item.nome) === chaveTexto(nome))
+    : undefined;
+  const inativo = (status: string) => !/^ativ/i.test(status.trim());
 
   function adicionar() {
     const valor = nome.trim();
     if (!valor) return;
+    setErroLista(null);
 
     startTransition(async () => {
-      await onCreate(valor);
-      setNome("");
+      try {
+        await onCreate(valor);
+        setNome("");
+      } catch {
+        setErroLista("Não foi possível salvar. Atualize a página e tente de novo.");
+      }
+    });
+  }
+
+  function reativar(id: number) {
+    if (!onReativar) return;
+    setErroLista(null);
+    setPendingId(id);
+    startTransition(async () => {
+      try {
+        await onReativar(id);
+      } catch {
+        setErroLista("Não foi possível ativar. Atualize a página e tente de novo.");
+      }
+      setPendingId(null);
     });
   }
 
@@ -390,9 +421,14 @@ function AuxiliarList({
       return;
     }
 
+    setErroLista(null);
     setPendingId(id);
     startTransition(async () => {
-      await onDelete(id);
+      try {
+        await onDelete(id);
+      } catch {
+        setErroLista("Não foi possível excluir. Atualize a página e tente de novo.");
+      }
       setPendingId(null);
     });
   }
@@ -419,13 +455,24 @@ function AuxiliarList({
         <Button
           type="button"
           onClick={adicionar}
-          disabled={isPending || !nome.trim()}
+          disabled={isPending || !nome.trim() || Boolean(jaExiste && !inativo(jaExiste.status))}
           className="sm:w-auto"
         >
           <Plus className="h-4 w-4" />
-          Adicionar
+          {jaExiste && inativo(jaExiste.status) ? "Ativar" : "Adicionar"}
         </Button>
       </div>
+
+      {jaExiste ? (
+        <p className="mt-2 text-xs text-amber-200">
+          {inativo(jaExiste.status)
+            ? `"${jaExiste.nome}" já existe, mas está inativo. Clique em Ativar para usar de novo.`
+            : `"${jaExiste.nome}" já está na lista.`}
+        </p>
+      ) : null}
+      {erroLista ? (
+        <div className="mt-3 rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">{erroLista}</div>
+      ) : null}
 
       <button
         type="button"
@@ -457,15 +504,28 @@ function AuxiliarList({
                     : ` · Ordem ${item.ordem || 0}`}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => excluir(item.id)}
-                disabled={isPending && pendingId === item.id}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-200 transition hover:bg-rose-400/15 disabled:opacity-60"
-              >
-                <Trash2 className="h-4 w-4" />
-                Excluir
-              </button>
+              <div className="flex shrink-0 flex-wrap gap-2">
+                {onReativar && inativo(item.status) ? (
+                  <button
+                    type="button"
+                    onClick={() => reativar(item.id)}
+                    disabled={isPending && pendingId === item.id}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-400/15 disabled:opacity-60"
+                  >
+                    <Eye className="h-4 w-4" />
+                    Ativar
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => excluir(item.id)}
+                  disabled={isPending && pendingId === item.id}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-200 transition hover:bg-rose-400/15 disabled:opacity-60"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Excluir
+                </button>
+              </div>
             </div>
           ))
         ) : (
@@ -776,14 +836,20 @@ function ServicosList({ items, procedimentosInteresse, usos }: ServicosListProps
     const nome = procedimentoSelecionado.trim();
     if (!nome || servicoJaExiste) return;
 
+    setAviso(null);
     startTransition(async () => {
-      await criarProcedimentoServico({
-        nome,
-        duracaoPadrao: interpretarDuracao(duracao),
-        valorPadrao: parseCurrency(valor),
-        custoPadrao: parseCurrency(custo),
-        status: "Ativo",
-      });
+      try {
+        await criarProcedimentoServico({
+          nome,
+          duracaoPadrao: interpretarDuracao(duracao),
+          valorPadrao: parseCurrency(valor),
+          custoPadrao: parseCurrency(custo),
+          status: "Ativo",
+        });
+      } catch {
+        setAviso("Não foi possível adicionar. Se ele estiver em Procedimentos ocultos, use Mostrar de novo.");
+        return;
+      }
       setProcedimentoSelecionado("");
       setDuracao("1 hora");
       setValor("");
@@ -893,8 +959,13 @@ function ServicosList({ items, procedimentosInteresse, usos }: ServicosListProps
 
       {servicoJaExiste ? (
         <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
-          Este procedimento já está configurado como serviço da agenda. Atualize
-          preço e custo no cartão existente abaixo.
+          {items.some(
+            (item) =>
+              item.status !== "Ativo" &&
+              item.nome.toLowerCase() === procedimentoSelecionado.toLowerCase(),
+          )
+            ? "Este procedimento já existe, mas está oculto. Abra \"Procedimentos ocultos\" abaixo e clique em Mostrar de novo."
+            : "Este procedimento já está configurado como serviço da agenda. Atualize preço e custo no cartão existente abaixo."}
         </div>
       ) : null}
 
@@ -1747,6 +1818,7 @@ export default function ConfiguracoesClient({
                     criarOrigemCliente({ nome, status: "Ativa" })
                   }
                   onDelete={excluirOrigemCliente}
+                  onReativar={(id) => reativarCadastroAuxiliar("origem", id)}
                 />
 
                 <AuxiliarList
@@ -1759,6 +1831,7 @@ export default function ConfiguracoesClient({
                   onCreate={(nome) =>
                     criarProcedimentoInteresse({ nome, status: "Ativo" })
                   }
+                  onReativar={(id) => reativarCadastroAuxiliar("interesse", id)}
                   onDelete={excluirProcedimentoInteresse}
                 />
 
@@ -1770,6 +1843,7 @@ export default function ConfiguracoesClient({
                   statusLabel="Status"
                   onCreate={(nome) => criarMotivoPerda({ nome, status: "Ativo" })}
                   onDelete={excluirMotivoPerda}
+                  onReativar={(id) => reativarCadastroAuxiliar("motivo", id)}
                 />
 
                 <ServicosList
