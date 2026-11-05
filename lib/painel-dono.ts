@@ -58,6 +58,7 @@ export type PainelDono = {
     vendas: Numero;
     ticketAtendimento: number | null;
     ticketCliente: number | null;
+    /** Clientes diferentes no periodo (atendidas ou que compraram): divisor do ticket por cliente. */
     clientesQueCompraram: number;
     voltaram: Numero;
     voltaramRenderam: Numero;
@@ -138,6 +139,9 @@ export async function obterPainelDono(parametros: {
           descricao: true,
           valor: true,
           taxaPagamento: true,
+          taxaPercentualAplicada: true,
+          taxaFixaAplicada: true,
+          formaPagamento: true,
           tipo: true,
           categoria: true,
           origem: true,
@@ -244,8 +248,12 @@ export async function obterPainelDono(parametros: {
 
   const entrouTotal = numero([...servicos, ...produtos, ...outros]);
 
+  // Taxa da maquininha lancada a mao (ex.: diferenca do fechamento do mes)
+  // soma com a taxa calculada sozinha, na mesma linha.
+  const ehTaxaManual = (categoria?: string | null) => /^taxas? da maquininha$/.test(norm(categoria));
   const porCategoria = new Map<string, ItemDetalhe[]>();
   for (const item of saidasPagas) {
+    if (ehTaxaManual(item.categoria)) continue;
     const chaveCategoria = norm(item.categoria) || "sem categoria";
     const nome = NOME_CATEGORIA[chaveCategoria] ?? (item.categoria?.trim() || "Sem categoria");
     const lista = porCategoria.get(nome) ?? [];
@@ -263,18 +271,36 @@ export async function obterPainelDono(parametros: {
     .map(([nome, itens]) => ({ nome, ...numero(itens) }))
     .sort((a, b) => b.valor - a.valor);
 
-  const taxas = numero(
-    entradasPagas
+  const taxas = numero([
+    ...entradasPagas
       .filter((item) => item.taxaPagamento > 0)
+      .map((item) => {
+        const regra = [
+          item.taxaPercentualAplicada > 0 ? `${String(item.taxaPercentualAplicada).replace(".", ",")}%` : null,
+          item.taxaFixaAplicada > 0 ? `R$ ${item.taxaFixaAplicada.toFixed(2).replace(".", ",")} fixo` : null,
+        ]
+          .filter(Boolean)
+          .join(" + ");
+        return {
+          id: `t-${item.id}`,
+          data: iso(item.data),
+          titulo: nomeCliente(item.clienteId ?? item.venda?.clienteId) ?? item.descricao,
+          detalhe: `Automática · ${item.formaPagamento || "forma não informada"}${regra ? ` (${regra})` : ""} sobre ${formatarReais(item.valor)}`,
+          valor: item.taxaPagamento,
+          href: null,
+        };
+      }),
+    ...saidasPagas
+      .filter((item) => ehTaxaManual(item.categoria))
       .map((item) => ({
-        id: `t-${item.id}`,
+        id: `tm-${item.id}`,
         data: iso(item.data),
-        titulo: nomeCliente(item.clienteId ?? item.venda?.clienteId) ?? item.descricao,
-        detalhe: `Taxa sobre ${item.descricao}`,
-        valor: item.taxaPagamento,
-        href: null,
+        titulo: item.descricao,
+        detalhe: "Lançada à mão",
+        valor: item.valor,
+        href: "/financeiro",
       })),
-  );
+  ]);
 
   const saiuTotal = numero([...categorias.flatMap((categoria) => categoria.itens), ...taxas.itens]);
 
@@ -327,12 +353,12 @@ export async function obterPainelDono(parametros: {
       href: linkCliente(venda.clienteId),
     })),
   );
-  const clientesQueCompraram = new Set(
-    vendasComValor.map((venda) => venda.clienteId).filter((id): id is number => typeof id === "number"),
-  ).size;
-  const somaVendasComCliente = vendasComValor
-    .filter((venda) => venda.clienteId)
-    .reduce((soma, venda) => soma + venda.valorTotal, 0);
+  // Ticket medio: o mesmo faturamento (vendas pagas do periodo) dividido
+  // pelo numero de atendimentos ou pelo numero de clientes diferentes.
+  const clientesQueCompraram = new Set<number>([
+    ...atendidosBase.map((item) => item.clienteId),
+    ...vendasComValor.map((venda) => venda.clienteId).filter((id): id is number => typeof id === "number"),
+  ]).size;
 
   const idsAtendidos = Array.from(new Set(atendidosBase.map((item) => item.clienteId)));
   const comHistorico = idsAtendidos.length
@@ -489,8 +515,8 @@ export async function obterPainelDono(parametros: {
       novos,
       atendimentos,
       vendas,
-      ticketAtendimento: vendasComValor.length ? arred(vendas.valor / vendasComValor.length) : null,
-      ticketCliente: clientesQueCompraram ? arred(somaVendasComCliente / clientesQueCompraram) : null,
+      ticketAtendimento: atendimentos.valor > 0 ? arred(vendas.valor / atendimentos.valor) : null,
+      ticketCliente: clientesQueCompraram > 0 ? arred(vendas.valor / clientesQueCompraram) : null,
       clientesQueCompraram,
       voltaram,
       voltaramRenderam,
@@ -508,6 +534,10 @@ export async function obterPainelDono(parametros: {
       },
     },
   };
+}
+
+function formatarReais(valor: number) {
+  return `R$ ${valor.toFixed(2).replace(".", ",")}`;
 }
 
 function formatarDia(data: Date) {

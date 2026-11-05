@@ -35,7 +35,7 @@ function normalizarTexto(value?: string | null) {
 }
 
 const categoriasEntrada = ["Procedimentos", "Pacotes", "Produtos", "Avaliação", "Outros recebimentos"];
-const categoriasSaida = ["Produtos e insumos", "Aluguel", "Marketing", "Equipamentos", "Salários", "Impostos", "Outras despesas"];
+const categoriasSaida = ["Produtos e insumos", "Aluguel", "Marketing", "Equipamentos", "Salários", "Impostos", "Taxas da maquininha", "Outras despesas"];
 
 function hoje() {
   const now = new Date();

@@ -224,7 +224,7 @@ export default function PainelDonoClient({ dados }: { dados: PainelDono }) {
                 </Linha>
               ))}
               <Linha rotulo="Taxas da maquininha">
-                <Valor numero={saiu.taxas} titulo="Saiu · taxas da maquininha" abrir={abrir} />
+                <Valor numero={saiu.taxas} titulo="Saiu · taxas da maquininha" subtitulo="automáticas + lançadas à mão" abrir={abrir} />
               </Linha>
               {saiu.categorias.length === 0 && saiu.taxas.valor === 0 ? (
                 <p className="text-xs text-slate-500">Nenhuma despesa paga no período.</p>
@@ -271,7 +271,7 @@ export default function PainelDonoClient({ dados }: { dados: PainelDono }) {
                 <Valor
                   numero={clientes.vendas}
                   titulo="Ticket médio"
-                  subtitulo={`vendas pagas de ${clientes.clientesQueCompraram} cliente(s)`}
+                  subtitulo={`${formatarMoeda(clientes.vendas.valor)} em vendas ÷ ${clientes.clientesQueCompraram} cliente(s)`}
                   abrir={abrir}
                   texto={clientes.ticketCliente === null ? "—" : formatarMoeda(clientes.ticketCliente)}
                 />
@@ -280,13 +280,15 @@ export default function PainelDonoClient({ dados }: { dados: PainelDono }) {
                 <Valor
                   numero={clientes.vendas}
                   titulo="Ticket médio"
-                  subtitulo={`${clientes.vendas.itens.length} venda(s) paga(s)`}
+                  subtitulo={`${formatarMoeda(clientes.vendas.valor)} em vendas ÷ ${clientes.atendimentos.valor} atendimento(s)`}
                   abrir={abrir}
                   texto={clientes.ticketAtendimento === null ? "—" : formatarMoeda(clientes.ticketAtendimento)}
                 />
               </Linha>
             </div>
-            <p className="mt-1 text-xs text-slate-500">Quanto cada cliente gastou, em média, no período.</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Vendas pagas ({formatarMoeda(clientes.vendas.valor)}) ÷ {clientes.clientesQueCompraram} cliente(s) ou ÷ {clientes.atendimentos.valor} atendimento(s).
+            </p>
           </Cartao>
           <Cartao>
             <Rotulo>Clientes que voltaram</Rotulo>
