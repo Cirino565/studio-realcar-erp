@@ -19,6 +19,7 @@ import {
   MessagesSquare,
   Menu,
   Package,
+  PiggyBank,
   Settings,
   ShieldCheck,
   ShoppingCart,
@@ -33,6 +34,12 @@ const mainMenus = [
     icon: LayoutDashboard,
     href: "/",
     permissao: "dashboard.visualizar",
+  },
+  {
+    nome: "Painel do Dono",
+    icon: PiggyBank,
+    href: "/painel-dono",
+    permissao: "relatorios.visualizar",
   },
   {
     nome: "Gestão",
