@@ -259,15 +259,14 @@ async function sincronizarProcedimentosComTransacao(
     const existenteServico = servicosPorChave.get(chave);
 
     if (existenteServico) {
+      // Preco, custo e duracao sao cuidados em Configuracoes: a sincronizacao
+      // nao sobrescreve o que ja foi ajustado no dia a dia.
       await tx.procedimentoServico.update({
         where: { id: existenteServico.id },
         data: {
           nome: procedimento.nome,
           categoria: procedimento.categoria,
           descricao: procedimento.descricao,
-          duracaoPadrao: procedimento.duracaoPadrao,
-          valorPadrao: procedimento.valorPadrao,
-          custoPadrao: procedimento.custoPadrao,
           status: "Ativo",
           ordem: index + 1,
         },

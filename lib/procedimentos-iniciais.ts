@@ -10,8 +10,7 @@ export type ProcedimentoInicial = {
 export const PROCEDIMENTOS_INICIAIS: readonly ProcedimentoInicial[] = [
   {"nome": "1 Sessão PEIM", "duracaoPadrao": 95, "valorPadrao": 150.0, "custoPadrao": 76.0, "categoria": "Estética", "descricao": null},
   {"nome": "Auriculoterapia", "duracaoPadrao": 60, "valorPadrao": 100.0, "custoPadrao": 45.0, "categoria": "Bem estar", "descricao": null},
-  {"nome": "Bioestimulador optimus", "duracaoPadrao": 120, "valorPadrao": 1400.0, "custoPadrao": 450.0, "categoria": "Estética", "descricao": null},
-  {"nome": "Bioestimulador Elleva 150", "duracaoPadrao": 120, "valorPadrao": 1650.0, "custoPadrao": 895.0, "categoria": "Estética", "descricao": null},
+  {"nome": "Bioestimulador", "duracaoPadrao": 120, "valorPadrao": 1650.0, "custoPadrao": 895.0, "categoria": "Estética", "descricao": null},
   {"nome": "Botox Dysport", "duracaoPadrao": 110, "valorPadrao": 850.0, "custoPadrao": 280.0, "categoria": "Estética", "descricao": null},
   {"nome": "Clareamento com intradermoterapia", "duracaoPadrao": 90, "valorPadrao": 150.0, "custoPadrao": 86.0, "categoria": "Estética", "descricao": null},
   {"nome": "Clareamento com dermocosméticos", "duracaoPadrao": 100, "valorPadrao": 135.0, "custoPadrao": 83.47, "categoria": "Estética", "descricao": null},

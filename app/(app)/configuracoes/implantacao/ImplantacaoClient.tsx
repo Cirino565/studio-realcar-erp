@@ -101,7 +101,7 @@ export default function ImplantacaoClient({ resumoInicial }: Props) {
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-violet-600">Implantação</p>
           <h1 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">Preparar início oficial</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-            Remove os registros operacionais de teste, reinicia a numeração das tabelas limpas e importa os 43 procedimentos oficiais com duração, preço e custo direto.
+            Remove os registros operacionais de teste, reinicia a numeração das tabelas limpas e importa os procedimentos oficiais com duração, preço e custo direto.
           </p>
         </div>
         <Link href="/configuracoes" className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">
@@ -194,7 +194,7 @@ export default function ImplantacaoClient({ resumoInicial }: Props) {
         <div className="rounded-3xl border border-violet-200 bg-white p-6 shadow-sm dark:border-violet-900/50 dark:bg-slate-950">
           <h2 className="text-lg font-black text-slate-950 dark:text-white">Somente procedimentos</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-            Atualiza ou inclui os 43 procedimentos da planilha sem apagar clientes, vendas ou qualquer outro dado operacional. Procedimentos antigos fora da lista ficam inativos, com Avaliação preservada.
+            Inclui os procedimentos da planilha que faltarem, sem apagar clientes, vendas ou qualquer outro dado operacional. Preço, custo e duração já ajustados em Configurações são mantidos. Procedimentos fora da lista ficam ocultos, com Avaliação preservada.
           </p>
           <button
             type="button"
@@ -202,7 +202,7 @@ export default function ImplantacaoClient({ resumoInicial }: Props) {
             disabled={isPending}
             className="mt-5 w-full rounded-xl bg-violet-600 px-4 py-3 text-sm font-black text-white transition hover:bg-violet-700 disabled:opacity-40"
           >
-            {isPending ? "Processando..." : "Atualizar os 43 procedimentos"}
+            {isPending ? "Processando..." : "Atualizar os procedimentos oficiais"}
           </button>
 
           <div className="mt-5 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600 dark:bg-slate-900 dark:text-slate-300">

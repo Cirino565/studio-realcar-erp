@@ -410,10 +410,89 @@ export async function atualizarProcedimentoServico(dados: ProcedimentoServicoInp
   revalidatePath("/agenda");
 }
 
+function chaveNome(valor: string) {
+  return valor
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+/** Quantos atendimentos e itens de venda ja usaram este procedimento. */
+async function contarUsosProcedimento(servico: { id: number; nome: string }) {
+  const [agendamentos, itensVenda] = await Promise.all([
+    prisma.agendamento.count({
+      where: { procedimento: { equals: servico.nome, mode: "insensitive" } },
+    }),
+    prisma.vendaItem.count({ where: { procedimentoServicoId: servico.id } }),
+  ]);
+  return agendamentos + itensVenda;
+}
+
+/**
+ * Ocultar / mostrar de novo. Oculto (Inativo) some das listas de agendar,
+ * finalizar e vender, mas continua valendo para historico, relatorios e
+ * lembrete de retorno de quem ja fez.
+ */
+export async function alterarVisibilidadeProcedimentoServico(id: number, visivel: boolean) {
+  await requirePermission("configuracoes.gerenciar");
+  const servico = await prisma.procedimentoServico.findUnique({ where: { id } });
+  if (!servico) return { ok: false as const, erro: "Procedimento não encontrado." };
+
+  await prisma.procedimentoServico.update({
+    where: { id },
+    data: { status: visivel ? "Ativo" : "Inativo" },
+  });
+  await registrarAuditoria(
+    visivel ? "Mostrou serviço/procedimento" : "Ocultou serviço/procedimento",
+    "ProcedimentoServico",
+    servico.nome,
+  );
+  revalidatePath("/configuracoes");
+  revalidatePath("/agenda");
+  revalidatePath("/marketing");
+  return { ok: true as const };
+}
+
+/** Corrige o nome (ex.: erro de digitacao). Atendimentos antigos ficam com o nome antigo. */
+export async function renomearProcedimentoServico(id: number, novoNome: string) {
+  await requirePermission("configuracoes.gerenciar");
+  const nome = normalizarNome(novoNome);
+  if (!nome) return { ok: false as const, erro: "Escreva o novo nome." };
+
+  const servico = await prisma.procedimentoServico.findUnique({ where: { id } });
+  if (!servico) return { ok: false as const, erro: "Procedimento não encontrado." };
+  if (servico.nome === nome) return { ok: true as const };
+
+  const todos = await prisma.procedimentoServico.findMany({ select: { id: true, nome: true } });
+  const repetido = todos.find((item) => item.id !== id && chaveNome(item.nome) === chaveNome(nome));
+  if (repetido) {
+    return { ok: false as const, erro: `Já existe um procedimento chamado "${repetido.nome}".` };
+  }
+
+  await prisma.procedimentoServico.update({ where: { id }, data: { nome } });
+  await registrarAuditoria("Renomeou serviço/procedimento", "ProcedimentoServico", `${servico.nome} → ${nome}`);
+  revalidatePath("/configuracoes");
+  revalidatePath("/agenda");
+  revalidatePath("/marketing");
+  return { ok: true as const };
+}
+
 export async function excluirProcedimentoServico(id: number) {
   await requirePermission("configuracoes.gerenciar");
   const servico = await prisma.procedimentoServico.findUnique({ where: { id } });
-  if (!servico) return;
+  if (!servico) return { ok: false as const, erro: "Procedimento não encontrado." };
+
+  // Ja foi usado: nao apaga (perderia lembrete de retorno, anamnese e o
+  // cadastro no relatorio). O certo e ocultar.
+  const usos = await contarUsosProcedimento(servico);
+  if (usos > 0) {
+    return {
+      ok: false as const,
+      erro: `"${servico.nome}" já foi usado em ${usos} atendimento(s) ou venda(s). Para não perder histórico e lembretes de retorno, use "Ocultar".`,
+    };
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.procedimentoServico.delete({ where: { id } });
@@ -422,4 +501,5 @@ export async function excluirProcedimentoServico(id: number) {
   await registrarAuditoria("Excluiu serviço/procedimento", "ProcedimentoServico", servico.nome);
   revalidatePath("/configuracoes");
   revalidatePath("/agenda");
+  return { ok: true as const };
 }

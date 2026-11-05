@@ -8,6 +8,9 @@ import {
   CalendarClock,
   ChevronDown,
   CheckCircle2,
+  Eye,
+  EyeOff,
+  Pencil,
   Clock3,
   Copy,
   Image as ImageIcon,
@@ -41,6 +44,8 @@ import {
   excluirOrigemCliente,
   excluirProcedimentoInteresse,
   excluirProcedimentoServico,
+  alterarVisibilidadeProcedimentoServico,
+  renomearProcedimentoServico,
 } from "@/actions/cadastro-auxiliar.actions";
 import { Button } from "@/components/ui/button";
 import { formatarDuracao, interpretarDuracao } from "@/lib/duracao";
@@ -59,6 +64,8 @@ type Props = {
   origens: CadastroAuxiliarView[];
   procedimentosInteresse: CadastroAuxiliarView[];
   servicos: ProcedimentoServicoView[];
+  // Quantos atendimentos/vendas ja usaram cada procedimento (id -> quantidade).
+  usosServicos?: Record<number, number>;
   anamneseModelos: AnamneseModeloView[];
   motivosPerda: CadastroAuxiliarView[];
 };
@@ -475,6 +482,7 @@ function AuxiliarList({
 type ServicosListProps = {
   items: ProcedimentoServicoView[];
   procedimentosInteresse: CadastroAuxiliarView[];
+  usos: Record<number, number>;
 };
 
 function formatCurrencyInput(value: string) {
@@ -506,11 +514,18 @@ function currencyFromNumber(value: number) {
 
 function ServicoCardEditor({
   item,
+  usos,
   onExcluir,
+  onVisibilidade,
+  onRenomear,
 }: {
   item: ProcedimentoServicoView;
+  usos: number;
   onExcluir: (id: number) => void;
+  onVisibilidade: (item: ProcedimentoServicoView, visivel: boolean) => void;
+  onRenomear: (item: ProcedimentoServicoView, usos: number) => void;
 }) {
+  const oculto = item.status !== "Ativo";
   const [duracao, setDuracao] = useState(formatarDuracao(item.duracaoPadrao || 60));
   const [intervaloRetorno, setIntervaloRetorno] = useState(
     item.intervaloRetornoDias ? String(item.intervaloRetornoDias) : "",
@@ -549,23 +564,55 @@ function ServicoCardEditor({
   }
 
   return (
-    <div className="rounded-3xl border border-white/[0.08] bg-[#111827]/70 p-4">
-      <div className="flex items-start justify-between gap-3">
+    <div className={`rounded-3xl border p-4 ${oculto ? "border-dashed border-white/[0.12] bg-[#111827]/40" : "border-white/[0.08] bg-[#111827]/70"}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-white">{item.nome}</p>
+          <p className="truncate text-sm font-semibold text-white">
+            {item.nome}
+            {oculto ? (
+              <span className="ml-2 rounded-full bg-slate-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">Oculto</span>
+            ) : null}
+          </p>
           <p className="mt-1 text-xs text-slate-500">
-            Configure preço, custo direto padrão e duração.
+            {usos > 0
+              ? `Usado em ${usos} atendimento(s)/venda(s).`
+              : "Ainda não usado em atendimentos."}{" "}
+            {oculto ? "Não aparece nas listas de agendar." : "Configure preço, custo direto padrão e duração."}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => onExcluir(item.id)}
-          disabled={isPending}
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-200 transition hover:bg-rose-400/15 disabled:opacity-60"
-        >
-          <Trash2 className="h-4 w-4" />
-          Excluir
-        </button>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => onRenomear(item, usos)}
+            disabled={isPending}
+            title="Corrigir o nome"
+            className="inline-flex items-center justify-center gap-1.5 rounded-2xl border border-white/[0.10] bg-white/[0.06] px-3 py-2 text-xs font-semibold text-slate-200 transition hover:bg-white/[0.10] disabled:opacity-60"
+          >
+            <Pencil className="h-4 w-4" />
+            Editar nome
+          </button>
+          <button
+            type="button"
+            onClick={() => onVisibilidade(item, oculto)}
+            disabled={isPending}
+            title={oculto ? "Voltar a aparecer nas listas" : "Some das listas de agendar, mas mantém histórico e retornos"}
+            className="inline-flex items-center justify-center gap-1.5 rounded-2xl border border-violet-400/20 bg-violet-400/10 px-3 py-2 text-xs font-semibold text-violet-200 transition hover:bg-violet-400/15 disabled:opacity-60"
+          >
+            {oculto ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+            {oculto ? "Mostrar de novo" : "Ocultar"}
+          </button>
+          {usos === 0 ? (
+            <button
+              type="button"
+              onClick={() => onExcluir(item.id)}
+              disabled={isPending}
+              className="inline-flex items-center justify-center gap-1.5 rounded-2xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-200 transition hover:bg-rose-400/15 disabled:opacity-60"
+            >
+              <Trash2 className="h-4 w-4" />
+              Excluir
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -669,14 +716,54 @@ function ServicoCardEditor({
   );
 }
 
-function ServicosList({ items, procedimentosInteresse }: ServicosListProps) {
+function ServicosList({ items, procedimentosInteresse, usos }: ServicosListProps) {
   const [procedimentoSelecionado, setProcedimentoSelecionado] = useState("");
   const [duracao, setDuracao] = useState("1 hora");
   const [valor, setValor] = useState("");
   const [custo, setCusto] = useState("");
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [listaAberta, setListaAberta] = useState(false);
+  const [ocultosAbertos, setOcultosAbertos] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const ativos = items.filter((item) => item.status === "Ativo");
+  const ocultos = items.filter((item) => item.status !== "Ativo");
+
+  function alterarVisibilidade(item: ProcedimentoServicoView, visivel: boolean) {
+    if (
+      !visivel &&
+      !confirm(
+        `Ocultar "${item.nome}"?\n\nEle some das listas de agendar, finalizar e vender. O histórico das clientes, os relatórios e os lembretes de retorno de quem já fez continuam funcionando. Dá para mostrar de novo quando quiser.`,
+      )
+    ) {
+      return;
+    }
+    setAviso(null);
+    setPendingId(item.id);
+    startTransition(async () => {
+      const resultado = await alterarVisibilidadeProcedimentoServico(item.id, visivel);
+      if (!resultado.ok) setAviso(resultado.erro);
+      setPendingId(null);
+    });
+  }
+
+  function renomear(item: ProcedimentoServicoView, quantidade: number) {
+    const novo = window.prompt(
+      quantidade > 0
+        ? `Novo nome para "${item.nome}".\n\nAtenção: os ${quantidade} atendimento(s) antigos continuam com o nome antigo. Use só para corrigir erro de digitação; para trocar de procedimento, crie um novo e oculte este.`
+        : `Novo nome para "${item.nome}":`,
+      item.nome,
+    );
+    if (novo === null || !novo.trim() || novo.trim() === item.nome) return;
+    setAviso(null);
+    setPendingId(item.id);
+    startTransition(async () => {
+      const resultado = await renomearProcedimentoServico(item.id, novo);
+      if (!resultado.ok) setAviso(resultado.erro);
+      setPendingId(null);
+    });
+  }
 
   const procedimentosAtivos = ordenarPorNome(
     procedimentosInteresse.filter((item) => item.status === "Ativo"),
@@ -713,9 +800,11 @@ function ServicosList({ items, procedimentosInteresse }: ServicosListProps) {
       return;
     }
 
+    setAviso(null);
     setPendingId(id);
     startTransition(async () => {
-      await excluirProcedimentoServico(id);
+      const resultado = await excluirProcedimentoServico(id);
+      if (!resultado.ok) setAviso(resultado.erro);
       setPendingId(null);
     });
   }
@@ -734,7 +823,7 @@ function ServicosList({ items, procedimentosInteresse }: ServicosListProps) {
           </p>
         </div>
         <span className="w-fit rounded-full border border-white/[0.10] bg-white/[0.06] px-3 py-1 text-xs font-semibold text-slate-300">
-          {items.length} serviços
+          {ativos.length} ativos{ocultos.length > 0 ? ` · ${ocultos.length} ocultos` : ""}
         </span>
       </div>
 
@@ -815,7 +904,7 @@ function ServicosList({ items, procedimentosInteresse }: ServicosListProps) {
         aria-expanded={listaAberta}
         className="mt-5 flex w-full items-center justify-between rounded-2xl border border-white/[0.10] bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.07]"
       >
-        <span>{listaAberta ? "Ocultar lista" : `Ver serviços (${items.length})`}</span>
+        <span>{listaAberta ? "Fechar lista" : `Ver serviços (${ativos.length})`}</span>
         <ChevronDown
           className={`h-4 w-4 transition-transform ${listaAberta ? "rotate-180" : ""}`}
         />
@@ -824,9 +913,16 @@ function ServicosList({ items, procedimentosInteresse }: ServicosListProps) {
       <div
         className={`mt-3 grid gap-3 xl:grid-cols-2 ${listaAberta ? "" : "hidden"}`}
       >
-        {items.length > 0 ? (
-          ordenarPorNome(items).map((item) => (
-            <ServicoCardEditor key={item.id} item={item} onExcluir={excluir} />
+        {ativos.length > 0 ? (
+          ordenarPorNome(ativos).map((item) => (
+            <ServicoCardEditor
+              key={item.id}
+              item={item}
+              usos={usos[item.id] ?? 0}
+              onExcluir={excluir}
+              onVisibilidade={alterarVisibilidade}
+              onRenomear={renomear}
+            />
           ))
         ) : (
           <div className="rounded-3xl border border-dashed border-white/[0.10] p-6 text-center text-sm text-slate-400 xl:col-span-2">
@@ -835,6 +931,38 @@ function ServicosList({ items, procedimentosInteresse }: ServicosListProps) {
           </div>
         )}
       </div>
+
+      {ocultos.length > 0 ? (
+        <>
+          <button
+            type="button"
+            onClick={() => setOcultosAbertos((aberta) => !aberta)}
+            aria-expanded={ocultosAbertos}
+            className="mt-3 flex w-full items-center justify-between rounded-2xl border border-dashed border-white/[0.12] px-4 py-3 text-sm font-semibold text-slate-400 transition hover:bg-white/[0.04]"
+          >
+            <span>
+              {ocultosAbertos ? "Fechar procedimentos ocultos" : `Procedimentos ocultos (${ocultos.length})`}
+            </span>
+            <ChevronDown className={`h-4 w-4 transition-transform ${ocultosAbertos ? "rotate-180" : ""}`} />
+          </button>
+          <div className={`mt-3 grid gap-3 xl:grid-cols-2 ${ocultosAbertos ? "" : "hidden"}`}>
+            {ordenarPorNome(ocultos).map((item) => (
+              <ServicoCardEditor
+                key={item.id}
+                item={item}
+                usos={usos[item.id] ?? 0}
+                onExcluir={excluir}
+                onVisibilidade={alterarVisibilidade}
+                onRenomear={renomear}
+              />
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      {aviso ? (
+        <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">{aviso}</div>
+      ) : null}
 
       {pendingId ? (
         <p className="mt-3 text-xs text-slate-500">Atualizando serviço...</p>
@@ -848,6 +976,7 @@ export default function ConfiguracoesClient({
   origens,
   procedimentosInteresse,
   servicos,
+  usosServicos = {},
   anamneseModelos,
   motivosPerda,
 }: Props) {
@@ -1646,6 +1775,7 @@ export default function ConfiguracoesClient({
                 <ServicosList
                   items={servicos}
                   procedimentosInteresse={procedimentosInteresse}
+                  usos={usosServicos}
                 />
               </div>
 

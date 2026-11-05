@@ -60,12 +60,38 @@ export default async function ConfiguracoesPage() {
     prisma.motivoPerdaLead.findMany({ orderBy: [{ ordem: "asc" }, { nome: "asc" }] }),
   ]);
 
+  // Quantos atendimentos/vendas ja usaram cada procedimento (para saber se
+  // pode excluir ou so ocultar).
+  const [usosAgenda, usosVenda] = await Promise.all([
+    prisma.agendamento.groupBy({ by: ["procedimento"], _count: { _all: true } }),
+    prisma.vendaItem.groupBy({
+      by: ["procedimentoServicoId"],
+      where: { procedimentoServicoId: { not: null } },
+      _count: { _all: true },
+    }),
+  ]);
+  const chave = (texto: string) =>
+    texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toLowerCase();
+  const agendaPorNome = new Map<string, number>();
+  for (const item of usosAgenda) {
+    const k = chave(item.procedimento);
+    agendaPorNome.set(k, (agendaPorNome.get(k) ?? 0) + item._count._all);
+  }
+  const vendaPorId = new Map(usosVenda.map((item) => [item.procedimentoServicoId, item._count._all]));
+  const usosServicos: Record<number, number> = Object.fromEntries(
+    servicos.map((servico) => [
+      servico.id,
+      (agendaPorNome.get(chave(servico.nome)) ?? 0) + (vendaPorId.get(servico.id) ?? 0),
+    ]),
+  );
+
   return (
     <ConfiguracoesClient
       configuracao={configuracao ?? buildDefaultConfiguracao()}
       origens={origens}
       procedimentosInteresse={procedimentosInteresse}
       servicos={servicos}
+      usosServicos={usosServicos}
       anamneseModelos={anamneseModelos}
       motivosPerda={motivosPerda}
     />
