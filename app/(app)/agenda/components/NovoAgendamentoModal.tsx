@@ -270,16 +270,12 @@ export default function NovoAgendamentoModal({
   const [data, setData] = useState("");
   const [hora, setHora] = useState("09:00");
   const [excecaoHorario, setExcecaoHorario] = useState(false);
-  const [permitirEncaixeSemIntervalo, setPermitirEncaixeSemIntervalo] =
-    useState(false);
+  // Encaixe sem o intervalo padrao fica sempre liberado: o horario aparece
+  // como "encaixe" e um aviso amarelo mostra que ficou sem intervalo.
+  // Dois atendimentos ao mesmo tempo continuam bloqueados.
+  const permitirEncaixeSemIntervalo = true;
 
-  const quantidadeOpcoesAvancadasAtivas =
-    Number(excecaoHorario) +
-    Number(
-      tipoAtendimento === "agendamento" &&
-        intervaloEntreAtendimentos > 0 &&
-        permitirEncaixeSemIntervalo,
-    );
+  const quantidadeOpcoesAvancadasAtivas = Number(excecaoHorario);
   const [duracao, setDuracao] = useState("1 hora");
   const [valor, setValor] = useState("");
   // Outros procedimentos no mesmo horario (botao "Adicionar procedimento").
@@ -393,7 +389,6 @@ export default function NovoAgendamentoModal({
     setData(initialPayload?.data || getHojeInput());
     setHora(initialPayload?.hora || "09:00");
     setExcecaoHorario(false);
-    setPermitirEncaixeSemIntervalo(false);
     setSucesso(false);
     setAvisoSucesso(null);
     setDuracao(formatarDuracao(initialPayload?.duracao || 60));
@@ -1415,41 +1410,17 @@ export default function NovoAgendamentoModal({
                 />
               </label>
 
-              {tipoAtendimento === "agendamento" &&
-              intervaloEntreAtendimentos > 0 ? (
-                <label className="flex cursor-pointer items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-sm dark:border-amber-400/20 dark:bg-amber-400/10">
-                  <span className="min-w-0">
-                    <span className="block font-bold text-amber-950 dark:text-amber-100">
-                      Permitir encaixe sem intervalo de{" "}
-                      {intervaloEntreAtendimentos} min
-                    </span>
-                    <span className="mt-0.5 block text-xs leading-5 text-amber-800/80 dark:text-amber-100/70">
-                      O padrão reserva {intervaloEntreAtendimentos} minutos entre
-                      compromissos. Ative somente para um encaixe excepcional.
-                      Sobreposição real continua bloqueada.
-                    </span>
-                  </span>
-
-                  <input
-                    type="checkbox"
-                    checked={permitirEncaixeSemIntervalo}
-                    onChange={(event) => {
-                      setPermitirEncaixeSemIntervalo(event.target.checked);
-                      setHora("");
-                      setErro("");
-                      setErroAcaoHorario(false);
-                    }}
-                    className="mt-0.5 size-5 shrink-0 accent-amber-600"
-                  />
-                </label>
-              ) : null}
             </div>
           </details>
 
           {horarioSelecionadoNaDisponibilidade?.encaixe ? (
             <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100">
-              Encaixe selecionado: este horário não terá o intervalo padrão de{" "}
-              {intervaloEntreAtendimentos} minutos entre compromissos.
+              Encaixe: este horário fica sem o intervalo de{" "}
+              {intervaloEntreAtendimentos} minutos
+              {horarioSelecionadoNaDisponibilidade.motivo
+                ? ` (${horarioSelecionadoNaDisponibilidade.motivo})`
+                : ""}
+              . Pode salvar normalmente.
             </div>
           ) : null}
 

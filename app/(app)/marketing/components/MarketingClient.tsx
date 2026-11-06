@@ -3778,8 +3778,8 @@ function AgendarAvaliacaoModal({
   const [valor, setValor] = useState("0");
   const [sinalPago, setSinalPago] = useState(false);
   const [valorSinal, setValorSinal] = useState("30,00");
-  const [permitirEncaixeSemIntervalo, setPermitirEncaixeSemIntervalo] =
-    useState(false);
+  // Encaixe sem intervalo sempre liberado (aparece marcado como "encaixe").
+  const permitirEncaixeSemIntervalo = true;
   const [horarios, setHorarios] = useState<
     {
       hora: string;
@@ -3803,7 +3803,6 @@ function AgendarAvaliacaoModal({
     setDuracao(String(servicoInicial?.duracaoPadrao || 30));
     setValor(String(servicoInicial?.valorPadrao || 0));
     setSinalPago(false);
-    setPermitirEncaixeSemIntervalo(false);
     setErro(null);
   }, [lead, profissionais, avaliacao]);
 
@@ -3922,27 +3921,6 @@ function AgendarAvaliacaoModal({
         </div>
         <div className="grid gap-4 sm:grid-cols-3"><Input label="Data" type="date" min={hojeInput()} value={data} onChange={setData} /><Input label="Duração, min" type="number" min="15" step="5" value={duracao} onChange={setDuracao} /><Input label="Valor" type="number" min="0" step="0.01" value={valor} onChange={setValor} /></div>
 
-        <label className="flex cursor-pointer items-start justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5 transition hover:bg-amber-100 dark:border-amber-400/20 dark:bg-amber-400/10 dark:hover:bg-amber-400/15">
-          <span className="min-w-0">
-            <span className="block text-sm font-bold text-amber-950 dark:text-amber-100">
-              Permitir encaixe sem intervalo de 30 min
-            </span>
-            <span className="mt-0.5 block text-xs leading-5 text-amber-800 dark:text-amber-100/70">
-              Por padrão, a agenda reserva 30 minutos entre clientes. Ative apenas quando quiser atender um cliente logo após o outro. Sobreposição real continua bloqueada.
-            </span>
-          </span>
-          <input
-            type="checkbox"
-            checked={permitirEncaixeSemIntervalo}
-            onChange={(event) => {
-              setPermitirEncaixeSemIntervalo(event.target.checked);
-              setHora("");
-              setErro(null);
-            }}
-            className="mt-0.5 size-5 shrink-0 accent-amber-600"
-          />
-        </label>
-
         <div className="grid gap-2">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -4018,7 +3996,7 @@ function AgendarAvaliacaoModal({
               <CheckCircle2 className="size-4" />
               Horário selecionado: {hora}
               {horarios.find((item) => item.hora === hora)?.encaixe
-                ? " · encaixe sem intervalo"
+                ? " · encaixe: fica sem o intervalo de 30 min (pode salvar)"
                 : ""}
             </div>
           ) : null}
@@ -4099,7 +4077,6 @@ function AgendarAvaliacaoModal({
         <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-3 text-xs leading-5 text-cyan-900 dark:border-cyan-400/20 dark:bg-cyan-400/10 dark:text-cyan-100">
           Ao salvar, o sistema reutiliza um cliente existente pelo telefone ou cria o cadastro necessário, gera o agendamento real e move o lead para Agendado.
           {sinalPago ? " O sinal será marcado como pago na agenda." : ""}
-          {permitirEncaixeSemIntervalo ? " Encaixes sem o intervalo padrão de 30 minutos estão liberados para esta marcação." : ""}
         </div>
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><Button type="button" variant="outline" onClick={onClose}>Cancelar</Button><Button type="button" onClick={salvar} disabled={pending || loadingHorarios || !hora}><CalendarPlus className="size-4" />{pending ? "Agendando..." : "Criar agendamento"}</Button></div>
       </div>

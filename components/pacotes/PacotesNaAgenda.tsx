@@ -140,7 +140,8 @@ export function FecharPacoteCard({
   const [salvo, setSalvo] = useState<PacoteSalvoNaAgenda | null>(null);
   const [diaProxima, setDiaProxima] = useState("");
   const [horaProxima, setHoraProxima] = useState("");
-  const [encaixe, setEncaixe] = useState(false);
+  // Encaixe sem intervalo sempre liberado (aparece marcado como "encaixe").
+  const encaixe = true;
   const [horarios, setHorarios] = useState<
     { hora: string; disponivel: boolean; encaixe?: boolean }[]
   >([]);
@@ -521,36 +522,14 @@ export function FecharPacoteCard({
           !horarios.some((item) => item.disponivel) ? (
             <p className="mt-2 text-[11px] font-semibold text-rose-700 dark:text-rose-300">
               Sem horário livre neste dia (clínica fechada ou agenda cheia).
-              Escolha outro dia
-              {encaixe ? "." : " ou ligue o encaixe abaixo."}
+              Escolha outro dia.
             </p>
           ) : null}
-          <label className="mt-2 flex cursor-pointer items-start justify-between gap-3 rounded-xl border border-amber-300/70 bg-amber-50/70 p-2.5 dark:border-amber-400/20 dark:bg-amber-400/10">
-            <span className="min-w-0">
-              <span className="block text-xs font-bold text-amber-950 dark:text-amber-100">
-                Permitir encaixe sem intervalo
-              </span>
-              <span className="mt-0.5 block text-[11px] leading-4 text-amber-900 dark:text-amber-100">
-                Libera horários que ficam colados em outro atendimento. Dois
-                atendimentos ao mesmo tempo continuam bloqueados.
-              </span>
-            </span>
-            <input
-              type="checkbox"
-              checked={encaixe}
-              onChange={(event) => {
-                setEncaixe(event.target.checked);
-                if (diaProxima) {
-                  void carregarHorarios({
-                    dia: diaProxima,
-                    encaixe: event.target.checked,
-                    procedimentoId,
-                  });
-                }
-              }}
-              className="mt-0.5 size-5 shrink-0 accent-amber-600"
-            />
-          </label>
+          {horarios.find((item) => item.hora === horaProxima)?.encaixe ? (
+            <p className="mt-2 text-[11px] font-semibold text-amber-900 dark:text-amber-100">
+              Encaixe: este horário fica sem o intervalo de 30 min. Pode salvar normalmente.
+            </p>
+          ) : null}
         </div>
       ) : null}
 
