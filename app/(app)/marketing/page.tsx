@@ -1,7 +1,7 @@
 import { canAccess, requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
-  buscarIdsClientesComCliquePago,
+  buscarAtribuicaoPaga,
   leadTeveCliquePago,
   movimentoEhDeCliquePago,
 } from "@/lib/atribuicao-campanha";
@@ -19,7 +19,7 @@ export default async function MarketingPage() {
 
   // Quem teve clique pago de verdade (codigo do clique ou origem Google Ads).
   // So essas pessoas entram nos numeros da campanha paga.
-  const idsPagos = await buscarIdsClientesComCliquePago();
+  const { todos: idsPagos, porIndicacao: idsPorIndicacao } = await buscarAtribuicaoPaga();
 
   const [leadsBase, campanhasBase, profissionais, servicos, procedimentosInteresseBase, clientesBase, contas, vendasCampanha, lancamentosCampanha, receitasSemCampanhaBase, motivosPerda] = await Promise.all([
     prisma.lead.findMany({
@@ -192,6 +192,7 @@ export default async function MarketingPage() {
   const clientes = clientesBase.map((cliente) => ({
     ...cliente,
     cliquePago: idsPagos.has(cliente.id),
+    porIndicacao: idsPorIndicacao.has(cliente.id),
   }));
 
   // Lista do que esta por tras do "Entrou" de cada campanha: tudo que esta
@@ -252,9 +253,11 @@ export default async function MarketingPage() {
     idsClientesLista.length
       ? prisma.cliente.findMany({
           where: { id: { in: idsClientesLista } },
-          select: { id: true, nome: true, origem: true },
+          select: { id: true, nome: true, origem: true, indicadaPor: { select: { nome: true } } },
         })
-      : Promise.resolve([] as Array<{ id: number; nome: string; origem: string | null }>),
+      : Promise.resolve(
+          [] as Array<{ id: number; nome: string; origem: string | null; indicadaPor: { nome: string } | null }>,
+        ),
     idsAgendamentosSinal.length
       ? prisma.agendamento.findMany({
           where: { id: { in: idsAgendamentosSinal } },
@@ -262,7 +265,19 @@ export default async function MarketingPage() {
         })
       : Promise.resolve([] as Array<{ id: number; status: string }>),
   ]);
-  const clientePorIdLista = new Map(clientesLista.map((item) => [item.id, item]));
+  // Indicada por cliente de anuncio: a etiqueta mostra quem indicou.
+  const clientePorIdLista = new Map(
+    clientesLista.map((item) => [
+      item.id,
+      {
+        nome: item.nome,
+        origem:
+          idsPorIndicacao.has(item.id) && item.indicadaPor
+            ? `indicada por ${item.indicadaPor.nome}`
+            : item.origem,
+      },
+    ]),
+  );
   const statusAgendamentoPorId = new Map(agendamentosSinal.map((item) => [item.id, item.status]));
   const itensReceita: ItemReceitaCampanha[] = [
     ...vendasLista.map((venda) =>

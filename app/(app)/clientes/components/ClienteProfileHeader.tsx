@@ -27,7 +27,11 @@ type Props = {
     origemDosContatos: string[];
     campanha: string | null;
     cliquePago: boolean;
+    /** Conta na campanha so porque foi indicada por cliente de anuncio. */
+    porIndicacao?: boolean;
   };
+  // "Indicada por" / "Indicou" (montado na pagina).
+  indicacao?: React.ReactNode;
   // Faltas e desmarcacoes da cliente (para saber quem costuma faltar).
   presenca?: {
     atendidos: number;
@@ -68,6 +72,7 @@ export default function ClienteProfileHeader({
   data,
   cliente,
   atribuicao,
+  indicacao,
   presenca,
   podeJuntar = false,
 }: Props) {
@@ -150,12 +155,15 @@ export default function ClienteProfileHeader({
                 : ""}
             </p>
             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              {atribuicao.cliquePago
+              {atribuicao.cliquePago && atribuicao.porIndicacao
+                ? `Indicada por cliente de anúncio${atribuicao.campanha ? ` · conta na campanha: ${atribuicao.campanha}` : ""}.`
+                : atribuicao.cliquePago
                 ? `Clique pago confirmado${atribuicao.campanha ? ` · campanha: ${atribuicao.campanha}` : ""}.`
                 : atribuicao.campanha
                   ? `Caiu na página da campanha "${atribuicao.campanha}", mas sem clique pago: não conta nos números da campanha.`
                   : "Sem clique pago."}
             </p>
+            {indicacao}
           </div>
         ) : null}
 

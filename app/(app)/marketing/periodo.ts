@@ -41,6 +41,8 @@ export type MetricasPeriodo = {
   leads: number;
   convertidos: number;
   clientes: number;
+  // Quantos desses clientes contam por terem sido indicados por cliente de anuncio.
+  clientesPorIndicacao: number;
   // So cairam na pagina da campanha (sem clique pago): nao entram nos numeros.
   leadsSoPagina: number;
   clientesSoPagina: number;
@@ -62,6 +64,7 @@ export const METRICAS_PERIODO_VAZIAS: MetricasPeriodo = {
   leads: 0,
   convertidos: 0,
   clientes: 0,
+  clientesPorIndicacao: 0,
   leadsSoPagina: 0,
   clientesSoPagina: 0,
   receitaSoPagina: 0,
@@ -147,6 +150,7 @@ export function calcularMetricasPeriodo({
     campanhaAquisicaoId: number | null;
     createdAt: Date | string;
     cliquePago?: boolean;
+    porIndicacao?: boolean;
   }>;
 }): MetricasPeriodo {
   // Da pagina = ligada a campanha. Pago = alem disso, com clique pago de verdade.
@@ -242,6 +246,9 @@ export function calcularMetricasPeriodo({
     leads: leadsNoPeriodo.length,
     convertidos: leadsNoPeriodo.filter((lead) => lead.etapa === "Convertido").length,
     clientes: pessoas.size,
+    clientesPorIndicacao: clientes.filter(
+      (cliente) => cliente.porIndicacao && cliente.id != null && pessoas.has(`c${cliente.id}`),
+    ).length,
     leadsSoPagina: leadsDaPaginaNoPeriodo.length - leadsNoPeriodo.length,
     clientesSoPagina: clientesDaPaginaNoPeriodo.length - clientesNoPeriodo.length,
     receitaSoPagina,

@@ -2306,6 +2306,9 @@ function CampanhasView({
                   </td>
                   <td className="px-5 py-4">
                     {m.clientes}
+                    {m.clientesPorIndicacao > 0 ? (
+                      <p className="mt-1 text-[11px] text-slate-500">{m.clientesPorIndicacao} por indicação</p>
+                    ) : null}
                     {m.clientesSoPagina > 0 ? (
                       <p className="mt-1 text-[11px] text-slate-500" title="Caíram na página da campanha mas vieram de outra origem (Direto, Orgânico, Instagram, Perfil da Empresa). Não entram nos números da campanha paga.">
                         +{m.clientesSoPagina} só pela página
@@ -2541,7 +2544,9 @@ function CartaoCampanha({ campanha, m, podeGerenciar, disabled, onEditar, onVinc
       <div className="grid grid-cols-2 gap-x-3 gap-y-4 border-t border-white/[0.08] pt-4 sm:grid-cols-4">
         <div>
           <p className="text-base font-semibold text-white">{m.clientes}</p>
-          <p className="text-[11px] text-slate-500">Clientes</p>
+          <p className="text-[11px] text-slate-500">
+            Clientes{m.clientesPorIndicacao > 0 ? ` (${m.clientesPorIndicacao} por indicação)` : ""}
+          </p>
         </div>
         <div>
           <p className="text-base font-semibold text-white">{m.leads}</p>

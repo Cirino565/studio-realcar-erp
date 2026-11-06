@@ -46,6 +46,11 @@ model Cliente {
   areaCilios   Boolean  @default(false)
   campanhaAquisicaoId Int?
   campanhaAquisicao CampanhaMarketing? @relation(fields: [campanhaAquisicaoId], references: [id], onDelete: SetNull)
+  // Quem indicou esta cliente (um nivel so). Se quem indicou veio de anuncio,
+  // esta cliente conta na mesma campanha.
+  indicadaPorId Int?
+  indicadaPor   Cliente?  @relation("IndicacaoCliente", fields: [indicadaPorId], references: [id], onDelete: SetNull)
+  indicadas     Cliente[] @relation("IndicacaoCliente")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -63,6 +68,7 @@ model Cliente {
 
   @@index([campanhaAquisicaoId])
   @@index([origem])
+  @@index([indicadaPorId])
 }
 
 model OrigemCliente {

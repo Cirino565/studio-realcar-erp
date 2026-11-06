@@ -4,7 +4,8 @@ import { canAccess, requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isGoogleDriveConfigured } from "@/lib/google-drive";
 import ClienteProfileHeader from "@/app/(app)/clientes/components/ClienteProfileHeader";
-import { leadTeveCliquePago, origemEhAnuncioPago } from "@/lib/atribuicao-campanha";
+import { CLIENTE_COM_CLIQUE_PAGO_DIRETO, leadTeveCliquePago, origemEhAnuncioPago } from "@/lib/atribuicao-campanha";
+import IndicacaoCliente from "../components/IndicacaoCliente";
 
 type ClientePageProps = {
   params: Promise<{ id: string }> | { id: string };
@@ -181,7 +182,7 @@ export default async function ClientePage({
 
   // De onde a cliente veio de verdade: origem cadastrada, origem dos contatos
   // e se algum clique foi pago (codigo do clique / Google Ads).
-  const [contatosDaCliente, campanhaDaCliente] = await Promise.all([
+  const [contatosDaCliente, campanhaDaCliente, indicacao] = await Promise.all([
     prisma.lead.findMany({
       where: { clienteId },
       select: { origem: true, gclid: true, campanha: { select: { nome: true } } },
@@ -193,7 +194,19 @@ export default async function ClientePage({
           select: { nome: true },
         })
       : Promise.resolve(null),
+    prisma.cliente.findUnique({
+      where: { id: clienteId },
+      select: {
+        indicadaPor: { select: { id: true, nome: true } },
+        indicadas: { select: { id: true, nome: true }, orderBy: { nome: "asc" }, take: 30 },
+      },
+    }),
   ]);
+  const indicadoraDeAnuncio = indicacao?.indicadaPor
+    ? (await prisma.cliente.count({
+        where: { id: indicacao.indicadaPor.id, ...CLIENTE_COM_CLIQUE_PAGO_DIRETO },
+      })) > 0
+    : false;
   const origemDosContatos = Array.from(
     new Set(
       contatosDaCliente
@@ -207,8 +220,23 @@ export default async function ClientePage({
     campanha: campanhaDaCliente?.nome ?? null,
     cliquePago:
       origemEhAnuncioPago(cliente.origem) ||
-      contatosDaCliente.some((contato) => leadTeveCliquePago(contato)),
+      contatosDaCliente.some((contato) => leadTeveCliquePago(contato)) ||
+      indicadoraDeAnuncio,
+    porIndicacao:
+      indicadoraDeAnuncio &&
+      !origemEhAnuncioPago(cliente.origem) &&
+      !contatosDaCliente.some((contato) => leadTeveCliquePago(contato)),
   };
+  const blocoIndicacao = (
+    <IndicacaoCliente
+      clienteId={clienteId}
+      indicadaPor={indicacao?.indicadaPor ?? null}
+      indicadoraDeAnuncio={indicadoraDeAnuncio}
+      indicou={indicacao?.indicadas ?? []}
+      podeEditar={canAccess(usuario, "clientes.gerenciar")}
+      mostrarEditor={/indica/i.test(cliente.origem ?? "")}
+    />
+  );
 
   const anamneses = cliente.anamneses.map(mapAnamnese);
 
@@ -326,6 +354,7 @@ export default async function ClientePage({
         data={data}
         cliente={cliente}
         atribuicao={atribuicao}
+        indicacao={blocoIndicacao}
         presenca={{
           atendidos: atendidosTotal,
           itens: faltasEDesmarques.map((item) => ({
