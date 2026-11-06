@@ -322,6 +322,12 @@ function getPalette(color: string, index: number) {
   return createPalette(solid, gradientEnd);
 }
 
+// Cancelados ficam escondidos na agenda por padrao (so poluem a tela). Um
+// aviso acima da grade mostra quantos sao e deixa ver quando precisar.
+function ehCancelado(status?: string | null) {
+  return (status || "").trim().toLowerCase() === "cancelado";
+}
+
 function getStatusPalette(status: string) {
   const normalized = (status || "Agendado").toLowerCase();
 
@@ -404,7 +410,7 @@ export default function AgendaCalendar({
   onProfissionalFiltroChange,
   profissionais,
   todosProfissionais,
-  agendamentos,
+  agendamentos: todosAgendamentos,
   focusAgendamentoId,
   bloqueios,
   onNovoHorario,
@@ -415,6 +421,14 @@ export default function AgendaCalendar({
   viewMode,
 }: Props) {
   const [now, setNow] = useState(() => new Date());
+  const [mostrarCancelados, setMostrarCancelados] = useState(false);
+  const agendamentos = useMemo(
+    () =>
+      mostrarCancelados
+        ? todosAgendamentos
+        : todosAgendamentos.filter((appointment) => !ehCancelado(appointment.status)),
+    [mostrarCancelados, todosAgendamentos],
+  );
   const today = now;
   const selectedDateInput = formatDateInput(selectedDate);
   const selectedDateIsToday = selectedDateInput === formatSaoPauloDateKey(now);
@@ -1537,6 +1551,61 @@ export default function AgendaCalendar({
         );
       })()}
 
+      {(() => {
+        const diasVisiveis = new Set(
+          (viewMode === "week" ? weekDays : [selectedDate]).map((dia) => formatDateInput(dia)),
+        );
+        const idsVisiveis = new Set(visibleProfessionals.map((item) => item.id));
+        const cancelados = todosAgendamentos
+          .filter(
+            (appointment) =>
+              ehCancelado(appointment.status) &&
+              (!appointment.profissionalId || idsVisiveis.has(appointment.profissionalId)) &&
+              diasVisiveis.has(formatSaoPauloDateKey(appointment.data)),
+          )
+          .sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
+        if (cancelados.length === 0) return null;
+        const LIMITE = 8;
+        const visiveis = cancelados.slice(0, LIMITE);
+        const diaCurto = (valor: Date | string) =>
+          new Intl.DateTimeFormat("pt-BR", { weekday: "short", timeZone: SAO_PAULO_TIMEZONE })
+            .format(new Date(valor))
+            .replace(".", "");
+        return (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+            <span className="inline-flex shrink-0 items-center gap-1.5 font-bold text-slate-700 dark:text-slate-200">
+              <Ban size={13} className="text-rose-500" />
+              {viewMode === "week" ? "Cancelados na semana:" : selectedDateIsToday ? "Cancelados hoje:" : "Cancelados neste dia:"}
+            </span>
+            {visiveis.map((appointment) => (
+              <button
+                key={`cancelado-${appointment.id}`}
+                type="button"
+                onClick={() => onSelectAppointment(appointment)}
+                title="Abrir o agendamento cancelado"
+                className="inline-flex max-w-full items-center gap-1 rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700 transition hover:border-rose-300 hover:bg-rose-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-rose-500/10"
+              >
+                <span className="truncate line-through decoration-slate-400">{appointment.cliente.nome}</span>
+                <span className="shrink-0 font-normal text-slate-500 dark:text-slate-400">
+                  · {viewMode === "week" ? `${diaCurto(appointment.data)} ` : ""}
+                  {formatTime(appointment.data)}
+                </span>
+              </button>
+            ))}
+            {cancelados.length > LIMITE ? (
+              <span className="text-[11px] font-semibold text-slate-500">+{cancelados.length - LIMITE}</span>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setMostrarCancelados((atual) => !atual)}
+              className="ml-auto shrink-0 rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+            >
+              {mostrarCancelados ? "Esconder da agenda" : "Mostrar na agenda"}
+            </button>
+          </div>
+        );
+      })()}
+
       {viewMode === "week" ? (
         <div className="w-full overflow-x-auto border-t border-slate-300 dark:border-slate-700">
           <div className="grid min-w-[1180px] grid-cols-7 bg-slate-200 dark:bg-slate-800">
@@ -1547,7 +1616,14 @@ export default function AgendaCalendar({
               const saturday = dayOfWeek === 6;
               const sunday = dayOfWeek === 0;
               const appointmentCount = items.filter(
-                (item) => item.kind === "appointment",
+                (item) => item.kind === "appointment" && !ehCancelado(item.appointment.status),
+              ).length;
+              const canceladosDia = todosAgendamentos.filter(
+                (appointment) =>
+                  ehCancelado(appointment.status) &&
+                  formatSaoPauloDateKey(appointment.data) === dateKey &&
+                  (!appointment.profissionalId ||
+                    visibleProfessionals.some((item) => item.id === appointment.profissionalId)),
               ).length;
 
               return (
@@ -1597,9 +1673,19 @@ export default function AgendaCalendar({
                       ) : null}
                     </div>
                     {!closed ? (
-                      <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                        {appointmentCount}
-                      </span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                          {appointmentCount}
+                        </span>
+                        {canceladosDia > 0 ? (
+                          <span
+                            className="rounded-full bg-rose-50 px-2 py-0.5 text-[9px] font-bold text-rose-600 dark:bg-rose-500/10 dark:text-rose-300"
+                            title={`${canceladosDia} cancelado(s) neste dia`}
+                          >
+                            {canceladosDia} cancel.
+                          </span>
+                        ) : null}
+                      </div>
                     ) : null}
                   </a>
 
@@ -1671,7 +1757,7 @@ export default function AgendaCalendar({
                               key={`appointment-${appointment.id}`}
                               type="button"
                               onClick={() => onSelectAppointment(appointment)}
-                              className="w-full overflow-hidden rounded-md border p-2 text-left shadow-sm transition hover:-translate-y-px hover:shadow-md"
+                              className={`w-full overflow-hidden rounded-md border p-2 text-left shadow-sm transition hover:-translate-y-px hover:shadow-md ${ehCancelado(appointment.status) ? "opacity-55" : ""}`}
                               style={{
                                 borderColor: palette.border,
                                 background: palette.soft,
@@ -1685,7 +1771,7 @@ export default function AgendaCalendar({
                               >
                                 {formatTime(appointment.data)}–{formatTime(appointmentEnd(appointment))}
                               </p>
-                              <p className="mt-1 truncate text-xs font-extrabold uppercase text-slate-900 dark:text-white">
+                              <p className={`mt-1 truncate text-xs font-extrabold uppercase text-slate-900 dark:text-white ${ehCancelado(appointment.status) ? "line-through" : ""}`}>
                                 {appointment.cliente.nome}
                               </p>
                               <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-slate-600 dark:text-slate-300">
@@ -2051,7 +2137,7 @@ export default function AgendaCalendar({
                               onSelectAppointment(appointment);
                             }
                           }}
-                          className="agenda-card absolute left-0.5 right-0.5 z-10 cursor-pointer overflow-hidden rounded-sm border text-left shadow-sm transition-all duration-300 hover:brightness-105 hover:shadow-md sm:left-0.5 sm:right-0.5"
+                          className={`agenda-card absolute left-0.5 right-0.5 z-10 cursor-pointer overflow-hidden rounded-sm border text-left shadow-sm transition-all duration-300 hover:brightness-105 hover:shadow-md sm:left-0.5 sm:right-0.5 ${ehCancelado(appointment.status) ? "opacity-55" : ""}`}
                           style={{
                             top,
                             height,
@@ -2106,7 +2192,7 @@ export default function AgendaCalendar({
                                   ) : null}
                                 </div>
                                 <p
-                                  className="mt-0.5 truncate text-[0.78rem] font-black leading-[1.05] sm:text-[0.84rem]"
+                                  className={`mt-0.5 truncate text-[0.78rem] font-black leading-[1.05] sm:text-[0.84rem] ${ehCancelado(appointment.status) ? "line-through" : ""}`}
                                   style={{ color: statusPalette.text }}
                                 >
                                   {appointment.cliente.nome}
