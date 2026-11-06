@@ -64,7 +64,7 @@ export default function ParaRemarcarPainel({ pendentes, onAgendar }: Props) {
             Para remarcar: {pendentes.length} cliente{pendentes.length === 1 ? "" : "s"}
           </span>
           <span className="block text-xs text-amber-800/80 dark:text-amber-200/80">
-            Desmarcaram e ainda não têm nova data
+            Desmarcaram ou faltaram e ainda não têm nova data
             {comSinal > 0 ? ` · ${comSinal} com sinal guardado` : ""}
           </span>
         </span>
@@ -87,9 +87,9 @@ export default function ParaRemarcarPainel({ pendentes, onAgendar }: Props) {
             return (
               <li
                 key={pendente.id}
-                className="rounded-xl border border-amber-200 bg-white p-3 text-sm dark:border-white/10 dark:bg-slate-900"
+                className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between"
               >
-                <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="flex min-w-0 flex-wrap items-start justify-between gap-2 sm:flex-1">
                   <div className="min-w-0">
                     <p className="break-words font-bold text-slate-900 dark:text-white">{pendente.clienteNome}</p>
                     <p className="text-xs text-slate-600 dark:text-slate-300">
@@ -106,7 +106,7 @@ export default function ParaRemarcarPainel({ pendentes, onAgendar }: Props) {
                 </div>
 
                 {desistindo === pendente.id ? (
-                  <div className="mt-2 rounded-lg bg-slate-50 p-2 text-xs text-slate-700 dark:bg-white/[0.06] dark:text-slate-200">
+                  <div className="rounded-lg bg-slate-50 p-2 text-xs text-slate-700 dark:bg-white/[0.06] dark:text-slate-200">
                     {pendente.sinalGuardado ? (
                       <>
                         <p className="font-semibold">Ela desistiu. E o sinal de {moeda(pendente.valorSinal)}?</p>
@@ -136,20 +136,20 @@ export default function ParaRemarcarPainel({ pendentes, onAgendar }: Props) {
                     {salvando === pendente.id ? <Loader2 size={14} className="mt-2 animate-spin" /> : null}
                   </div>
                 ) : (
-                  <div className="mt-2 grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-3 gap-2 sm:flex sm:shrink-0">
                     <button
                       type="button"
                       onClick={() => onAgendar(pendente)}
-                      className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-violet-600 px-2 text-xs font-bold text-white hover:bg-violet-700"
+                      className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-violet-600 px-2 text-xs font-bold text-white hover:bg-violet-700 sm:px-3"
                     >
-                      <CalendarPlus size={14} /> Agendar
+                      <CalendarPlus size={14} /> Remarcar
                     </button>
                     {whatsapp ? (
                       <a
                         href={whatsapp}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2 text-xs font-bold text-emerald-700"
+                        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2 text-xs font-bold text-emerald-700 sm:px-3"
                       >
                         <MessageCircle size={14} /> WhatsApp
                       </a>
@@ -159,7 +159,7 @@ export default function ParaRemarcarPainel({ pendentes, onAgendar }: Props) {
                     <button
                       type="button"
                       onClick={() => setDesistindo(pendente.id)}
-                      className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-600 dark:border-white/10 dark:bg-transparent dark:text-slate-300"
+                      className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-600 dark:border-white/10 dark:bg-transparent dark:text-slate-300 sm:px-3"
                     >
                       <UserX size={14} /> Desistiu
                     </button>

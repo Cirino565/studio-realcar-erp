@@ -409,11 +409,14 @@ export default function AgendaClient({
   // "Agendar" na lista Para remarcar: abre um novo horario ja com a cliente e o
   // procedimento. Ao salvar, o sistema tira ela da lista (e leva o sinal guardado).
   function abrirRemarcacao(pendente: RemarcacaoPendente) {
+    // Nunca sugere uma data que ja passou.
+    const hojeRemarcar = toDateInput(new Date());
+    const diaVisto = toDateInput(selectedDate);
     setSelectedAppointment(null);
     setNovoHorario({
       modo: "novo",
       tipoAtendimento: "agendamento",
-      data: toDateInput(selectedDate),
+      data: diaVisto < hojeRemarcar ? hojeRemarcar : diaVisto,
       hora: toTimeInput(pendente.data),
       profissionalId: pendente.profissionalId || undefined,
       clienteId: pendente.clienteId,
