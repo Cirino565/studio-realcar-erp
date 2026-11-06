@@ -487,6 +487,35 @@ export default function AgendaClient({
     appointment: AgendamentoAgenda,
     opcoes?: { procedimento?: string; duracao?: number; observacoes?: string },
   ) {
+    // Cancelado ou faltou: "Remarcar" - novo horario igual ao que foi perdido
+    // (mesmo procedimento, retorno continua retorno). O antigo fica no
+    // historico e, se estava em "Para remarcar", sai da lista ao salvar.
+    const statusAtual = (appointment.status || "").trim().toLowerCase();
+    if (statusAtual === "cancelado" || statusAtual === "faltou") {
+      const hojeInput = toDateInput(new Date());
+      const selecionadoInput = toDateInput(selectedDate);
+      setSelectedAppointment(null);
+      setFinishAppointment(null);
+      setNovoHorario({
+        modo: "novo",
+        tipoAtendimento: "agendamento",
+        data: selecionadoInput < hojeInput ? hojeInput : selecionadoInput,
+        hora: toTimeInput(appointment.data),
+        profissionalId: appointment.profissionalId || undefined,
+        clienteId: appointment.clienteId,
+        procedimento: appointment.procedimento,
+        procedimentosExtras: lerProcedimentosExtras(appointment.procedimentosExtras),
+        duracao: appointment.duracao || 60,
+        naturezaAtendimento: appointment.naturezaAtendimento,
+        agendamentoOrigemId: appointment.agendamentoOrigemId,
+        valor: appointment.naturezaAtendimento === "RETORNO" ? 0 : appointment.valor || 0,
+        status: "Agendado",
+        sinalPago: false,
+        observacoes: `Remarcação do horário de ${formatarDataCurta(appointment.data)}.`,
+      });
+      return;
+    }
+
     const dataBase = new Date(appointment.data);
 
     // Depois de uma AVALIACAO, o que vem em seguida quase sempre e o

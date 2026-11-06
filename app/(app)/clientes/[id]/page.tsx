@@ -131,7 +131,7 @@ export default async function ClientePage({
     );
   }
 
-  const [cliente, anamneseModelos, pacotes, formasPagamento, contas] =
+  const [cliente, anamneseModelos, pacotes, formasPagamento, contas, faltasEDesmarques, atendidosTotal] =
     await Promise.all([
       getClienteClinico(clienteId),
       prisma.anamneseModelo.findMany({
@@ -158,6 +158,17 @@ export default async function ClientePage({
         orderBy: [{ principal: "desc" }, { nome: "asc" }],
         select: { id: true, nome: true, principal: true },
       }),
+      // Faltas e desmarcacoes (so o necessario, para a ficha continuar leve).
+      prisma.agendamento.findMany({
+        where: {
+          clienteId,
+          OR: [{ status: "Faltou" }, { status: "Cancelado", desmarcadoEm: { not: null } }],
+        },
+        select: { id: true, data: true, status: true, procedimento: true, desmarcadoEm: true },
+        orderBy: { data: "desc" },
+        take: 40,
+      }),
+      prisma.agendamento.count({ where: { clienteId, status: "Atendido" } }),
     ]);
 
   if (!cliente) {
@@ -315,6 +326,19 @@ export default async function ClientePage({
         data={data}
         cliente={cliente}
         atribuicao={atribuicao}
+        presenca={{
+          atendidos: atendidosTotal,
+          itens: faltasEDesmarques.map((item) => ({
+            id: item.id,
+            data: item.data.toISOString(),
+            procedimento: item.procedimento,
+            faltou: item.status === "Faltou",
+            horasDeAviso:
+              item.status !== "Faltou" && item.desmarcadoEm
+                ? Math.max(0, Math.round((item.data.getTime() - item.desmarcadoEm.getTime()) / 3_600_000))
+                : null,
+          })),
+        }}
         podeJuntar={canAccess(usuario, "clientes.gerenciar")}
       />
 

@@ -28,6 +28,17 @@ type Props = {
     campanha: string | null;
     cliquePago: boolean;
   };
+  // Faltas e desmarcacoes da cliente (para saber quem costuma faltar).
+  presenca?: {
+    atendidos: number;
+    itens: Array<{
+      id: number;
+      data: string;
+      procedimento: string;
+      faltou: boolean;
+      horasDeAviso: number | null;
+    }>;
+  };
 };
 
 
@@ -57,6 +68,7 @@ export default function ClienteProfileHeader({
   data,
   cliente,
   atribuicao,
+  presenca,
   podeJuntar = false,
 }: Props) {
   const totalProcedimentos = data.procedimentos.length;
@@ -146,6 +158,53 @@ export default function ClienteProfileHeader({
             </p>
           </div>
         ) : null}
+
+        {presenca && presenca.itens.length > 0 ? (() => {
+          const faltas = presenca.itens.filter((item) => item.faltou).length;
+          const desmarcou = presenca.itens.length - faltas;
+          const atencao = faltas >= 2 || presenca.itens.length >= 3;
+          return (
+            <details
+              className={`rounded-2xl border px-4 py-3 text-sm ${
+                atencao
+                  ? "border-amber-200 bg-amber-50 dark:border-amber-400/20 dark:bg-amber-500/10"
+                  : "border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/[0.04]"
+              }`}
+            >
+              <summary className="cursor-pointer list-none">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Faltas e desmarcações
+                </p>
+                <p className="mt-1 font-medium text-slate-800 dark:text-slate-100">
+                  Faltou {faltas}x · Desmarcou {desmarcou}x
+                  <span className="font-normal text-slate-500 dark:text-slate-400">
+                    {" "}· {presenca.atendidos} atendimento(s) realizado(s)
+                  </span>
+                </p>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  {atencao ? "Costuma faltar ou desmarcar: vale pedir sinal. " : ""}
+                  <span className="underline decoration-dotted underline-offset-2">Ver datas</span>
+                </p>
+              </summary>
+              <ul className="mt-2 space-y-1 border-t border-slate-200 pt-2 text-xs text-slate-600 dark:border-white/10 dark:text-slate-300">
+                {presenca.itens.map((item) => (
+                  <li key={item.id} className="flex flex-wrap justify-between gap-x-3">
+                    <span>
+                      {formatarData(item.data)} · {item.procedimento}
+                    </span>
+                    <span className={item.faltou ? "font-semibold text-rose-600 dark:text-rose-300" : "text-slate-500 dark:text-slate-400"}>
+                      {item.faltou
+                        ? "Faltou"
+                        : item.horasDeAviso !== null
+                          ? `Desmarcou ${item.horasDeAviso >= 48 ? `${Math.round(item.horasDeAviso / 24)} dias` : `${item.horasDeAviso}h`} antes`
+                          : "Desmarcou"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          );
+        })() : null}
 
         <AvisoPacoteAberto
           pacotes={data.pacotes.filter((pacote) => pacote.status === "Aberto")}

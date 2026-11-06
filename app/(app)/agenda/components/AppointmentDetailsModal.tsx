@@ -473,7 +473,11 @@ export default function AppointmentDetailsModal({
             />
             <AcaoRapida
               icon={CalendarClock}
-              label="Agendar próximo"
+              label={
+                currentAppointment.status === "Cancelado" || currentAppointment.status === "Faltou"
+                  ? "Remarcar"
+                  : "Agendar próximo"
+              }
               onClick={agendarProximo}
             />
             <AcaoRapida

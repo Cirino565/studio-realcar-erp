@@ -182,6 +182,7 @@ model Agendamento {
   @@index([status, data])
   @@index([procedimento, data])
   @@index([aguardandoRemarcacao, clienteId])
+  @@index([clienteId, status])
 }
 
 model Profissional {
