@@ -577,6 +577,8 @@ export default function MarketingClient({
   const [busca, setBusca] = useState("");
   const [etapaFiltro, setEtapaFiltro] = useState("todas");
   const [origemFiltro, setOrigemFiltro] = useState("todas");
+  // Filtro por campanha: so quem veio de clique pago daquela campanha.
+  const [campanhaFiltro, setCampanhaFiltro] = useState("todas");
   const [erro, setErro] = useState<string | null>(null);
   const [leadAcaoRapidaId, setLeadAcaoRapidaId] =
     useState<number | null>(null);
@@ -688,6 +690,9 @@ export default function MarketingClient({
       const matchesOrigem =
         origemFiltro === "todas" ||
         lead.origem === origemFiltro;
+      const matchesCampanha =
+        campanhaFiltro === "todas" ||
+        (lead.cliquePago && String(lead.campanhaId ?? "") === campanhaFiltro);
 
       const encerrado =
         lead.etapa === "Convertido" ||
@@ -704,11 +709,13 @@ export default function MarketingClient({
         matchesBusca &&
         matchesEtapa &&
         matchesOrigem &&
+        matchesCampanha &&
         matchesModo
       );
     });
   }, [
     busca,
+    campanhaFiltro,
     etapaFiltro,
     leads,
     origemFiltro,
@@ -1430,7 +1437,7 @@ export default function MarketingClient({
 
         <section className="premium-card-soft p-4 md:p-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div className="grid gap-3 lg:grid-cols-[1.4fr_0.8fr_0.9fr] xl:min-w-0 xl:flex-1">
+            <div className="grid gap-3 lg:grid-cols-[1.3fr_0.8fr_0.8fr_1fr] xl:min-w-0 xl:flex-1">
               <label className="relative">
                 <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
                 <input
@@ -1466,6 +1473,20 @@ export default function MarketingClient({
               <select value={origemFiltro} onChange={(event) => setOrigemFiltro(event.target.value)} className="premium-input h-11 w-full bg-[#1d2437]">
                 <option value="todas">Todas as origens</option>
                 {origens.map((origem) => <option key={origem} value={origem}>{origem}</option>)}
+              </select>
+
+              <select
+                value={campanhaFiltro}
+                onChange={(event) => setCampanhaFiltro(event.target.value)}
+                title="Mostra só quem veio de clique pago desta campanha (sem o orgânico)"
+                className="premium-input h-11 w-full bg-[#1d2437]"
+              >
+                <option value="todas">Todas as campanhas</option>
+                {campanhas.map((campanha) => (
+                  <option key={campanha.id} value={String(campanha.id)}>
+                    {campanha.nome} · só anúncio
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -1654,7 +1675,7 @@ export default function MarketingClient({
         ) : null}
 
         {tab === "campanhas" ? (
-          <CampanhasView campanhas={campanhas} leads={leads} clientes={clientes} contas={contas} receitasSemCampanha={receitasSemCampanha} itensReceita={itensReceita} movimentos={movimentosCampanha} onDelete={removerCampanha} onEditar={abrirEdicaoCampanha} isPending={isPending} podeGerenciar={podeGerenciarMarketing} />
+          <CampanhasView onAbrirLead={setDetalhesModal} campanhas={campanhas} leads={leads} clientes={clientes} contas={contas} receitasSemCampanha={receitasSemCampanha} itensReceita={itensReceita} movimentos={movimentosCampanha} onDelete={removerCampanha} onEditar={abrirEdicaoCampanha} isPending={isPending} podeGerenciar={podeGerenciarMarketing} />
         ) : null}
 
         {tab === "mensagens" ? <TemplatesView /> : null}
@@ -2066,7 +2087,9 @@ function CampanhasView({
   onEditar,
   isPending,
   podeGerenciar,
+  onAbrirLead,
 }: {
+  onAbrirLead: (lead: MarketingLead) => void;
   campanhas: MarketingCampanha[];
   leads: MarketingLead[];
   clientes: MarketingClienteOption[];
@@ -2085,6 +2108,21 @@ function CampanhasView({
   const [receita, setReceita] = useState<MarketingCampanha | null>(null);
   // Lista do que compoe o "Entrou" (abre ao clicar no valor).
   const [detalheReceita, setDetalheReceita] = useState<MarketingCampanha | null>(null);
+  // Pessoas que vieram do anuncio (so clique pago), por situacao.
+  const [pessoasCampanha, setPessoasCampanha] = useState<MarketingCampanha | null>(null);
+  const funilPorCampanha = useMemo(() => {
+    const mapa = new Map<number, { fecharam: number; agendados: number; conversa: number; perdidos: number }>();
+    for (const lead of leads) {
+      if (!lead.cliquePago || !lead.campanhaId) continue;
+      const atual = mapa.get(lead.campanhaId) ?? { fecharam: 0, agendados: 0, conversa: 0, perdidos: 0 };
+      if (lead.etapa === "Convertido") atual.fecharam += 1;
+      else if (lead.etapa === "Agendado") atual.agendados += 1;
+      else if (lead.etapa === "Perdido") atual.perdidos += 1;
+      else atual.conversa += 1;
+      mapa.set(lead.campanhaId, atual);
+    }
+    return mapa;
+  }, [leads]);
   const [erroLocal, setErroLocal] = useState<string | null>(null);
   const [pendingLocal, startLocalTransition] = useTransition();
   // Filtro de periodo: abre sempre em "Ultimos 30 dias".
@@ -2260,6 +2298,8 @@ function CampanhasView({
                 onLancarCusto={() => setCusto(campanha)}
                 onVincularReceita={() => setReceita(campanha)}
                 onVerReceita={() => setDetalheReceita(campanha)}
+                funil={funilPorCampanha.get(campanha.id)}
+                onVerPessoas={() => setPessoasCampanha(campanha)}
                 onExcluir={() => onDelete(campanha.id)}
               />
             ))}
@@ -2406,6 +2446,17 @@ function CampanhasView({
           setReceita(null);
         })}
       />
+      {pessoasCampanha ? (
+        <PessoasCampanhaModal
+          campanha={pessoasCampanha}
+          leads={leads.filter((lead) => lead.cliquePago && lead.campanhaId === pessoasCampanha.id)}
+          onClose={() => setPessoasCampanha(null)}
+          onAbrirLead={(lead) => {
+            setPessoasCampanha(null);
+            onAbrirLead(lead);
+          }}
+        />
+      ) : null}
       <ReceitaDetalheModal
         key={detalheReceita?.id ?? "fechado"}
         campanha={detalheReceita}
@@ -2434,7 +2485,9 @@ function CampanhasView({
   );
 }
 
-function CartaoCampanha({ campanha, m, podeGerenciar, disabled, onEditar, onVincularCliente, onLancarCusto, onVincularReceita, onVerReceita, onExcluir }: {
+function CartaoCampanha({ campanha, m, podeGerenciar, disabled, onEditar, onVincularCliente, onLancarCusto, onVincularReceita, onVerReceita, funil, onVerPessoas, onExcluir }: {
+  funil?: { fecharam: number; agendados: number; conversa: number; perdidos: number };
+  onVerPessoas: () => void;
   campanha: MarketingCampanha;
   m: MetricasPeriodo;
   podeGerenciar: boolean;
@@ -2561,6 +2614,22 @@ function CartaoCampanha({ campanha, m, podeGerenciar, disabled, onEditar, onVinc
           <p className="text-[11px] text-slate-500">Custo por lead</p>
         </div>
       </div>
+
+      {funil ? (
+        <button
+          type="button"
+          onClick={onVerPessoas}
+          title="Ver cada pessoa que veio do anúncio e a situação dela"
+          className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-violet-300/20 bg-violet-400/8 px-3 py-2 text-left text-xs text-slate-300 transition hover:bg-violet-400/15"
+        >
+          <span className="font-semibold text-violet-200">Do anúncio até hoje:</span>
+          <span><strong className="text-emerald-300">{funil.fecharam}</strong> fecharam</span>
+          <span><strong className="text-sky-300">{funil.agendados}</strong> agendados</span>
+          <span><strong className="text-white">{funil.conversa}</strong> em conversa</span>
+          {funil.perdidos > 0 ? <span><strong className="text-slate-400">{funil.perdidos}</strong> perdidos</span> : null}
+          <span className="ml-auto font-semibold text-violet-200 underline decoration-dotted underline-offset-4">Ver pessoas</span>
+        </button>
+      ) : null}
 
       {m.clientesSoPagina > 0 || m.leadsSoPagina > 0 || m.receitaSoPagina > 0 ? (
         <p className="rounded-xl bg-slate-100 px-3 py-2 text-[11px] leading-4 text-slate-600 dark:bg-white/[0.06] dark:text-slate-400" title="Caíram na página da campanha mas vieram de outra origem (Direto, Orgânico, Instagram, Perfil da Empresa). Não entram nos números da campanha paga.">
@@ -2853,6 +2922,91 @@ function ReceitaCampanhaModal({ campanha, receitas, disabled, onClose, onSubmit 
           <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
           <Button type="button" disabled={disabled || !lancamentoId} onClick={() => onSubmit(Number(lancamentoId))}>{disabled ? "Vinculando..." : "Vincular receita"}</Button>
         </div>
+      </div>
+    </Modal>
+  );
+}
+
+const GRUPOS_PESSOAS: Array<{ chave: "fecharam" | "agendados" | "conversa" | "perdidos"; titulo: string; descricao: string; cor: string }> = [
+  { chave: "fecharam", titulo: "Fecharam", descricao: "Foram atendidas e pagaram", cor: "text-emerald-600 dark:text-emerald-300" },
+  { chave: "agendados", titulo: "Agendados", descricao: "Marcaram e ainda não foram atendidas", cor: "text-sky-600 dark:text-sky-300" },
+  { chave: "conversa", titulo: "Em conversa", descricao: "Chamaram, ainda sem horário", cor: "text-slate-800 dark:text-white" },
+  { chave: "perdidos", titulo: "Perdidos", descricao: "Desistiram", cor: "text-slate-500" },
+];
+
+function grupoDoLead(lead: MarketingLead) {
+  if (lead.etapa === "Convertido") return "fecharam";
+  if (lead.etapa === "Agendado") return "agendados";
+  if (lead.etapa === "Perdido") return "perdidos";
+  return "conversa";
+}
+
+function PessoasCampanhaModal({ campanha, leads, onClose, onAbrirLead }: {
+  campanha: MarketingCampanha;
+  leads: MarketingLead[];
+  onClose: () => void;
+  onAbrirLead: (lead: MarketingLead) => void;
+}) {
+  const ordenados = [...leads].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const porGrupo = new Map(GRUPOS_PESSOAS.map((grupo) => [grupo.chave, ordenados.filter((lead) => grupoDoLead(lead) === grupo.chave)]));
+  const fecharam = porGrupo.get("fecharam")?.length ?? 0;
+  const agendados = porGrupo.get("agendados")?.length ?? 0;
+
+  return (
+    <Modal
+      title="Quem veio do anúncio"
+      description={`${campanha.nome} · só clique pago (sem o orgânico)`}
+      onClose={onClose}
+      wide
+    >
+      <div className="grid gap-4">
+        <div className="rounded-2xl border border-emerald-300/15 bg-emerald-400/8 p-3 text-sm leading-5 text-emerald-100">
+          O anúncio já trouxe <strong>{fecharam + agendados}</strong> {fecharam + agendados === 1 ? "cliente" : "clientes"}: {fecharam} {fecharam === 1 ? "fechou" : "fecharam"} e {agendados} {agendados === 1 ? "está agendada" : "estão agendadas"}. Ao todo, {leads.length} {leads.length === 1 ? "pessoa chamou" : "pessoas chamaram"} pelo anúncio.
+        </div>
+
+        {leads.length === 0 ? (
+          <p className="rounded-2xl border border-white/[0.10] bg-white/[0.04] p-6 text-center text-sm text-slate-500">
+            Ninguém com clique pago nesta campanha ainda.
+          </p>
+        ) : (
+          GRUPOS_PESSOAS.map((grupo) => {
+            const lista = porGrupo.get(grupo.chave) ?? [];
+            if (lista.length === 0) return null;
+            return (
+              <section key={grupo.chave}>
+                <h3 className={`text-sm font-bold ${grupo.cor}`}>
+                  {grupo.titulo} ({lista.length})
+                  <span className="ml-2 text-xs font-normal text-slate-500">{grupo.descricao}</span>
+                </h3>
+                <ul className="mt-2 divide-y divide-white/[0.06] rounded-2xl border border-white/[0.10]">
+                  {lista.map((lead) => (
+                    <li key={lead.id}>
+                      <button
+                        type="button"
+                        onClick={() => onAbrirLead(lead)}
+                        className="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2 text-left hover:bg-white/[0.05]"
+                      >
+                        <span className="min-w-0">
+                          <span className="text-sm font-semibold text-slate-900 dark:text-white">{lead.cliente?.nome || lead.nome}</span>
+                          <span className="ml-2 text-xs text-slate-500">chamou em {formatarData(lead.createdAt)}</span>
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          {lead.etapa === "Agendado" && lead.agendamento
+                            ? `${formatarData(lead.agendamento.data)} · ${lead.agendamento.procedimento}`
+                            : lead.etapa}
+                          {lead.receitaRastreada > 0 ? ` · ${formatarMoeda(lead.receitaRastreada)}` : ""}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            );
+          })
+        )}
+        <p className="text-[11px] leading-4 text-slate-500">
+          Clique numa pessoa para abrir os detalhes. No Pipeline, o filtro &quot;Todas as campanhas&quot; também mostra só quem veio do anúncio, separado por etapa.
+        </p>
       </div>
     </Modal>
   );
