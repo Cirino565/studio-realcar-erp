@@ -12,6 +12,7 @@ import {
   type ProcedimentoExtraAgenda,
 } from "@/lib/procedimentos-extras";
 import { concluirRemarcacaoNoTx } from "@/lib/remarcacao";
+import { aplicarIndicacaoNoTx } from "@/lib/indicacao";
 import { sincronizarSinalNoTx } from "@/lib/sinal";
 import {
   criarVendaNoTx,
@@ -25,6 +26,8 @@ type ClienteNovoAgendamento = {
   whatsapp?: string;
   telefone?: string;
   origem?: string;
+  // Quem indicou (quando a origem e Indicacao).
+  indicadaPorId?: number | null;
   procedimentoInteresse?: string;
   observacoes?: string;
 };
@@ -308,6 +311,7 @@ async function resolverCliente(dados: NovoAgendamento) {
       observacoes: dados.novoCliente.observacoes || null,
     },
   });
+  await aplicarIndicacaoNoTx(prisma, cliente.id, dados.novoCliente.indicadaPorId);
 
   return cliente.id;
 }
@@ -880,6 +884,7 @@ export async function criarAgendamento(
       });
 
       clienteId = cliente.id;
+      await aplicarIndicacaoNoTx(tx, cliente.id, dados.novoCliente.indicadaPorId);
     } else if (areaEstetica || areaCilios) {
       await tx.cliente.update({
         where: { id: clienteId },

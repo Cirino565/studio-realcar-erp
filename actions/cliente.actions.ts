@@ -3,6 +3,7 @@
 import { requirePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { aplicarIndicacaoNoTx } from "@/lib/indicacao";
 
 function textoOpcional(valor?: string) {
   return valor?.trim() || null;
@@ -49,6 +50,8 @@ export type ClienteForm = {
   areaEstetica?: boolean;
   areaCilios?: boolean;
   campanhaAquisicaoId?: number | null;
+  // Quem indicou (so no cadastro novo; depois se ajusta na ficha).
+  indicadaPorId?: number | null;
 };
 
 export async function listarClientes() {
@@ -62,7 +65,7 @@ export async function listarClientes() {
 
 export async function criarCliente(dados: ClienteForm) {
   await requirePermission("clientes.gerenciar");
-  await prisma.cliente.create({
+  const criado = await prisma.cliente.create({
     data: {
       nome: dados.nome,
       telefone: dados.telefone,
@@ -97,6 +100,10 @@ export async function criarCliente(dados: ClienteForm) {
           : null,
     },
   });
+
+  if (dados.indicadaPorId) {
+    await aplicarIndicacaoNoTx(prisma, criado.id, dados.indicadaPorId);
+  }
 
   revalidatePath("/clientes");
   revalidatePath("/marketing");

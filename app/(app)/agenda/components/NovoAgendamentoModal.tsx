@@ -36,6 +36,7 @@ import type { ProcedimentoExtraAgenda } from "@/lib/procedimentos-extras";
 
 import type { NovoHorarioPayload } from "./AgendaCalendar";
 import type { RemarcacaoPendente } from "@/lib/remarcacao";
+import IndicadaPorPicker from "@/components/clientes/IndicadaPorPicker";
 import type { FormaPagamentoFinalizacao } from "./FinalizarAtendimentoModal";
 
 type Cliente = {
@@ -259,6 +260,8 @@ export default function NovoAgendamentoModal({
   const [novoClienteNome, setNovoClienteNome] = useState("");
   const [novoClienteWhatsapp, setNovoClienteWhatsapp] = useState("");
   const [novoClienteOrigem, setNovoClienteOrigem] = useState("");
+  // Quem indicou a cliente nova (aparece quando a origem e Indicacao).
+  const [novoClienteIndicadaPor, setNovoClienteIndicadaPor] = useState<{ id: number; nome: string } | null>(null);
   const [areaEstetica, setAreaEstetica] = useState(false);
   const [areaCilios, setAreaCilios] = useState(false);
   const [profissionalId, setProfissionalId] = useState("");
@@ -365,6 +368,7 @@ export default function NovoAgendamentoModal({
     setNovoClienteNome("");
     setNovoClienteWhatsapp("");
     setNovoClienteOrigem("");
+    setNovoClienteIndicadaPor(null);
 
     const clienteInicial = initialPayload?.clienteId
       ? clientes.find(
@@ -775,6 +779,7 @@ export default function NovoAgendamentoModal({
     setNovoClienteNome("");
     setNovoClienteWhatsapp("");
     setNovoClienteOrigem("");
+    setNovoClienteIndicadaPor(null);
     aplicarAreasPadrao();
     setErro("");
   }
@@ -986,6 +991,9 @@ export default function NovoAgendamentoModal({
                 whatsapp: novoClienteWhatsapp,
                 telefone: novoClienteWhatsapp,
                 origem: novoClienteOrigem,
+                indicadaPorId: /indica/i.test(novoClienteOrigem)
+                  ? novoClienteIndicadaPor?.id ?? null
+                  : null,
                 procedimentoInteresse: procedimento,
               }
             : undefined,
@@ -1554,6 +1562,17 @@ export default function NovoAgendamentoModal({
                     </div>
                   </label>
                 </div>
+
+                {/indica/i.test(novoClienteOrigem) ? (
+                  <div className="mt-3">
+                    <span className={labelClassName()}>Indicada por</span>
+                    <IndicadaPorPicker
+                      value={novoClienteIndicadaPor}
+                      onChange={setNovoClienteIndicadaPor}
+                      className="mt-1"
+                    />
+                  </div>
+                ) : null}
 
                 <p className="mt-3 text-[11px] leading-4 text-slate-500">
                   O cliente será criado automaticamente ao salvar este atendimento.

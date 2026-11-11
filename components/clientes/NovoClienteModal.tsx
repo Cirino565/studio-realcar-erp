@@ -8,6 +8,7 @@ import EnderecoClienteFields, {
   type EnderecoClienteValues,
 } from "@/components/clientes/EnderecoClienteFields";
 import ProcedimentoSearchSelect from "@/components/clientes/ProcedimentoSearchSelect";
+import IndicadaPorPicker from "@/components/clientes/IndicadaPorPicker";
 import { Button } from "@/components/ui/button";
 import type { Cliente } from "@/lib/types";
 
@@ -93,6 +94,7 @@ type FormData = {
   areaEstetica: boolean;
   areaCilios: boolean;
   campanhaAquisicaoId: number | null;
+  indicadaPorId?: number | null;
 };
 
 type Props = {
@@ -296,6 +298,8 @@ function NovoClienteForm({
     montarFormulario(cliente, origemPadrao, procedimentoPadrao),
   );
   const [erro, setErro] = useState("");
+  // Quem indicou (so no cadastro novo; na ficha da para trocar depois).
+  const [indicadaPor, setIndicadaPor] = useState<{ id: number; nome: string } | null>(null);
 
   function alterarCampo<K extends keyof FormData>(campo: K, valor: FormData[K]) {
     setErro("");
@@ -346,6 +350,8 @@ function NovoClienteForm({
       contatoConfiancaVinculo: form.contatoConfiancaVinculo,
       contatoConfiancaAutorizado: form.contatoConfiancaAutorizado,
       observacoes: form.observacoes.trim(),
+      indicadaPorId:
+        !cliente && /indica/i.test(form.origem || origemPadrao) ? indicadaPor?.id ?? null : null,
     });
   }
 
@@ -633,6 +639,9 @@ function NovoClienteForm({
                 </option>
               ))}
             </select>
+            {!cliente && /indica/i.test(form.origem || origemPadrao) ? (
+              <IndicadaPorPicker value={indicadaPor} onChange={setIndicadaPor} className="mt-2" />
+            ) : null}
           </label>
 
           <label>
