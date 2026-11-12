@@ -109,7 +109,7 @@ export async function GET(_request: Request, contexto: ContextoRota) {
 
     if (!endereco) {
       return responderErro(
-        "CEP não encontrado. Confira o número ou preencha o endereço manualmente.",
+        "CEP não encontrado na base dos Correios. Sem problema: preencha rua, bairro e cidade à mão e salve normalmente.",
         404,
       );
     }
@@ -117,7 +117,7 @@ export async function GET(_request: Request, contexto: ContextoRota) {
     return NextResponse.json(endereco);
   } catch {
     return responderErro(
-      "A consulta de CEP está indisponível. Preencha o endereço manualmente.",
+      "A busca de CEP está fora do ar agora. Preencha o endereço à mão e salve normalmente.",
       503,
     );
   }

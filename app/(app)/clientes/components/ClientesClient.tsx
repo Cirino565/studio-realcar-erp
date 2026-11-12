@@ -215,13 +215,19 @@ export default function ClientesClient({
 
   function salvarCliente(dados: ClienteFormData) {
     startTransition(async () => {
-      if (clienteSelecionado) {
-        await atualizarCliente({
-          id: clienteSelecionado.id,
-          ...dados,
-        });
-      } else {
-        await criarCliente(dados);
+      try {
+        if (clienteSelecionado) {
+          await atualizarCliente({
+            id: clienteSelecionado.id,
+            ...dados,
+          });
+        } else {
+          await criarCliente(dados);
+        }
+      } catch {
+        // Antes, um erro aqui nao mostrava nada e parecia que "nao salvava".
+        window.alert("Não foi possível salvar a cliente. Confira os dados e tente de novo; o que você digitou continua na tela.");
+        return;
       }
 
       setModalAberto(false);

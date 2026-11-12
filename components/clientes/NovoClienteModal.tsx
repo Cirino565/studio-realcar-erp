@@ -741,6 +741,18 @@ function NovoClienteForm({
       </div>
 
       <footer className="grid shrink-0 gap-2 border-t border-slate-200 bg-slate-50/80 px-4 py-4 dark:border-white/10 dark:bg-white/[0.025] sm:grid-cols-2 sm:px-6">
+        {erro ? (
+          // O aviso aparece tambem aqui, ao lado do botao: quem esta no fim
+          // do formulario (endereco) nao via o aviso la em cima e achava que
+          // o sistema "nao deixava salvar".
+          <p
+            role="alert"
+            className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200 sm:col-span-2"
+          >
+            <AlertCircle size={15} className="mt-0.5 shrink-0" />
+            <span>{erro}</span>
+          </p>
+        ) : null}
         <Button type="button" variant="outline" onClick={onClose}>
           Cancelar
         </Button>

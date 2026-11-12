@@ -499,6 +499,12 @@ export default function ClienteQuickEditModal({
         </main>
 
         <footer className="shrink-0 border-t border-slate-200 bg-white p-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] sm:px-5">
+          {erro ? (
+            <p role="alert" className="mb-2 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+              <AlertCircle size={15} className="mt-0.5 shrink-0" />
+              <span>{erro}</span>
+            </p>
+          ) : null}
           <button
             type="button"
             onClick={salvar}

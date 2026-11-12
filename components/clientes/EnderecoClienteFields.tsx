@@ -132,7 +132,7 @@ export default function EnderecoClienteFields({
     }
 
     if (cep.length !== 8) {
-      setMensagem("Informe um CEP com 8 dígitos.");
+      setMensagem("O CEP tem 8 números. Se não souber, pode deixar em branco e preencher o endereço à mão.");
       setSucesso(false);
       return;
     }
@@ -229,7 +229,7 @@ export default function EnderecoClienteFields({
       <div className="mb-4 flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-800 dark:border-sky-400/20 dark:bg-sky-500/10 dark:text-sky-200">
         <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
         <p>
-          Digite o CEP para preencher rua, bairro, cidade e estado. Número e complemento são informados manualmente. Se a consulta estiver indisponível, todos os campos continuam editáveis.
+          Digite o CEP para preencher rua, bairro, cidade e estado. Se o CEP não for encontrado, escreva o endereço à mão: o endereço não é obrigatório e nunca impede de salvar.
         </p>
       </div>
 
