@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import { AlertCircle, CalendarDays, Save, UserRound, X } from "lucide-react";
 
 import { atualizarClienteNoAtendimento } from "@/actions/cliente.actions";
+import { mensagemErroAcao } from "@/lib/erro-acao";
 import EnderecoClienteFields, {
   type EnderecoClienteValues,
 } from "@/components/clientes/EnderecoClienteFields";
@@ -190,11 +191,7 @@ export default function ClienteQuickEditModal({
         onSaved(atualizado);
         onClose();
       } catch (error) {
-        setErro(
-          error instanceof Error
-            ? error.message
-            : "Não foi possível atualizar o cadastro da cliente.",
-        );
+        setErro(mensagemErroAcao(error, "Não foi possível atualizar o cadastro da cliente."));
       }
     });
   }

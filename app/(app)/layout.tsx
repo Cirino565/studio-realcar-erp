@@ -6,6 +6,8 @@ import {
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import BarraNavegacao from "@/components/layout/BarraNavegacao";
+import AvisoNovaVersao from "@/components/layout/AvisoNovaVersao";
+import { versaoAtual } from "@/lib/versao";
 import { Suspense } from "react";
 
 export default async function AppLayout({
@@ -35,6 +37,7 @@ export default async function AppLayout({
           </main>
         </div>
       </div>
+      <AvisoNovaVersao versao={versaoAtual()} />
     </div>
   );
 }

@@ -20,6 +20,7 @@ import ClienteTable from "@/components/clientes/ClienteTable";
 import NovoClienteModal from "@/components/clientes/NovoClienteModal";
 import { Button } from "@/components/ui/button";
 import type { Cliente } from "@/lib/types";
+import { mensagemErroAcao } from "@/lib/erro-acao";
 
 import ClienteQuickMessageModal from "./ClienteQuickMessageModal";
 
@@ -224,9 +225,14 @@ export default function ClientesClient({
         } else {
           await criarCliente(dados);
         }
-      } catch {
+      } catch (error) {
         // Antes, um erro aqui nao mostrava nada e parecia que "nao salvava".
-        window.alert("Não foi possível salvar a cliente. Confira os dados e tente de novo; o que você digitou continua na tela.");
+        window.alert(
+          mensagemErroAcao(
+            error,
+            "Não foi possível salvar a cliente. Confira os dados e tente de novo; o que você digitou continua na tela.",
+          ),
+        );
         return;
       }
 

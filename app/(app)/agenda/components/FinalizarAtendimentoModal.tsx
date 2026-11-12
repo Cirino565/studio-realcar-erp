@@ -44,6 +44,7 @@ import {
 import { ClienteFotoUploadForm } from "@/app/(app)/clientes/components/ClienteFotoUploadForm";
 import type { AppointmentDetails } from "./AppointmentDetailsModal";
 import { lerProcedimentosExtras, somaValorExtras } from "@/lib/procedimentos-extras";
+import { mensagemErroAcao } from "@/lib/erro-acao";
 
 type ServicoFinalizacao = {
   id: number;
@@ -175,7 +176,8 @@ function mensagemErroSeguro(error: unknown, fallback: string) {
     return fallback;
   }
 
-  return mensagem;
+  // Tela aberta desde antes de uma atualizacao do sistema: mensagem clara.
+  return mensagemErroAcao(error, mensagem);
 }
 
 export default function FinalizarAtendimentoModal({

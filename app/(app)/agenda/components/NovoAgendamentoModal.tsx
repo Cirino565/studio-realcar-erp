@@ -37,6 +37,7 @@ import type { ProcedimentoExtraAgenda } from "@/lib/procedimentos-extras";
 import type { NovoHorarioPayload } from "./AgendaCalendar";
 import type { RemarcacaoPendente } from "@/lib/remarcacao";
 import IndicadaPorPicker from "@/components/clientes/IndicadaPorPicker";
+import { mensagemErroAcao } from "@/lib/erro-acao";
 import type { FormaPagamentoFinalizacao } from "./FinalizarAtendimentoModal";
 
 type Cliente = {
@@ -232,7 +233,8 @@ function mensagemErroSeguro(error: unknown, fallback: string) {
     return fallback;
   }
 
-  return mensagem;
+  // Tela aberta desde antes de uma atualizacao do sistema: mensagem clara.
+  return mensagemErroAcao(error, mensagem);
 }
 
 export default function NovoAgendamentoModal({
