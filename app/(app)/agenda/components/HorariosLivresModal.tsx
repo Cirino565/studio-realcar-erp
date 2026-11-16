@@ -357,8 +357,19 @@ export default function HorariosLivresModal({
             Para a cliente ({escolhidos.length} de {MAX_HORARIOS_CLIENTE}) · toque nos horários para trocar
           </p>
           {aviso ? <p className="text-xs font-medium text-amber-700">{aviso}</p> : null}
-          <p className="min-h-[2.5rem] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800">
-            {mensagem || <span className="text-slate-400">Escolha até {MAX_HORARIOS_CLIENTE} horários na lista.</span>}
+          <p className="max-h-28 min-h-[2.5rem] overflow-y-auto sm:max-h-44 whitespace-pre-line rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm leading-relaxed text-slate-800">
+            {mensagem ? (
+              // Mostra como fica no WhatsApp (*texto* em negrito).
+              mensagem.split(/(\*[^*\n]+\*)/).map((parte, indice) =>
+                parte.startsWith("*") && parte.endsWith("*") && parte.length > 2 ? (
+                  <strong key={indice}>{parte.slice(1, -1)}</strong>
+                ) : (
+                  <span key={indice}>{parte}</span>
+                ),
+              )
+            ) : (
+              <span className="text-slate-400">Escolha até {MAX_HORARIOS_CLIENTE} horários na lista.</span>
+            )}
           </p>
           <div className="flex flex-col gap-2 sm:flex-row">
             <button

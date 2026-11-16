@@ -128,7 +128,39 @@ function juntarComOu(partes: string[]) {
   return `${partes.slice(0, -1).join(", ")} ou ${partes[partes.length - 1]}`;
 }
 
-/** Mensagem curta para colar no WhatsApp da cliente. */
+const DIAS_SEMANA_COMPLETO = [
+  "Domingo",
+  "Segunda-feira",
+  "Terça-feira",
+  "Quarta-feira",
+  "Quinta-feira",
+  "Sexta-feira",
+  "Sábado",
+];
+
+/** "Hoje, 16/11", "Amanhã, 17/11" ou "Quarta-feira, 18/11". */
+function diaParaCliente(dataISO: string, hojeISO: string) {
+  const dm = `${dataISO.slice(8, 10)}/${dataISO.slice(5, 7)}`;
+  if (dataISO === hojeISO) return `Hoje, ${dm}`;
+  if (dataISO === somarDiasISO(hojeISO, 1)) return `Amanhã, ${dm}`;
+  return `${DIAS_SEMANA_COMPLETO[diaDaSemanaISO(dataISO)]}, ${dm}`;
+}
+
+/**
+ * Mensagem para colar no WhatsApp da cliente, uma linha por dia:
+ *
+ *   Olá! Tudo bem? 😊
+ *
+ *   Para *Limpeza de pele* à tarde, tenho estes horários disponíveis:
+ *
+ *   📅 *Hoje, 16/11* – 15h
+ *   📅 *Amanhã, 17/11* – 16h
+ *   📅 *Quarta-feira, 18/11* – 14h
+ *
+ *   Qual fica melhor para você? Assim já deixo reservado. ✨
+ *
+ * (*texto* fica em negrito no WhatsApp.)
+ */
 export function mensagemHorariosCliente({
   procedimento,
   periodo,
@@ -142,18 +174,25 @@ export function mensagemHorariosCliente({
 }) {
   if (escolhidos.length === 0) return "";
 
-  const lista = ordenarEscolhidos(escolhidos).map(
-    (item) => `${diaFalado(item.data, hojeISO)} às ${horaFalada(item.hora)}`,
+  // Agrupa por dia: "📅 *Terça-feira, 17/11* – 10h ou 14h".
+  const porDia = new Map<string, string[]>();
+  for (const item of ordenarEscolhidos(escolhidos)) {
+    porDia.set(item.data, [...(porDia.get(item.data) ?? []), horaFalada(item.hora)]);
+  }
+  const linhas = [...porDia.entries()].map(
+    ([data, horas]) => `📅 *${diaParaCliente(data, hojeISO)}* – ${juntarComOu(horas)}`,
   );
-  const nome = (procedimento || "").trim();
-  const quando = periodo === "manha" ? "de manhã" : periodo === "tarde" ? "à tarde" : "";
-  const pergunta = escolhidos.length === 1 ? "Fica bom para você?" : "Qual fica melhor para você?";
-  // "Para limpeza de pele à tarde, tenho..." / "À tarde, tenho..." / "Tenho..."
-  const abertura = nome
-    ? `Para ${nome}${quando ? ` ${quando}` : ""}, tenho`
-    : quando
-      ? `${quando.charAt(0).toUpperCase()}${quando.slice(1)}, tenho`
-      : "Tenho";
 
-  return `Oi! ${abertura} ${juntarComOu(lista)}. ${pergunta} 😊`;
+  const um = escolhidos.length === 1;
+  const nome = (procedimento || "").trim();
+  const quando = periodo === "manha" ? " pela manhã" : periodo === "tarde" ? " à tarde" : "";
+  const oferta = um ? "tenho este horário disponível" : "tenho estes horários disponíveis";
+  const abertura = nome
+    ? `Para *${nome}*${quando}, ${oferta}:`
+    : `${oferta.charAt(0).toUpperCase()}${oferta.slice(1)}${quando}:`;
+  const pergunta = um
+    ? "Fica bom para você? Assim já deixo reservado. ✨"
+    : "Qual fica melhor para você? Assim já deixo reservado. ✨";
+
+  return ["Olá! Tudo bem? 😊", "", abertura, "", ...linhas, "", pergunta].join("\n");
 }
