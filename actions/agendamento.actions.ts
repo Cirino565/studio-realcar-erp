@@ -20,6 +20,7 @@ import {
   type VendaProdutoInput,
 } from "@/lib/vendas";
 import { revalidatePath } from "next/cache";
+import type { Prisma } from "@prisma/client";
 
 type ClienteNovoAgendamento = {
   nome: string;
@@ -286,6 +287,46 @@ export async function criarServicosPadrao() {
 
   revalidatePath("/agenda");
   revalidatePath("/configuracoes");
+}
+
+/**
+ * Cliente com lead em andamento que nao tem horario valido (desmarcou,
+ * faltou ou ainda nao tinha marcado): o novo horario passa a ser o do lead
+ * e o lead vai sozinho para "Agendado".
+ */
+async function religarLeadAoNovoHorarioNoTx(
+  tx: Prisma.TransactionClient,
+  clienteId: number,
+  filtroNovo: Prisma.AgendamentoWhereInput,
+) {
+  const leads = await tx.lead.findMany({
+    where: { clienteId, etapa: { notIn: ["Convertido", "Perdido"] } },
+    select: { id: true, agendamento: { select: { status: true } } },
+    orderBy: { updatedAt: "desc" },
+  });
+  const lead = leads.find(
+    (item) => !item.agendamento || ["Cancelado", "Faltou"].includes(item.agendamento.status),
+  );
+  if (!lead) return;
+
+  const novo = await tx.agendamento.findFirst({
+    where: { ...filtroNovo, clienteId, lead: { is: null } },
+    orderBy: [{ data: "asc" }, { id: "desc" }],
+    select: { id: true, data: true },
+  });
+  if (!novo) return;
+
+  await tx.lead.update({
+    where: { id: lead.id },
+    data: { agendamentoId: novo.id, etapa: "Agendado", proximoContatoEm: null },
+  });
+  await tx.leadInteracao.create({
+    data: {
+      leadId: lead.id,
+      tipo: "Reagendamento",
+      descricao: `Novo horário marcado para ${formatarDataHoraLeadAgenda(novo.data)}. Lead movido automaticamente para Agendado.`,
+    },
+  });
 }
 
 async function resolverCliente(dados: NovoAgendamento) {
@@ -989,6 +1030,14 @@ export async function criarAgendamento(
         });
       }
     }
+
+    // Lead que tinha desmarcado/faltado (ou ainda nao tinha marcado) volta
+    // sozinho para "Agendado", ligado a este novo horario.
+    await religarLeadAoNovoHorarioNoTx(tx, clienteId!, {
+      data: datas[0],
+      procedimento: dados.procedimento,
+      naturezaAtendimento,
+    });
   });
 
   revalidatePath("/agenda");
