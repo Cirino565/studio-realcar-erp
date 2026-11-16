@@ -4,13 +4,15 @@ import { revalidatePath } from "next/cache";
 
 import { origemEhAnuncioPago, ORIGEM_INSTAGRAM_ADS } from "@/lib/atribuicao-campanha";
 import { requirePermission } from "@/lib/auth";
+import { campanhaEhInstagram, interesseDaCampanha } from "@/lib/campanha-instagram";
 import { prisma } from "@/lib/prisma";
 import { chaveTelefone, formatarTelefoneNacional, telefoneValido } from "@/lib/telefone-chave";
 
 /**
  * Botao "Lead do Instagram": quem chamou no WhatsApp pelo anuncio do
- * Instagram (clique pro WhatsApp). A equipe cola o numero e o CRM:
- *  - acha a campanha pelo identificador (utm_campaign) cadastrado nela;
+ * Instagram (clique pro WhatsApp). A equipe cola o numero, escolhe a
+ * campanha (o WhatsApp mostra o anuncio no topo da conversa) e o CRM:
+ *  - usa a campanha escolhida (sem escolha: a do identificador abaixo);
  *  - nao duplica: um lead em andamento por numero;
  *  - marca origem "Instagram Ads" (conta como clique pago).
  */
@@ -39,6 +41,7 @@ export async function registrarLeadInstagram(dados: {
   telefone: string;
   nome?: string;
   interesse?: string;
+  campanhaId?: number | null;
 }): Promise<ResultadoLeadInstagram> {
   const usuario = await requirePermission("marketing.gerenciar");
 
@@ -49,20 +52,31 @@ export async function registrarLeadInstagram(dados: {
   const chave = chaveTelefone(dados.telefone);
   const telefone = formatarTelefoneNacional(dados.telefone);
   const nomeInformado = (dados.nome || "").trim();
-  const interesse = (dados.interesse || "").trim() || null;
-
-  const campanhas = await prisma.campanhaMarketing.findMany({
-    where: { utmCampaign: { not: null } },
-    select: { id: true, nome: true, utmCampaign: true },
-  });
-  const campanha = campanhas.find(
-    (item) => normalizar(item.utmCampaign) === UTM_CAMPANHA_INSTAGRAM,
-  );
-  if (!campanha) {
-    throw new Error(
-      `Não achei a campanha do Instagram. Em Marketing > Campanhas, edite a campanha do Instagram e preencha o identificador com ${UTM_CAMPANHA_INSTAGRAM}.`,
-    );
+  const campanhaEscolhida = Number(dados.campanhaId) || 0;
+  let campanha: { id: number; nome: string } | null = null;
+  if (campanhaEscolhida > 0) {
+    const achada = await prisma.campanhaMarketing.findUnique({
+      where: { id: campanhaEscolhida },
+      select: { id: true, nome: true, canal: true },
+    });
+    if (!achada || !campanhaEhInstagram(achada)) {
+      throw new Error("Essa campanha não é do Instagram. Escolha outra na lista.");
+    }
+    campanha = { id: achada.id, nome: achada.nome };
+  } else {
+    const campanhas = await prisma.campanhaMarketing.findMany({
+      where: { utmCampaign: { not: null } },
+      select: { id: true, nome: true, utmCampaign: true },
+    });
+    campanha =
+      campanhas.find((item) => normalizar(item.utmCampaign) === UTM_CAMPANHA_INSTAGRAM) ?? null;
   }
+  if (!campanha) {
+    throw new Error("Escolha a campanha do Instagram de onde a pessoa veio.");
+  }
+  // Sem interesse digitado: usa o procedimento do nome da campanha
+  // ("Instagram | Despigmentação | WhatsApp" -> "Despigmentação").
+  const interesse = (dados.interesse || "").trim() || interesseDaCampanha(campanha.nome);
 
   // Leads e clientes com o mesmo numero (comparando so DDD + 8 ultimos digitos).
   const [leads, clientes] = await Promise.all([
@@ -110,7 +124,7 @@ export async function registrarLeadInstagram(dados: {
           ultimoContatoEm: agora,
           // Nome provisorio ("Instagram · numero") troca pelo nome informado.
           ...(nomeInformado && ativo.nome.startsWith("Instagram · ") ? { nome: nomeInformado } : {}),
-          ...(interesse ? { interesse } : {}),
+          ...((dados.interesse || "").trim() && interesse ? { interesse } : {}),
           ...(semCampanhaOuEsta ? { campanhaId: campanha.id } : {}),
           ...(semCampanhaOuEsta && !jaPago ? { origem: ORIGEM_INSTAGRAM_ADS } : {}),
         },
@@ -129,7 +143,7 @@ export async function registrarLeadInstagram(dados: {
         leadId: ativo.id,
         nome: ativo.nome,
         mensagem: semCampanhaOuEsta
-          ? `${ativo.nome} já estava no CRM (${ativo.etapa}). Não criei outro lead: registrei o contato e deixei na campanha do Instagram.`
+          ? `${ativo.nome} já estava no CRM (${ativo.etapa}). Não criei outro lead: registrei o contato e deixei na campanha ${campanha.nome}.`
           : `${ativo.nome} já estava no CRM (${ativo.etapa}) pela campanha ${ativo.campanha?.nome || "outra"}. Não criei outro lead e mantive a campanha dela; o contato pelo Instagram ficou registrado no histórico.`,
       };
     }
@@ -159,7 +173,7 @@ export async function registrarLeadInstagram(dados: {
         situacao: "reaberto" as const,
         leadId: perdido.id,
         nome: perdido.nome,
-        mensagem: `${perdido.nome} já tinha um lead marcado como Perdido. Não criei outro: ele voltou para Novo, na campanha do Instagram.`,
+        mensagem: `${perdido.nome} já tinha um lead marcado como Perdido. Não criei outro: ele voltou para Novo, na campanha ${campanha.nome}.`,
       };
     }
 
@@ -195,8 +209,8 @@ export async function registrarLeadInstagram(dados: {
       leadId: criado.id,
       nome,
       mensagem: cliente
-        ? `${cliente.nome} já é cliente. Criei a oportunidade ligada ao cadastro dela (sem cadastro novo), na campanha do Instagram.`
-        : `Lead criado: ${nome}, origem Instagram Ads, na campanha do Instagram.`,
+        ? `${cliente.nome} já é cliente. Criei a oportunidade ligada ao cadastro dela (sem cadastro novo), na campanha ${campanha.nome}.`
+        : `Lead criado: ${nome}, origem Instagram Ads, na campanha ${campanha.nome}.`,
     };
   });
 

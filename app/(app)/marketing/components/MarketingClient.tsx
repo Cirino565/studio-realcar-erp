@@ -38,6 +38,7 @@ import {
 
 import { buscarDisponibilidadeAgenda } from "@/actions/agendamento.actions";
 import { registrarLeadInstagram, type ResultadoLeadInstagram } from "@/actions/lead-instagram.actions";
+import { campanhaEhInstagram } from "@/lib/campanha-instagram";
 import type { VinculoDoLead } from "@/lib/vinculo-clique";
 import VinculoCliquePainel from "./VinculoCliquePainel";
 import {
@@ -1691,6 +1692,7 @@ export default function MarketingClient({
 
       {leadInstagramAberto ? (
         <LeadInstagramModal
+          campanhas={campanhas}
           onClose={() => setLeadInstagramAberto(false)}
           onSalvo={() => router.refresh()}
         />
@@ -3148,7 +3150,19 @@ function ReceitaDetalheModal({ campanha, itens, periodo, podeGerenciar, disabled
   );
 }
 
-function LeadInstagramModal({ onClose, onSalvo }: { onClose: () => void; onSalvo: () => void }) {
+function LeadInstagramModal({ campanhas, onClose, onSalvo }: { campanhas: MarketingCampanha[]; onClose: () => void; onSalvo: () => void }) {
+  // Campanhas de Instagram ativas. Com mais de uma, precisa escolher (nada
+  // marcado de inicio, para o lead nao cair na campanha errada).
+  const opcoesCampanha = useMemo(
+    () =>
+      campanhas
+        .filter((item) => item.status === "Ativa" && campanhaEhInstagram(item))
+        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
+    [campanhas],
+  );
+  const [campanhaId, setCampanhaId] = useState(() =>
+    opcoesCampanha.length === 1 ? String(opcoesCampanha[0].id) : "",
+  );
   const [telefone, setTelefone] = useState("");
   const [nome, setNome] = useState("");
   const [interesse, setInteresse] = useState("");
@@ -3160,7 +3174,7 @@ function LeadInstagramModal({ onClose, onSalvo }: { onClose: () => void; onSalvo
     setErro(null);
     startSalvar(async () => {
       try {
-        const feito = await registrarLeadInstagram({ telefone, nome, interesse });
+        const feito = await registrarLeadInstagram({ telefone, nome, interesse, campanhaId: Number(campanhaId) });
         setResultado(feito);
         onSalvo();
       } catch (error) {
@@ -3210,15 +3224,34 @@ function LeadInstagramModal({ onClose, onSalvo }: { onClose: () => void; onSalvo
             autoFocus
             required
           />
+          <label className="grid gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+            Campanha
+            <select
+              value={campanhaId}
+              onChange={(event) => setCampanhaId(event.target.value)}
+              className="premium-input w-full"
+              required
+            >
+              {opcoesCampanha.length !== 1 ? <option value="">Escolha o anúncio de onde ela veio</option> : null}
+              {opcoesCampanha.map((item) => (
+                <option key={item.id} value={String(item.id)}>{item.nome}</option>
+              ))}
+            </select>
+            {opcoesCampanha.length === 0 ? (
+              <span className="text-xs font-normal text-amber-700 dark:text-amber-200">
+                Nenhuma campanha de Instagram ativa. Cadastre em Campanhas (canal Instagram).
+              </span>
+            ) : null}
+          </label>
           <Input label="Nome (se souber)" value={nome} onChange={setNome} placeholder="Pode deixar em branco" />
-          <Input label="Interesse (opcional)" value={interesse} onChange={setInteresse} placeholder="Ex.: Limpeza de pele" />
+          <Input label="Interesse (opcional)" value={interesse} onChange={setInteresse} placeholder="Se deixar em branco, usa o da campanha" />
           <p className="rounded-2xl border border-violet-300/15 bg-violet-400/8 p-3 text-xs leading-5 text-slate-600 dark:text-violet-100">
-            Entra com origem Instagram Ads (clique pago), na campanha do Instagram. Se o número já estiver no CRM, não cria outro lead: só registra o contato.
+            Entra com origem Instagram Ads (clique pago), na campanha escolhida. Se o número já estiver no CRM, não cria outro lead: só registra o contato.
           </p>
           {erro ? <div className="rounded-2xl border border-rose-300/20 bg-rose-400/10 p-3 text-sm text-rose-700 dark:text-rose-100">{erro}</div> : null}
           <div className="flex justify-end gap-3">
             <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
-            <Button type="submit" disabled={salvando || !telefone.trim()}>{salvando ? "Lançando..." : "Lançar lead"}</Button>
+            <Button type="submit" disabled={salvando || !telefone.trim() || !campanhaId}>{salvando ? "Lançando..." : "Lançar lead"}</Button>
           </div>
         </form>
       )}
