@@ -15,6 +15,9 @@ const MAX_BATCH_FILES = 20;
 type Props = {
   clienteId: number;
   driveConfigurado: boolean;
+  // Avisa quem usa este formulario quantas fotos estao escolhidas e ainda
+  // nao salvas (a finalizacao do atendimento usa para nao deixar perder).
+  onPendentesChange?: (estado: { pendentes: number; enviando: boolean }) => void;
 };
 
 type StatusEnvio = "idle" | "preparando" | "enviando";
@@ -104,7 +107,7 @@ async function prepareImage(file: File) {
   });
 }
 
-export function ClienteFotoUploadForm({ clienteId, driveConfigurado }: Props) {
+export function ClienteFotoUploadForm({ clienteId, driveConfigurado, onPendentesChange }: Props) {
   const router = useRouter();
   const cameraInput = useRef<HTMLInputElement>(null);
   const galleryInput = useRef<HTMLInputElement>(null);
@@ -301,6 +304,14 @@ export function ClienteFotoUploadForm({ clienteId, driveConfigurado }: Props) {
   }
 
   const busy = status !== "idle";
+
+  useEffect(() => {
+    onPendentesChange?.({ pendentes: selectedPhotos.length, enviando: busy });
+  }, [selectedPhotos.length, busy, onPendentesChange]);
+
+  useEffect(() => {
+    return () => onPendentesChange?.({ pendentes: 0, enviando: false });
+  }, [onPendentesChange]);
 
   const botaoTexto =
     status === "preparando"
