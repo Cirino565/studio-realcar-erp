@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, Plus } from "lucide-react";
+import { CalendarDays, Clock3, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { KitVendaOption, ProdutoVendaOption } from "@/lib/vendas.types";
@@ -21,6 +21,7 @@ import FinalizarAtendimentoModal, {
 } from "./FinalizarAtendimentoModal";
 import NovoAgendamentoModal from "./NovoAgendamentoModal";
 import ParaRemarcarPainel from "./ParaRemarcarPainel";
+import HorariosLivresModal, { type HorarioLivreParaAgendar } from "./HorariosLivresModal";
 import type { RemarcacaoPendente } from "@/lib/remarcacao";
 import {
   lerProcedimentosExtras,
@@ -406,6 +407,23 @@ export default function AgendaClient({
     });
   }
 
+  // "Horários livres": ao escolher um horario, abre o novo agendamento ja preenchido.
+  const [horariosLivresAberto, setHorariosLivresAberto] = useState(false);
+
+  function agendarHorarioLivre(horario: HorarioLivreParaAgendar) {
+    setHorariosLivresAberto(false);
+    setNovoHorario({
+      modo: "novo",
+      tipoAtendimento: "agendamento",
+      data: horario.data,
+      hora: horario.hora,
+      profissionalId: horario.profissionalId,
+      procedimento: horario.procedimento,
+      duracao: horario.duracao,
+      status: "Agendado",
+    });
+  }
+
   // "Agendar" na lista Para remarcar: abre um novo horario ja com a cliente e o
   // procedimento. Ao salvar, o sistema tira ela da lista (e leva o sinal guardado).
   function abrirRemarcacao(pendente: RemarcacaoPendente) {
@@ -702,6 +720,17 @@ export default function AgendaClient({
               }}
             />
 
+            <div className="mb-3 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setHorariosLivresAberto(true)}
+                className="inline-flex h-9 items-center gap-2 rounded-xl border border-violet-200 bg-white px-3 text-sm font-semibold text-violet-700 shadow-sm hover:bg-violet-50 dark:border-violet-400/30 dark:bg-violet-500/10 dark:text-violet-100"
+              >
+                <Clock3 size={16} />
+                Horários livres
+              </button>
+            </div>
+
             <ParaRemarcarPainel
               pendentes={remarcacoesPendentes}
               onAgendar={abrirRemarcacao}
@@ -729,6 +758,18 @@ export default function AgendaClient({
           </>
         )}
       </div>
+
+      {horariosLivresAberto ? (
+        <HorariosLivresModal
+          servicos={servicos}
+          profissionais={profissionais}
+          profissionalInicialId={
+            profissionalFiltro !== "todas" ? Number(profissionalFiltro) : undefined
+          }
+          onClose={() => setHorariosLivresAberto(false)}
+          onAgendar={agendarHorarioLivre}
+        />
+      ) : null}
 
       <NovoAgendamentoModal
         open={Boolean(novoHorario)}

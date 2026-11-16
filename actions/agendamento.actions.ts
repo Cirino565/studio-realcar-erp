@@ -14,6 +14,13 @@ import {
 import { concluirRemarcacaoNoTx } from "@/lib/remarcacao";
 import { aplicarIndicacaoNoTx } from "@/lib/indicacao";
 import { sincronizarSinalNoTx } from "@/lib/sinal";
+import { feriadoDoDia } from "@/lib/feriados";
+import {
+  horaNoPeriodo,
+  somarDiasISO,
+  type DiaHorariosLivres,
+  type PeriodoHorario,
+} from "@/lib/horarios-livres";
 import {
   criarVendaNoTx,
   type VendaKitInput,
@@ -2808,6 +2815,148 @@ export async function listarHorariosPublicos(
       return !semIntervalo;
     });
   });
+}
+
+export type ResultadoHorariosLivres = {
+  /** Hoje em Sao Paulo, "AAAA-MM-DD". */
+  hojeISO: string;
+  inicio: string;
+  /** Primeiro dia da proxima busca ("Próxima semana"). */
+  proximoInicio: string;
+  duracao: number;
+  dias: DiaHorariosLivres[];
+  /** Feriados pulados no caminho. */
+  fechados: { data: string; motivo: string }[];
+};
+
+/**
+ * Horarios livres dos proximos 7 dias de atendimento de uma profissional,
+ * para responder rapido quem pede "manha" ou "tarde". Uma consulta so ao
+ * banco, e so quando a tela pede (nada roda sozinho).
+ *
+ * Livre = cabe a duracao inteira antes de fechar, nao bate em atendimento nem
+ * bloqueio e respeita o intervalo entre atendimentos. Pula domingo/dia
+ * fechado e feriado (ponto facultativo conta como dia normal) e horario que
+ * ja passou.
+ */
+export async function buscarHorariosLivresSemana({
+  profissionalId,
+  duracao = 60,
+  inicio,
+  periodo = "qualquer",
+}: {
+  profissionalId: number;
+  duracao?: number;
+  inicio?: string;
+  periodo?: PeriodoHorario;
+}): Promise<ResultadoHorariosLivres> {
+  await requirePermission("agenda.visualizar");
+
+  const profissional = Number(profissionalId);
+  if (!Number.isInteger(profissional) || profissional <= 0) {
+    throw new Error("Escolha a profissional.");
+  }
+  const duracaoMin = Math.min(600, Math.max(15, Math.round(Number(duracao) || 60)));
+  const hojeISO = formatDateSaoPaulo(new Date());
+  const inicioISO =
+    inicio && /^\d{4}-\d{2}-\d{2}$/.test(inicio) && inicio > hojeISO ? inicio : hojeISO;
+
+  const configuracaoClinica = await prisma.configuracaoClinica.findFirst({
+    select: {
+      horarioAtendimento: true,
+      intervaloAgenda: true,
+      intervaloEntreAtendimentos: true,
+    },
+  });
+  const intervaloEntre = Math.max(0, configuracaoClinica?.intervaloEntreAtendimentos ?? 30);
+  const configuracaoHorario = parseHorarioFuncionamento(
+    configuracaoClinica?.horarioAtendimento,
+    configuracaoClinica?.intervaloAgenda || 30,
+  );
+
+  // Proximos 7 dias de atendimento (olha no maximo 3 semanas, nunca trava).
+  const diasAtendimento: { data: string; funcionamento: NonNullable<HorarioFuncionamento> }[] = [];
+  const fechados: { data: string; motivo: string }[] = [];
+  let ultimoOlhado = inicioISO;
+  for (let i = 0; i < 21 && diasAtendimento.length < 7; i += 1) {
+    const data = somarDiasISO(inicioISO, i);
+    ultimoOlhado = data;
+    const diaSemana = getDiaSemana(data);
+    const funcionamento =
+      diaSemana === 0
+        ? configuracaoHorario.domingo
+        : diaSemana === 6
+          ? configuracaoHorario.sabado
+          : configuracaoHorario.semana;
+    if (!funcionamento) continue;
+    const feriado = feriadoDoDia(data);
+    if (feriado && feriado.tipo !== "facultativo") {
+      fechados.push({ data, motivo: feriado.nome });
+      continue;
+    }
+    diasAtendimento.push({ data, funcionamento });
+  }
+
+  const proximoInicio = somarDiasISO(ultimoOlhado, 1);
+  if (diasAtendimento.length === 0) {
+    return { hojeISO, inicio: inicioISO, proximoInicio, duracao: duracaoMin, dias: [], fechados };
+  }
+
+  const inicioFaixa = parseLocalDateTime(`${diasAtendimento[0].data}T00:00`);
+  const fimFaixa = parseLocalDateTime(
+    `${somarDiasISO(diasAtendimento[diasAtendimento.length - 1].data, 1)}T00:00`,
+  );
+
+  const [agendamentos, bloqueios] = await Promise.all([
+    prisma.agendamento.findMany({
+      where: {
+        profissionalId: profissional,
+        data: { gte: inicioFaixa, lt: fimFaixa },
+        status: { notIn: ["Cancelado"] },
+      },
+      select: { data: true, duracao: true },
+    }),
+    prisma.bloqueioAgenda.findMany({
+      where: {
+        profissionalId: profissional,
+        data: { gte: inicioFaixa, lt: fimFaixa },
+        status: "Ativo",
+      },
+      select: { data: true, duracao: true },
+    }),
+  ]);
+
+  // Ocupado de cada dia, ja com o intervalo entre atendimentos dos dois lados.
+  const ocupadoPorDia = new Map<string, { inicio: number; fim: number }[]>();
+  for (const item of [...agendamentos, ...bloqueios]) {
+    const inicioItem = new Date(item.data);
+    const dia = formatDateSaoPaulo(inicioItem);
+    const lista = ocupadoPorDia.get(dia) ?? [];
+    lista.push({
+      inicio: addMinutes(inicioItem, -intervaloEntre).getTime(),
+      fim: addMinutes(inicioItem, (item.duracao || 0) + intervaloEntre).getTime(),
+    });
+    ocupadoPorDia.set(dia, lista);
+  }
+
+  const agora = Date.now();
+  const dias: DiaHorariosLivres[] = diasAtendimento.map(({ data, funcionamento }) => {
+    const fechamento = minutosDoHorario(funcionamento.fechamento);
+    const ocupados = ocupadoPorDia.get(data) ?? [];
+    const horarios = gerarSlotsDisponibilidade(funcionamento, configuracaoHorario.intervalo).filter(
+      (hora) => {
+        if (!horaNoPeriodo(hora, periodo)) return false;
+        if (minutosDoHorario(hora) + duracaoMin > fechamento) return false;
+        const inicioNovo = montarHorario(data, hora).getTime();
+        if (inicioNovo <= agora) return false;
+        const fimNovo = inicioNovo + duracaoMin * 60_000;
+        return ocupados.every((item) => !(item.inicio < fimNovo && item.fim > inicioNovo));
+      },
+    );
+    return { data, horarios };
+  });
+
+  return { hojeISO, inicio: inicioISO, proximoInicio, duracao: duracaoMin, dias, fechados };
 }
 
 export async function buscarDisponibilidadeAgenda({
