@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Minus, PackagePlus, Plus, Trash2 } from "lucide-react";
+import { useMemo } from "react";
+import { Minus, Plus, Trash2 } from "lucide-react";
 
 import type {
   ItemProdutoVendaDraft,
@@ -30,8 +30,6 @@ export default function ProdutosVendaEditor({
   compact = false,
   podeExcederEstoque = false,
 }: Props) {
-  const [produtoSelecionado, setProdutoSelecionado] = useState("");
-
   const produtosDisponiveis = useMemo(
     () =>
       produtos.filter(
@@ -41,9 +39,22 @@ export default function ProdutosVendaEditor({
       ),
     [produtos, podeExcederEstoque],
   );
+  // Ativos com estoque zerado no sistema: aparecem na lista (bloqueados) para
+  // a equipe entender por que nao da para escolher.
+  const produtosSemEstoque = useMemo(
+    () =>
+      podeExcederEstoque
+        ? []
+        : produtos.filter(
+            (produto) => produto.status.toLowerCase() === "ativo" && produto.quantidade <= 0,
+          ),
+    [produtos, podeExcederEstoque],
+  );
 
-  function adicionarProduto() {
-    const id = Number(produtoSelecionado);
+  // Escolher na lista ja coloca o produto na venda (antes precisava tocar em
+  // "Adicionar"; quem esquecia vendia sem baixar o estoque).
+  function adicionarProduto(valor: string) {
+    const id = Number(valor);
     const produto = produtosDisponiveis.find((item) => item.id === id);
 
     if (!produto) return;
@@ -78,8 +89,6 @@ export default function ProdutosVendaEditor({
         },
       ]);
     }
-
-    setProdutoSelecionado("");
   }
 
   function atualizarQuantidade(produtoId: number, quantidade: number) {
@@ -125,11 +134,12 @@ export default function ProdutosVendaEditor({
 
   return (
     <div className={compact ? "space-y-3" : "space-y-4"}>
-      <div className="flex gap-2">
+      <div>
         <select
-          value={produtoSelecionado}
-          onChange={(event) => setProdutoSelecionado(event.target.value)}
-          className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100 dark:border-white/10 dark:bg-white/5 dark:text-white dark:focus:bg-white/10"
+          value=""
+          onChange={(event) => adicionarProduto(event.target.value)}
+          aria-label="Adicionar produto"
+          className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100 dark:border-white/10 dark:bg-white/5 dark:text-white dark:focus:bg-white/10"
         >
           <option value="">Adicionar produto...</option>
           {produtosDisponiveis.map((produto) => (
@@ -137,16 +147,16 @@ export default function ProdutosVendaEditor({
               {produto.nome} · estoque {produto.quantidade} · {formatarMoeda(produto.valorVenda)}
             </option>
           ))}
+          {produtosSemEstoque.length > 0 ? (
+            <optgroup label="Sem estoque no sistema (confira o Estoque)">
+              {produtosSemEstoque.map((produto) => (
+                <option key={produto.id} value={produto.id} disabled>
+                  {produto.nome} · estoque {produto.quantidade}
+                </option>
+              ))}
+            </optgroup>
+          ) : null}
         </select>
-        <button
-          type="button"
-          onClick={adicionarProduto}
-          disabled={!produtoSelecionado}
-          className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-3 text-xs font-bold text-white transition hover:bg-violet-700 disabled:opacity-40"
-        >
-          <PackagePlus className="size-4" />
-          <span className="hidden sm:inline">Adicionar</span>
-        </button>
       </div>
 
       {itens.length > 0 ? (

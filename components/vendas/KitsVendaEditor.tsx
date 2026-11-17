@@ -83,6 +83,13 @@ export default function KitsVendaEditor({
   const totalFlexivel = Math.max(0, subtotalFlexivel - descontoFlexivel);
 
   function mudarKit(value: string) {
+    // Kit fixo: escolher na lista ja coloca na venda (nao depende de tocar
+    // em "Adicionar kit"). Kit de selecao livre: escolhe os produtos antes.
+    const escolhido = kitsAtivos.find((kit) => kit.id === Number(value));
+    if (escolhido && escolhido.tipo === "FIXO") {
+      adicionarKit(escolhido);
+      return;
+    }
     setKitSelecionado(value);
     setSelecaoFlexivel({});
     setErro("");
@@ -106,7 +113,8 @@ export default function KitsVendaEditor({
     setErro("");
   }
 
-  function adicionarKit() {
+  function adicionarKit(kitEscolhido?: typeof kitAtual) {
+    const kitAtual = kitEscolhido ?? kitsAtivos.find((kit) => kit.id === Number(kitSelecionado));
     if (!kitAtual) return;
 
     let componentes: ItemKitVendaDraft["componentes"];
@@ -200,7 +208,7 @@ export default function KitsVendaEditor({
           </select>
           <button
             type="button"
-            onClick={adicionarKit}
+            onClick={() => adicionarKit()}
             disabled={!kitAtual || (kitAtual.tipo === "FLEXIVEL" && totalSelecionado <= 0)}
             className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-3 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-40"
           >
@@ -213,7 +221,7 @@ export default function KitsVendaEditor({
           <div className="mt-3 space-y-2">
             <div className="flex items-center justify-between gap-3 text-xs">
               <p className="font-bold text-violet-900 dark:text-violet-200">
-                Selecione livremente os produtos
+                Escolha os produtos e toque em &quot;Adicionar kit&quot; (só entra na venda depois disso)
               </p>
               <span className={totalSelecionado > 0 ? "font-bold text-emerald-700" : "font-bold text-amber-700"}>
                 {totalSelecionado} item(ns)
