@@ -9,6 +9,7 @@ import {
   AlertTriangle,
   BadgeCheck,
   CalendarClock,
+  CalendarX2,
   CheckCircle2,
   ChevronRight,
   ClipboardList,
@@ -283,6 +284,7 @@ export default function AppointmentDetailsModal({
   const [evolucaoAdicional, setEvolucaoAdicional] =
     useState<AppointmentDetails | null>(null);
   const [desmarcando, setDesmarcando] = useState(false);
+  const [tipoDesmarque, setTipoDesmarque] = useState<"CANCELOU" | "FALTOU" | undefined>(undefined);
 
   useLockBodyScroll(open);
 
@@ -800,11 +802,32 @@ export default function AppointmentDetailsModal({
                   Aqui embaixo fica só o que apaga, para não ser tocado sem querer. */}
               {!atendimentoCancelado && currentAppointment.status !== "Faltou" ? (
                 <div className="mt-2">
-                  <Button type="button" onClick={() => setDesmarcando(true)} disabled={isDeleting} className="h-11 w-full rounded-xl bg-amber-600 text-sm font-bold text-white hover:bg-amber-700 disabled:opacity-50">
-                    <CalendarClock size={16} /> Cliente desmarcou ou faltou
-                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setTipoDesmarque("FALTOU");
+                        setDesmarcando(true);
+                      }}
+                      disabled={isDeleting}
+                      className="h-11 w-full rounded-xl bg-rose-600 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-50"
+                    >
+                      <CalendarX2 size={16} /> Faltou
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setTipoDesmarque("CANCELOU");
+                        setDesmarcando(true);
+                      }}
+                      disabled={isDeleting}
+                      className="h-11 w-full rounded-xl bg-amber-600 text-sm font-bold text-white hover:bg-amber-700 disabled:opacity-50"
+                    >
+                      <CalendarClock size={16} /> Desmarcou
+                    </Button>
+                  </div>
                   <p className="mt-1 text-[11px] leading-4 text-slate-500">
-                    Libera o horário, decide o sinal e, se ela vai remarcar, coloca na lista &quot;Para remarcar&quot;.
+                    Faltou: não veio e não avisou (já abre a mensagem para o WhatsApp). Desmarcou: avisou que não vem.
                   </p>
                 </div>
               ) : null}
@@ -831,6 +854,7 @@ export default function AppointmentDetailsModal({
 
       <DesmarcarAgendamentoModal
         open={desmarcando}
+        tipoInicial={tipoDesmarque}
         agendamento={{
           id: currentAppointment.id,
           data: currentAppointment.data,

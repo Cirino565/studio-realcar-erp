@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarX2, Clock3, Loader2, X } from "lucide-react";
+import { CalendarX2, Check, Clock3, Copy, Loader2, MessageCircle, X } from "lucide-react";
 
 import { desmarcarAgendamento, type DecisaoSinal } from "@/actions/remarcacao.actions";
+import { buildWhatsAppUrl } from "@/lib/whatsapp";
 
 type Props = {
   open: boolean;
@@ -16,6 +17,8 @@ type Props = {
     sinalPago: boolean;
     retorno: boolean;
   } | null;
+  /** Botao "Faltou" ja abre marcado como falta. */
+  tipoInicial?: "CANCELOU" | "FALTOU";
   onClose: () => void;
   onConcluido: () => void;
 };
@@ -65,17 +68,27 @@ function Opcao({
   );
 }
 
-export default function DesmarcarAgendamentoModal({ open, agendamento, onClose, onConcluido }: Props) {
+export default function DesmarcarAgendamentoModal({ open, agendamento, tipoInicial, onClose, onConcluido }: Props) {
   if (!open || !agendamento) return null;
-  return <Conteudo key={agendamento.id} agendamento={agendamento} onClose={onClose} onConcluido={onConcluido} />;
+  return (
+    <Conteudo
+      key={`${agendamento.id}-${tipoInicial ?? ""}`}
+      agendamento={agendamento}
+      tipoInicial={tipoInicial}
+      onClose={onClose}
+      onConcluido={onConcluido}
+    />
+  );
 }
 
 function Conteudo({
   agendamento,
+  tipoInicial,
   onClose,
   onConcluido,
 }: {
   agendamento: NonNullable<Props["agendamento"]>;
+  tipoInicial?: "CANCELOU" | "FALTOU";
   onClose: () => void;
   onConcluido: () => void;
 }) {
@@ -85,8 +98,14 @@ function Conteudo({
   const emCimaDaHora = !jaPassou && horas < HORAS_REGRA;
   const temSinal = agendamento.sinalPago && agendamento.valorSinal > 0 && !agendamento.retorno;
 
-  const [tipo, setTipo] = useState<"CANCELOU" | "FALTOU">(jaPassou ? "FALTOU" : "CANCELOU");
-  const [vaiRemarcar, setVaiRemarcar] = useState<boolean | null>(null);
+  const [tipo, setTipo] = useState<"CANCELOU" | "FALTOU">(tipoInicial ?? (jaPassou ? "FALTOU" : "CANCELOU"));
+  // Falta: ja deixa "vai remarcar" marcado (a mensagem convida para remarcar
+  // e ela fica na lista Para remarcar ate responder).
+  const [vaiRemarcar, setVaiRemarcar] = useState<boolean | null>(tipoInicial === "FALTOU" ? true : null);
+  // Depois de marcar a falta: mensagem pronta para o WhatsApp (editavel).
+  const [envio, setEnvio] = useState<{ texto: string; telefone: string | null } | null>(null);
+  const [abriuWhatsapp, setAbriuWhatsapp] = useState(false);
+  const [copiado, setCopiado] = useState(false);
   const [sinal, setSinal] = useState<DecisaoSinal | null>(null);
   const [observacao, setObservacao] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -114,18 +133,122 @@ function Conteudo({
     setErro("");
     setSalvando(true);
     try {
-      await desmarcarAgendamento({
+      const resultado = await desmarcarAgendamento({
         agendamentoId: agendamento.id,
         tipo,
         vaiRemarcar,
         sinal: temSinal ? sinalEscolhido : null,
         observacao,
       });
+      if (tipo === "FALTOU" && resultado.mensagem) {
+        setSalvando(false);
+        setEnvio({ texto: resultado.mensagem, telefone: resultado.telefone });
+        return;
+      }
       onConcluido();
     } catch (e) {
       setSalvando(false);
       setErro(e instanceof Error && e.message ? e.message : "Não foi possível desmarcar. Tente de novo.");
     }
+  }
+
+  async function copiarMensagem() {
+    if (!envio?.texto.trim()) return;
+    try {
+      await navigator.clipboard.writeText(envio.texto);
+    } catch {
+      const campo = document.createElement("textarea");
+      campo.value = envio.texto;
+      document.body.appendChild(campo);
+      campo.select();
+      document.execCommand("copy");
+      campo.remove();
+    }
+    setCopiado(true);
+  }
+
+  if (envio) {
+    return (
+      <div className="fixed inset-0 z-[130] flex items-end justify-center bg-slate-950/55 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+        <div className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl">
+          <header className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-5">
+            <div className="min-w-0">
+              <p className="flex items-center gap-2 text-base font-bold text-slate-900">
+                <Check size={18} className="text-emerald-600" />
+                Falta registrada
+              </p>
+              <p className="mt-0.5 text-sm text-slate-600">
+                Mensagem para {agendamento.clienteNome}. Revise e envie pelo WhatsApp.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onConcluido}
+              aria-label="Fechar"
+              className="shrink-0 rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"
+            >
+              <X size={17} />
+            </button>
+          </header>
+
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-4 sm:px-5">
+            <textarea
+              value={envio.texto}
+              onChange={(evento) => {
+                setEnvio({ ...envio, texto: evento.target.value });
+                setCopiado(false);
+              }}
+              rows={12}
+              aria-label="Mensagem para a cliente"
+              className="w-full resize-y rounded-xl border border-slate-200 px-3 py-2 text-sm leading-relaxed text-slate-800 outline-none focus:border-violet-400"
+            />
+            <p className="text-xs text-slate-500">
+              Pode mudar o texto aqui só para esta cliente. O texto padrão fica em Comunicações &gt; Modelos
+              (&quot;Contato após falta&quot;).
+            </p>
+            {!envio.telefone ? (
+              <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                A ficha não tem telefone. O WhatsApp vai abrir para você escolher o contato (ou copie o texto).
+              </p>
+            ) : null}
+          </div>
+
+          <footer className="flex flex-col-reverse gap-2 border-t border-slate-100 px-4 py-3 sm:flex-row sm:px-5">
+            <button
+              type="button"
+              onClick={copiarMensagem}
+              disabled={!envio.texto.trim()}
+              className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 sm:flex-1"
+            >
+              {copiado ? <Check size={16} /> : <Copy size={16} />}
+              {copiado ? "Copiado" : "Copiar"}
+            </button>
+            {abriuWhatsapp ? (
+              <button
+                type="button"
+                onClick={onConcluido}
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-900 text-sm font-bold text-white hover:bg-slate-800 sm:flex-[2]"
+              >
+                <Check size={16} /> Concluir
+              </button>
+            ) : (
+              <a
+                href={buildWhatsAppUrl(envio.telefone, envio.texto.trim())}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setAbriuWhatsapp(true)}
+                aria-disabled={!envio.texto.trim()}
+                className={`inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 sm:flex-[2] ${
+                  envio.texto.trim() ? "" : "pointer-events-none opacity-50"
+                }`}
+              >
+                <MessageCircle size={16} /> Abrir no WhatsApp
+              </a>
+            )}
+          </footer>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -135,7 +258,7 @@ function Conteudo({
           <div className="min-w-0">
             <p className="flex items-center gap-2 text-base font-bold text-slate-900">
               <CalendarX2 size={18} className="text-amber-600" />
-              Cliente desmarcou
+              {tipo === "FALTOU" ? "Cliente faltou" : "Cliente desmarcou"}
             </p>
             <p className="mt-0.5 truncate text-sm text-slate-600">
               {agendamento.clienteNome} · {agendamento.procedimento}
@@ -264,7 +387,7 @@ function Conteudo({
             className="inline-flex h-11 flex-[2] items-center justify-center gap-2 rounded-xl bg-amber-600 text-sm font-bold text-white hover:bg-amber-700 disabled:opacity-50"
           >
             {salvando ? <Loader2 size={16} className="animate-spin" /> : <CalendarX2 size={16} />}
-            Confirmar e liberar o horário
+            {tipo === "FALTOU" ? "Marcar falta e ver a mensagem" : "Confirmar e liberar o horário"}
           </button>
         </footer>
       </div>

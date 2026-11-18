@@ -62,6 +62,12 @@ export type PainelDono = {
     clientesQueCompraram: number;
     voltaram: Numero;
     voltaramRenderam: Numero;
+    /** Agendamentos marcados como Faltou no periodo. */
+    faltas: Numero;
+    /** Das faltas: a cliente marcou outro horario depois. */
+    faltasRemarcaram: Numero;
+    /** Das faltas: ainda sem novo horario. */
+    faltasSemRemarcar: Numero;
   };
   anuncios: {
     gasto: PorCanal;
@@ -394,6 +400,51 @@ export async function obterPainelDono(parametros: {
       })),
   );
 
+  // Faltas do periodo e quem marcou outro horario depois (agendamento criado
+  // depois do horario em que faltou, que nao tenha sido cancelado).
+  const faltasBase = await prisma.agendamento.findMany({
+    where: { data: noPeriodo, status: "Faltou" },
+    select: { id: true, data: true, procedimento: true, clienteId: true, cliente: { select: { nome: true } } },
+  });
+  const idsFaltaram = Array.from(new Set(faltasBase.map((item) => item.clienteId)));
+  const depoisDaFalta = idsFaltaram.length
+    ? await prisma.agendamento.findMany({
+        where: {
+          clienteId: { in: idsFaltaram },
+          createdAt: { gte: faltasBase.reduce((menor, item) => (item.data < menor ? item.data : menor), fim) },
+          status: { not: "Cancelado" },
+        },
+        select: { id: true, clienteId: true, createdAt: true, data: true, status: true },
+      })
+    : [];
+  const itensFaltas = faltasBase.map((falta) => {
+    const novo = depoisDaFalta
+      .filter(
+        (item) =>
+          item.id !== falta.id &&
+          item.clienteId === falta.clienteId &&
+          item.createdAt >= falta.data &&
+          item.data > falta.data,
+      )
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
+    return {
+      remarcou: Boolean(novo),
+      item: {
+        id: `f-${falta.id}`,
+        data: iso(falta.data),
+        titulo: falta.cliente?.nome ?? "Cliente",
+        detalhe: novo
+          ? `${falta.procedimento} · remarcou para ${formatarDia(novo.data)}${novo.status === "Faltou" ? " (faltou de novo)" : ""}`
+          : `${falta.procedimento} · ainda sem novo horário`,
+        valor: null,
+        href: linkCliente(falta.clienteId),
+      } satisfies ItemDetalhe,
+    };
+  });
+  const faltas = numero(itensFaltas.map((item) => item.item), true);
+  const faltasRemarcaram = numero(itensFaltas.filter((item) => item.remarcou).map((item) => item.item), true);
+  const faltasSemRemarcar = numero(itensFaltas.filter((item) => !item.remarcou).map((item) => item.item), true);
+
   /* ------------------------------------------------------ Bloco 3: anuncios */
   const canalDe = (campanhaId?: number | null): Canal =>
     canalDaCampanha(campanhaId ? campanhaPorId.get(campanhaId)?.canal : null);
@@ -520,6 +571,9 @@ export async function obterPainelDono(parametros: {
       clientesQueCompraram,
       voltaram,
       voltaramRenderam,
+      faltas,
+      faltasRemarcaram,
+      faltasSemRemarcar,
     },
     anuncios: {
       gasto,

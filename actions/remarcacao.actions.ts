@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requirePermission } from "@/lib/auth";
+import { decodificarMensagemModelo } from "@/lib/mensagem-modelo.server";
 import { prisma } from "@/lib/prisma";
 import { dataHoraCurta, horasAteOHorario } from "@/lib/remarcacao";
 
@@ -24,6 +25,50 @@ function textoAntecedencia(horas: number) {
   if (horas <= 0) return "depois do horário";
   if (horas < 1) return "menos de 1h antes";
   return `${Math.floor(horas)}h antes`;
+}
+
+/**
+ * Mensagem pronta para a cliente que faltou, a partir do modelo editavel em
+ * Comunicacoes > Modelos. Sinal retido usa a versao que explica o sinal.
+ */
+async function montarMensagemFalta(dados: {
+  nome: string;
+  procedimento: string;
+  data: Date;
+  sinalRetido: boolean;
+}) {
+  const [modelos, configuracao] = await Promise.all([
+    prisma.mensagemModelo.findMany({
+      where: { chave: { in: ["cliente_faltou", "cliente_faltou_sem_sinal"] }, ativo: true },
+      select: { chave: true, corpo: true },
+    }),
+    prisma.configuracaoClinica.findFirst({ select: { nome: true } }),
+  ]);
+  const porChave = new Map(modelos.map((item) => [item.chave, decodificarMensagemModelo(item.corpo)]));
+  const corpo = dados.sinalRetido
+    ? porChave.get("cliente_faltou")
+    : porChave.get("cliente_faltou_sem_sinal") ?? porChave.get("cliente_faltou");
+  if (!corpo) return null;
+
+  const nome = dados.nome.trim();
+  const variaveis: Record<string, string> = {
+    primeiro_nome: nome.split(/\s+/)[0] || nome,
+    nome,
+    clinica: configuracao?.nome || "Studio Realçar",
+    procedimento: dados.procedimento,
+    data: dados.data.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }),
+    horario: dados.data.toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "America/Sao_Paulo",
+    }),
+    profissional: "",
+    interesse_texto: "",
+  };
+  // Modelos antigos podem ter "\n" escrito como texto.
+  return corpo
+    .replace(/\\n/g, "\n")
+    .replace(/\{([a-zA-Z0-9_]+)\}/g, (_, chave: string) => variaveis[chave] ?? "");
 }
 
 /**
@@ -54,6 +99,7 @@ export async function desmarcarAgendamento(dados: {
         valorSinal: true,
         sinalLancamentoId: true,
         lead: { select: { id: true, etapa: true } },
+        cliente: { select: { nome: true, telefone: true, whatsapp: true } },
       },
     });
 
@@ -169,11 +215,35 @@ export async function desmarcarAgendamento(dados: {
       },
     });
 
-    return { status: novoStatus, decisao };
+    return {
+      status: novoStatus,
+      decisao,
+      cliente: agendamento.cliente,
+      procedimento: agendamento.procedimento,
+      data: agendamento.data,
+    };
   });
 
   revalidar();
-  return { ok: true as const, ...resultado };
+
+  // Faltou: devolve a mensagem pronta para abrir no WhatsApp da cliente.
+  const mensagem =
+    dados.tipo === "FALTOU" && resultado.cliente
+      ? await montarMensagemFalta({
+          nome: resultado.cliente.nome,
+          procedimento: resultado.procedimento,
+          data: resultado.data,
+          sinalRetido: resultado.decisao === "RETER",
+        })
+      : null;
+
+  return {
+    ok: true as const,
+    status: resultado.status,
+    decisao: resultado.decisao,
+    mensagem,
+    telefone: resultado.cliente ? resultado.cliente.whatsapp || resultado.cliente.telefone || null : null,
+  };
 }
 
 /** Tira da lista "Para remarcar" (a cliente desistiu). Decide o sinal guardado, se houver. */

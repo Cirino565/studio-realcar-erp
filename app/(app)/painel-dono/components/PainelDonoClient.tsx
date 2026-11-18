@@ -253,7 +253,7 @@ export default function PainelDonoClient({ dados }: { dados: PainelDono }) {
 
       {/* ---------------------------------------------- Bloco 2 */}
       <Bloco titulo="Clientes">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <Cartao>
             <Rotulo>Clientes novos</Rotulo>
             <Valor numero={clientes.novos} titulo="Clientes novos" subtitulo="cadastradas no período" contagem abrir={abrir} className="mt-1 block text-3xl font-bold text-slate-950" />
@@ -297,6 +297,18 @@ export default function PainelDonoClient({ dados }: { dados: PainelDono }) {
               Renderam{" "}
               <Valor numero={clientes.voltaramRenderam} titulo="Quanto renderam as clientes que voltaram" abrir={abrir} className="font-semibold text-emerald-700" />
             </p>
+          </Cartao>
+          <Cartao>
+            <Rotulo>Faltas</Rotulo>
+            <Valor numero={clientes.faltas} titulo="Faltas" subtitulo="não vieram e não avisaram" contagem abrir={abrir} className="mt-1 block text-3xl font-bold text-slate-950" />
+            <div className="mt-2">
+              <Linha rotulo="Remarcaram depois">
+                <Valor numero={clientes.faltasRemarcaram} titulo="Faltaram e remarcaram depois" contagem abrir={abrir} className="font-semibold text-emerald-700" />
+              </Linha>
+              <Linha rotulo="Ainda sem horário">
+                <Valor numero={clientes.faltasSemRemarcar} titulo="Faltaram e ainda não remarcaram" contagem abrir={abrir} className="font-semibold text-rose-700" />
+              </Linha>
+            </div>
           </Cartao>
         </div>
       </Bloco>
