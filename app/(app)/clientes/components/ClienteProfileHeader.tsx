@@ -88,7 +88,27 @@ export default function ClienteProfileHeader({
     ) +
     data.pacotes.reduce((total, pacote) => total + pacote.valorPago, 0);
 
-  const ultimoProcedimento = data.procedimentos[0];
+  // Atendimentos por dia (procedimentos + produtos comprados no mesmo dia),
+  // do mais recente para o mais antigo.
+  const diaDe = (iso: string) =>
+    new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const porDia = new Map<string, { data: string; nomes: string[]; produtos: number }>();
+  for (const procedimento of data.procedimentos) {
+    const dia = diaDe(procedimento.dataProcedimento);
+    const grupo = porDia.get(dia) ?? { data: procedimento.dataProcedimento, nomes: [], produtos: 0 };
+    if (!grupo.nomes.includes(procedimento.nome)) grupo.nomes.push(procedimento.nome);
+    porDia.set(dia, grupo);
+  }
+  for (const compra of data.compras ?? []) {
+    const dia = diaDe(compra.data);
+    const grupo = porDia.get(dia) ?? { data: compra.data, nomes: [], produtos: 0 };
+    grupo.produtos += compra.itens.reduce((soma, item) => soma + item.quantidade, 0);
+    porDia.set(dia, grupo);
+  }
+  const atendimentos = [...porDia.entries()]
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([, grupo]) => grupo);
+  const ultimoAtendimento = atendimentos[0];
   const ultimaEvolucao = data.evolucoes[0];
   const totalFotos = data.fotos.length;
   const enderecoEstruturado = montarEnderecoEstruturado(cliente);
@@ -293,6 +313,22 @@ export default function ClienteProfileHeader({
             <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
               {totalProcedimentos}
             </p>
+
+            {/* O que fez e quando (os 3 ultimos), com atalho para a lista. */}
+            {data.procedimentos.length > 0 ? (
+              <a href="#procedimentos" className="mt-1 block space-y-0.5 text-xs text-slate-600 hover:text-violet-700 dark:text-slate-300">
+                {data.procedimentos.slice(0, 3).map((procedimento) => (
+                  <span key={procedimento.id} className="block truncate">
+                    {procedimento.nome} · {formatarData(procedimento.dataProcedimento)}
+                  </span>
+                ))}
+                {data.procedimentos.length > 3 ? (
+                  <span className="block font-semibold text-violet-700 dark:text-violet-300">
+                    Ver todos ({data.procedimentos.length})
+                  </span>
+                ) : null}
+              </a>
+            ) : null}
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.04]">
@@ -312,19 +348,25 @@ export default function ClienteProfileHeader({
             <div className="flex items-center gap-2 text-slate-500">
               <Stethoscope className="size-4" />
               <span className="text-xs font-semibold uppercase tracking-wide">
-                Último procedimento
+                Último atendimento
               </span>
             </div>
 
-            <p className="mt-2 truncate text-sm font-semibold text-slate-900 dark:text-white">
-              {ultimoProcedimento?.nome ?? "Nenhum"}
-            </p>
-
-            {ultimoProcedimento ? (
-              <p className="mt-1 text-xs text-slate-500">
-                {formatarData(ultimoProcedimento.dataProcedimento)}
-              </p>
-            ) : null}
+            {ultimoAtendimento ? (
+              <a href="#procedimentos" className="block hover:text-violet-700">
+                <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
+                  {ultimoAtendimento.nomes.join(" + ") || "Compra de produtos"}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {formatarData(ultimoAtendimento.data)}
+                  {ultimoAtendimento.produtos > 0
+                    ? ` · ${ultimoAtendimento.produtos} produto${ultimoAtendimento.produtos === 1 ? "" : "s"}`
+                    : ""}
+                </p>
+              </a>
+            ) : (
+              <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">Nenhum</p>
+            )}
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.04]">

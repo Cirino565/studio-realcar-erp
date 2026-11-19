@@ -934,21 +934,7 @@ export function ClienteClinicoTabs({
             )}{" "}
             registrados
           </p>
-          {historicoPorDia[0] ? (
-            <button
-              type="button"
-              onClick={() => ativarAba("procedimentos")}
-              className="mt-2 block w-full text-left text-xs leading-5 text-slate-600 underline-offset-2 hover:underline dark:text-slate-300"
-            >
-              <span className="font-semibold">Último dia ({formatarData(historicoPorDia[0].data)}):</span>{" "}
-              {[
-                ...historicoPorDia[0].procedimentos.map((item) => item.nome),
-                ...(historicoPorDia[0].produtos.length > 0
-                  ? [`${historicoPorDia[0].produtos.reduce((soma, item) => soma + item.quantidade, 0)} produto(s)`]
-                  : []),
-              ].join(" · ")}
-            </button>
-          ) : null}
+
         </div>
 
         <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.06] sm:p-5">
@@ -1385,6 +1371,11 @@ export function ClienteClinicoTabs({
                   name="observacoes"
                   rows={3}
                 />
+
+                <p className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+                  Isto só anota na ficha: <strong>não entra no caixa</strong>. Procedimento feito e cobrado no
+                  atendimento vai em Finalizar atendimento &gt; &quot;Outros procedimentos fechados agora&quot;.
+                </p>
 
                 <BotaoSalvar salvandoLabel="Salvando procedimento...">
                   <Plus size={17} />
