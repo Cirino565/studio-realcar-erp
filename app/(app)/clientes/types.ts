@@ -60,6 +60,13 @@ export type ClienteProcedimentoData = {
   observacoes: string | null;
 };
 
+/** Produtos (e kits) comprados numa venda, para a ficha mostrar o que levou. */
+export type ClienteCompraData = {
+  id: number;
+  data: string;
+  itens: { descricao: string; quantidade: number; valorTotal: number }[];
+};
+
 export type ClienteEvolucaoData = {
   id: number;
   titulo: string;
@@ -90,6 +97,7 @@ export type ClienteClinicoData = {
   fotos: ClienteFotoData[];
   documentos: ClienteDocumentoData[];
   procedimentos: ClienteProcedimentoData[];
+  compras: ClienteCompraData[];
   evolucoes: ClienteEvolucaoData[];
   evolucoesPendentes: ClienteEvolucaoPendenteData[];
   podeRegistrarEvolucao: boolean;

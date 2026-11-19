@@ -1321,6 +1321,11 @@ export default function FinalizarAtendimentoModal({
                               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-emerald-400"
                             />
                           </label>
+                          {extra.nome.trim() && extra.valor <= 0 ? (
+                            <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] font-semibold leading-4 text-amber-800">
+                              {extra.nome} está sem valor. Digite quanto foi cobrado (deixe 0 só se for cortesia).
+                            </p>
+                          ) : null}
                         </div>
                       ))}
                     </div>
@@ -1527,8 +1532,31 @@ export default function FinalizarAtendimentoModal({
 
                 <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <ResumoLinha label="Cliente" value={currentAppointment.cliente.nome} />
-                  <ResumoLinha label="Procedimento" value={procedimentoFinal} />
-                  <ResumoLinha label="Serviço" value={formatCurrency(valorServico)} />
+                  {/* Cada procedimento com o seu valor (antes o extra nao aparecia
+                      aqui e nao dava para saber se tinha entrado). */}
+                  <div className="border-b border-slate-100 py-2.5">
+                    <p className="text-xs text-slate-500">
+                      {procedimentosExtras.length > 0 ? "Procedimentos" : "Procedimento"}
+                    </p>
+                    <div className="mt-1.5 space-y-1.5">
+                      {[
+                        { chave: "principal", nome: procedimentoFinal, valor: valorServico },
+                        ...procedimentosExtras
+                          .filter((item) => item.nome.trim())
+                          .map((item) => ({ chave: item.chave, nome: item.nome.trim(), valor: item.valor })),
+                      ].map((item) => (
+                        <div key={item.chave} className="flex items-start justify-between gap-3 text-xs">
+                          <span className="min-w-0 break-words font-semibold text-slate-800">{item.nome}</span>
+                          <span className="shrink-0 text-right">
+                            <strong className="text-slate-900">{formatCurrency(item.valor)}</strong>
+                            {item.valor <= 0 && !atendimentoRetorno && !atendimentoAvaliacao ? (
+                              <span className="block text-[10px] font-bold text-amber-700">sem valor · confira</span>
+                            ) : null}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                   <ResumoLinha label="Produtos" value={formatCurrency(totais.totalProdutos)} />
                   <ResumoLinha label="Total" value={formatCurrency(totais.total)} forte />
                   {sinalAbatidoPrevisto > 0 ? (
@@ -1610,7 +1638,7 @@ export default function FinalizarAtendimentoModal({
                 <section className="rounded-2xl border border-violet-200 bg-violet-50 p-3.5">
                   <div className="flex items-start gap-2.5">
                     <RotateCcw size={17} className="mt-0.5 text-violet-700" />
-                    <p className="text-[11px] leading-4 text-violet-800">Após confirmar, você poderá agendar o retorno ou voltar para a agenda.</p>
+                    <p className="text-[11px] leading-4 text-violet-800">Após confirmar, você poderá deixar o próximo horário ou voltar para a agenda.</p>
                   </div>
                 </section>
               </div>

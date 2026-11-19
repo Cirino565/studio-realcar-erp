@@ -84,6 +84,21 @@ async function getClienteClinico(clienteId: number) {
       procedimentos: {
         orderBy: { dataProcedimento: "desc" },
       },
+      // So os produtos e kits das vendas (procedimentos ja vem acima).
+      vendas: {
+        where: { situacao: { not: "CANCELADA" }, itens: { some: { tipo: { in: ["PRODUTO", "KIT"] } } } },
+        orderBy: { data: "desc" },
+        take: 80,
+        select: {
+          id: true,
+          data: true,
+          itens: {
+            where: { tipo: { in: ["PRODUTO", "KIT"] } },
+            select: { descricao: true, quantidade: true, valorTotal: true, kitNomeHistorico: true },
+            orderBy: { id: "asc" },
+          },
+        },
+      },
       evolucoes: {
         orderBy: { dataRegistro: "desc" },
         include: {
@@ -278,6 +293,15 @@ export default async function ClientePage({
       status: procedimento.status,
       dataProcedimento: toIsoString(procedimento.dataProcedimento),
       observacoes: procedimento.observacoes,
+    })),
+    compras: cliente.vendas.map((venda) => ({
+      id: venda.id,
+      data: toIsoString(venda.data),
+      itens: venda.itens.map((item) => ({
+        descricao: item.kitNomeHistorico || item.descricao,
+        quantidade: item.quantidade,
+        valorTotal: item.valorTotal,
+      })),
     })),
     evolucoes: cliente.evolucoes.map((evolucao) => ({
       id: evolucao.id,

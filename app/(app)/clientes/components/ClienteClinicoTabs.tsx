@@ -785,6 +785,37 @@ export function ClienteClinicoTabs({
     };
   }, [data]);
 
+  // Historico por dia: procedimentos + produtos comprados no mesmo dia.
+  const historicoPorDia = useMemo(() => {
+    const diaDe = (iso: string) =>
+      new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+    const dias = new Map<
+      string,
+      {
+        dia: string;
+        data: string;
+        procedimentos: typeof data.procedimentos;
+        produtos: { chave: string; descricao: string; quantidade: number; valorTotal: number }[];
+      }
+    >();
+    const pegar = (iso: string) => {
+      const dia = diaDe(iso);
+      const atual = dias.get(dia) ?? { dia, data: iso, procedimentos: [], produtos: [] };
+      dias.set(dia, atual);
+      return atual;
+    };
+    for (const procedimento of data.procedimentos) {
+      pegar(procedimento.dataProcedimento).procedimentos.push(procedimento);
+    }
+    for (const compra of data.compras ?? []) {
+      const grupo = pegar(compra.data);
+      compra.itens.forEach((item, indice) =>
+        grupo.produtos.push({ chave: `${compra.id}-${indice}`, ...item }),
+      );
+    }
+    return [...dias.values()].sort((a, b) => b.dia.localeCompare(a.dia));
+  }, [data]);
+
   const procedimentosDisponiveis = Array.from(
     new Set([
       ...data.procedimentos.map(
@@ -903,6 +934,21 @@ export function ClienteClinicoTabs({
             )}{" "}
             registrados
           </p>
+          {historicoPorDia[0] ? (
+            <button
+              type="button"
+              onClick={() => ativarAba("procedimentos")}
+              className="mt-2 block w-full text-left text-xs leading-5 text-slate-600 underline-offset-2 hover:underline dark:text-slate-300"
+            >
+              <span className="font-semibold">Último dia ({formatarData(historicoPorDia[0].data)}):</span>{" "}
+              {[
+                ...historicoPorDia[0].procedimentos.map((item) => item.nome),
+                ...(historicoPorDia[0].produtos.length > 0
+                  ? [`${historicoPorDia[0].produtos.reduce((soma, item) => soma + item.quantidade, 0)} produto(s)`]
+                  : []),
+              ].join(" · ")}
+            </button>
+          ) : null}
         </div>
 
         <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.06] sm:p-5">
@@ -1286,13 +1332,13 @@ export function ClienteClinicoTabs({
             <SectionHeader
               icon={Stethoscope}
               title="Procedimentos"
-              description="Histórico de procedimentos, valores e profissional responsável."
+              description="Tudo o que ela fez e comprou, por dia: procedimentos, valores e produtos."
             />
 
             <div className="grid min-w-0 gap-5 p-4 sm:p-6 lg:grid-cols-[minmax(280px,380px)_minmax(0,1fr)]">
               <form
                 action={criarProcedimentoCliente}
-                className="h-fit space-y-4 rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/[0.04]"
+                className="order-2 h-fit space-y-4 rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/[0.04] lg:order-none"
               >
                 <input
                   type="hidden"
@@ -1346,9 +1392,27 @@ export function ClienteClinicoTabs({
                 </BotaoSalvar>
               </form>
 
-              <div className="min-w-0 space-y-4">
-                {data.procedimentos.length > 0 ? (
-                  data.procedimentos.map(
+              {/* No celular o historico vem antes do formulario manual. */}
+              <div className="order-1 min-w-0 space-y-4 lg:order-none">
+                {historicoPorDia.length > 0 ? (
+                  historicoPorDia.map((grupo) => (
+                    <section
+                      key={grupo.dia}
+                      className="min-w-0 space-y-3 rounded-3xl border border-slate-200 bg-slate-50/60 p-3 dark:border-white/10 dark:bg-white/[0.025] sm:p-4"
+                    >
+                      <div className="flex items-baseline justify-between gap-3 px-1">
+                        <p className="text-sm font-bold text-slate-900 dark:text-white">
+                          {formatarData(grupo.data)}
+                        </p>
+                        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                          Total do dia{" "}
+                          {formatarMoeda(
+                            grupo.procedimentos.reduce((soma, item) => soma + item.valor, 0) +
+                              grupo.produtos.reduce((soma, item) => soma + item.valorTotal, 0),
+                          )}
+                        </p>
+                      </div>
+                  {grupo.procedimentos.map(
                     (procedimento) => (
                       <article
                         key={procedimento.id}
@@ -1396,7 +1460,28 @@ export function ClienteClinicoTabs({
                         ) : null}
                       </article>
                     ),
-                  )
+                  )}
+                      {grupo.produtos.length > 0 ? (
+                        <article className="min-w-0 rounded-3xl border border-violet-200 bg-white p-4 shadow-sm dark:border-violet-400/20 dark:bg-white/[0.04] sm:p-5">
+                          <p className="text-xs font-bold uppercase tracking-wide text-violet-600 dark:text-violet-300">
+                            Produtos comprados
+                          </p>
+                          <ul className="mt-2 space-y-1.5">
+                            {grupo.produtos.map((item) => (
+                              <li key={item.chave} className="flex items-start justify-between gap-3 text-sm">
+                                <span className="min-w-0 break-words text-slate-700 dark:text-slate-300">
+                                  {item.quantidade}x {item.descricao}
+                                </span>
+                                <strong className="shrink-0 text-slate-900 dark:text-white">
+                                  {formatarMoeda(item.valorTotal)}
+                                </strong>
+                              </li>
+                            ))}
+                          </ul>
+                        </article>
+                      ) : null}
+                    </section>
+                  ))
                 ) : (
                   <EmptyState
                     icon={Stethoscope}
