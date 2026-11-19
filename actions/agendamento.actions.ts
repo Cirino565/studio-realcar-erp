@@ -50,6 +50,8 @@ export type RecorrenciaAgendaInput = {
 export type NaturezaAtendimentoAgenda = "PROCEDIMENTO" | "RETORNO";
 
 type NovoAgendamento = {
+  // Pre-reserva (cliente ainda vai confirmar). Nao informado = nao mexe.
+  preReserva?: boolean;
   clienteId?: number;
   novoCliente?: ClienteNovoAgendamento;
   profissionalId?: number;
@@ -981,6 +983,7 @@ export async function criarAgendamento(
             : Boolean(dados.sinalPago),
         naturezaAtendimento,
         agendamentoOrigemId,
+        preReserva: dados.preReserva ? "PENDENTE" : null,
         serieId,
         recorrenciaTipo: serieId ? regra.tipo : null,
         recorrenciaIntervalo: serieId ? regra.intervalo : null,
@@ -1177,6 +1180,7 @@ export async function atualizarAgendamento({
             : Boolean(dados.sinalPago),
         naturezaAtendimento,
         agendamentoOrigemId,
+        ...(dados.preReserva === true ? { preReserva: "PENDENTE" } : {}),
         statusAntesAtendimento:
           dados.status === "Em atendimento" ? undefined : null,
       },
@@ -1187,6 +1191,14 @@ export async function atualizarAgendamento({
         profissionalId: true,
       },
     });
+
+    // Tirou a marca de pre-reserva na edicao: a cliente confirmou.
+    if (dados.preReserva === false) {
+      await tx.agendamento.updateMany({
+        where: { id, preReserva: "PENDENTE" },
+        data: { preReserva: "CONFIRMADA" },
+      });
+    }
 
     // Mantem o Financeiro de acordo com o sinal (so quando a tela informou
     // o valor do sinal).

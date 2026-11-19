@@ -99,6 +99,8 @@ type NovoAgendamentoPayload = NovoHorarioPayload & {
   valorSinal?: number;
   naturezaAtendimento?: "PROCEDIMENTO" | "RETORNO";
   agendamentoOrigemId?: number | null;
+  /** Mostra a escolha "Pré-reserva / Confirmado" ja marcada assim. */
+  preReserva?: boolean;
 };
 
 type Props = {
@@ -255,6 +257,8 @@ export default function NovoAgendamentoModal({
     "PROCEDIMENTO" | "RETORNO"
   >("PROCEDIMENTO");
   const [agendamentoOrigemId, setAgendamentoOrigemId] = useState("");
+  // Pre-reserva: so aparece quando vem do "proximo horario" (ou ao editar uma).
+  const [preReserva, setPreReserva] = useState(false);
   const [tipoCliente, setTipoCliente] = useState<"existente" | "novo">("existente");
   const [clienteId, setClienteId] = useState("");
   const [clienteBloqueado, setClienteBloqueado] = useState(false);
@@ -358,6 +362,7 @@ export default function NovoAgendamentoModal({
     setErroAcaoHorario(false);
     setTipoAtendimento(initialPayload?.tipoAtendimento || (modoEdicaoBloqueio ? "bloqueio" : "agendamento"));
     setNaturezaAtendimento(naturezaInicial);
+    setPreReserva(Boolean(initialPayload?.preReserva));
     setAgendamentoOrigemId(
       initialPayload?.agendamentoOrigemId
         ? String(initialPayload.agendamentoOrigemId)
@@ -1037,6 +1042,7 @@ export default function NovoAgendamentoModal({
             : recorrencia,
         excecaoHorarioFuncionamento: excecaoHorario,
         permitirEncaixeSemIntervalo,
+        preReserva: initialPayload?.preReserva !== undefined ? preReserva : undefined,
       };
 
       const resultado =
@@ -1468,15 +1474,49 @@ export default function NovoAgendamentoModal({
                 }`}
               >
                 <RotateCcw size={16} />
-                Retorno
+                Retorno sem custo
               </button>
             </div>
             {naturezaAtendimento === "RETORNO" ? (
               <p className="mt-2.5 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs leading-5 text-cyan-800 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:text-cyan-200">
-                Use o procedimento original. O retorno será salvo separadamente, com valor zero, sem sinal e sem receita de serviço.
+                Só para revisar o que já foi feito, sem cobrar. Se ela vai fazer outro procedimento (pago), escolha Procedimento.
               </p>
             ) : null}
           </section>
+
+          {initialPayload?.preReserva !== undefined ? (
+            <section className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-800/40">
+              <span className={labelClassName()}>Ela já confirmou?</span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPreReserva(true)}
+                  aria-pressed={preReserva}
+                  className={`flex min-h-12 flex-col items-center justify-center rounded-xl border px-2 py-1.5 text-center transition ${
+                    preReserva
+                      ? "border-amber-500 bg-amber-500 text-white"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-amber-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                  }`}
+                >
+                  <span className="text-sm font-bold">Pré-reserva</span>
+                  <span className={`text-[11px] leading-4 ${preReserva ? "text-amber-50" : "text-slate-500"}`}>confirma 7 dias antes</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreReserva(false)}
+                  aria-pressed={!preReserva}
+                  className={`flex min-h-12 flex-col items-center justify-center rounded-xl border px-2 py-1.5 text-center transition ${
+                    !preReserva
+                      ? "border-emerald-600 bg-emerald-600 text-white"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-emerald-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                  }`}
+                >
+                  <span className="text-sm font-bold">Confirmado</span>
+                  <span className={`text-[11px] leading-4 ${!preReserva ? "text-emerald-50" : "text-slate-500"}`}>já é certeza</span>
+                </button>
+              </div>
+            </section>
+          ) : null}
 
           <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-700">
             <div className="flex items-center justify-between gap-3">

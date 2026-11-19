@@ -318,7 +318,7 @@ export function FecharPacoteCard({
             </p>
             {procedimentoId && !agendadoPara ? (
               <p className="mt-1 text-xs font-bold text-emerald-950 dark:text-emerald-50">
-                Toque em &quot;Agendar retorno&quot;: o procedimento já vai
+                Toque em &quot;Agendar próxima sessão&quot;: o procedimento já vai
                 preenchido.
               </p>
             ) : null}
@@ -340,7 +340,7 @@ export function FecharPacoteCard({
                 className="mt-2 flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-emerald-300 px-4 text-xs font-bold text-emerald-950 ring-1 ring-emerald-600/30 dark:bg-emerald-500/25 dark:text-emerald-100"
               >
                 <CalendarPlus className="size-4" />
-                Agendar retorno agora
+                Agendar próxima sessão
               </button>
             ) : null}
           </div>

@@ -49,6 +49,8 @@ import AvisoPacoteAberto, {
 
 import AnamneseAtendimentoModal from "./AnamneseAtendimentoModal";
 import DesmarcarAgendamentoModal from "./DesmarcarAgendamentoModal";
+import { confirmarPreReserva } from "@/actions/pre-reserva.actions";
+import { mensagemErroAcao } from "@/lib/erro-acao";
 import ClienteQuickEditModal from "./ClienteQuickEditModal";
 
 export type ClienteAtendimentoDetalhes = {
@@ -91,6 +93,8 @@ export type AppointmentDetails = {
   valorSinal?: number;
   naturezaAtendimento?: "PROCEDIMENTO" | "RETORNO";
   agendamentoOrigemId?: number | null;
+  // PENDENTE = pre-reserva ainda sem confirmacao.
+  preReserva?: string | null;
   status: string;
   statusAntesAtendimento?: string | null;
   evolucaoStatus?: string | null;
@@ -285,6 +289,19 @@ export default function AppointmentDetailsModal({
     useState<AppointmentDetails | null>(null);
   const [desmarcando, setDesmarcando] = useState(false);
   const [tipoDesmarque, setTipoDesmarque] = useState<"CANCELOU" | "FALTOU" | undefined>(undefined);
+  const [confirmandoPre, setConfirmandoPre] = useState(false);
+
+  async function marcarPreReservaConfirmada() {
+    setConfirmandoPre(true);
+    setError("");
+    try {
+      await confirmarPreReserva(currentAppointment.id);
+      window.location.reload();
+    } catch (e) {
+      setConfirmandoPre(false);
+      setError(mensagemErroAcao(e, "Não foi possível confirmar. Tente de novo."));
+    }
+  }
 
   useLockBodyScroll(open);
 
@@ -430,7 +447,12 @@ export default function AppointmentDetailsModal({
                   </span>
                   {currentAppointment.naturezaAtendimento === "RETORNO" ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-cyan-50 px-2 py-0.5 text-[10px] font-bold text-cyan-700">
-                      <CalendarClock size={11} /> Retorno
+                      <CalendarClock size={11} /> Retorno sem custo
+                    </span>
+                  ) : null}
+                  {currentAppointment.preReserva === "PENDENTE" ? (
+                    <span className="inline-flex items-center rounded-full border border-dashed border-amber-400 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                      Pré-reserva
                     </span>
                   ) : null}
                   {currentAppointment.sinalPago ? (
@@ -503,6 +525,39 @@ export default function AppointmentDetailsModal({
               <div className="flex items-start gap-2.5 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-rose-700">
                 <AlertCircle size={18} className="mt-0.5 shrink-0" />
                 <p className="text-sm">{error}</p>
+              </div>
+            ) : null}
+
+            {currentAppointment.preReserva === "PENDENTE" &&
+            currentAppointment.status !== "Cancelado" &&
+            currentAppointment.status !== "Faltou" &&
+            currentAppointment.status !== "Atendido" ? (
+              <div className="rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50 p-3">
+                <p className="text-sm font-bold text-amber-900">Pré-reserva · ela ainda não confirmou</p>
+                <p className="mt-0.5 text-xs leading-5 text-amber-800">
+                  Combinado no fim do atendimento. Confirme com ela uns 7 dias antes.
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={marcarPreReservaConfirmada}
+                    disabled={confirmandoPre || isDeleting}
+                    className="h-10 rounded-xl bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    {confirmandoPre ? "Salvando..." : "Confirmou"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTipoDesmarque("CANCELOU");
+                      setDesmarcando(true);
+                    }}
+                    disabled={confirmandoPre || isDeleting}
+                    className="h-10 rounded-xl border border-amber-300 bg-white text-sm font-bold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                  >
+                    Não vem · liberar
+                  </button>
+                </div>
               </div>
             ) : null}
 

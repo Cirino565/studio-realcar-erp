@@ -100,6 +100,7 @@ export async function desmarcarAgendamento(dados: {
         sinalLancamentoId: true,
         lead: { select: { id: true, etapa: true } },
         cliente: { select: { nome: true, telefone: true, whatsapp: true } },
+        preReserva: true,
       },
     });
 
@@ -184,6 +185,8 @@ export async function desmarcarAgendamento(dados: {
         aguardandoRemarcacao: Boolean(dados.vaiRemarcar),
         sinalGuardado: decisao === "GUARDAR",
         desmarcadoEm: agora,
+        // Pre-reserva que nao foi confirmada: fica registrada como liberada.
+        ...(agendamento.preReserva === "PENDENTE" ? { preReserva: "LIBERADA" } : {}),
         ...(decisao === "DEVOLVER" ? { valorSinal: 0, sinalLancamentoId: null, sinalPago: false } : {}),
         observacoes: [agendamento.observacoes?.trim(), linha].filter(Boolean).join("\n"),
       },

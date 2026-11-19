@@ -22,6 +22,9 @@ import FinalizarAtendimentoModal, {
 import NovoAgendamentoModal from "./NovoAgendamentoModal";
 import ParaRemarcarPainel from "./ParaRemarcarPainel";
 import HorariosLivresModal, { type HorarioLivreParaAgendar } from "./HorariosLivresModal";
+import PreReservasPainel from "./PreReservasPainel";
+import ProximoHorarioEscolha, { type TipoProximoHorario } from "./ProximoHorarioEscolha";
+import type { PreReservasDaAgenda } from "@/lib/pre-reserva-lista";
 import type { RemarcacaoPendente } from "@/lib/remarcacao";
 import {
   lerProcedimentosExtras,
@@ -100,6 +103,7 @@ type NovoAgendamentoPayload = NovoHorarioPayload & {
   valorSinal?: number;
   naturezaAtendimento?: "PROCEDIMENTO" | "RETORNO";
   agendamentoOrigemId?: number | null;
+  preReserva?: boolean;
 };
 
 type Props = {
@@ -127,6 +131,8 @@ type Props = {
   driveConfigurado?: boolean;
   // Clientes que desmarcaram e ainda nao tem nova data (lista "Para remarcar").
   remarcacoesPendentes?: RemarcacaoPendente[];
+  // Pre-reservas dos proximos 7 dias ainda sem confirmacao.
+  preReservas?: PreReservasDaAgenda;
 };
 
 function parseLocalDate(value: string) {
@@ -313,6 +319,7 @@ export default function AgendaClient({
   podeRegistrarEvolucao,
   driveConfigurado,
   remarcacoesPendentes = [],
+  preReservas,
 }: Props) {
   const [selectedDate, setSelectedDate] = useState(() =>
     parseLocalDate(initialDate),
@@ -496,8 +503,14 @@ export default function AgendaClient({
       recorrenciaIndice: appointment.recorrenciaIndice,
       recorrenciaTotal: appointment.recorrenciaTotal,
       observacoes: appointment.observacoes || "",
+      // Editando uma pre-reserva: mostra a escolha para marcar que confirmou.
+      preReserva: appointment.preReserva === "PENDENTE" ? true : undefined,
     });
   }
+
+  // "Agendar proximo" sem saber o tipo: pergunta antes (procedimento pago ou
+  // retorno sem custo), em vez de abrir sempre como retorno.
+  const [escolhaProximo, setEscolhaProximo] = useState<AgendamentoAgenda | null>(null);
 
   function abrirFinalizacao(appointment: AgendamentoAgenda) {
     setSelectedAppointment(null);
@@ -506,7 +519,12 @@ export default function AgendaClient({
 
   function abrirReagendamento(
     appointment: AgendamentoAgenda,
-    opcoes?: { procedimento?: string; duracao?: number; observacoes?: string },
+    opcoes?: {
+      procedimento?: string;
+      duracao?: number;
+      observacoes?: string;
+      tipo?: TipoProximoHorario;
+    },
   ) {
     // Cancelado ou faltou: "Remarcar" - novo horario igual ao que foi perdido
     // (mesmo procedimento, retorno continua retorno). O antigo fica no
@@ -576,8 +594,39 @@ export default function AgendaClient({
         status: "Agendado",
         sinalPago: false,
         naturezaAtendimento: "PROCEDIMENTO",
+        preReserva: false,
       });
 
+      return;
+    }
+
+    // Sessao de pacote ja vem com o procedimento: segue direto (ja pago).
+    // Sem tipo escolhido: pergunta primeiro.
+    if (!opcoes?.procedimento && !opcoes?.tipo) {
+      setSelectedAppointment(null);
+      setFinishAppointment(null);
+      setEscolhaProximo(appointment);
+      return;
+    }
+
+    // Novo procedimento (pago), combinado no fim do atendimento: pre-reserva.
+    if (opcoes?.tipo === "procedimento") {
+      setNovoHorario({
+        modo: "novo",
+        tipoAtendimento: "agendamento",
+        data: toSaoPauloDateInput(dataSugerida),
+        hora: toTimeInput(dataBase),
+        profissionalId: appointment.profissionalId || undefined,
+        clienteId: appointment.clienteId,
+        procedimento: appointment.procedimento,
+        duracao: servicoDoProcedimento?.duracaoPadrao || appointment.duracao || 60,
+        valor: servicoDoProcedimento?.valorPadrao || 0,
+        status: "Agendado",
+        sinalPago: false,
+        naturezaAtendimento: "PROCEDIMENTO",
+        observacoes: `Combinado no atendimento de ${formatarDataCurta(appointment.data)}.`,
+        preReserva: true,
+      });
       return;
     }
 
@@ -599,6 +648,8 @@ export default function AgendaClient({
         `Retorno referente ao atendimento de ${formatarDataCurta(
           appointment.data,
         )}.`,
+      // Sessao de pacote ja paga: confirmado; retorno combinado: pre-reserva.
+      preReserva: !opcoes?.procedimento,
     });
   }
 
@@ -736,6 +787,20 @@ export default function AgendaClient({
               onAgendar={abrirRemarcacao}
             />
 
+            {preReservas ? (
+              <PreReservasPainel
+                itens={preReservas.itens}
+                modelo={preReservas.modelo}
+                clinica={preReservas.clinica}
+                onAbrir={(id) => {
+                  const item = preReservas.itens.find((atual) => atual.id === id);
+                  if (!item) return;
+                  const dia = new Date(item.data).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+                  window.location.href = `/agenda?data=${dia}&agendamentoId=${id}`;
+                }}
+              />
+            ) : null}
+
             <AgendaCalendar
             selectedDate={selectedDate}
             onDateChange={handleDateChange}
@@ -758,6 +823,19 @@ export default function AgendaClient({
           </>
         )}
       </div>
+
+      {escolhaProximo ? (
+        <ProximoHorarioEscolha
+          clienteNome={escolhaProximo.cliente.nome}
+          procedimento={escolhaProximo.procedimento}
+          onClose={() => setEscolhaProximo(null)}
+          onEscolher={(tipo) => {
+            const base = escolhaProximo;
+            setEscolhaProximo(null);
+            abrirReagendamento(base, { tipo });
+          }}
+        />
+      ) : null}
 
       {horariosLivresAberto ? (
         <HorariosLivresModal

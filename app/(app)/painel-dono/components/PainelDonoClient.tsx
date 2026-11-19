@@ -253,7 +253,7 @@ export default function PainelDonoClient({ dados }: { dados: PainelDono }) {
 
       {/* ---------------------------------------------- Bloco 2 */}
       <Bloco titulo="Clientes">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <Cartao>
             <Rotulo>Clientes novos</Rotulo>
             <Valor numero={clientes.novos} titulo="Clientes novos" subtitulo="cadastradas no período" contagem abrir={abrir} className="mt-1 block text-3xl font-bold text-slate-950" />
@@ -307,6 +307,21 @@ export default function PainelDonoClient({ dados }: { dados: PainelDono }) {
               </Linha>
               <Linha rotulo="Ainda sem horário">
                 <Valor numero={clientes.faltasSemRemarcar} titulo="Faltaram e ainda não remarcaram" contagem abrir={abrir} className="font-semibold text-rose-700" />
+              </Linha>
+            </div>
+          </Cartao>
+          <Cartao>
+            <Rotulo>Pré-reservas</Rotulo>
+            <Valor numero={clientes.preReservas} titulo="Pré-reservas" subtitulo="horários combinados no fim do atendimento" contagem abrir={abrir} className="mt-1 block text-3xl font-bold text-slate-950" />
+            <div className="mt-2">
+              <Linha rotulo="Confirmaram">
+                <Valor numero={clientes.preReservasConfirmadas} titulo="Pré-reservas confirmadas" contagem abrir={abrir} className="font-semibold text-emerald-700" />
+              </Linha>
+              <Linha rotulo="Liberaram o horário">
+                <Valor numero={clientes.preReservasLiberadas} titulo="Pré-reservas liberadas" contagem abrir={abrir} className="font-semibold text-rose-700" />
+              </Linha>
+              <Linha rotulo="Ainda sem resposta">
+                <Valor numero={clientes.preReservasAguardando} titulo="Pré-reservas sem resposta" contagem abrir={abrir} className="font-semibold text-amber-700" />
               </Linha>
             </div>
           </Cartao>

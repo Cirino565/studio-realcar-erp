@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   AlertCircle,
   AlertTriangle,
-  CalendarPlus,
   Check,
   Camera,
   CheckCircle2,
@@ -43,6 +42,7 @@ import {
 
 import { ClienteFotoUploadForm } from "@/app/(app)/clientes/components/ClienteFotoUploadForm";
 import type { AppointmentDetails } from "./AppointmentDetailsModal";
+import { ProximoHorarioOpcoes, type TipoProximoHorario } from "./ProximoHorarioEscolha";
 import { lerProcedimentosExtras, somaValorExtras } from "@/lib/procedimentos-extras";
 import { mensagemErroAcao } from "@/lib/erro-acao";
 
@@ -105,7 +105,12 @@ type Props = {
   podeAutorizarEstoqueNegativo: boolean;
   onAgendarRetorno?: (
     appointment: AppointmentDetails,
-    opcoes?: { procedimento?: string; duracao?: number; observacoes?: string },
+    opcoes?: {
+      procedimento?: string;
+      duracao?: number;
+      observacoes?: string;
+      tipo?: TipoProximoHorario;
+    },
   ) => void;
   onFinalizado?: (payload: AtendimentoFinalizadoPayload) => void;
 };
@@ -666,6 +671,12 @@ export default function FinalizarAtendimentoModal({
     onClose();
   }
 
+  // "Proximo horario" escolhido no fim: procedimento (pago) ou retorno sem custo.
+  function agendarProximoTipo(tipo: TipoProximoHorario) {
+    onClose();
+    onAgendarRetorno?.(currentAppointment, { tipo });
+  }
+
   function agendarRetornoAgora() {
     onClose();
 
@@ -842,24 +853,19 @@ export default function FinalizarAtendimentoModal({
               </div>
             </main>
 
-            <footer className="shrink-0 border-t border-slate-200 bg-white p-3 sm:p-4">
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={concluirSemRetorno}
-                  className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Voltar à agenda
-                </button>
-                <button
-                  type="button"
-                  onClick={agendarRetornoAgora}
-                  className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-3 text-xs font-semibold text-white hover:bg-violet-700"
-                >
-                  <CalendarPlus size={15} />
-                  Agendar retorno
-                </button>
-              </div>
+            <footer className="shrink-0 space-y-2 border-t border-slate-200 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4">
+              <p className="text-xs font-bold text-slate-700">Deixar próximo horário?</p>
+              <ProximoHorarioOpcoes
+                procedimento={currentAppointment.procedimento}
+                onEscolher={agendarProximoTipo}
+              />
+              <button
+                type="button"
+                onClick={concluirSemRetorno}
+                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Agora não · voltar à agenda
+              </button>
             </footer>
           </>
 

@@ -68,6 +68,11 @@ export type PainelDono = {
     faltasRemarcaram: Numero;
     /** Das faltas: ainda sem novo horario. */
     faltasSemRemarcar: Numero;
+    /** Pre-reservas com data no periodo. */
+    preReservas: Numero;
+    preReservasConfirmadas: Numero;
+    preReservasLiberadas: Numero;
+    preReservasAguardando: Numero;
   };
   anuncios: {
     gasto: PorCanal;
@@ -445,6 +450,27 @@ export async function obterPainelDono(parametros: {
   const faltasRemarcaram = numero(itensFaltas.filter((item) => item.remarcou).map((item) => item.item), true);
   const faltasSemRemarcar = numero(itensFaltas.filter((item) => !item.remarcou).map((item) => item.item), true);
 
+  // Pre-reservas (horario combinado no fim do atendimento) com data no periodo.
+  const preReservasBase = await prisma.agendamento.findMany({
+    where: { data: noPeriodo, preReserva: { not: null } },
+    select: { id: true, data: true, procedimento: true, clienteId: true, preReserva: true, cliente: { select: { nome: true } } },
+    orderBy: { data: "asc" },
+  });
+  const itemPre = (item: (typeof preReservasBase)[number]): ItemDetalhe => ({
+    id: `p-${item.id}`,
+    data: iso(item.data),
+    titulo: item.cliente?.nome ?? "Cliente",
+    detalhe: `${item.procedimento} · ${
+      item.preReserva === "CONFIRMADA" ? "confirmou" : item.preReserva === "LIBERADA" ? "liberou o horário" : "ainda não confirmou"
+    }`,
+    valor: null,
+    href: linkCliente(item.clienteId),
+  });
+  const preReservas = numero(preReservasBase.map(itemPre), true);
+  const preReservasConfirmadas = numero(preReservasBase.filter((item) => item.preReserva === "CONFIRMADA").map(itemPre), true);
+  const preReservasLiberadas = numero(preReservasBase.filter((item) => item.preReserva === "LIBERADA").map(itemPre), true);
+  const preReservasAguardando = numero(preReservasBase.filter((item) => item.preReserva === "PENDENTE").map(itemPre), true);
+
   /* ------------------------------------------------------ Bloco 3: anuncios */
   const canalDe = (campanhaId?: number | null): Canal =>
     canalDaCampanha(campanhaId ? campanhaPorId.get(campanhaId)?.canal : null);
@@ -574,6 +600,10 @@ export async function obterPainelDono(parametros: {
       faltas,
       faltasRemarcaram,
       faltasSemRemarcar,
+      preReservas,
+      preReservasConfirmadas,
+      preReservasLiberadas,
+      preReservasAguardando,
     },
     anuncios: {
       gasto,
