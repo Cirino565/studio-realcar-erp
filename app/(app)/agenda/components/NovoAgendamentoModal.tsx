@@ -38,6 +38,7 @@ import type { NovoHorarioPayload } from "./AgendaCalendar";
 import type { RemarcacaoPendente } from "@/lib/remarcacao";
 import IndicadaPorPicker from "@/components/clientes/IndicadaPorPicker";
 import { mensagemErroAcao } from "@/lib/erro-acao";
+import { areaDaProfissional } from "@/lib/area-cliente";
 import type { FormaPagamentoFinalizacao } from "./FinalizarAtendimentoModal";
 
 type Cliente = {
@@ -337,8 +338,17 @@ export default function NovoAgendamentoModal({
       initialPayload?.naturezaAtendimento === "RETORNO",
   );
 
+  // Area automatica: a de quem esta logado (Vivian/Gabriely) ou, se nao
+  // tiver, a da profissional escolhida no agendamento (Vivian = Estetica).
   const areaAutomaticaAtiva =
-    !modoEdicao && !modoEdicaoBloqueio ? areaPadraoAgendamento : null;
+    !modoEdicao && !modoEdicaoBloqueio
+      ? areaPadraoAgendamento ??
+        areaDaProfissional(
+          profissionais.find((profissional) => String(profissional.id) === String(profissionalId)),
+        )
+      : null;
+  const areaEsteticaMarcada = areaEstetica || areaAutomaticaAtiva === "estetica";
+  const areaCiliosMarcada = areaCilios || areaAutomaticaAtiva === "cilios";
 
   useEffect(() => {
     if (!open) {
@@ -383,10 +393,10 @@ export default function NovoAgendamentoModal({
         )
       : null;
     setAreaEstetica(
-      Boolean(clienteInicial?.areaEstetica) || areaAutomaticaAtiva === "estetica",
+      Boolean(clienteInicial?.areaEstetica),
     );
     setAreaCilios(
-      Boolean(clienteInicial?.areaCilios) || areaAutomaticaAtiva === "cilios",
+      Boolean(clienteInicial?.areaCilios),
     );
 
     setProfissionalId(
@@ -751,9 +761,10 @@ export default function NovoAgendamentoModal({
     );
   }
 
+  // A area automatica (da profissional) ja e somada na tela e ao salvar.
   function aplicarAreasPadrao() {
-    setAreaEstetica(areaAutomaticaAtiva === "estetica");
-    setAreaCilios(areaAutomaticaAtiva === "cilios");
+    setAreaEstetica(false);
+    setAreaCilios(false);
   }
 
   function selecionarCliente(cliente: Cliente) {
@@ -761,10 +772,10 @@ export default function NovoAgendamentoModal({
     setTipoCliente("existente");
     setBuscaCliente("");
     setAreaEstetica(
-      cliente.areaEstetica || areaAutomaticaAtiva === "estetica",
+      Boolean(cliente.areaEstetica),
     );
     setAreaCilios(
-      cliente.areaCilios || areaAutomaticaAtiva === "cilios",
+      Boolean(cliente.areaCilios),
     );
     setErro("");
   }
@@ -1034,8 +1045,8 @@ export default function NovoAgendamentoModal({
           naturezaAtendimento === "RETORNO" && agendamentoOrigemId
             ? Number(agendamentoOrigemId)
             : undefined,
-        areaEstetica,
-        areaCilios,
+        areaEstetica: areaEsteticaMarcada,
+        areaCilios: areaCiliosMarcada,
         recorrencia:
           modoEdicao || naturezaAtendimento === "RETORNO"
             ? { tipo: "nenhuma" as const }
@@ -1737,7 +1748,7 @@ export default function NovoAgendamentoModal({
               </span>
               {areaAutomaticaAtiva ? (
                 <span className="text-[11px] font-medium text-violet-700 dark:text-violet-300">
-                  Padrão automático: {areaAutomaticaAtiva === "estetica" ? "Estética" : "Cílios"}
+                  Automático pela profissional: {areaAutomaticaAtiva === "estetica" ? "Estética" : "Cílios"}
                 </span>
               ) : null}
             </div>
@@ -1746,7 +1757,7 @@ export default function NovoAgendamentoModal({
               <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
                 <input
                   type="checkbox"
-                  checked={areaEstetica}
+                  checked={areaEsteticaMarcada}
                   disabled={areaAutomaticaAtiva === "estetica"}
                   onChange={(event) => setAreaEstetica(event.target.checked)}
                   className="size-4 accent-violet-600 disabled:cursor-not-allowed"
@@ -1757,7 +1768,7 @@ export default function NovoAgendamentoModal({
               <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
                 <input
                   type="checkbox"
-                  checked={areaCilios}
+                  checked={areaCiliosMarcada}
                   disabled={areaAutomaticaAtiva === "cilios"}
                   onChange={(event) => setAreaCilios(event.target.checked)}
                   className="size-4 accent-violet-600 disabled:cursor-not-allowed"
