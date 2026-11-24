@@ -228,13 +228,24 @@ export default function ReativacaoClient({ dados, podeGerenciar }: Props) {
 
       {filtros.aba === "lista" ? (
         <>
-          <section className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:grid-cols-[1.3fr_1fr_1fr_auto] sm:items-end">
+          <section className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:grid-cols-2 sm:items-end lg:grid-cols-[1.3fr_1.3fr_1fr_1fr_auto]">
             <label className="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
               Serviço que procurou
               <select value={filtros.servico} onChange={(evento) => irPara({ servico: evento.target.value })} className={campo}>
                 <option value="">Todos os serviços</option>
                 {dados.servicos.map((item) => (
                   <option key={item.nome} value={item.nome}>
+                    {item.nome} ({item.quantidade})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+              Campanha
+              <select value={filtros.campanha} onChange={(evento) => irPara({ campanha: evento.target.value })} className={campo}>
+                <option value="">Todas as campanhas</option>
+                {dados.campanhas.map((item) => (
+                  <option key={item.id} value={item.id}>
                     {item.nome} ({item.quantidade})
                   </option>
                 ))}
@@ -382,6 +393,7 @@ function CartaoPerdido({
           <p className="break-words font-semibold text-slate-900 dark:text-white">{item.nome}</p>
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
             {item.servico || "Serviço não informado"} · {item.origem || "sem origem"} · perdido em {dataCurta(item.perdidoEm)}
+            {item.campanha ? ` · ${item.campanha}` : ""}
           </p>
           {item.motivoPerda ? <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Motivo: {item.motivoPerda}</p> : null}
         </div>

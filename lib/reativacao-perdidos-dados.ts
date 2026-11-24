@@ -22,12 +22,14 @@ export type FiltrosReativacao = {
   servico: string;
   dias: number; // 0 = qualquer data
   origem: string;
+  campanha: string;
   pagina: number;
 };
 
 export type ItemReativacao = {
   id: number;
   nome: string;
+  campanha: string | null;
   telefone: string;
   servico: string | null;
   origem: string | null;
@@ -55,6 +57,7 @@ export type DadosReativacao = {
   filtros: FiltrosReativacao;
   servicos: Array<{ nome: string; quantidade: number }>;
   origens: Array<{ nome: string; quantidade: number }>;
+  campanhas: Array<{ id: string; nome: string; quantidade: number }>;
   totalLista: number;
   itens: ItemReativacao[];
   totalEnviadas: number;
@@ -79,6 +82,7 @@ export function lerFiltros(params: Record<string, string | undefined>): FiltrosR
     servico: (params.servico || "").trim(),
     dias: [0, 30, 60, 90, 180, 365].includes(dias) ? dias : 0,
     origem: (params.origem || "").trim(),
+    campanha: (params.campanha || "").trim(),
     pagina: Math.max(1, Math.floor(lerNumero(params.pagina, 1))),
   };
 }
@@ -117,7 +121,7 @@ export async function carregarReativacao(filtros: FiltrosReativacao): Promise<Da
     await Promise.all([
       prisma.procedimentoServico.findMany({ select: { nome: true } }),
       prisma.lead.groupBy({ by: ["interesse"], where: base, _count: { _all: true } }),
-      prisma.lead.groupBy({ by: ["origem"], where: base, _count: { _all: true } }),
+      prisma.lead.groupBy({ by: ["origem", "campanhaId"], where: base, _count: { _all: true } }),
       prisma.configuracaoClinica.findFirst({ select: { reativacaoLimiteDiario: true } }),
       prisma.comunicacaoRegistro.count({
         where: { categoria: CATEGORIA_REATIVACAO_PERDIDOS, enviadoEm: { gte: inicioDoDiaSaoPaulo(agora) } },
@@ -147,8 +151,30 @@ export async function carregarReativacao(filtros: FiltrosReativacao): Promise<Da
     .map(([nome, quantidade]) => ({ nome, quantidade }))
     .sort((a, b) => b.quantidade - a.quantidade || a.nome.localeCompare(b.nome, "pt-BR"));
 
-  const origens = porOrigem
-    .map((grupo) => ({ nome: grupo.origem || "Sem origem", quantidade: grupo._count._all }))
+  const quantidadePorOrigem = new Map<string, number>();
+  const quantidadePorCampanha = new Map<string, number>();
+  for (const grupo of porOrigem) {
+    const origem = grupo.origem || "Sem origem";
+    quantidadePorOrigem.set(origem, (quantidadePorOrigem.get(origem) ?? 0) + grupo._count._all);
+    const campanha = grupo.campanhaId ? String(grupo.campanhaId) : "sem";
+    quantidadePorCampanha.set(campanha, (quantidadePorCampanha.get(campanha) ?? 0) + grupo._count._all);
+  }
+  const origens = Array.from(quantidadePorOrigem.entries())
+    .map(([nome, quantidade]) => ({ nome, quantidade }))
+    .sort((a, b) => b.quantidade - a.quantidade);
+
+  // Campanhas de onde vieram os perdidos (filtro "Campanha").
+  const idsCampanhas = Array.from(quantidadePorCampanha.keys()).filter((id) => id !== "sem").map(Number);
+  const nomesCampanhas = idsCampanhas.length
+    ? await prisma.campanhaMarketing.findMany({ where: { id: { in: idsCampanhas } }, select: { id: true, nome: true } })
+    : [];
+  const nomeCampanha = new Map(nomesCampanhas.map((item) => [item.id, item.nome]));
+  const campanhas = Array.from(quantidadePorCampanha.entries())
+    .map(([id, quantidade]) => ({
+      id,
+      nome: id === "sem" ? "Sem campanha" : nomeCampanha.get(Number(id)) ?? `Campanha ${id}`,
+      quantidade,
+    }))
     .sort((a, b) => b.quantidade - a.quantidade);
 
   // Filtros escolhidos na tela (tudo resolvido no banco).
@@ -169,6 +195,11 @@ export async function carregarReativacao(filtros: FiltrosReativacao): Promise<Da
   }
   if (filtros.origem) {
     filtrosLista.push(filtros.origem === "Sem origem" ? { origem: null } : { origem: filtros.origem });
+  }
+  if (filtros.campanha) {
+    filtrosLista.push(
+      filtros.campanha === "sem" ? { campanhaId: null } : { campanhaId: Number(filtros.campanha) || -1 },
+    );
   }
   const whereLista: Prisma.LeadWhereInput = { AND: filtrosLista };
 
@@ -202,7 +233,16 @@ export async function carregarReativacao(filtros: FiltrosReativacao): Promise<Da
           orderBy: [{ perdidoEm: { sort: "desc", nulls: "last" } }, { id: "desc" }],
           skip: (filtros.pagina - 1) * POR_PAGINA,
           take: POR_PAGINA,
-          select: { id: true, nome: true, telefone: true, interesse: true, origem: true, motivoPerda: true, perdidoEm: true },
+          select: {
+            id: true,
+            nome: true,
+            telefone: true,
+            interesse: true,
+            origem: true,
+            motivoPerda: true,
+            perdidoEm: true,
+            campanha: { select: { nome: true } },
+          },
         })
       : Promise.resolve([]),
   ]);
@@ -216,6 +256,7 @@ export async function carregarReativacao(filtros: FiltrosReativacao): Promise<Da
     return {
       id: lead.id,
       nome: lead.nome,
+      campanha: lead.campanha?.nome ?? null,
       telefone: lead.telefone || "",
       servico,
       origem: lead.origem,
@@ -274,6 +315,7 @@ export async function carregarReativacao(filtros: FiltrosReativacao): Promise<Da
     filtros,
     servicos,
     origens,
+    campanhas,
     totalLista,
     itens,
     totalEnviadas: enviadasTodas.length,

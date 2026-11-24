@@ -26,9 +26,9 @@ export const ROTULO_RESULTADO: Record<ResultadoReativacao, string> = {
 };
 
 export const TEXTO_PADRAO =
-  "Oi, {nome}! Tudo bem? 😊 Aqui é do Studio Realçar.\n\n" +
-  "Um tempo atrás você falou com a gente sobre {servico}. Ainda tem interesse?\n\n" +
-  "Estamos com horários nesta semana e posso reservar um para você. Me conta qual dia e período (manhã ou tarde) ficam melhores. 💜";
+  "Oi, {nome}! Tudo bem? 😊 Vi que você se interessou pela nossa {servico} há um tempinho e a gente acabou não conseguindo marcar um horário. " +
+  "Passei só pra dizer que seguimos de portas abertas pra te receber! " +
+  "Se quiser, me conta qual dia e período ficam melhores que eu já separo um horário pra você. Qualquer dúvida, é só me chamar 💛";
 
 export function normalizarTexto(valor?: string | null) {
   return (valor || "")
