@@ -1777,7 +1777,7 @@ function ResumoCard({ title, value, detail, icon: Icon }: { title: string; value
 
 // Encerrados (convertidos e perdidos) mostram so os mais recentes; o resto
 // aparece no "Mostrar mais". A busca continua achando todos.
-const LEADS_ENCERRADOS_POR_VEZ = 10;
+const LEADS_ENCERRADOS_POR_VEZ = 20;
 
 function PipelineColumn({
   etapa,
@@ -1811,8 +1811,17 @@ function PipelineColumn({
   const total = leads.reduce((acc, lead) => acc + lead.valorPrevisto, 0);
   const encerrada = etapa === "Convertido" || etapa === "Perdido";
   const [quantosVer, setQuantosVer] = useState(LEADS_ENCERRADOS_POR_VEZ);
-  const visiveis = encerrada ? leads.slice(0, quantosVer) : leads;
-  const faltam = leads.length - visiveis.length;
+  // Perdidos: "Para contato" = tem telefone e ainda nao recebeu a ultima
+  // mensagem (Reativar perdidos). O resto (sem telefone ou ja recebeu e nao
+  // voltou) fica no "Arquivo", fora do caminho.
+  const [visaoPerdidos, setVisaoPerdidos] = useState<"contato" | "arquivo">("contato");
+  const perdidoParaContato = (lead: MarketingLead) =>
+    Boolean((lead.telefone || "").replace(/\D/g, "")) && !lead.reativacaoEnviadaEm;
+  const paraContato = etapa === "Perdido" ? leads.filter(perdidoParaContato) : leads;
+  const arquivo = etapa === "Perdido" ? leads.filter((lead) => !perdidoParaContato(lead)) : [];
+  const daVisao = etapa === "Perdido" && visaoPerdidos === "arquivo" ? arquivo : paraContato;
+  const visiveis = encerrada ? daVisao.slice(0, quantosVer) : leads;
+  const faltam = daVisao.length - visiveis.length;
 
   return (
     <div className="min-h-[20rem] rounded-3xl border border-white/[0.10] bg-white/[0.055] p-4 shadow-xl shadow-black/10">
@@ -1823,12 +1832,55 @@ function PipelineColumn({
         </div>
         <span className="rounded-full border border-white/[0.10] bg-white/[0.07] px-2.5 py-1 text-xs font-semibold text-slate-300">{leads.length}</span>
       </div>
-      <div className="mb-4 rounded-2xl border border-white/[0.08] bg-black/10 px-3 py-2 text-xs text-slate-400">Valor previsto: <strong className="text-slate-100">{formatarMoeda(total)}</strong></div>
+      {etapa === "Perdido" ? (
+        <div className="mb-3 space-y-2">
+          <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1" role="group" aria-label="Perdidos">
+            {(
+              [
+                { valor: "contato", rotulo: `Para contato (${paraContato.length})` },
+                { valor: "arquivo", rotulo: `Arquivo (${arquivo.length})` },
+              ] as const
+            ).map((opcao) => (
+              <button
+                key={opcao.valor}
+                type="button"
+                onClick={() => {
+                  setVisaoPerdidos(opcao.valor);
+                  setQuantosVer(LEADS_ENCERRADOS_POR_VEZ);
+                }}
+                aria-pressed={visaoPerdidos === opcao.valor}
+                className={`h-8 rounded-lg text-xs font-semibold transition ${
+                  visaoPerdidos === opcao.valor ? "bg-white text-violet-700 shadow-sm" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                {opcao.rotulo}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] leading-4 text-slate-500">
+            {visaoPerdidos === "contato"
+              ? "Têm telefone e ainda não receberam a última mensagem."
+              : "Sem telefone ou já receberam a última mensagem e não voltaram."}
+          </p>
+          {visaoPerdidos === "contato" && paraContato.length > 0 ? (
+            <Link
+              href="/marketing/reativacao"
+              className="flex h-10 items-center justify-center gap-2 rounded-xl bg-violet-600 px-3 text-sm font-bold text-white hover:bg-violet-700"
+            >
+              <MessageCircle className="size-4" /> Mandar a última mensagem
+            </Link>
+          ) : null}
+        </div>
+      ) : (
+        <div className="mb-4 rounded-2xl border border-white/[0.08] bg-black/10 px-3 py-2 text-xs text-slate-400">Valor previsto: <strong className="text-slate-100">{formatarMoeda(total)}</strong></div>
+      )}
 
-      <div className="space-y-3">
-        {leads.length === 0 ? (
+      <div className={encerrada ? "space-y-1.5" : "space-y-3"}>
+        {daVisao.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-white/[0.12] p-4 text-center text-xs text-slate-500">Nenhum lead nesta etapa.</div>
-        ) : visiveis.map((lead) => (
+        ) : encerrada ? visiveis.map((lead) => (
+          <LinhaLeadEncerrado key={lead.id} lead={lead} onMessage={onMessage} onDetails={onDetails} />
+        )) : visiveis.map((lead) => (
           <LeadCard
             key={lead.id}
             lead={lead}
@@ -1868,6 +1920,59 @@ function PipelineColumn({
           ) : null}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+// Linha curta para Convertidos e Perdidos (lista longa sem rolar tanto).
+function LinhaLeadEncerrado({
+  lead,
+  onMessage,
+  onDetails,
+}: {
+  lead: MarketingLead;
+  onMessage: (lead: MarketingLead) => void;
+  onDetails: (lead: MarketingLead) => void;
+}) {
+  const telefone = (lead.telefone || "").replace(/\D/g, "");
+  const quando = lead.etapa === "Perdido" ? lead.perdidoEm ?? lead.updatedAt : lead.updatedAt;
+  const dataCurta = quando
+    ? new Date(quando).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" })
+    : "";
+  const extra =
+    lead.etapa === "Perdido"
+      ? !telefone
+        ? "sem telefone"
+        : lead.reativacaoEnviadaEm
+          ? `última mensagem em ${new Date(lead.reativacaoEnviadaEm).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" })}`
+          : lead.motivoPerda || ""
+      : "";
+
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+      <button type="button" onClick={() => onDetails(lead)} className="min-w-0 flex-1 text-left">
+        <p className="truncate text-sm font-semibold text-slate-900">{lead.nome}</p>
+        <p className="truncate text-[11px] text-slate-500">
+          {[lead.interesse, lead.campanha?.nome || lead.origem, dataCurta, extra].filter(Boolean).join(" · ")}
+        </p>
+      </button>
+      {telefone ? (
+        <button
+          type="button"
+          onClick={() => onMessage(lead)}
+          aria-label={`WhatsApp de ${lead.nome}`}
+          className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+        >
+          <MessageCircle className="size-4" />
+        </button>
+      ) : null}
+      <button
+        type="button"
+        onClick={() => onDetails(lead)}
+        className="h-9 shrink-0 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+      >
+        Detalhes
+      </button>
     </div>
   );
 }
