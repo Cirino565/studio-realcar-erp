@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { formatarMoeda } from "@/lib/format";
+import ResultadoSimples from "./ResultadoSimples";
 import type {
   GestaoCampanhaResultado,
   GestaoData,
@@ -391,6 +392,8 @@ export default function GestaoDashboard({ data }: Props) {
 
   return (
     <div className="min-w-0 space-y-5 pb-4">
+      <ResultadoSimples financeiro={data.financeiro} />
+
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           title="Receita recebida"
@@ -431,6 +434,13 @@ export default function GestaoDashboard({ data }: Props) {
             icon={WalletCards}
           />
 
+          {/* Os numeros detalhados ficam recolhidos (o resumo em palavras esta no topo). */}
+          <details className="group mt-4">
+            <summary className="flex cursor-pointer list-none items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+              Ver os números em detalhe
+              <span className="text-xs text-violet-700 group-open:hidden">abrir</span>
+              <span className="hidden text-xs text-violet-700 group-open:inline">fechar</span>
+            </summary>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <LeituraFinanceiraCard
               label="Receita de serviços"
@@ -519,6 +529,7 @@ export default function GestaoDashboard({ data }: Props) {
               <p className="mt-1 text-[11px] text-slate-600">{data.financeiro.quantidadeAReceber} lançamento(s) ainda não marcado(s) como pago.</p>
             </div>
           </div>
+          </details>
         </div>
 
         <div className="premium-card p-4 sm:p-5">
