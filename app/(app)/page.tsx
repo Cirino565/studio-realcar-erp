@@ -32,6 +32,7 @@ import EvolucoesPendentesClient from "@/components/dashboard/EvolucoesPendentesC
 import FilaComercialClient from "@/components/dashboard/FilaComercialClient";
 import ReativacaoClient from "@/components/dashboard/ReativacaoClient";
 import { WhatsAppLink } from "@/components/ui/whatsapp-link";
+import { WhatsAppEnviado } from "@/components/ui/whatsapp-enviado";
 import { lerProcedimentosExtras, nomesParaMensagem } from "@/lib/procedimentos-extras";
 
 const TIMEZONE = "America/Sao_Paulo";
@@ -469,6 +470,34 @@ export default async function Home() {
     .slice(0, 10);
 
   const nomeClinica = configuracaoClinica?.nome?.trim() || "Studio Realçar";
+
+  // Mensagens do Dashboard ja enviadas (botao fica cinza). Consulta pequena.
+  const enviadasDashboard =
+    aniversariantesHoje.length + posAtendimento.length > 0
+      ? await prisma.comunicacaoRegistro.findMany({
+          where: {
+            status: "Enviada",
+            OR: [
+              {
+                categoria: "Aniversário",
+                clienteId: { in: aniversariantesHoje.map((cliente) => cliente.id) },
+                createdAt: { gte: new Date(`${hojeISO}T00:00:00-03:00`) },
+              },
+              {
+                categoria: "Pós-atendimento",
+                agendamentoId: { in: posAtendimento.map((item) => item.id) },
+              },
+            ],
+          },
+          select: { categoria: true, clienteId: true, agendamentoId: true },
+        })
+      : [];
+  const aniversarioEnviado = new Set(
+    enviadasDashboard.filter((item) => item.categoria === "Aniversário").map((item) => item.clienteId),
+  );
+  const posEnviado = new Set(
+    enviadasDashboard.filter((item) => item.categoria === "Pós-atendimento").map((item) => item.agendamentoId),
+  );
 
   const produtosCriticos = produtosAtivos
     .filter(
@@ -1135,7 +1164,7 @@ export default async function Home() {
                         {item.profissional?.nome || "Equipe"} · {formatarDataCurta(item.data)}
                       </p>
                     </div>
-                    <WhatsAppLink
+                    <WhatsAppEnviado
                       href={buildWhatsAppUrl(
                         item.cliente.whatsapp || item.cliente.telefone,
                         buildWhatsAppMessage({
@@ -1145,11 +1174,20 @@ export default async function Home() {
                           appointmentDate: item.data,
                         }),
                       )}
+                      enviadaInicial={posEnviado.has(item.id)}
+                      registro={{
+                        categoria: "Pós-atendimento",
+                        clienteId: item.cliente.id,
+                        agendamentoId: item.id,
+                        destinatarioNome: item.cliente.nome,
+                        telefone: item.cliente.whatsapp || item.cliente.telefone,
+                      }}
                       className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white hover:bg-emerald-700"
+                      classNameEnviada="inline-flex h-10 shrink-0 items-center justify-center gap-1 rounded-xl border border-slate-200 bg-slate-100 px-2.5 text-xs font-bold text-slate-500 hover:bg-slate-200"
                       aria-label={`Enviar pós-atendimento para ${item.cliente.nome}`}
                     >
                       <MessageCircle className="size-4" />
-                    </WhatsAppLink>
+                    </WhatsAppEnviado>
                   </div>
                 </div>
               ))
@@ -1206,16 +1244,24 @@ export default async function Home() {
                       <p className="mt-0.5 text-xs font-semibold text-rose-600">Aniversário hoje</p>
                     </div>
                     {mensagemAniversario ? (
-                      <WhatsAppLink
+                      <WhatsAppEnviado
                         href={buildWhatsAppUrl(
                           cliente.whatsapp || cliente.telefone,
                           mensagemAniversario,
                         )}
+                        enviadaInicial={aniversarioEnviado.has(cliente.id)}
+                        registro={{
+                          categoria: "Aniversário",
+                          clienteId: cliente.id,
+                          destinatarioNome: cliente.nome,
+                          telefone: cliente.whatsapp || cliente.telefone,
+                        }}
                         className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+                        classNameEnviada="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-200"
                       >
                         <MessageCircle className="size-3.5" />
                         Mensagem
-                      </WhatsAppLink>
+                      </WhatsAppEnviado>
                     ) : podeGerenciarMarketing ? (
                       <Link
                         href="/comunicacoes?aba=modelos#modelo-aniversario"
