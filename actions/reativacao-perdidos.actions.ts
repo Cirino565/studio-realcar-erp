@@ -147,6 +147,39 @@ export async function registrarResultadoReativacao(dados: { leadId: number; resu
   return { ok: true as const };
 }
 
+/**
+ * Marca que o perdido recebeu a ULTIMA mensagem (pelo Arquivo do pipeline).
+ * Depois disso o botao fica cinza e ele nao entra mais em nenhuma lista de
+ * envio. Serve para um lead ou para varios de uma vez.
+ */
+export async function marcarUltimaMensagemPerdidos(leadIds: number[]) {
+  await requirePermission("marketing.gerenciar");
+  const ids = Array.from(new Set((leadIds || []).map(Number).filter((id) => Number.isInteger(id) && id > 0))).slice(0, 2000);
+  if (ids.length === 0) return { ok: true as const, marcados: 0 };
+
+  const agora = new Date();
+  const pendentes = await prisma.lead.findMany({
+    where: { id: { in: ids }, ultimaMensagemEm: null },
+    select: { id: true },
+  });
+  if (pendentes.length > 0) {
+    const idsPendentes = pendentes.map((item) => item.id);
+    await prisma.$transaction([
+      prisma.lead.updateMany({ where: { id: { in: idsPendentes } }, data: { ultimaMensagemEm: agora } }),
+      prisma.leadInteracao.createMany({
+        data: idsPendentes.map((leadId) => ({
+          leadId,
+          tipo: "Reativação",
+          descricao: "Última mensagem enviada pelo WhatsApp (arquivo). Não enviar de novo.",
+        })),
+      }),
+    ]);
+  }
+
+  revalidar();
+  return { ok: true as const, marcados: pendentes.length };
+}
+
 /** Quantos dias depois de perdido a pessoa entra na lista (padrao 7). */
 export async function definirDiasEsfriarReativacao(dias: number) {
   await requirePermission("marketing.gerenciar");

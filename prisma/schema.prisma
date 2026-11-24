@@ -523,6 +523,8 @@ model Lead {
   // de reativacao (uma vez so) e o que aconteceu depois.
   perdidoEm             DateTime?
   reativacaoEnviadaEm   DateTime?
+  // "Ultima das ultimas" mensagem para perdido (Arquivo): nao manda de novo.
+  ultimaMensagemEm      DateTime?
   reativacaoResultado   String?
   reativacaoResultadoEm DateTime?
   // "Chamou" / "Nao chamou" / "A verificar" - controle manual de quem

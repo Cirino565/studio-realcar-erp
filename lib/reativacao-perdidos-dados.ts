@@ -101,6 +101,7 @@ export async function carregarReativacao(filtros: FiltrosReativacao): Promise<Da
   const base: Prisma.LeadWhereInput = {
     etapa: "Perdido",
     reativacaoEnviadaEm: null,
+    ultimaMensagemEm: null,
     telefone: { not: null },
     ...jaEsfriou,
     NOT: [

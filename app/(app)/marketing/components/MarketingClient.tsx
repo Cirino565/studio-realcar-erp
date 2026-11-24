@@ -38,6 +38,7 @@ import {
 
 import { buscarDisponibilidadeAgenda } from "@/actions/agendamento.actions";
 import { registrarLeadInstagram, type ResultadoLeadInstagram } from "@/actions/lead-instagram.actions";
+import { marcarUltimaMensagemPerdidos } from "@/actions/reativacao-perdidos.actions";
 import { campanhaEhInstagram } from "@/lib/campanha-instagram";
 import type { VinculoDoLead } from "@/lib/vinculo-clique";
 import VinculoCliquePainel from "./VinculoCliquePainel";
@@ -1815,11 +1816,33 @@ function PipelineColumn({
   // mensagem (Reativar perdidos). O resto (sem telefone ou ja recebeu e nao
   // voltou) fica no "Arquivo", fora do caminho.
   const [visaoPerdidos, setVisaoPerdidos] = useState<"contato" | "arquivo">("contato");
-  const perdidoParaContato = (lead: MarketingLead) =>
-    Boolean((lead.telefone || "").replace(/\D/g, "")) && !lead.reativacaoEnviadaEm;
+  // Arquivo em 3 partes: falta a ultima mensagem / ja recebeu tudo / sem telefone.
+  const [parteArquivo, setParteArquivo] = useState<"pendente" | "enviada" | "semTelefone">("pendente");
+  const [marcadosAgora, setMarcadosAgora] = useState<Record<number, string>>({});
+  const [marcandoTodos, setMarcandoTodos] = useState(false);
+  const temTelefone = (lead: MarketingLead) => Boolean((lead.telefone || "").replace(/\D/g, ""));
+  const ultimaEm = (lead: MarketingLead) =>
+    marcadosAgora[lead.id] ?? (lead.ultimaMensagemEm ? new Date(lead.ultimaMensagemEm).toISOString() : null);
+  const perdidoParaContato = (lead: MarketingLead) => temTelefone(lead) && !lead.reativacaoEnviadaEm && !ultimaEm(lead);
   const paraContato = etapa === "Perdido" ? leads.filter(perdidoParaContato) : leads;
   const arquivo = etapa === "Perdido" ? leads.filter((lead) => !perdidoParaContato(lead)) : [];
-  const daVisao = etapa === "Perdido" && visaoPerdidos === "arquivo" ? arquivo : paraContato;
+  const arquivoPendente = arquivo.filter((lead) => temTelefone(lead) && !ultimaEm(lead));
+  const arquivoEnviada = arquivo.filter((lead) => Boolean(ultimaEm(lead)));
+  const arquivoSemTelefone = arquivo.filter((lead) => !temTelefone(lead) && !ultimaEm(lead));
+  const daVisao =
+    etapa === "Perdido" && visaoPerdidos === "arquivo"
+      ? parteArquivo === "pendente"
+        ? arquivoPendente
+        : parteArquivo === "enviada"
+          ? arquivoEnviada
+          : arquivoSemTelefone
+      : paraContato;
+
+  function marcarUltima(ids: number[]) {
+    const agora = new Date().toISOString();
+    setMarcadosAgora((atual) => ({ ...atual, ...Object.fromEntries(ids.map((id) => [id, agora])) }));
+    return marcarUltimaMensagemPerdidos(ids);
+  }
   const visiveis = encerrada ? daVisao.slice(0, quantosVer) : leads;
   const faltam = daVisao.length - visiveis.length;
 
@@ -1857,11 +1880,61 @@ function PipelineColumn({
               </button>
             ))}
           </div>
+          {visaoPerdidos === "arquivo" ? (
+            <div className="flex flex-wrap gap-1.5">
+              {(
+                [
+                  { valor: "pendente", rotulo: `Falta a última (${arquivoPendente.length})` },
+                  { valor: "enviada", rotulo: `Já recebeu a última (${arquivoEnviada.length})` },
+                  { valor: "semTelefone", rotulo: `Sem telefone (${arquivoSemTelefone.length})` },
+                ] as const
+              ).map((opcao) => (
+                <button
+                  key={opcao.valor}
+                  type="button"
+                  onClick={() => {
+                    setParteArquivo(opcao.valor);
+                    setQuantosVer(LEADS_ENCERRADOS_POR_VEZ);
+                  }}
+                  aria-pressed={parteArquivo === opcao.valor}
+                  className={`h-7 rounded-full border px-2.5 text-[11px] font-semibold ${
+                    parteArquivo === opcao.valor
+                      ? "border-violet-600 bg-violet-600 text-white"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-violet-300"
+                  }`}
+                >
+                  {opcao.rotulo}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <p className="text-[11px] leading-4 text-slate-500">
             {visaoPerdidos === "contato"
-              ? "Têm telefone e ainda não receberam a última mensagem."
-              : "Sem telefone ou já receberam a última mensagem e não voltaram."}
+              ? "Têm telefone e ainda não receberam a mensagem de reativação."
+              : parteArquivo === "pendente"
+                ? "Já receberam a reativação e não voltaram. Mandou a última pelo botão do WhatsApp? Ela fica marcada e o botão fica cinza."
+                : parteArquivo === "enviada"
+                  ? "Já receberam a última mensagem. Não mandar de novo."
+                  : "Sem telefone: não dá para mandar mensagem."}
           </p>
+          {visaoPerdidos === "arquivo" && parteArquivo === "pendente" && arquivoPendente.length > 0 && podeGerenciarMarketing ? (
+            <button
+              type="button"
+              disabled={marcandoTodos}
+              onClick={async () => {
+                if (!window.confirm(`Marcar os ${arquivoPendente.length} desta lista como "já recebeu a última mensagem"? Use se você já mandou para todos.`)) return;
+                setMarcandoTodos(true);
+                try {
+                  await marcarUltima(arquivoPendente.map((lead) => lead.id));
+                } finally {
+                  setMarcandoTodos(false);
+                }
+              }}
+              className="h-9 w-full rounded-xl border border-violet-200 bg-white px-3 text-xs font-bold text-violet-700 hover:bg-violet-50 disabled:opacity-50"
+            >
+              {marcandoTodos ? "Marcando..." : `Já mandei para todos estes (${arquivoPendente.length})`}
+            </button>
+          ) : null}
           {visaoPerdidos === "contato" && paraContato.length > 0 ? (
             <Link
               href="/marketing/reativacao"
@@ -1879,7 +1952,19 @@ function PipelineColumn({
         {daVisao.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-white/[0.12] p-4 text-center text-xs text-slate-500">Nenhum lead nesta etapa.</div>
         ) : encerrada ? visiveis.map((lead) => (
-          <LinhaLeadEncerrado key={lead.id} lead={lead} onMessage={onMessage} onDetails={onDetails} />
+          <LinhaLeadEncerrado
+            key={lead.id}
+            lead={lead}
+            onMessage={(item) => {
+              // No Arquivo, mandar pelo WhatsApp ja marca como "ultima mensagem".
+              if (etapa === "Perdido" && visaoPerdidos === "arquivo" && podeGerenciarMarketing) {
+                void marcarUltima([item.id]).catch(() => undefined);
+              }
+              onMessage(item);
+            }}
+            onDetails={onDetails}
+            ultimaEnviadaEm={etapa === "Perdido" ? ultimaEm(lead) : null}
+          />
         )) : visiveis.map((lead) => (
           <LeadCard
             key={lead.id}
@@ -1929,10 +2014,12 @@ function LinhaLeadEncerrado({
   lead,
   onMessage,
   onDetails,
+  ultimaEnviadaEm,
 }: {
   lead: MarketingLead;
   onMessage: (lead: MarketingLead) => void;
   onDetails: (lead: MarketingLead) => void;
+  ultimaEnviadaEm?: string | null;
 }) {
   const telefone = (lead.telefone || "").replace(/\D/g, "");
   const quando = lead.etapa === "Perdido" ? lead.perdidoEm ?? lead.updatedAt : lead.updatedAt;
@@ -1941,7 +2028,9 @@ function LinhaLeadEncerrado({
     : "";
   const extra =
     lead.etapa === "Perdido"
-      ? !telefone
+      ? ultimaEnviadaEm
+        ? `última enviada em ${new Date(ultimaEnviadaEm).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" })}`
+        : !telefone
         ? "sem telefone"
         : lead.reativacaoEnviadaEm
           ? `última mensagem em ${new Date(lead.reativacaoEnviadaEm).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" })}`
@@ -1956,7 +2045,14 @@ function LinhaLeadEncerrado({
           {[lead.interesse, lead.campanha?.nome || lead.origem, dataCurta, extra].filter(Boolean).join(" · ")}
         </p>
       </button>
-      {telefone ? (
+      {telefone && ultimaEnviadaEm ? (
+        <span
+          title="Já recebeu a última mensagem"
+          className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-slate-400"
+        >
+          <CheckCircle2 className="size-4" />
+        </span>
+      ) : telefone ? (
         <button
           type="button"
           onClick={() => onMessage(lead)}
