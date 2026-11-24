@@ -112,7 +112,7 @@ export default function PreReservasPainel({ itens, modelo, clinica, onAbrir }: P
                             }),
                           )
                         }
-                        className="h-9 rounded-lg bg-slate-800 px-3 font-semibold text-white disabled:opacity-50"
+                        className="h-9 rounded-lg bg-rose-600 px-3 font-semibold text-white hover:bg-rose-700 disabled:opacity-50"
                       >
                         Sim, liberar
                       </button>

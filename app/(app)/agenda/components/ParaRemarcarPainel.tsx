@@ -125,7 +125,7 @@ export default function ParaRemarcarPainel({ pendentes, onAgendar }: Props) {
                       <>
                         <p className="font-semibold">Ela desistiu. E o sinal de {moeda(pendente.valorSinal)}?</p>
                         <div className="mt-2 flex flex-wrap gap-2">
-                          <button type="button" onClick={() => desistiu(pendente, "RETER")} disabled={salvando !== null} className="h-9 rounded-lg bg-slate-800 px-3 font-semibold text-white disabled:opacity-50">
+                          <button type="button" onClick={() => desistiu(pendente, "RETER")} disabled={salvando !== null} className="h-9 rounded-lg bg-rose-600 px-3 font-semibold text-white hover:bg-rose-700 disabled:opacity-50">
                             Ficar com o sinal
                           </button>
                           <button type="button" onClick={() => desistiu(pendente, "DEVOLVER")} disabled={salvando !== null} className="h-9 rounded-lg border border-slate-300 bg-white px-3 font-semibold disabled:opacity-50">
@@ -139,7 +139,7 @@ export default function ParaRemarcarPainel({ pendentes, onAgendar }: Props) {
                     ) : (
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-semibold">Tirar da lista?</span>
-                        <button type="button" onClick={() => desistiu(pendente)} disabled={salvando !== null} className="h-9 rounded-lg bg-slate-800 px-3 font-semibold text-white disabled:opacity-50">
+                        <button type="button" onClick={() => desistiu(pendente)} disabled={salvando !== null} className="h-9 rounded-lg bg-rose-600 px-3 font-semibold text-white hover:bg-rose-700 disabled:opacity-50">
                           Sim, desistiu
                         </button>
                         <button type="button" onClick={() => setDesistindo(null)} disabled={salvando !== null} className="h-9 px-2 font-semibold text-slate-500">

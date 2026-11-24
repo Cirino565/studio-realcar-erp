@@ -143,7 +143,7 @@ export default function ImplantacaoClient({ resumoInicial }: Props) {
             Esta etapa apaga vendas, itens, lançamentos, movimentações, compras, clientes, agendamentos, bloqueios, leads, comunicações, anamneses e demais registros operacionais de teste.
           </p>
 
-          <a href="/api/backup" className="mt-5 inline-flex rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white dark:bg-white dark:text-slate-950">
+          <a href="/api/backup" className="mt-5 inline-flex rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-violet-700">
             1. Baixar backup JSON completo
           </a>
 

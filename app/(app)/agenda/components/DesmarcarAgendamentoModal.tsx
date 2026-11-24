@@ -227,7 +227,7 @@ function Conteudo({
               <button
                 type="button"
                 onClick={onConcluido}
-                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-900 text-sm font-bold text-white hover:bg-slate-800 sm:flex-[2]"
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-600 text-sm font-bold text-white hover:bg-violet-700 sm:flex-[2]"
               >
                 <Check size={16} /> Concluir
               </button>
