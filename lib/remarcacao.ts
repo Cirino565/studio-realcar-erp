@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { motivoDesmarque } from "@/lib/motivo-desmarque";
 
 /**
  * Remarcacao de agendamentos desmarcados.
@@ -27,6 +28,8 @@ export type RemarcacaoPendente = {
   desmarcadoEm: string | null;
   sinalGuardado: boolean;
   valorSinal: number;
+  /** O que foi escrito ao desmarcar (motivo). */
+  motivo: string | null;
 };
 
 export function horasAteOHorario(data: Date, agora: Date = new Date()) {
@@ -63,6 +66,7 @@ export async function listarRemarcacoesPendentes(): Promise<RemarcacaoPendente[]
       sinalGuardado: true,
       valorSinal: true,
       sinalLancamentoId: true,
+      observacoes: true,
       cliente: { select: { nome: true, telefone: true, whatsapp: true } },
     },
   });
@@ -82,6 +86,7 @@ export async function listarRemarcacoesPendentes(): Promise<RemarcacaoPendente[]
     desmarcadoEm: item.desmarcadoEm?.toISOString() ?? null,
     sinalGuardado: item.sinalGuardado && Boolean(item.sinalLancamentoId) && item.valorSinal > 0,
     valorSinal: item.sinalGuardado ? item.valorSinal : 0,
+    motivo: motivoDesmarque(item.observacoes),
   }));
 }
 

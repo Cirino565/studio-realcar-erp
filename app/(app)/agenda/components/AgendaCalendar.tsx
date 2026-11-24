@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import type { AppointmentDetails } from "./AppointmentDetailsModal";
 import { feriadoDoDia, rotuloTipoFeriado } from "@/lib/feriados";
+import { motivoDesmarque } from "@/lib/motivo-desmarque";
 import { lerProcedimentosExtras, nomesComExtras } from "@/lib/procedimentos-extras";
 import {
   getMutedTextColor,
@@ -422,6 +423,8 @@ export default function AgendaCalendar({
 }: Props) {
   const [now, setNow] = useState(() => new Date());
   const [mostrarCancelados, setMostrarCancelados] = useState(false);
+  // Lista com o motivo de cada cancelado (o que foi escrito ao desmarcar).
+  const [verMotivosCancelados, setVerMotivosCancelados] = useState(false);
   const agendamentos = useMemo(
     () =>
       mostrarCancelados
@@ -1594,6 +1597,35 @@ export default function AgendaCalendar({
             ))}
             {cancelados.length > LIMITE ? (
               <span className="text-[11px] font-semibold text-slate-500">+{cancelados.length - LIMITE}</span>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setVerMotivosCancelados((atual) => !atual)}
+              aria-expanded={verMotivosCancelados}
+              className="shrink-0 rounded-md border border-rose-200 bg-white px-2 py-1 text-[11px] font-bold text-rose-700 transition hover:bg-rose-50 dark:border-rose-400/30 dark:bg-slate-800 dark:text-rose-200"
+            >
+              {verMotivosCancelados ? "Esconder motivos" : "Ver motivos"}
+            </button>
+            {verMotivosCancelados ? (
+              <ul className="order-last w-full space-y-1 pt-1">
+                {cancelados.map((appointment) => (
+                  <li key={`motivo-${appointment.id}`}>
+                    <button
+                      type="button"
+                      onClick={() => onSelectAppointment(appointment)}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-left text-[11px] leading-4 hover:border-rose-300 dark:border-slate-700 dark:bg-slate-800"
+                    >
+                      <span className="font-bold text-slate-800 dark:text-slate-100">
+                        {appointment.cliente.nome} · {viewMode === "week" ? `${diaCurto(appointment.data)} ` : ""}
+                        {formatTime(appointment.data)}
+                      </span>
+                      <span className="block text-slate-600 dark:text-slate-300">
+                        {motivoDesmarque(appointment.observacoes) || "Sem observação."}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
             ) : null}
             <button
               type="button"

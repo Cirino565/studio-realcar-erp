@@ -25,6 +25,10 @@ function dataCurta(valor: string | null) {
   });
 }
 
+function diaISO(valor: string) {
+  return new Date(valor).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
 function primeiroNome(nome: string) {
   return nome.trim().split(/\s+/)[0] || nome;
 }
@@ -91,12 +95,22 @@ export default function ParaRemarcarPainel({ pendentes, onAgendar }: Props) {
               >
                 <div className="flex min-w-0 flex-wrap items-start justify-between gap-2 sm:flex-1">
                   <div className="min-w-0">
-                    <p className="break-words font-bold text-slate-900 dark:text-white">{pendente.clienteNome}</p>
+                    {/* Nome leva ao dia em que estava marcada. */}
+                    <a
+                      href={`/agenda?data=${diaISO(pendente.data)}&agendamentoId=${pendente.id}`}
+                      title="Ver o dia em que estava marcada"
+                      className="break-words font-bold text-slate-900 underline-offset-2 hover:text-violet-700 hover:underline dark:text-white"
+                    >
+                      {pendente.clienteNome}
+                    </a>
                     <p className="text-xs text-slate-600 dark:text-slate-300">
                       {pendente.procedimento}
                       {pendente.naturezaAtendimento === "RETORNO" ? " (retorno)" : ""} · era {dataCurta(pendente.data)}
                       {pendente.status === "Faltou" ? " · faltou" : ` · desmarcou ${dataCurta(pendente.desmarcadoEm)}`}
                     </p>
+                    {pendente.motivo ? (
+                      <p className="mt-0.5 text-xs italic text-slate-500 dark:text-slate-400">{pendente.motivo}</p>
+                    ) : null}
                   </div>
                   {pendente.sinalGuardado ? (
                     <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
