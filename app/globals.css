@@ -1826,6 +1826,33 @@ body {
 }
 
 /* Agenda: cartoes de atendimento em vidro escuro, com faixa de cor */
+/* Retorno sem custo: listras e borda azul-piscina, para ver de longe que
+   esse horario nao gera valor. */
+.agenda-retorno {
+  isolation: isolate;
+}
+
+.agenda-retorno::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(8, 145, 178, 0.13) 0 10px,
+    transparent 10px 20px
+  );
+}
+
+.agenda-card.agenda-retorno,
+.theme-light .agenda-card.agenda-retorno,
+.theme-dark .agenda-card.agenda-retorno {
+  border-color: #0891b2 !important;
+  box-shadow: inset 5px 0 0 #0891b2 !important;
+}
+
 .theme-dark .agenda-card {
   background:
     linear-gradient(135deg,

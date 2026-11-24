@@ -1789,7 +1789,7 @@ export default function AgendaCalendar({
                               key={`appointment-${appointment.id}`}
                               type="button"
                               onClick={() => onSelectAppointment(appointment)}
-                              className={`w-full overflow-hidden rounded-md border p-2 text-left shadow-sm transition hover:-translate-y-px hover:shadow-md ${ehCancelado(appointment.status) ? "opacity-55" : ""} ${appointment.preReserva === "PENDENTE" ? "border-2 border-dashed opacity-80" : ""}`}
+                              className={`w-full overflow-hidden rounded-md border p-2 text-left shadow-sm transition hover:-translate-y-px hover:shadow-md ${ehCancelado(appointment.status) ? "opacity-55" : ""} ${appointment.preReserva === "PENDENTE" ? "border-2 border-dashed opacity-80" : ""} ${appointment.naturezaAtendimento === "RETORNO" ? "agenda-retorno relative" : ""}`}
                               style={{
                                 borderColor: palette.border,
                                 background: palette.soft,
@@ -1825,9 +1825,9 @@ export default function AgendaCalendar({
                                   </span>
                                 ) : null}
                                 {appointment.naturezaAtendimento === "RETORNO" ? (
-                                  <span className="inline-flex items-center gap-1 rounded border border-cyan-200 bg-cyan-50 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-cyan-700 shadow-sm dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:text-cyan-200">
-                                    <CalendarClock size={10} />
-                                    Retorno
+                                  <span className="inline-flex items-center gap-1 rounded bg-cyan-600 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-white shadow-sm">
+                                    <CalendarClock size={11} />
+                                    Retorno · R$ 0
                                   </span>
                                 ) : null}
                                 {appointment.sinalPago ? (
@@ -2174,7 +2174,7 @@ export default function AgendaCalendar({
                               onSelectAppointment(appointment);
                             }
                           }}
-                          className={`agenda-card absolute left-0.5 right-0.5 z-10 cursor-pointer overflow-hidden rounded-sm border text-left shadow-sm transition-all duration-300 hover:brightness-105 hover:shadow-md sm:left-0.5 sm:right-0.5 ${ehCancelado(appointment.status) ? "opacity-55" : ""} ${appointment.preReserva === "PENDENTE" ? "border-2 border-dashed opacity-75" : ""}`}
+                          className={`agenda-card absolute left-0.5 right-0.5 z-10 cursor-pointer overflow-hidden rounded-sm border text-left shadow-sm transition-all duration-300 hover:brightness-105 hover:shadow-md sm:left-0.5 sm:right-0.5 ${ehCancelado(appointment.status) ? "opacity-55" : ""} ${appointment.preReserva === "PENDENTE" ? "border-2 border-dashed opacity-75" : ""} ${appointment.naturezaAtendimento === "RETORNO" ? "agenda-retorno" : ""}`}
                           style={{
                             top,
                             height,
@@ -2247,11 +2247,12 @@ export default function AgendaCalendar({
                                 ) : null}
                                 {appointment.naturezaAtendimento === "RETORNO" ? (
                                   <span
-                                    className="inline-flex items-center gap-1 rounded-md border border-white/80 bg-white/90 px-1.5 py-1 text-[9px] font-extrabold uppercase tracking-wide text-cyan-700 shadow-sm"
-                                    title="Retorno gratuito"
+                                    className="inline-flex items-center gap-1 rounded-md bg-cyan-600 px-2 py-1 text-[11px] font-black uppercase tracking-wide text-white shadow-sm"
+                                    title="Retorno sem custo: não gera valor"
                                   >
-                                    <CalendarClock size={11} />
-                                    <span className="hidden xl:inline">Retorno</span>
+                                    <CalendarClock size={13} />
+                                    Retorno
+                                    <span className="hidden sm:inline">· sem custo</span>
                                   </span>
                                 ) : null}
 
@@ -2329,6 +2330,7 @@ export default function AgendaCalendar({
                                 style={{ color: statusPalette.mutedText }}
                               >
                                 {appointment.status}
+                                {appointment.naturezaAtendimento === "RETORNO" ? " · retorno, não gera valor" : ""}
                                 {!observacaoReal && note !== appointment.status
                                   ? ` · ${note}`
                                   : ""}
