@@ -19,6 +19,7 @@ import {
   horaNoPeriodo,
   somarDiasISO,
   type DiaHorariosLivres,
+  type OcupadoDoDia,
   type PeriodoHorario,
 } from "@/lib/horarios-livres";
 import {
@@ -2926,7 +2927,13 @@ export async function buscarHorariosLivresSemana({
         data: { gte: inicioFaixa, lt: fimFaixa },
         status: { notIn: ["Cancelado"] },
       },
-      select: { data: true, duracao: true },
+      select: {
+        data: true,
+        duracao: true,
+        procedimento: true,
+        preReserva: true,
+        cliente: { select: { nome: true } },
+      },
     }),
     prisma.bloqueioAgenda.findMany({
       where: {
@@ -2934,13 +2941,18 @@ export async function buscarHorariosLivresSemana({
         data: { gte: inicioFaixa, lt: fimFaixa },
         status: "Ativo",
       },
-      select: { data: true, duracao: true },
+      select: { data: true, duracao: true, motivo: true },
     }),
   ]);
 
   // Ocupado de cada dia, ja com o intervalo entre atendimentos dos dois lados.
   const ocupadoPorDia = new Map<string, { inicio: number; fim: number }[]>();
-  for (const item of [...agendamentos, ...bloqueios]) {
+  // O mesmo, para a tela: quem esta marcado e os bloqueios (em minutos do dia).
+  const visivelPorDia = new Map<string, (OcupadoDoDia & { ini: number; fimMin: number })[]>();
+  for (const item of [
+    ...agendamentos.map((ag) => ({ ...ag, motivo: null as string | null })),
+    ...bloqueios.map((bl) => ({ ...bl, procedimento: null as string | null, preReserva: null as string | null, cliente: null })),
+  ]) {
     const inicioItem = new Date(item.data);
     const dia = formatDateSaoPaulo(inicioItem);
     const lista = ocupadoPorDia.get(dia) ?? [];
@@ -2949,12 +2961,32 @@ export async function buscarHorariosLivresSemana({
       fim: addMinutes(inicioItem, (item.duracao || 0) + intervaloEntre).getTime(),
     });
     ocupadoPorDia.set(dia, lista);
+
+    const ini = minutosDoHorario(formatHourMinute(inicioItem));
+    const fimMin = ini + (item.duracao || 0);
+    const hhmm = (minutos: number) =>
+      `${String(Math.floor(minutos / 60)).padStart(2, "0")}:${String(minutos % 60).padStart(2, "0")}`;
+    const visiveis = visivelPorDia.get(dia) ?? [];
+    visiveis.push({
+      ini,
+      fimMin,
+      inicio: hhmm(ini),
+      fim: hhmm(fimMin),
+      tipo: item.cliente ? "agendamento" : "bloqueio",
+      titulo: item.cliente ? item.cliente.nome.split(/\s+/).slice(0, 2).join(" ") : item.motivo || "Bloqueado",
+      detalhe: item.cliente
+        ? `${item.procedimento || ""}${item.preReserva === "PENDENTE" ? " · pré-reserva" : ""}`
+        : undefined,
+    });
+    visivelPorDia.set(dia, visiveis);
   }
 
   const agora = Date.now();
+  const passo = Math.max(5, configuracaoHorario.intervalo || 30);
   const dias: DiaHorariosLivres[] = diasAtendimento.map(({ data, funcionamento }) => {
     const fechamento = minutosDoHorario(funcionamento.fechamento);
     const ocupados = ocupadoPorDia.get(data) ?? [];
+    const visiveis = (visivelPorDia.get(data) ?? []).sort((a, b) => a.ini - b.ini);
     const horarios = gerarSlotsDisponibilidade(funcionamento, configuracaoHorario.intervalo).filter(
       (hora) => {
         if (!horaNoPeriodo(hora, periodo)) return false;
@@ -2965,7 +2997,23 @@ export async function buscarHorariosLivresSemana({
         return ocupados.every((item) => !(item.inicio < fimNovo && item.fim > inicioNovo));
       },
     );
-    return { data, horarios };
+    // "Colado": o primeiro horario possivel depois de um atendimento/bloqueio,
+    // ou o que termina logo antes do proximo. Encaixa sem deixar buraco.
+    const colados = horarios.filter((hora) => {
+      const ini = minutosDoHorario(hora);
+      const fim = ini + duracaoMin;
+      return visiveis.some(
+        (item) =>
+          (ini >= item.fimMin + intervaloEntre && ini < item.fimMin + intervaloEntre + passo) ||
+          (fim + intervaloEntre <= item.ini && fim + intervaloEntre > item.ini - passo),
+      );
+    });
+    return {
+      data,
+      horarios,
+      colados,
+      ocupados: visiveis.map(({ inicio, fim, tipo, titulo, detalhe }) => ({ inicio, fim, tipo, titulo, detalhe })),
+    };
   });
 
   return { hojeISO, inicio: inicioISO, proximoInicio, duracao: duracaoMin, dias, fechados };

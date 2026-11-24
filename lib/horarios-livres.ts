@@ -1,21 +1,37 @@
 /**
  * "Horarios livres": regras puras (sem banco), usadas na tela.
  *
- * A lista completa de horarios livres e so para a equipe ver. Para a cliente
- * vao no maximo 3 opcoes, em dias diferentes, para a agenda nao parecer vazia.
+ * A lista completa (com quem ja esta marcado) e so para a equipe ver. Para a
+ * cliente vao poucas opcoes (3 sugeridas, pode marcar mais), dando preferencia
+ * aos horarios "colados" em outro atendimento, para a agenda nao ficar com
+ * buracos.
  */
 
 export type PeriodoHorario = "manha" | "tarde" | "qualquer";
+
+/** O que ja ocupa o dia: atendimento marcado ou bloqueio (almoco...). */
+export type OcupadoDoDia = {
+  inicio: string;
+  fim: string;
+  tipo: "agendamento" | "bloqueio";
+  titulo: string;
+  detalhe?: string;
+};
 
 export type DiaHorariosLivres = {
   /** "AAAA-MM-DD" */
   data: string;
   /** Horarios livres ("14:00"), ja filtrados pelo periodo. */
   horarios: string[];
+  /** Livres que encostam em outro atendimento/bloqueio (agenda sem buraco). */
+  colados?: string[];
+  /** Atendimentos e bloqueios do dia, em ordem. */
+  ocupados?: OcupadoDoDia[];
 };
 
 export type HorarioEscolhido = { data: string; hora: string };
 
+/** Quantos a sugestao automatica marca (a equipe pode marcar mais). */
 export const MAX_HORARIOS_CLIENTE = 3;
 
 const DIAS_SEMANA = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
@@ -76,8 +92,9 @@ function maisPerto(horarios: string[], alvo: string, evitar: string[]) {
 
 /**
  * Sugestao automatica para a cliente: ate 3 horarios, um por dia, nos
- * primeiros dias com vaga, em horas cheias e diferentes entre si ("14h",
- * "16h"...). So repete um dia se faltarem dias, com 2h de distancia.
+ * primeiros dias com vaga. Em cada dia prefere o horario colado em outro
+ * atendimento; sem isso, horas cheias e diferentes entre si ("14h", "16h").
+ * So repete um dia se faltarem dias, com 2h de distancia.
  */
 export function sugerirHorarios(
   dias: DiaHorariosLivres[],
@@ -91,7 +108,12 @@ export function sugerirHorarios(
   for (const dia of comVaga) {
     if (escolhidos.length >= maximo) break;
     const alvo = alvos[escolhidos.length % alvos.length];
-    const hora = maisPerto(dia.horarios, alvo, escolhidos.map((item) => item.hora));
+    // Primeiro o horario colado em outro atendimento (agenda sem buraco).
+    const colados = (dia.colados ?? []).filter((hora) => dia.horarios.includes(hora));
+    // (o primeiro deles: um cliente logo depois do outro).
+    const hora = colados.length > 0
+      ? colados[0]
+      : maisPerto(dia.horarios, alvo, escolhidos.map((item) => item.hora));
     escolhidos.push({ data: dia.data, hora });
   }
 
@@ -147,15 +169,13 @@ function diaParaCliente(dataISO: string, hojeISO: string) {
 }
 
 /**
- * Mensagem para colar no WhatsApp da cliente, uma linha por dia:
- *
- *   Olá! Tudo bem? 😊
+ * Mensagem para colar no WhatsApp da cliente (sem saudacao: a conversa ja
+ * esta acontecendo), uma linha por dia:
  *
  *   Para *Limpeza de pele* à tarde, tenho estes horários disponíveis:
  *
  *   📅 *Hoje, 16/11* – 15h
- *   📅 *Amanhã, 17/11* – 16h
- *   📅 *Quarta-feira, 18/11* – 14h
+ *   📅 *Amanhã, 17/11* – 12h30 ou 16h
  *
  *   Qual fica melhor para você? Assim já deixo reservado. ✨
  *
@@ -194,5 +214,5 @@ export function mensagemHorariosCliente({
     ? "Fica bom para você? Assim já deixo reservado. ✨"
     : "Qual fica melhor para você? Assim já deixo reservado. ✨";
 
-  return ["Olá! Tudo bem? 😊", "", abertura, "", ...linhas, "", pergunta].join("\n");
+  return [abertura, "", ...linhas, "", pergunta].join("\n");
 }
