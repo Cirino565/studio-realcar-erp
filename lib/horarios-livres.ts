@@ -27,7 +27,55 @@ export type DiaHorariosLivres = {
   colados?: string[];
   /** Atendimentos e bloqueios do dia, em ordem. */
   ocupados?: OcupadoDoDia[];
+  /** O dia ja ficou sem espaco para o almoco (aviso na tela). */
+  semAlmoco?: boolean;
 };
+
+/** Almoco configurado na agenda (Configuracoes): "ALMOCO=12:00-13:00". */
+export type AlmocoConfig = { ativo: boolean; inicio: number; fim: number; dias: number[] };
+
+export function lerAlmoco(texto?: string | null): AlmocoConfig {
+  const valor = texto || "";
+  const horario = valor.match(/ALMOCO=(\d{2}:\d{2})-(\d{2}:\d{2})/i);
+  const ativo = valor.match(/ALMOCO_ATIVO=(0|1)/i);
+  const dias = valor.match(/ALMOCO_DIAS=([0-6](?:,[0-6])*)/i);
+  return {
+    ativo: ativo ? ativo[1] === "1" : true,
+    inicio: minutosDaHora(horario?.[1] || "12:00"),
+    fim: minutosDaHora(horario?.[2] || "13:00"),
+    dias: dias ? dias[1].split(",").map(Number) : [1, 2, 3, 4, 5, 6],
+  };
+}
+
+/**
+ * O almoco cabe? Precisa sobrar um tempo livre seguido do tamanho do almoco
+ * (ex.: 1h) entre o inicio do almoco e 1h depois do fim dele (12h-14h).
+ * Flexivel: se a cliente das 11h vai ate 12h30, o almoco pode ser 12h30-13h30.
+ */
+export function almocoCabe(ocupados: { ini: number; fim: number }[], almoco: AlmocoConfig) {
+  const precisa = almoco.fim - almoco.inicio;
+  if (precisa <= 0) return true;
+  const comeco = almoco.inicio;
+  const final = almoco.fim + 60;
+  const dentro = ocupados
+    .filter((item) => item.fim > comeco && item.ini < final)
+    .sort((a, b) => a.ini - b.ini);
+  let livreDesde = comeco;
+  for (const item of dentro) {
+    if (item.ini - livreDesde >= precisa) return true;
+    livreDesde = Math.max(livreDesde, item.fim);
+  }
+  return final - livreDesde >= precisa;
+}
+
+const PARTICULAS = new Set(["de", "da", "do", "das", "dos", "e"]);
+
+/** "Fernanda de Souza Lima" -> "Fernanda Souza" (curto para a lista). */
+export function nomeCurto(nome: string) {
+  const partes = nome.trim().split(/\s+/);
+  const sobrenome = partes.slice(1).find((parte) => !PARTICULAS.has(parte.toLowerCase()));
+  return sobrenome ? `${partes[0]} ${sobrenome}` : partes[0] || nome;
+}
 
 export type HorarioEscolhido = { data: string; hora: string };
 

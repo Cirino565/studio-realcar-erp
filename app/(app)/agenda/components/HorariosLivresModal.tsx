@@ -99,8 +99,13 @@ export default function HorariosLivresModal({
     [servicos],
   );
 
+  // Ja vem com Limpeza de pele (o mais marcado); da para trocar.
   const [filtros, setFiltros] = useState<Filtros>(() => ({
-    servicoId: "",
+    servicoId: String(
+      servicosOrdenados.find((item) => /^limpeza de pele$/i.test(item.nome.trim()))?.id ??
+        servicosOrdenados.find((item) => /limpeza de pele/i.test(item.nome))?.id ??
+        "",
+    ),
     profissionalId:
       profissionais.find((item) => item.id === profissionalInicialId)?.id ??
       profissionais[0]?.id ??
@@ -328,6 +333,11 @@ export default function HorariosLivresModal({
                         {(dia.ocupados ?? []).filter((item) => item.tipo === "agendamento").length} marcado(s)
                       </span>
                     </p>
+                    {dia.semAlmoco ? (
+                      <p className="mt-1 rounded-lg bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-700">
+                        Atenção: este dia já está sem espaço para o almoço.
+                      </p>
+                    ) : null}
                     {linhas.length === 0 ? (
                       <p className="mt-1 text-xs text-slate-500">Sem horário livre neste período.</p>
                     ) : (

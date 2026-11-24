@@ -21,6 +21,9 @@ import {
   type DiaHorariosLivres,
   type OcupadoDoDia,
   type PeriodoHorario,
+  almocoCabe,
+  lerAlmoco,
+  nomeCurto,
 } from "@/lib/horarios-livres";
 import {
   criarVendaNoTx,
@@ -2973,7 +2976,7 @@ export async function buscarHorariosLivresSemana({
       inicio: hhmm(ini),
       fim: hhmm(fimMin),
       tipo: item.cliente ? "agendamento" : "bloqueio",
-      titulo: item.cliente ? item.cliente.nome.split(/\s+/).slice(0, 2).join(" ") : item.motivo || "Bloqueado",
+      titulo: item.cliente ? nomeCurto(item.cliente.nome) : item.motivo || "Bloqueado",
       detalhe: item.cliente
         ? `${item.procedimento || ""}${item.preReserva === "PENDENTE" ? " · pré-reserva" : ""}`
         : undefined,
@@ -2983,6 +2986,8 @@ export async function buscarHorariosLivresSemana({
 
   const agora = Date.now();
   const passo = Math.max(5, configuracaoHorario.intervalo || 30);
+  // Almoco da agenda (Configuracoes): nao oferece horario que tire o almoco.
+  const almoco = lerAlmoco(configuracaoClinica?.horarioAtendimento);
   const dias: DiaHorariosLivres[] = diasAtendimento.map(({ data, funcionamento }) => {
     const fechamento = minutosDoHorario(funcionamento.fechamento);
     const ocupados = ocupadoPorDia.get(data) ?? [];
@@ -2997,6 +3002,21 @@ export async function buscarHorariosLivresSemana({
         return ocupados.every((item) => !(item.inicio < fimNovo && item.fim > inicioNovo));
       },
     );
+    // Almoco: vale nos dias marcados, se ainda nao houver bloqueio de almoco.
+    const temBloqueioAlmoco = visiveis.some(
+      (item) => item.tipo === "bloqueio" && /almo/i.test(item.titulo),
+    );
+    const cuidaAlmoco =
+      almoco.ativo && almoco.dias.includes(getDiaSemana(data)) && !temBloqueioAlmoco;
+    const ocupadosMin = visiveis.map((item) => ({ ini: item.ini, fim: item.fimMin }));
+    const semAlmoco = cuidaAlmoco && !almocoCabe(ocupadosMin, almoco);
+    if (cuidaAlmoco && !semAlmoco) {
+      const comAlmoco = horarios.filter((hora) => {
+        const ini = minutosDoHorario(hora);
+        return almocoCabe([...ocupadosMin, { ini, fim: ini + duracaoMin }], almoco);
+      });
+      horarios.splice(0, horarios.length, ...comAlmoco);
+    }
     // "Colado": o primeiro horario possivel depois de um atendimento/bloqueio,
     // ou o que termina logo antes do proximo. Encaixa sem deixar buraco.
     const colados = horarios.filter((hora) => {
@@ -3011,6 +3031,7 @@ export async function buscarHorariosLivresSemana({
     return {
       data,
       horarios,
+      semAlmoco,
       colados,
       ocupados: visiveis.map(({ inicio, fim, tipo, titulo, detalhe }) => ({ inicio, fim, tipo, titulo, detalhe })),
     };
