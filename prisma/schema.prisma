@@ -774,6 +774,8 @@ model ConfiguracaoClinica {
   googleAdsPorProcedimento Boolean @default(false)
   // Reativacao de perdidos: quantas mensagens por dia (protege o numero).
   reativacaoLimiteDiario Int @default(15)
+  // Reativacao: so entra quem foi marcado como perdido ha mais de X dias.
+  reativacaoDiasEsfriar Int @default(7)
   logoUrl               String?
   corPrincipal          String   @default("violet")
   assinaturaMensagem    String?

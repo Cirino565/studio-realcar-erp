@@ -147,6 +147,21 @@ export async function registrarResultadoReativacao(dados: { leadId: number; resu
   return { ok: true as const };
 }
 
+/** Quantos dias depois de perdido a pessoa entra na lista (padrao 7). */
+export async function definirDiasEsfriarReativacao(dias: number) {
+  await requirePermission("marketing.gerenciar");
+  const valor = Math.min(90, Math.max(0, Math.round(Number(dias))));
+  if (!Number.isFinite(valor)) throw new Error("Escolha a quantidade de dias.");
+  const atual = await prisma.configuracaoClinica.findFirst({ select: { id: true } });
+  if (atual) {
+    await prisma.configuracaoClinica.update({ where: { id: atual.id }, data: { reativacaoDiasEsfriar: valor } });
+  } else {
+    await prisma.configuracaoClinica.create({ data: { reativacaoDiasEsfriar: valor } });
+  }
+  revalidar();
+  return { ok: true as const, dias: valor };
+}
+
 export async function definirLimiteDiarioReativacao(limite: number) {
   await requirePermission("marketing.gerenciar");
   const valor = Math.min(LIMITE_MAXIMO, Math.max(LIMITE_MINIMO, Math.round(Number(limite) || 15)));

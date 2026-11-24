@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import {
+  definirDiasEsfriarReativacao,
   definirLimiteDiarioReativacao,
   desfazerEnvioReativacao,
   registrarEnvioReativacao,
@@ -47,6 +48,7 @@ const OPCOES_DIAS = [
 ];
 
 const OPCOES_LIMITE = [5, 10, 15, 20, 30];
+const OPCOES_ESFRIAR = [3, 5, 7, 10, 15, 30];
 
 function dataCurta(valor: string | null) {
   if (!valor) return "-";
@@ -119,6 +121,18 @@ export default function ReativacaoClient({ dados, podeGerenciar }: Props) {
     });
   }
 
+  function mudarDiasEsfriar(valor: number) {
+    setErro("");
+    iniciar(async () => {
+      try {
+        await definirDiasEsfriarReativacao(valor);
+        router.refresh();
+      } catch (e) {
+        setErro(mensagemErro(e));
+      }
+    });
+  }
+
   function mudarLimite(valor: number) {
     setErro("");
     iniciar(async () => {
@@ -166,8 +180,33 @@ export default function ReativacaoClient({ dados, podeGerenciar }: Props) {
                 <strong>{dados.foraDaLista.comHorario}</strong> já têm horário marcado.{" "}
               </>
             ) : null}
+            {dados.foraDaLista.recentes > 0 ? (
+              <>
+                <strong>{dados.foraDaLista.recentes}</strong> foram perdidos há menos de {dados.diasEsfriar} dias
+                (ainda quentes, para retorno direto) e entram sozinhos quando completarem {dados.diasEsfriar} dias.{" "}
+              </>
+            ) : null}
             Convertidos não entram, porque já são clientes.
           </p>
+        ) : null}
+
+        {podeGerenciar ? (
+          <label className="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+            Mostrar só quem foi perdido há mais de
+            <select
+              value={OPCOES_ESFRIAR.includes(dados.diasEsfriar) ? dados.diasEsfriar : ""}
+              onChange={(evento) => mudarDiasEsfriar(Number(evento.target.value))}
+              disabled={pendente}
+              className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs dark:border-white/10 dark:bg-slate-900"
+            >
+              {!OPCOES_ESFRIAR.includes(dados.diasEsfriar) ? <option value="">{dados.diasEsfriar}</option> : null}
+              {OPCOES_ESFRIAR.map((opcao) => (
+                <option key={opcao} value={opcao}>
+                  {opcao} dias
+                </option>
+              ))}
+            </select>
+          </label>
         ) : null}
 
         <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-[1.4fr_1fr_1fr_1fr] sm:gap-3">

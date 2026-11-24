@@ -64,8 +64,10 @@ export type DadosReativacao = {
   enviadas: ItemEnviado[];
   resumo: { enviadas: number; responderam: number; voltaram: number; enviadasHoje: number };
   // Por que nem todo Perdido aparece na lista.
-  foraDaLista: { perdidos: number; semTelefone: number; comHorario: number; jaEnviados: number };
+  foraDaLista: { perdidos: number; semTelefone: number; comHorario: number; jaEnviados: number; recentes: number };
   limiteDiario: number;
+  /** So aparece quem foi perdido ha mais de tantos dias (ja esfriou). */
+  diasEsfriar: number;
   ultimoEnvioEm: string | null;
   modelos: Array<{ servico: string | null; chave: string; texto: string; personalizado: boolean }>;
 };
@@ -89,12 +91,18 @@ export function lerFiltros(params: Record<string, string | undefined>): FiltrosR
 
 export async function carregarReativacao(filtros: FiltrosReativacao): Promise<DadosReativacao> {
   const agora = new Date();
+  const configEsfriar = await prisma.configuracaoClinica.findFirst({ select: { reativacaoDiasEsfriar: true } });
+  const diasEsfriar = configEsfriar?.reativacaoDiasEsfriar ?? 7;
+  // Perdido recente ainda esta "quente": recebe retorno direto, nao a reativacao.
+  const corteEsfriou = new Date(agora.getTime() - diasEsfriar * 86_400_000);
+  const jaEsfriou: Prisma.LeadWhereInput = { OR: [{ perdidoEm: null }, { perdidoEm: { lte: corteEsfriou } }] };
 
-  // Quem pode receber: perdido, com telefone, nunca recebeu e sem horario marcado.
+  // Quem pode receber: perdido ha mais de X dias, com telefone, nunca recebeu e sem horario marcado.
   const base: Prisma.LeadWhereInput = {
     etapa: "Perdido",
     reativacaoEnviadaEm: null,
     telefone: { not: null },
+    ...jaEsfriou,
     NOT: [
       { telefone: "" },
       {
@@ -110,11 +118,14 @@ export async function carregarReativacao(filtros: FiltrosReativacao): Promise<Da
     cliente: { is: { agendamentos: { some: { data: { gt: agora }, status: { notIn: ["Cancelado", "Faltou"] } } } } },
   };
 
-  const [foraPerdidos, foraSemTelefone, foraComHorario, foraJaEnviados] = await Promise.all([
+  const [foraPerdidos, foraSemTelefone, foraComHorario, foraJaEnviados, foraRecentes] = await Promise.all([
     prisma.lead.count({ where: { etapa: "Perdido" } }),
     prisma.lead.count({ where: { etapa: "Perdido", ...semTelefone } }),
     prisma.lead.count({ where: { AND: [{ etapa: "Perdido", reativacaoEnviadaEm: null }, { NOT: semTelefone }, comHorarioFuturo] } }),
     prisma.lead.count({ where: { etapa: "Perdido", reativacaoEnviadaEm: { not: null }, NOT: semTelefone } }),
+    prisma.lead.count({
+      where: { etapa: "Perdido", reativacaoEnviadaEm: null, perdidoEm: { gt: corteEsfriou }, NOT: semTelefone },
+    }),
   ]);
 
   const [servicosCadastrados, porInteresse, porOrigem, config, enviadasHoje, ultimoEnvio, modelosSalvos] =
@@ -329,8 +340,10 @@ export async function carregarReativacao(filtros: FiltrosReativacao): Promise<Da
       semTelefone: foraSemTelefone,
       comHorario: foraComHorario,
       jaEnviados: foraJaEnviados,
+      recentes: foraRecentes,
     },
     limiteDiario: config?.reativacaoLimiteDiario ?? 15,
+    diasEsfriar,
     ultimoEnvioEm: ultimoEnvio?.enviadoEm?.toISOString() ?? null,
     modelos,
   };
