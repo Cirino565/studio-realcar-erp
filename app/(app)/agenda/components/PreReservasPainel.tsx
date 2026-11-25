@@ -44,7 +44,7 @@ export default function PreReservasPainel({ itens, modelo, clinica, onAbrir }: P
 
   return (
     <section
-      className={`mb-3 rounded-2xl border shadow-sm ${
+      className={`mb-2 rounded-2xl border shadow-sm sm:mb-3 ${
         urgentes > 0
           ? "border-rose-200 bg-rose-50/80 dark:border-rose-400/20 dark:bg-rose-500/10"
           : "border-sky-200 bg-sky-50/80 dark:border-sky-400/20 dark:bg-sky-500/10"
@@ -54,7 +54,7 @@ export default function PreReservasPainel({ itens, modelo, clinica, onAbrir }: P
         type="button"
         onClick={() => setAberto((atual) => !atual)}
         aria-expanded={aberto}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left sm:px-4 sm:py-3"
       >
         <span className="min-w-0">
           <span className="block text-sm font-bold text-slate-900 dark:text-white">

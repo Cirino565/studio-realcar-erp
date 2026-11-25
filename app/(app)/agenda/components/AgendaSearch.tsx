@@ -352,7 +352,7 @@ export default function AgendaSearch({
   }
 
   return (
-    <div className="relative z-[60] mb-3 px-1 sm:mb-4">
+    <div className="relative z-[60] px-1">
       <div className="relative">
         <Search
           size={17}

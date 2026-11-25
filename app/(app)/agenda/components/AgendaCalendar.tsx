@@ -425,6 +425,8 @@ export default function AgendaCalendar({
   const [mostrarCancelados, setMostrarCancelados] = useState(false);
   // Lista com o motivo de cada cancelado (o que foi escrito ao desmarcar).
   const [verMotivosCancelados, setVerMotivosCancelados] = useState(false);
+  // No celular a faixa de cancelados vem fechada (uma linha so).
+  const [canceladosAbertos, setCanceladosAbertos] = useState(false);
   const agendamentos = useMemo(
     () =>
       mostrarCancelados
@@ -1575,7 +1577,20 @@ export default function AgendaCalendar({
             .format(new Date(valor))
             .replace(".", "");
         return (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+          <>
+          {!canceladosAbertos ? (
+            <button
+              type="button"
+              onClick={() => setCanceladosAbertos(true)}
+              className="flex w-full items-center gap-1.5 border-t border-slate-200 bg-slate-50 px-3 py-1.5 text-left text-xs font-bold text-slate-700 sm:hidden dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"
+            >
+              <Ban size={13} className="shrink-0 text-rose-500" />
+              {cancelados.length} cancelado{cancelados.length === 1 ? "" : "s"}
+              {viewMode === "week" ? " na semana" : selectedDateIsToday ? " hoje" : " neste dia"}
+              <span className="ml-auto font-semibold text-violet-700 dark:text-violet-200">ver</span>
+            </button>
+          ) : null}
+          <div className={`${canceladosAbertos ? "flex" : "hidden sm:flex"} flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300`}>
             <span className="inline-flex shrink-0 items-center gap-1.5 font-bold text-slate-700 dark:text-slate-200">
               <Ban size={13} className="text-rose-500" />
               {viewMode === "week" ? "Cancelados na semana:" : selectedDateIsToday ? "Cancelados hoje:" : "Cancelados neste dia:"}
@@ -1634,7 +1649,15 @@ export default function AgendaCalendar({
             >
               {mostrarCancelados ? "Esconder da agenda" : "Mostrar na agenda"}
             </button>
+            <button
+              type="button"
+              onClick={() => setCanceladosAbertos(false)}
+              className="shrink-0 rounded-md px-2 py-1 text-[11px] font-bold text-violet-700 sm:hidden dark:text-violet-200"
+            >
+              Fechar
+            </button>
           </div>
+          </>
         );
       })()}
 

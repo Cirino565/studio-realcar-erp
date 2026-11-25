@@ -56,18 +56,22 @@ export default function ParaRemarcarPainel({ pendentes, onAgendar }: Props) {
   }
 
   return (
-    <section className="mb-3 rounded-2xl border border-amber-200 bg-amber-50/80 shadow-sm dark:border-amber-400/20 dark:bg-amber-500/10">
+    <section className="mb-2 rounded-2xl border border-amber-200 bg-amber-50/80 shadow-sm dark:border-amber-400/20 dark:bg-amber-500/10 sm:mb-3">
       <button
         type="button"
         onClick={() => setAberto((atual) => !atual)}
         aria-expanded={aberto}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left sm:px-4 sm:py-3"
       >
         <span className="min-w-0">
-          <span className="block text-sm font-bold text-amber-900 dark:text-amber-100">
+          <span className="block truncate text-sm font-bold text-amber-900 dark:text-amber-100">
             Para remarcar: {pendentes.length} cliente{pendentes.length === 1 ? "" : "s"}
+            {comSinal > 0 ? (
+              <span className="font-semibold text-amber-800/80 sm:hidden"> · {comSinal} com sinal</span>
+            ) : null}
           </span>
-          <span className="block text-xs text-amber-800/80 dark:text-amber-200/80">
+          {/* No celular fica so a linha de cima (a agenda precisa de espaco). */}
+          <span className="hidden text-xs text-amber-800/80 dark:text-amber-200/80 sm:block">
             Desmarcaram ou faltaram e ainda não têm nova data
             {comSinal > 0 ? ` · ${comSinal} com sinal guardado` : ""}
           </span>

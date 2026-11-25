@@ -749,6 +749,10 @@ export default function AgendaClient({
           </section>
         ) : (
           <>
+            {/* Busca e "Horarios livres" na mesma linha: no celular sobra
+                mais tela para a agenda. */}
+            <div className="mb-2 flex items-center gap-2 sm:mb-3">
+            <div className="min-w-0 flex-1">
             <AgendaSearch
               clientes={clientes}
               onSelect={(resultado) => {
@@ -770,15 +774,16 @@ export default function AgendaClient({
                 );
               }}
             />
-
-            <div className="mb-3 flex justify-end">
+            </div>
               <button
                 type="button"
                 onClick={() => setHorariosLivresAberto(true)}
-                className="inline-flex h-9 items-center gap-2 rounded-xl border border-violet-200 bg-white px-3 text-sm font-semibold text-violet-700 shadow-sm hover:bg-violet-50 dark:border-violet-400/30 dark:bg-violet-500/10 dark:text-violet-100"
+                aria-label="Horários livres"
+                className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-xl border border-violet-200 bg-white px-3 text-sm font-semibold text-violet-700 shadow-sm hover:bg-violet-50 dark:border-violet-400/30 dark:bg-violet-500/10 dark:text-violet-100"
               >
                 <Clock3 size={16} />
-                Horários livres
+                <span className="sm:hidden">Livres</span>
+                <span className="hidden sm:inline">Horários livres</span>
               </button>
             </div>
 
