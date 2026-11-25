@@ -3,7 +3,7 @@
 import { requireCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-const CATEGORIAS = new Set(["Aniversário", "Pós-atendimento"]);
+const CATEGORIAS = new Set(["Aniversário", "Pós-atendimento", "Confirmação de agendamento"]);
 
 /**
  * Marca que a mensagem do Dashboard (aniversario, pos-atendimento) foi

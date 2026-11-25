@@ -10,7 +10,7 @@ type Props = {
   href: string;
   enviadaInicial: boolean;
   registro: {
-    categoria: "Aniversário" | "Pós-atendimento";
+    categoria: "Aniversário" | "Pós-atendimento" | "Confirmação de agendamento";
     clienteId: number;
     agendamentoId?: number | null;
     destinatarioNome: string;
@@ -21,6 +21,8 @@ type Props = {
   /** Classes depois de enviada (cinza). */
   classNameEnviada: string;
   rotuloEnviada?: string;
+  /** Avisa a tela quando a mensagem acabou de ser enviada. */
+  onEnviada?: () => void;
   "aria-label"?: string;
   children: React.ReactNode;
 };
@@ -36,6 +38,7 @@ export function WhatsAppEnviado({
   className,
   classNameEnviada,
   rotuloEnviada = "Enviada",
+  onEnviada,
   children,
   ...props
 }: Props) {
@@ -50,6 +53,7 @@ export function WhatsAppEnviado({
       onClick={() => {
         if (!enviada) {
           setEnviada(true);
+          onEnviada?.();
           void registrarMensagemEnviada(registro).catch(() => undefined);
         }
       }}

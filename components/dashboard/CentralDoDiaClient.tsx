@@ -1,13 +1,17 @@
 "use client";
 
 import { confirmarAgendamentoCentral } from "@/actions/dashboard.actions";
-import { WhatsAppLink } from "@/components/ui/whatsapp-link";
+import { WhatsAppEnviado } from "@/components/ui/whatsapp-enviado";
 import { BadgeCheck, MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 type ConfirmacaoItem = {
   id: number;
+  clienteId: number;
+  telefone: string | null;
+  /** A mensagem de confirmacao ja foi aberta no WhatsApp. */
+  enviada: boolean;
   cliente: string;
   procedimento: string;
   horario: string;
@@ -30,6 +34,7 @@ export default function CentralDoDiaClient({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [confirmados, setConfirmados] = useState<number[]>([]);
+  const [enviadasAgora, setEnviadasAgora] = useState<number[]>([]);
   const [erro, setErro] = useState<string | null>(null);
 
   const pendentes = confirmacoes.filter((item) => !confirmados.includes(item.id));
@@ -74,10 +79,12 @@ export default function CentralDoDiaClient({
         </div>
       ) : null}
 
-      {pendentes.map((item) => (
+      {pendentes.map((item) => {
+        const enviada = item.enviada || enviadasAgora.includes(item.id);
+        return (
         <div
           key={item.id}
-          className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm"
+          className={`rounded-2xl border p-3 shadow-sm ${enviada ? "border-slate-200 bg-slate-50" : "border-slate-200 bg-white"}`}
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -99,19 +106,36 @@ export default function CentralDoDiaClient({
               </div>
             </div>
 
-            <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-700">
-              Pendente
-            </span>
+            {enviada ? (
+              <span className="shrink-0 rounded-full bg-sky-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-sky-700">
+                Aguardando resposta
+              </span>
+            ) : (
+              <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-700">
+                Pendente
+              </span>
+            )}
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <WhatsAppLink
+            <WhatsAppEnviado
               href={item.whatsappUrl}
+              enviadaInicial={item.enviada}
+              onEnviada={() => setEnviadasAgora((atuais) => [...atuais, item.id])}
+              registro={{
+                categoria: "Confirmação de agendamento",
+                clienteId: item.clienteId,
+                agendamentoId: item.id,
+                destinatarioNome: item.cliente,
+                telefone: item.telefone,
+              }}
+              rotuloEnviada="Já enviada"
               className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-700"
+              classNameEnviada="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-200 px-3 py-2 text-xs font-bold text-slate-500 transition hover:bg-slate-300"
             >
               <MessageCircle className="size-4" />
               WhatsApp
-            </WhatsAppLink>
+            </WhatsAppEnviado>
 
             {podeGerenciarAgenda ? (
               <button
@@ -130,7 +154,8 @@ export default function CentralDoDiaClient({
             )}
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

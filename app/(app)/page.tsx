@@ -260,7 +260,7 @@ export default async function Home() {
         status: "Agendado",
       },
       include: {
-        cliente: { select: { nome: true, whatsapp: true, telefone: true } },
+        cliente: { select: { id: true, nome: true, whatsapp: true, telefone: true } },
         profissional: { select: { nome: true } },
       },
       orderBy: { data: "asc" },
@@ -473,7 +473,7 @@ export default async function Home() {
 
   // Mensagens do Dashboard ja enviadas (botao fica cinza). Consulta pequena.
   const enviadasDashboard =
-    aniversariantesHoje.length + posAtendimento.length > 0
+    aniversariantesHoje.length + posAtendimento.length + confirmacoesAmanha.length > 0
       ? await prisma.comunicacaoRegistro.findMany({
           where: {
             status: "Enviada",
@@ -487,6 +487,13 @@ export default async function Home() {
                 categoria: "Pós-atendimento",
                 agendamentoId: { in: posAtendimento.map((item) => item.id) },
               },
+              {
+                // Confirmacao da vespera: vale o envio dos ultimos 3 dias
+                // (sabado para segunda, por exemplo).
+                categoria: "Confirmação de agendamento",
+                agendamentoId: { in: confirmacoesAmanha.map((item) => item.id) },
+                createdAt: { gte: new Date(inicioHoje.getTime() - 3 * 24 * 60 * 60 * 1000) },
+              },
             ],
           },
           select: { categoria: true, clienteId: true, agendamentoId: true },
@@ -497,6 +504,11 @@ export default async function Home() {
   );
   const posEnviado = new Set(
     enviadasDashboard.filter((item) => item.categoria === "Pós-atendimento").map((item) => item.agendamentoId),
+  );
+  const confirmacaoEnviada = new Set(
+    enviadasDashboard
+      .filter((item) => item.categoria === "Confirmação de agendamento")
+      .map((item) => item.agendamentoId),
   );
 
   const produtosCriticos = produtosAtivos
@@ -706,6 +718,9 @@ export default async function Home() {
 
   const confirmacoes = confirmacoesAmanha.map((agendamento) => ({
     id: agendamento.id,
+    clienteId: agendamento.cliente.id,
+    telefone: agendamento.cliente.whatsapp || agendamento.cliente.telefone || null,
+    enviada: confirmacaoEnviada.has(agendamento.id),
     cliente: agendamento.cliente.nome,
     procedimento: formatarProcedimentoAgendamento(agendamento),
     horario: horarioConfirmacao(agendamento.data),
