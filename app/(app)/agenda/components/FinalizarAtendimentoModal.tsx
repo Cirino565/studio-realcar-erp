@@ -203,8 +203,8 @@ export default function FinalizarAtendimentoModal({
   onFinalizado,
 }: Props) {
   const [procedimentoRealizado, setProcedimentoRealizado] = useState("");
-  // Sessao de pacote: undefined = escolha automatica; null = nao e do pacote.
-  const [sessaoPacoteEscolha, setSessaoPacoteEscolha] = useState<number | null | undefined>(undefined);
+  // Sessoes de pacote: undefined = escolha automatica; [] = nao e de pacote.
+  const [sessaoPacoteEscolha, setSessaoPacoteEscolha] = useState<number[] | undefined>(undefined);
   const [pacoteRegistrado, setPacoteRegistrado] = useState<{
     procedimentoId: number | null;
     descricao: string;
@@ -458,13 +458,21 @@ export default function FinalizarAtendimentoModal({
   const pacotesComSessao = pacotesDaCliente.filter(
     (pacote) => (pacote.sessoes ?? 0) > (pacote.sessoesFeitas ?? 0),
   );
-  // Automatico: um pacote so com sessoes e a sessao sem cobranca (retorno ou R$ 0).
-  const sessaoPacoteId =
+  // Automatico so quando ha um pacote e a sessao e sem cobranca (retorno ou
+  // R$ 0). Com dois ou mais, quem atende toca em cada um que fez hoje.
+  const sessaoPacoteIds: number[] =
     sessaoPacoteEscolha !== undefined
       ? sessaoPacoteEscolha
       : pacotesComSessao.length === 1 && (atendimentoRetorno || valorServico <= 0)
-        ? pacotesComSessao[0].id
-        : null;
+        ? [pacotesComSessao[0].id]
+        : [];
+  function alternarSessaoPacote(id: number) {
+    setSessaoPacoteEscolha(
+      sessaoPacoteIds.includes(id)
+        ? sessaoPacoteIds.filter((item) => item !== id)
+        : [...sessaoPacoteIds, id],
+    );
+  }
   const procedimentoFinal =
     procedimentoRealizado.trim() || currentAppointment.procedimento || "Atendimento";
 
@@ -659,7 +667,7 @@ export default function FinalizarAtendimentoModal({
           formaPagamentoConfigId: formaConfig?.id || null,
           statusPagamento,
           evolucao: evolucaoClinica,
-          pacoteSessaoId: sessaoPacoteId,
+          pacoteSessaoIds: sessaoPacoteIds,
         });
 
         onFinalizado?.({
@@ -1035,14 +1043,20 @@ export default function FinalizarAtendimentoModal({
                         <p className="text-xs font-bold text-violet-900">
                           Esta sessão é de pacote?
                         </p>
+                        {pacotesComSessao.length > 1 ? (
+                          <p className="mt-0.5 text-[11px] text-violet-800">
+                            Toque em cada pacote feito hoje (pode ser mais de um).
+                          </p>
+                        ) : null}
                         <div className="mt-2 flex flex-col gap-1.5">
                           {pacotesComSessao.map((pacote) => {
-                            const escolhido = sessaoPacoteId === pacote.id;
+                            const escolhido = sessaoPacoteIds.includes(pacote.id);
                             return (
                               <button
                                 key={pacote.id}
                                 type="button"
-                                onClick={() => setSessaoPacoteEscolha(pacote.id)}
+                                aria-pressed={escolhido}
+                                onClick={() => alternarSessaoPacote(pacote.id)}
                                 className={`flex min-h-10 items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-[11px] font-semibold transition ${
                                   escolhido
                                     ? "border-violet-500 bg-violet-600 text-white"
@@ -1063,14 +1077,14 @@ export default function FinalizarAtendimentoModal({
                           })}
                           <button
                             type="button"
-                            onClick={() => setSessaoPacoteEscolha(null)}
+                            onClick={() => setSessaoPacoteEscolha([])}
                             className={`min-h-9 rounded-lg border px-3 text-[11px] font-semibold transition ${
-                              sessaoPacoteId === null
+                              sessaoPacoteIds.length === 0
                                 ? "border-slate-500 bg-slate-200 text-slate-900"
                                 : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                             }`}
                           >
-                            {sessaoPacoteId === null ? "✓ " : ""}Não é sessão de pacote
+                            {sessaoPacoteIds.length === 0 ? "✓ " : ""}Não é sessão de pacote
                           </button>
                         </div>
                       </div>

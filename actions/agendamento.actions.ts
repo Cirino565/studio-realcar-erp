@@ -1802,6 +1802,8 @@ export type FinalizarAtendimentoInput = {
   permitirEstoqueNegativo?: boolean;
   /** Esta sessao faz parte deste pacote: conta +1 sessao feita. */
   pacoteSessaoId?: number | null;
+  /** Varios pacotes feitos no mesmo dia (ex.: axila e virilha): +1 em cada. */
+  pacoteSessaoIds?: number[];
   formaPagamento: string;
   formaPagamentoConfigId?: number | null;
   statusPagamento: string;
@@ -2176,9 +2178,16 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
         : null,
     });
 
-    // Sessao de pacote: conta mais uma sessao feita (so pacote desta cliente).
-    const pacoteSessaoId = Math.trunc(Number(dados.pacoteSessaoId) || 0);
-    if (pacoteSessaoId > 0) {
+    // Sessao de pacote: conta mais uma sessao feita em cada pacote escolhido
+    // (so pacotes desta cliente, cada um uma vez).
+    const idsSessao = Array.from(
+      new Set(
+        [...(dados.pacoteSessaoIds ?? []), dados.pacoteSessaoId]
+          .map((id) => Math.trunc(Number(id) || 0))
+          .filter((id) => id > 0),
+      ),
+    ).slice(0, 10);
+    for (const pacoteSessaoId of idsSessao) {
       const pacoteSessao = await tx.pacoteCliente.findFirst({
         where: { id: pacoteSessaoId, clienteId: agendamento.clienteId, status: { not: "Cancelado" } },
         select: { id: true, sessoes: true, sessoesFeitas: true },
