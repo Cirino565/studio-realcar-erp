@@ -272,14 +272,20 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
     // Pacotes com saldo em aberto, para avisar na finalizacao quando a
     // cliente ja tem credito pago. Sao poucos registros por natureza (so os
     // que ainda nao foram quitados), entao nao pesa na agenda.
+    // Tambem os pacotes ja pagos que ainda tem sessoes por fazer.
     prisma.pacoteCliente.findMany({
-      where: { status: "Aberto" },
+      where: {
+        OR: [{ status: "Aberto" }, { status: "Quitado", sessoes: { not: null } }],
+      },
       select: {
         id: true,
         clienteId: true,
         descricao: true,
         valorTotal: true,
         valorPago: true,
+        sessoes: true,
+        sessoesFeitas: true,
+        status: true,
       },
     }),
   ]);
@@ -407,7 +413,11 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
         formasPagamento={formasPagamento}
         remarcacoesPendentes={remarcacoesPendentes}
         preReservas={preReservas}
-        pacotesAbertos={pacotesAbertos}
+        pacotesAbertos={pacotesAbertos.filter(
+          (pacote) =>
+            pacote.status === "Aberto" ||
+            (pacote.sessoes !== null && pacote.sessoesFeitas < pacote.sessoes),
+        )}
         podeAutorizarEstoqueNegativo={usuarioAdmin}
         areaPadraoAgendamento={areaPadraoAgendamento}
         initialDate={toDateInput(dataSelecionada)}

@@ -31,12 +31,14 @@ import {
   excluirRegistroClinico,
 } from "@/actions/cliente-clinico.actions";
 import {
+  ajustarSessaoPacote,
   cancelarPacoteCliente,
   criarPacoteCliente,
   editarPacoteCliente,
   excluirPacoteCliente,
   registrarPagamentoPacote,
 } from "@/actions/pacote.actions";
+import PacoteProcedimentoCampos from "./PacoteProcedimentoCampos";
 import RegistrarEvolucaoPendenteModal from "@/components/atendimento/RegistrarEvolucaoPendenteModal";
 import { Button } from "@/components/ui/button";
 import AnamneseMobileForm from "./AnamneseMobileForm";
@@ -1500,22 +1502,11 @@ export function ClienteClinicoTabs({
               >
                 <input type="hidden" name="clienteId" value={data.id} />
 
-                <Field
-                  label="Descrição do pacote"
-                  name="descricao"
-                  required
-                  placeholder="Ex: Pacote Criolipólise 5 sessões"
-                />
+                {/* Escolher o procedimento preenche nome, valor e sessoes. */}
+                <PacoteProcedimentoCampos procedimentos={data.procedimentosPacote ?? []} />
 
                 <div className="grid grid-cols-2 gap-3">
-                  <Field
-                    label="Valor total"
-                    name="valorTotal"
-                    type="text"
-                    required
-                    placeholder="0,00"
-                  />
-
+                  <Field label="Sessões já feitas" name="sessoesFeitas" type="number" placeholder="0" />
                   <Field
                     label="Adiantado agora"
                     name="valorAdiantado"
@@ -1523,6 +1514,18 @@ export function ClienteClinicoTabs({
                     placeholder="0,00"
                   />
                 </div>
+
+                {/* Quando a cliente pagou o pacote dentro do atendimento (o
+                    valor ja entrou no caixa pela finalizacao). */}
+                <label className="flex items-start gap-2 rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs text-violet-900 dark:border-violet-400/30 dark:bg-violet-500/10 dark:text-violet-100">
+                  <input type="checkbox" name="pagoNoAtendimento" className="mt-0.5 size-4 shrink-0 accent-violet-600" />
+                  <span>
+                    <strong className="block">Já foi pago no atendimento</strong>
+                    O valor já entrou no caixa quando o atendimento foi finalizado.
+                    O pacote fica registrado sem lançar dinheiro de novo (o
+                    &quot;Adiantado agora&quot; é ignorado).
+                  </span>
+                </label>
 
                 <div className="grid grid-cols-2 gap-3">
                   <label className="space-y-1.5">
@@ -1637,6 +1640,54 @@ export function ClienteClinicoTabs({
                           </p>
                         ) : null}
 
+                        {pacote.pagoNoAtendimento ? (
+                          <p className="mt-1 text-xs font-semibold text-violet-700 dark:text-violet-300">
+                            Pago no atendimento (o valor já está no caixa).
+                          </p>
+                        ) : null}
+
+                        {pacote.sessoes && !cancelado ? (
+                          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-violet-200 bg-white/70 px-3 py-2 dark:border-violet-400/20 dark:bg-white/[0.04]">
+                            <span className="text-sm font-bold text-slate-900 dark:text-white">
+                              Sessões: {pacote.sessoesFeitas} de {pacote.sessoes} feitas
+                            </span>
+                            <span
+                              className={`text-xs font-semibold ${
+                                pacote.sessoesFeitas >= pacote.sessoes
+                                  ? "text-emerald-700 dark:text-emerald-300"
+                                  : "text-violet-700 dark:text-violet-300"
+                              }`}
+                            >
+                              {pacote.sessoesFeitas >= pacote.sessoes
+                                ? "· todas feitas"
+                                : `· faltam ${pacote.sessoes - pacote.sessoesFeitas}`}
+                            </span>
+                            <form action={ajustarSessaoPacote} className="ml-auto flex gap-1.5">
+                              <input type="hidden" name="pacoteId" value={pacote.id} />
+                              <button
+                                type="submit"
+                                name="passo"
+                                value="-1"
+                                disabled={pacote.sessoesFeitas <= 0}
+                                aria-label="Tirar uma sessão"
+                                className="size-8 rounded-lg border border-slate-200 bg-white text-sm font-bold text-slate-700 disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
+                              >
+                                −
+                              </button>
+                              <button
+                                type="submit"
+                                name="passo"
+                                value="1"
+                                disabled={pacote.sessoesFeitas >= pacote.sessoes}
+                                aria-label="Marcar mais uma sessão feita"
+                                className="size-8 rounded-lg bg-violet-600 text-sm font-bold text-white disabled:opacity-40"
+                              >
+                                +
+                              </button>
+                            </form>
+                          </div>
+                        ) : null}
+
                         {pacote.observacoes ? (
                           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{pacote.observacoes}</p>
                         ) : null}
@@ -1734,6 +1785,10 @@ export function ClienteClinicoTabs({
                                 maximumFractionDigits: 2,
                               })}
                             />
+                            <div className="grid grid-cols-2 gap-3">
+                              <Field label="Nº de sessões" name="sessoes" type="number" defaultValue={pacote.sessoes ?? ""} />
+                              <Field label="Sessões feitas" name="sessoesFeitas" type="number" defaultValue={pacote.sessoesFeitas} />
+                            </div>
 
                             <div className="flex gap-2">
                               <BotaoSalvar className="flex-1" salvandoLabel="Salvando...">
@@ -1741,7 +1796,7 @@ export function ClienteClinicoTabs({
                               </BotaoSalvar>
                               <ExcluirPacoteButton
                                 pacoteId={pacote.id}
-                                valorPago={pacote.valorPago}
+                                valorPago={pacote.pagoNoAtendimento ? 0 : pacote.valorPago}
                               />
                             </div>
                           </form>

@@ -135,6 +135,8 @@ export function FecharPacoteCard({
   const [descricao, setDescricao] = useState("");
   const [valorTotal, setValorTotal] = useState("");
   const [valorSinal, setValorSinal] = useState("");
+  const [sessoes, setSessoes] = useState("");
+  const [contarHoje, setContarHoje] = useState(true);
   const [formaId, setFormaId] = useState(() => formaInicial(formasPagamento));
   const [erro, setErro] = useState("");
   const [salvo, setSalvo] = useState<PacoteSalvoNaAgenda | null>(null);
@@ -242,6 +244,8 @@ export function FecharPacoteCard({
           valorTotal: paraNumero(valorTotal),
           valorSinal: paraNumero(valorSinal),
           formaPagamentoConfigId: formaId ? Number(formaId) : null,
+          sessoes: Math.trunc(paraNumero(sessoes)) || null,
+          contarSessaoDeHoje: contarHoje,
         });
         setSalvo(resultado);
         onPacoteRegistrado?.({
@@ -316,6 +320,12 @@ export function FecharPacoteCard({
               )}
               . O aviso aparece sempre que a cliente for atendida.
             </p>
+            {Math.trunc(paraNumero(sessoes)) > 0 ? (
+              <p className="mt-1 text-xs font-bold text-emerald-950 dark:text-emerald-50">
+                {Math.trunc(paraNumero(sessoes))} sessões
+                {contarHoje ? " · a de hoje já contou como a 1ª" : ""}.
+              </p>
+            ) : null}
             {procedimentoId && !agendadoPara ? (
               <p className="mt-1 text-xs font-bold text-emerald-950 dark:text-emerald-50">
                 Toque em &quot;Agendar próxima sessão&quot;: o procedimento já vai
@@ -439,6 +449,32 @@ export function FecharPacoteCard({
             className={campo}
           />
         </label>
+
+        <label className="block">
+          <span className={rotulo}>Nº de sessões</span>
+          <span className="block text-[11px] font-medium text-slate-500 dark:text-slate-400">
+            O sistema conta as sessões feitas.
+          </span>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={sessoes}
+            onChange={(event) => setSessoes(event.target.value.replace(/\D/g, "").slice(0, 3))}
+            placeholder="Ex.: 6"
+            className={campo}
+          />
+        </label>
+        {Math.trunc(paraNumero(sessoes)) > 0 ? (
+          <label className="flex items-center gap-2 self-end pb-2 text-xs font-bold text-slate-700 dark:text-slate-200">
+            <input
+              type="checkbox"
+              checked={contarHoje}
+              onChange={(event) => setContarHoje(event.target.checked)}
+              className="size-4 accent-amber-600"
+            />
+            A sessão de hoje já conta (1ª feita)
+          </label>
+        ) : null}
 
         {paraNumero(valorSinal) > 0 && formasPagamento.length > 0 ? (
           <label className="block sm:col-span-2">

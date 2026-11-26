@@ -1800,6 +1800,8 @@ export type FinalizarAtendimentoInput = {
   produtos?: VendaProdutoInput[];
   kits?: VendaKitInput[];
   permitirEstoqueNegativo?: boolean;
+  /** Esta sessao faz parte deste pacote: conta +1 sessao feita. */
+  pacoteSessaoId?: number | null;
   formaPagamento: string;
   formaPagamentoConfigId?: number | null;
   statusPagamento: string;
@@ -2173,6 +2175,21 @@ export async function finalizarAtendimento(dados: FinalizarAtendimentoInput) {
         ? usuarioAtual.email
         : null,
     });
+
+    // Sessao de pacote: conta mais uma sessao feita (so pacote desta cliente).
+    const pacoteSessaoId = Math.trunc(Number(dados.pacoteSessaoId) || 0);
+    if (pacoteSessaoId > 0) {
+      const pacoteSessao = await tx.pacoteCliente.findFirst({
+        where: { id: pacoteSessaoId, clienteId: agendamento.clienteId, status: { not: "Cancelado" } },
+        select: { id: true, sessoes: true, sessoesFeitas: true },
+      });
+      if (pacoteSessao?.sessoes && pacoteSessao.sessoesFeitas < pacoteSessao.sessoes) {
+        await tx.pacoteCliente.update({
+          where: { id: pacoteSessao.id },
+          data: { sessoesFeitas: { increment: 1 } },
+        });
+      }
+    }
 
     await tx.cliente.update({
       where: { id: agendamento.clienteId },

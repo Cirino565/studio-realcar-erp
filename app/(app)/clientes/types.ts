@@ -105,6 +105,8 @@ export type ClienteClinicoData = {
   anamneseRespostas: ClienteAnamneseRespostaData[];
   driveConfigurado: boolean;
   pacotes: ClientePacoteData[];
+  /** Procedimentos ativos para escolher ao criar pacote (os de "Pacote" primeiro). */
+  procedimentosPacote?: { id: number; nome: string; valorPadrao: number }[];
   formasPagamento: ClienteFormaPagamentoOption[];
   contas: ClienteContaFinanceiraOption[];
 };
@@ -117,6 +119,11 @@ export type ClientePacoteData = {
   status: string;
   observacoes: string | null;
   createdAt: string;
+  /** Numero de sessoes (null = sem controle) e quantas ja foram feitas. */
+  sessoes: number | null;
+  sessoesFeitas: number;
+  /** O dinheiro entrou pela venda do atendimento, nao pelo pacote. */
+  pagoNoAtendimento: boolean;
 };
 
 export type ClienteFormaPagamentoOption = {

@@ -147,7 +147,7 @@ export default async function ClientePage({
     );
   }
 
-  const [cliente, anamneseModelos, pacotes, formasPagamento, contas, faltasEDesmarques, atendidosTotal] =
+  const [cliente, anamneseModelos, pacotes, formasPagamento, contas, faltasEDesmarques, atendidosTotal, procedimentosPacote] =
     await Promise.all([
       getClienteClinico(clienteId),
       prisma.anamneseModelo.findMany({
@@ -185,6 +185,12 @@ export default async function ClientePage({
         take: 40,
       }),
       prisma.agendamento.count({ where: { clienteId, status: "Atendido" } }),
+      // Para o formulario de pacote: escolher o procedimento em vez de digitar.
+      prisma.procedimentoServico.findMany({
+        where: { status: "Ativo" },
+        orderBy: [{ ordem: "asc" }, { nome: "asc" }],
+        select: { id: true, nome: true, valorPadrao: true },
+      }),
     ]);
 
   if (!cliente) {
@@ -360,6 +366,9 @@ export default async function ClientePage({
       status: pacote.status,
       observacoes: pacote.observacoes,
       createdAt: toIsoString(pacote.createdAt),
+      sessoes: pacote.sessoes,
+      sessoesFeitas: pacote.sessoesFeitas,
+      pagoNoAtendimento: pacote.pagoNoAtendimento,
     })),
     formasPagamento: formasPagamento.map((forma) => ({
       id: forma.id,
@@ -370,6 +379,7 @@ export default async function ClientePage({
       nome: conta.nome,
       principal: conta.principal,
     })),
+    procedimentosPacote,
   };
 
   return (

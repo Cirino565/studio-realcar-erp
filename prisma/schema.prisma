@@ -599,6 +599,11 @@ model PacoteCliente {
   valorPago   Float    @default(0)
   status      String   @default("Aberto") // Aberto | Quitado | Cancelado
   observacoes String?
+  // Quantas sessoes o pacote tem (vazio = sem controle de sessoes) e quantas ja foram feitas.
+  sessoes       Int?
+  sessoesFeitas Int     @default(0)
+  // O dinheiro entrou pela venda do atendimento (nao por lancamento do pacote).
+  pagoNoAtendimento Boolean @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

@@ -23,6 +23,12 @@ function getNumber(formData: FormData, key: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+// Numero de sessoes: vazio ou zero = sem controle de sessoes.
+function getSessoes(formData: FormData, key: string) {
+  const numero = Math.trunc(Number(String(formData.get(key) ?? "").trim() || 0));
+  return Number.isFinite(numero) && numero > 0 ? Math.min(numero, 200) : null;
+}
+
 function getClienteId(formData: FormData) {
   const clienteId = Number(formData.get("clienteId"));
 
@@ -56,6 +62,11 @@ export async function criarPacoteCliente(formData: FormData) {
   const contaFinanceiraId = Number(formData.get("contaFinanceiraId")) || null;
   const data = getDate(formData, "data");
   const observacoes = getString(formData, "observacoes");
+  const sessoes = getSessoes(formData, "sessoes");
+  const sessoesFeitas = Math.min(getSessoes(formData, "sessoesFeitas") ?? 0, sessoes ?? 0);
+  // Pacote que a cliente ja pagou dentro do atendimento (o dinheiro ja esta
+  // no caixa pela venda): registra o pacote sem lancar dinheiro de novo.
+  const pagoNoAtendimento = formData.get("pagoNoAtendimento") === "on";
 
   if (!descricao) {
     throw new Error("Informe uma descrição para o pacote (ex.: Pacote Criolipólise).");
@@ -69,7 +80,7 @@ export async function criarPacoteCliente(formData: FormData) {
     throw new Error("O valor adiantado não pode ser negativo.");
   }
 
-  if (valorAdiantado > valorTotal) {
+  if (!pagoNoAtendimento && valorAdiantado > valorTotal) {
     throw new Error("O valor adiantado não pode ser maior que o valor total do pacote.");
   }
 
@@ -79,12 +90,16 @@ export async function criarPacoteCliente(formData: FormData) {
         clienteId,
         descricao,
         valorTotal,
-        valorPago: 0,
+        valorPago: pagoNoAtendimento ? valorTotal : 0,
+        status: pagoNoAtendimento ? "Quitado" : "Aberto",
+        pagoNoAtendimento,
+        sessoes,
+        sessoesFeitas,
         observacoes,
       },
     });
 
-    if (valorAdiantado > 0) {
+    if (!pagoNoAtendimento && valorAdiantado > 0) {
       const contexto = await resolverContextoFinanceiroVenda(tx, {
         clienteId,
         formaPagamentoConfigId,
@@ -268,14 +283,17 @@ export async function editarPacoteCliente(formData: FormData) {
 
   const pacote = await prisma.pacoteCliente.findUnique({
     where: { id: pacoteId },
-    select: { id: true, clienteId: true, valorPago: true, status: true },
+    select: { id: true, clienteId: true, valorPago: true, status: true, pagoNoAtendimento: true },
   });
 
   if (!pacote) {
     throw new Error("Pacote não encontrado.");
   }
 
-  if (valorTotal < pacote.valorPago - 0.01) {
+  const sessoes = getSessoes(formData, "sessoes");
+  const sessoesFeitas = Math.min(getSessoes(formData, "sessoesFeitas") ?? 0, sessoes ?? 0);
+
+  if (!pacote.pagoNoAtendimento && valorTotal < pacote.valorPago - 0.01) {
     throw new Error(
       `O valor total não pode ser menor do que já foi pago (R$ ${pacote.valorPago.toFixed(2).replace(".", ",")}).`,
     );
@@ -286,10 +304,14 @@ export async function editarPacoteCliente(formData: FormData) {
     data: {
       descricao,
       valorTotal,
+      sessoes,
+      sessoesFeitas,
+      // Pago no atendimento: o valor pago acompanha o total (ja esta no caixa).
+      ...(pacote.pagoNoAtendimento ? { valorPago: valorTotal } : {}),
       status:
         pacote.status === "Cancelado"
           ? "Cancelado"
-          : pacote.valorPago >= valorTotal - 0.01
+          : pacote.pagoNoAtendimento || pacote.valorPago >= valorTotal - 0.01
             ? "Quitado"
             : "Aberto",
     },
@@ -299,6 +321,37 @@ export async function editarPacoteCliente(formData: FormData) {
   revalidatePath("/agenda");
   revalidatePath("/financeiro");
   revalidatePath("/gestao");
+}
+
+/**
+ * Marca (+1) ou desmarca (-1) uma sessao feita do pacote, direto na ficha.
+ * Usa a permissao da agenda: quem atende consegue corrigir a contagem.
+ */
+export async function ajustarSessaoPacote(formData: FormData) {
+  await requirePermission("agenda.gerenciar");
+
+  const pacoteId = Number(formData.get("pacoteId"));
+  const passo = Number(formData.get("passo")) < 0 ? -1 : 1;
+  if (!Number.isInteger(pacoteId) || pacoteId <= 0) {
+    throw new Error("Pacote inválido.");
+  }
+
+  const pacote = await prisma.pacoteCliente.findUnique({
+    where: { id: pacoteId },
+    select: { id: true, clienteId: true, sessoes: true, sessoesFeitas: true },
+  });
+  if (!pacote || !pacote.sessoes) {
+    throw new Error("Este pacote não tem número de sessões.");
+  }
+
+  const novo = Math.max(0, Math.min(pacote.sessoes, pacote.sessoesFeitas + passo));
+  await prisma.pacoteCliente.update({
+    where: { id: pacote.id },
+    data: { sessoesFeitas: novo },
+  });
+
+  revalidatePath(`/clientes/${pacote.clienteId}`);
+  revalidatePath("/agenda");
 }
 
 /**

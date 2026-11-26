@@ -86,7 +86,7 @@ export default function ClienteProfileHeader({
       (total, procedimento) => total + procedimento.valor,
       0,
     ) +
-    data.pacotes.reduce((total, pacote) => total + pacote.valorPago, 0);
+    data.pacotes.reduce((total, pacote) => total + (pacote.pagoNoAtendimento ? 0 : pacote.valorPago), 0);
 
   // Atendimentos por dia (procedimentos + produtos comprados no mesmo dia),
   // do mais recente para o mais antigo.

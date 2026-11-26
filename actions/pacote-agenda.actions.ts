@@ -31,6 +31,10 @@ export async function fecharPacoteNaAgenda(dados: {
   valorTotal: number;
   valorSinal: number;
   formaPagamentoConfigId?: number | null;
+  /** Quantas sessoes o pacote tem (vazio = sem controle). */
+  sessoes?: number | null;
+  /** A sessao de hoje (ja finalizada) conta como feita. */
+  contarSessaoDeHoje?: boolean;
 }): Promise<PacoteSalvoNaAgenda> {
   await requirePermission("agenda.gerenciar");
 
@@ -38,6 +42,9 @@ export async function fecharPacoteNaAgenda(dados: {
   const descricao = String(dados.descricao || "").trim();
   const valorTotal = dinheiro(dados.valorTotal);
   const valorSinal = dinheiro(dados.valorSinal);
+  const sessoesNumero = Math.trunc(Number(dados.sessoes) || 0);
+  const sessoes = sessoesNumero > 0 ? Math.min(sessoesNumero, 200) : null;
+  const sessoesFeitas = sessoes && dados.contarSessaoDeHoje ? 1 : 0;
 
   if (!Number.isInteger(clienteId) || clienteId <= 0) {
     throw new Error("Cliente inválido.");
@@ -66,7 +73,7 @@ export async function fecharPacoteNaAgenda(dados: {
     if (!cliente) throw new Error("Cliente não encontrada.");
 
     const pacote = await tx.pacoteCliente.create({
-      data: { clienteId, descricao, valorTotal, valorPago: 0 },
+      data: { clienteId, descricao, valorTotal, valorPago: 0, sessoes, sessoesFeitas },
     });
 
     if (valorSinal <= 0) {
