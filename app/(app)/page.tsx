@@ -22,6 +22,7 @@ import {
   PackageSearch,
   RefreshCw,
   Sparkles,
+  Star,
   Users,
   WalletCards,
 } from "lucide-react";
@@ -31,6 +32,8 @@ import CentralDoDiaClient from "@/components/dashboard/CentralDoDiaClient";
 import EvolucoesPendentesClient from "@/components/dashboard/EvolucoesPendentesClient";
 import FilaComercialClient from "@/components/dashboard/FilaComercialClient";
 import ReativacaoClient from "@/components/dashboard/ReativacaoClient";
+import PedirAvaliacaoClient from "@/components/dashboard/PedirAvaliacaoClient";
+import { CATEGORIA_AVALIACAO_GOOGLE } from "@/lib/avaliacao-google";
 import { WhatsAppLink } from "@/components/ui/whatsapp-link";
 import { WhatsAppEnviado } from "@/components/ui/whatsapp-enviado";
 import { lerProcedimentosExtras, nomesParaMensagem } from "@/lib/procedimentos-extras";
@@ -224,6 +227,25 @@ export default async function Home() {
   // continua aparecendo no dia do atendimento, caso ainda não tenha
   // confirmado.
   const limiteAvaliacoesProximas = new Date(inicioHoje.getTime() + 1 * UM_DIA_MS);
+
+  // Pedir avaliacao no Google: atendidas de ontem para tras (ate 7 dias, para
+  // nao perder quem foi atendida no sabado), com telefone e que ainda nao
+  // receberam o pedido. Roda junto com as outras consultas.
+  const pedirAvaliacaoConsulta = prisma.agendamento.findMany({
+    where: {
+      data: { gte: new Date(inicioHoje.getTime() - 7 * UM_DIA_MS), lt: inicioHoje },
+      status: "Atendido",
+      cliente: { comunicacoes: { none: { categoria: CATEGORIA_AVALIACAO_GOOGLE } } },
+    },
+    select: {
+      id: true,
+      data: true,
+      procedimento: true,
+      cliente: { select: { id: true, nome: true, whatsapp: true, telefone: true } },
+    },
+    orderBy: { data: "desc" },
+    take: 60,
+  });
 
   const [
     agendaHoje,
@@ -438,6 +460,19 @@ export default async function Home() {
       select: { nome: true },
     }),
   ]);
+
+  // Uma linha por cliente (o atendimento mais recente), so com telefone de verdade.
+  const pedirAvaliacao = (await pedirAvaliacaoConsulta)
+    .filter((item) => (item.cliente.whatsapp || item.cliente.telefone || "").replace(/\D/g, "").length >= 8)
+    .filter((item, indice, lista) => lista.findIndex((outro) => outro.cliente.id === item.cliente.id) === indice)
+    .slice(0, 30)
+    .map((item) => ({
+      agendamentoId: item.id,
+      clienteId: item.cliente.id,
+      nome: item.cliente.nome,
+      procedimento: item.procedimento || "Atendimento",
+      quando: item.data >= inicioOntem ? "ontem" : formatarDataCurta(item.data),
+    }));
 
   const clientesEmEspera = await prisma.cliente.findMany({
     where: {
@@ -1151,6 +1186,18 @@ export default async function Home() {
             podeGerenciarAgenda={podeGerenciarAgenda}
           />
         </div>
+      </section>
+
+      <section id="pedir-avaliacao" className="premium-card p-4 sm:p-5">
+        <div className="mb-3 flex items-center gap-2">
+          <Star className="size-5 text-amber-500" />
+          <h2 className="text-lg font-bold text-slate-950">Pedir avaliação hoje</h2>
+        </div>
+        <p className="-mt-2 mb-3 text-sm text-slate-500">
+          Clientes atendidas ontem (e dias anteriores ainda sem pedido). Copie a mensagem, mande no
+          WhatsApp e toque em &quot;Já pedi&quot;.
+        </p>
+        <PedirAvaliacaoClient itens={pedirAvaliacao} />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-3">
