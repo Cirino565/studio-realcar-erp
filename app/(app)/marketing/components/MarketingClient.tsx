@@ -1944,11 +1944,11 @@ function PipelineColumn({
             </Link>
           ) : null}
         </div>
-      ) : (
-        <div className="mb-4 rounded-2xl border border-white/[0.08] bg-black/10 px-3 py-2 text-xs text-slate-400">Valor previsto: <strong className="text-slate-100">{formatarMoeda(total)}</strong></div>
-      )}
+      ) : total > 0 ? (
+        <div className="mb-3 rounded-2xl border border-white/[0.08] bg-black/10 px-3 py-2 text-xs text-slate-400">Valor previsto: <strong className="text-slate-100">{formatarMoeda(total)}</strong></div>
+      ) : null}
 
-      <div className={encerrada ? "space-y-1.5" : "space-y-3"}>
+      <div className={encerrada ? "space-y-1.5" : "space-y-2"}>
         {daVisao.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-white/[0.12] p-4 text-center text-xs text-slate-500">Nenhum lead nesta etapa.</div>
         ) : encerrada ? visiveis.map((lead) => (
@@ -2103,43 +2103,52 @@ function LeadCard({
   const retornoHoje =
     Boolean(lead.proximoContatoEm) &&
     dataInput(lead.proximoContatoEm) === hojeSaoPauloInput();
+  const [maisAberto, setMaisAberto] = useState(false);
 
+  const precisaVerificar = Boolean(lead.codigoAtendimento) && lead.chamouWhatsapp === "A verificar";
+
+  // Cartao compacto: o essencial a vista (nome, telefone, retorno/agenda e
+  // os botoes do dia a dia). Etapa, "Chamou no WhatsApp" ja respondido e
+  // Converter ficam em "Mais", para a coluna nao ficar gigante.
   return (
-    <article className="rounded-3xl border border-white/[0.10] bg-[#20283b]/88 p-4 shadow-lg shadow-black/10">
+    <article className="rounded-2xl border border-white/[0.10] bg-[#20283b]/88 p-3 shadow-sm shadow-black/10">
       <button type="button" onClick={() => onDetails(lead)} className="w-full text-left">
-        <div className="flex items-start gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-sm font-bold text-white">{getInitials(lead.nome)}</div>
+        <div className="flex items-start gap-2.5">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-xs font-bold text-white">{getInitials(lead.nome)}</div>
           <div className="min-w-0 flex-1">
-            <h3 className="truncate font-semibold text-white">{lead.nome}</h3>
-            <p className="mt-1 truncate text-xs text-slate-400">{lead.interesse || "Interesse não informado"}</p>
+            <div className="flex items-baseline justify-between gap-2">
+              <h3 className="truncate text-sm font-semibold text-white">{lead.nome}</h3>
+              {lead.valorPrevisto > 0 ? (
+                <strong className="shrink-0 text-xs text-slate-100">{formatarMoeda(lead.valorPrevisto)}</strong>
+              ) : null}
+            </div>
+            <p className="truncate text-xs text-slate-400">{lead.interesse || "Interesse não informado"}</p>
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-slate-500">
+              {lead.telefone ? (
+                <span className="inline-flex items-center gap-1 text-slate-300">
+                  <Phone className="size-3" />
+                  {lead.telefone}
+                </span>
+              ) : null}
+              <span
+                className="min-w-0 truncate"
+                title={lead.campanha && !lead.cliquePago ? "Caiu na página da campanha, mas veio de outra origem: não conta nos números da campanha paga." : undefined}
+              >
+                {lead.campanha ? lead.campanha.nome : getOrigemLabel(lead.origem)}
+              </span>
+              {lead.codigoAtendimento ? (
+                <span className="inline-flex items-center gap-0.5 font-mono text-[10px] tracking-tight text-slate-500"><Hash className="size-3" />{lead.codigoAtendimento}</span>
+              ) : null}
+            </p>
           </div>
-          {atrasado ? <span title="Follow-up pendente" className="rounded-lg bg-amber-400/15 p-1.5 text-amber-200"><Clock3 className="size-3.5" /></span> : null}
         </div>
       </button>
 
-      <div className="mt-4 space-y-2 text-xs text-slate-400">
-        <div className="flex items-center justify-between gap-3">
-          <span className="truncate" title={lead.campanha && !lead.cliquePago ? "Caiu na página da campanha, mas veio de outra origem: não conta nos números da campanha paga." : undefined}>
-            {lead.campanha ? (
-              <>
-                {lead.campanha.nome}{" "}
-                <span className="text-slate-500">
-                  · origem: {getOrigemLabel(lead.origem)}
-                  {lead.cliquePago ? "" : " (só pela página)"}
-                </span>
-              </>
-            ) : (
-              getOrigemLabel(lead.origem)
-            )}
-          </span>
-          <strong className="shrink-0 text-slate-100">{formatarMoeda(lead.valorPrevisto)}</strong>
-        </div>
-        {lead.telefone ? <div className="flex items-center gap-2"><Phone className="size-3.5 text-slate-500" /><span>{lead.telefone}</span></div> : null}
-
+      <div className="mt-2 space-y-1.5 text-xs">
         {lead.proximoContatoEm &&
         (lead.etapa === "Novo" || lead.etapa === "Aguardando resposta") ? (
           <div
-            className={`flex items-center gap-2 font-semibold ${
+            className={`flex items-center gap-1.5 font-semibold ${
               atrasado
                 ? "text-rose-200"
                 : retornoHoje
@@ -2155,80 +2164,39 @@ function LeadCard({
                   ? "Retorno hoje"
                   : `Retorno ${formatarData(lead.proximoContatoEm)}`}
             </span>
+            {tentativasSemResposta > 0 && isLeadAberto(lead) ? (
+              <span className={tentativasSemResposta >= 3 ? "text-rose-200" : "font-medium text-slate-400"}>
+                · {tentativasSemResposta} sem resposta
+              </span>
+            ) : null}
           </div>
-        ) : null}
-
-        {tentativasSemResposta > 0 && isLeadAberto(lead) ? (
-          <div
-            className={`rounded-xl border px-2.5 py-2 font-semibold ${
-              tentativasSemResposta >= 3
-                ? "border-rose-300/20 bg-rose-400/10 text-rose-200"
-                : "border-white/[0.08] bg-white/[0.04] text-slate-300"
-            }`}
-          >
+        ) : tentativasSemResposta > 0 && isLeadAberto(lead) ? (
+          <p className={`font-semibold ${tentativasSemResposta >= 3 ? "text-rose-200" : "text-slate-300"}`}>
             {tentativasSemResposta} tentativa(s) sem resposta
             {tentativasSemResposta >= 3 ? " · revisar encerramento" : ""}
-          </div>
+          </p>
         ) : null}
-        {/* So existe em lead que veio de clique de anuncio. Visivel direto
-            no cartao para nao precisar abrir Detalhes um por um so pra
-            achar o codigo e cruzar com a planilha de rastreamento. */}
-        {lead.codigoAtendimento ? (
-          <div className="flex items-center gap-2">
-            <Hash className="size-3.5 text-slate-500" />
-            <span className="font-mono text-[11px] tracking-tight text-slate-300">
-              {lead.codigoAtendimento}
-            </span>
-          </div>
-        ) : null}
+
         {lead.agendamento ? (
-          <div className="rounded-xl border border-cyan-300/10 bg-cyan-400/8 px-2.5 py-2 text-cyan-100">
-            <div className="flex items-center justify-between gap-2">
-              <p className="font-semibold">
-                {formatarDataHora(lead.agendamento.data)}
-              </p>
-              <span className="rounded-full border border-cyan-300/15 bg-cyan-400/10 px-2 py-0.5 text-[10px] font-bold text-cyan-100">
-                {lead.agendamento.status}
+          <div className="flex items-center justify-between gap-2 rounded-xl border border-cyan-300/10 bg-cyan-400/8 px-2.5 py-1.5 text-cyan-100">
+            <p className="min-w-0 truncate">
+              <span className="font-semibold">{formatarDataHora(lead.agendamento.data)}</span>
+              <span className="text-[11px] text-cyan-900">
+                {" "}· {lead.agendamento.procedimento} · {lead.agendamento.profissional?.nome || "Profissional não informado"}
               </span>
-            </div>
-            <p className="mt-0.5 truncate text-[11px] text-cyan-900">
-              {lead.agendamento.procedimento} · {lead.agendamento.profissional?.nome || "Profissional não informado"}
             </p>
+            <span className="shrink-0 rounded-full border border-cyan-300/15 bg-cyan-400/10 px-2 py-0.5 text-[10px] font-bold text-cyan-100">
+              {lead.agendamento.status}
+            </span>
           </div>
         ) : null}
         {lead.receitaRastreada > 0 ? <p className="text-emerald-300">Receita rastreada: <strong>{formatarMoeda(lead.receitaRastreada)}</strong></p> : null}
       </div>
 
       {podeGerenciarMarketing ? (
-        <div className="mt-4 grid gap-2">
-          <select
-            value={currentEtapa}
-            onChange={(event) => {
-              const novaEtapa = event.target.value as LeadEtapa;
-
-              // Marcar "Convertido" aqui so movia o cartao de coluna, sem
-              // criar o cliente - e os dados ficavam presos no lead. Agora
-              // essa escolha dispara a conversao de verdade.
-              if (novaEtapa === "Convertido" && !lead.clienteId) {
-                onConvert(lead.id);
-                return;
-              }
-
-              onEtapaChange(lead.id, novaEtapa);
-            }}
-            disabled={isPending}
-            className="h-10 rounded-2xl border border-white/[0.10] bg-[#171d2d] px-3 text-xs font-medium text-slate-100 outline-none focus:border-violet-400/40"
-          >
-            {LEAD_ETAPAS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-          </select>
-
-          {/* So faz sentido perguntar isso para quem veio de clique de
-              anuncio - lead criado a mao ja teve conversa de verdade na
-              hora do cadastro.
-              Texto das opcoes curto de proposito: a primeira versao repetia
-              "no WhatsApp" em cada opcao e o texto nao cabia no cartao,
-              brigando com a setinha do menu. */}
-          {lead.codigoAtendimento ? (
+        <div className="mt-2.5 grid gap-2">
+          {/* "A verificar" pede acao: fica a vista. Ja respondido vai para "Mais". */}
+          {precisaVerificar ? (
             <label className="grid gap-1">
               <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
                 Chamou no WhatsApp?
@@ -2257,22 +2225,85 @@ function LeadCard({
             </label>
           ) : null}
 
-          <div className="grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => onMessage(lead)} className="rounded-2xl border border-emerald-300/15 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-400/15">WhatsApp</button>
-            <button type="button" onClick={() => onDetails(lead)} className="rounded-2xl border border-white/[0.10] bg-white/[0.06] px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-white/[0.10]">Detalhes</button>
+          <div className="flex gap-1.5">
+            <button type="button" onClick={() => onMessage(lead)} className="h-9 flex-1 rounded-xl border border-emerald-300/15 bg-emerald-400/10 px-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-400/15">WhatsApp</button>
             {podeGerenciarAgenda && isLeadAberto(lead) ? (
-              <button type="button" onClick={() => onSchedule(lead)} className="rounded-2xl border border-cyan-300/15 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-200 hover:bg-cyan-400/15">{lead.agendamento ? "Reagendar" : "Agendar"}</button>
+              <button type="button" onClick={() => onSchedule(lead)} className="h-9 flex-1 rounded-xl border border-cyan-300/15 bg-cyan-400/10 px-2 text-xs font-semibold text-cyan-200 hover:bg-cyan-400/15">{lead.agendamento ? "Reagendar" : "Agendar"}</button>
             ) : null}
-            {/* Enquanto o lead nao tiver cliente vinculado, o botao continua
-                disponivel - inclusive na coluna Convertido. Antes ele sumia
-                ali e o lead ficava sem saida, sem virar cliente. */}
-            {!lead.clienteId ? (
-              <button type="button" onClick={() => onConvert(lead.id)} disabled={isPending} className="rounded-2xl border border-violet-300/15 bg-violet-400/10 px-3 py-2 text-xs font-semibold text-violet-200 hover:bg-violet-400/15 disabled:opacity-50">Converter</button>
-            ) : null}
+            <button
+              type="button"
+              onClick={() => setMaisAberto((atual) => !atual)}
+              aria-expanded={maisAberto}
+              className="h-9 shrink-0 rounded-xl border border-white/[0.10] bg-white/[0.06] px-3 text-xs font-semibold text-slate-200 hover:bg-white/[0.10]"
+            >
+              {maisAberto ? "Menos" : "Mais"}
+            </button>
           </div>
+
+          {maisAberto ? (
+            <div className="grid gap-2 rounded-xl border border-white/[0.08] bg-black/10 p-2">
+              <select
+                value={currentEtapa}
+                onChange={(event) => {
+                  const novaEtapa = event.target.value as LeadEtapa;
+
+                  // Marcar "Convertido" aqui so movia o cartao de coluna, sem
+                  // criar o cliente - e os dados ficavam presos no lead. Agora
+                  // essa escolha dispara a conversao de verdade.
+                  if (novaEtapa === "Convertido" && !lead.clienteId) {
+                    onConvert(lead.id);
+                    return;
+                  }
+
+                  onEtapaChange(lead.id, novaEtapa);
+                }}
+                disabled={isPending}
+                className="h-10 rounded-2xl border border-white/[0.10] bg-[#171d2d] px-3 text-xs font-medium text-slate-100 outline-none focus:border-violet-400/40"
+              >
+                {LEAD_ETAPAS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+              </select>
+
+              {lead.codigoAtendimento && !precisaVerificar ? (
+            <label className="grid gap-1">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                Chamou no WhatsApp?
+              </span>
+              <select
+                value={lead.chamouWhatsapp}
+                onChange={(event) =>
+                  onChamouWhatsappChange(
+                    lead.id,
+                    event.target.value as "Chamou" | "Não chamou" | "A verificar",
+                  )
+                }
+                disabled={isPending}
+                className={`h-10 w-full rounded-2xl border pl-3 pr-2 text-xs font-medium outline-none focus:border-violet-400/40 ${
+                  lead.chamouWhatsapp === "Chamou"
+                    ? "border-emerald-300/20 bg-emerald-400/10 text-emerald-100"
+                    : lead.chamouWhatsapp === "Não chamou"
+                      ? "border-rose-300/20 bg-rose-400/10 text-rose-100"
+                      : "border-amber-300/20 bg-amber-400/10 text-amber-100"
+                }`}
+              >
+                <option value="A verificar">A verificar</option>
+                <option value="Chamou">✓ Chamou</option>
+                <option value="Não chamou">✕ Não chamou</option>
+              </select>
+            </label>
+              ) : null}
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => onDetails(lead)} className="h-9 rounded-xl border border-white/[0.10] bg-white/[0.06] px-3 text-xs font-semibold text-slate-200 hover:bg-white/[0.10]">Detalhes</button>
+                {/* Enquanto o lead nao tiver cliente vinculado, o botao continua
+                    disponivel - inclusive na coluna Convertido. */}
+                {!lead.clienteId ? (
+                  <button type="button" onClick={() => onConvert(lead.id)} disabled={isPending} className="h-9 rounded-xl border border-violet-300/15 bg-violet-400/10 px-3 text-xs font-semibold text-violet-200 hover:bg-violet-400/15 disabled:opacity-50">Converter</button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : (
-        <button type="button" onClick={() => onDetails(lead)} className="mt-4 w-full rounded-2xl border border-white/[0.10] bg-white/[0.06] px-3 py-2 text-xs font-semibold text-slate-200">Ver detalhes</button>
+        <button type="button" onClick={() => onDetails(lead)} className="mt-2.5 h-9 w-full rounded-xl border border-white/[0.10] bg-white/[0.06] px-3 text-xs font-semibold text-slate-200">Ver detalhes</button>
       )}
     </article>
   );
