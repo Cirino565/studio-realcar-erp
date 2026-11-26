@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { resolverContextoFinanceiroVenda } from "@/lib/financeiro";
 
 // Valor padrao do sinal de reserva. A recepcao pode trocar na hora de marcar.
-export const SINAL_PADRAO = 30;
+export const SINAL_PADRAO = 50;
 
 export const CATEGORIA_SINAL = "Sinal";
 

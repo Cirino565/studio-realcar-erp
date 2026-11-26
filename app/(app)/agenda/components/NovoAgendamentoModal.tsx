@@ -2049,7 +2049,7 @@ export default function NovoAgendamentoModal({
                   onChange={(event) => {
                     setSinalPago(event.target.checked);
                     if (event.target.checked && parseCurrency(valorSinal) <= 0) {
-                      setValorSinal("30,00");
+                      setValorSinal("50,00");
                     }
                   }}
                   className="size-5 shrink-0 accent-emerald-600"
@@ -2069,7 +2069,7 @@ export default function NovoAgendamentoModal({
                       inputMode="decimal"
                       value={valorSinal}
                       onChange={(event) => setValorSinal(event.target.value)}
-                      placeholder="30,00"
+                      placeholder="50,00"
                       className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-400 dark:border-white/10 dark:bg-white/[0.06] dark:text-white"
                     />
                   </label>

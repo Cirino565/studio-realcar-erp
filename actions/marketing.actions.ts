@@ -60,7 +60,7 @@ export type AgendarAvaliacaoLeadInput = {
   duracao: number;
   valor: number;
   sinalPago?: boolean;
-  // Valor do sinal (padrao R$ 30,00). Vai para o Financeiro.
+  // Valor do sinal (padrao R$ 50,00). Vai para o Financeiro.
   valorSinal?: number;
   permitirEncaixeSemIntervalo?: boolean;
 };

@@ -4170,7 +4170,7 @@ function AgendarAvaliacaoModal({
   const [duracao, setDuracao] = useState("30");
   const [valor, setValor] = useState("0");
   const [sinalPago, setSinalPago] = useState(false);
-  const [valorSinal, setValorSinal] = useState("30,00");
+  const [valorSinal, setValorSinal] = useState("50,00");
   // Encaixe sem intervalo sempre liberado (aparece marcado como "encaixe").
   const permitirEncaixeSemIntervalo = true;
   const [horarios, setHorarios] = useState<
@@ -4423,7 +4423,7 @@ function AgendarAvaliacaoModal({
               inputMode="decimal"
               value={valorSinal}
               onChange={(event) => setValorSinal(event.target.value)}
-              placeholder="30,00"
+              placeholder="50,00"
               className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-400 dark:border-white/10 dark:bg-white/[0.06] dark:text-white"
             />
             <span className="mt-1.5 block text-[11px] leading-4 text-slate-500 dark:text-slate-400">
