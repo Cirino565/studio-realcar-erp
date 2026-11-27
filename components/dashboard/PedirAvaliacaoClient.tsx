@@ -12,6 +12,8 @@ export type PedirAvaliacaoItem = {
   procedimento: string;
   /** "ontem" ou a data curta do atendimento. */
   quando: string;
+  /** false = horario ja passou, mas o atendimento ainda nao foi finalizado. */
+  finalizado?: boolean;
 };
 
 async function copiarTexto(texto: string) {
@@ -82,6 +84,11 @@ export default function PedirAvaliacaoClient({ itens }: { itens: PedirAvaliacaoI
             <p className="truncate text-xs text-slate-500">
               {item.procedimento} · {item.quando}
             </p>
+            {item.finalizado === false ? (
+              <p className="text-[11px] font-semibold text-amber-700">
+                Ainda não finalizado · confira se ela veio
+              </p>
+            ) : null}
           </div>
           <div className="flex w-full gap-2 sm:w-auto">
             <button

@@ -234,12 +234,15 @@ export default async function Home() {
   const pedirAvaliacaoConsulta = prisma.agendamento.findMany({
     where: {
       data: { gte: new Date(inicioHoje.getTime() - 7 * UM_DIA_MS), lt: inicioHoje },
-      status: "Atendido",
+      // Nao espera a finalizacao (as vezes leva dias): entra quem tinha
+      // horario e nao foi marcado como falta ou cancelado.
+      status: { in: ["Atendido", "Agendado", "Confirmado"] },
       cliente: { comunicacoes: { none: { categoria: CATEGORIA_AVALIACAO_GOOGLE } } },
     },
     select: {
       id: true,
       data: true,
+      status: true,
       procedimento: true,
       cliente: { select: { id: true, nome: true, whatsapp: true, telefone: true } },
     },
@@ -472,6 +475,7 @@ export default async function Home() {
       nome: item.cliente.nome,
       procedimento: item.procedimento || "Atendimento",
       quando: item.data >= inicioOntem ? "ontem" : formatarDataCurta(item.data),
+      finalizado: item.status === "Atendido",
     }));
 
   const clientesEmEspera = await prisma.cliente.findMany({
@@ -1194,8 +1198,8 @@ export default async function Home() {
           <h2 className="text-lg font-bold text-slate-950">Pedir avaliação hoje</h2>
         </div>
         <p className="-mt-2 mb-3 text-sm text-slate-500">
-          Clientes atendidas ontem (e dias anteriores ainda sem pedido). Copie a mensagem, mande no
-          WhatsApp e toque em &quot;Já pedi&quot;.
+          Clientes com horário ontem (e dias anteriores ainda sem pedido), mesmo antes de finalizar o
+          atendimento. Copie a mensagem, mande no WhatsApp e toque em &quot;Já pedi&quot;.
         </p>
         <PedirAvaliacaoClient itens={pedirAvaliacao} />
       </section>
