@@ -476,6 +476,7 @@ export default async function Home() {
       procedimento: item.procedimento || "Atendimento",
       quando: item.data >= inicioOntem ? "ontem" : formatarDataCurta(item.data),
       finalizado: item.status === "Atendido",
+      telefone: item.cliente.whatsapp || item.cliente.telefone || "",
     }));
 
   const clientesEmEspera = await prisma.cliente.findMany({
