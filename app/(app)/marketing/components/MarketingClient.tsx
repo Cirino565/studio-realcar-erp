@@ -2104,6 +2104,7 @@ function LeadCard({
     Boolean(lead.proximoContatoEm) &&
     dataInput(lead.proximoContatoEm) === hojeSaoPauloInput();
   const [maisAberto, setMaisAberto] = useState(false);
+  const [codigoCopiado, setCodigoCopiado] = useState(false);
 
   const precisaVerificar = Boolean(lead.codigoAtendimento) && lead.chamouWhatsapp === "A verificar";
 
@@ -2123,7 +2124,13 @@ function LeadCard({
               ) : null}
             </div>
             <p className="truncate text-xs text-slate-400">{lead.interesse || "Interesse não informado"}</p>
-            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-slate-500">
+          </div>
+        </div>
+      </button>
+      {/* Fora do botao: da para selecionar o telefone e copiar o codigo SR
+          sem abrir os Detalhes. */}
+      <div className="pl-[42px]">
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
               {lead.telefone ? (
                 <span className="inline-flex items-center gap-1 text-slate-300">
                   <Phone className="size-3" />
@@ -2137,12 +2144,32 @@ function LeadCard({
                 {lead.campanha ? lead.campanha.nome : getOrigemLabel(lead.origem)}
               </span>
               {lead.codigoAtendimento ? (
-                <span className="inline-flex items-center gap-0.5 font-mono text-[10px] tracking-tight text-slate-500"><Hash className="size-3" />{lead.codigoAtendimento}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const codigo = lead.codigoAtendimento ?? "";
+                    void navigator.clipboard
+                      ?.writeText(codigo)
+                      .then(() => {
+                        setCodigoCopiado(true);
+                        window.setTimeout(() => setCodigoCopiado(false), 1500);
+                      })
+                      .catch(() => undefined);
+                  }}
+                  title="Copiar o código"
+                  className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[10px] tracking-tight transition ${
+                    codigoCopiado
+                      ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-300"
+                      : "border-white/[0.10] bg-white/[0.04] text-slate-300 hover:bg-white/[0.10]"
+                  }`}
+                >
+                  {codigoCopiado ? <CheckCircle2 className="size-3" /> : <Hash className="size-3" />}
+                  {codigoCopiado ? "Copiado" : lead.codigoAtendimento}
+                  {codigoCopiado ? null : <Copy className="size-3 opacity-70" />}
+                </button>
               ) : null}
             </p>
-          </div>
-        </div>
-      </button>
+      </div>
 
       <div className="mt-2 space-y-1.5 text-xs">
         {lead.proximoContatoEm &&
