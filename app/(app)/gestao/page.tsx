@@ -9,6 +9,9 @@ import {
 } from "@/lib/gestao";
 
 import GestaoDashboard from "./components/GestaoDashboard";
+import AbasGestao from "./components/AbasGestao";
+import CompararMeses from "./components/meses/CompararMeses";
+import { obterComparacaoMeses } from "@/lib/comparar-meses";
 
 type GestaoPageProps = {
   searchParams?:
@@ -43,11 +46,24 @@ export default async function GestaoPage({ searchParams }: GestaoPageProps) {
   const inicio = getParam(params, "inicio");
   const fim = getParam(params, "fim");
 
+  // Aba "Mes a mes": so os numeros dos meses (nao carrega a leitura do periodo).
+  if (getParam(params, "aba") === "meses") {
+    const meses = await obterComparacaoMeses(12);
+    return (
+      <div className="min-w-0 space-y-4 pb-6">
+        <AbasGestao ativa="meses" />
+        <CompararMeses dados={meses} />
+      </div>
+    );
+  }
+
   const dados = await obterDadosGestao({ periodo, inicio, fim });
   const periodoResolvido = resolverPeriodoGestao({ periodo, inicio, fim });
 
   return (
     <div className="min-w-0 space-y-5 pb-4">
+      <AbasGestao ativa="periodo" />
+
       <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 lg:p-6">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,0.14),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(14,165,233,0.10),transparent_30%)]" />
 
